@@ -23,7 +23,7 @@ If a change would exceed the limit, split it into several PRs. Prefer stacked PR
 
 Stacked diffs are encouraged for larger work because they preserve review quality while still letting us move quickly.
 
-Use the standard workflow in `docs/writing/STACKED_DIFFS.md`. The GitHub-visible PR structure is the standard. Graphite CLI is the preferred helper when available, especially for coding agents, but plain Git is fine when it produces the same branch shape, PR titles, and PR descriptions.
+Use the standard workflow in `agent-guidance/writing/STACKED_DIFFS.md`. The GitHub-visible PR structure is the standard. Graphite CLI is the preferred helper when available, especially for coding agents, but plain Git is fine when it produces the same branch shape, PR titles, and PR descriptions.
 
 ## CI
 
@@ -105,5 +105,5 @@ Before requesting review:
 - Tests prove behavior where risk justifies them.
 - New dependencies are justified.
 - The PR description explains what changed and why.
-- Stacked PRs include the stack section described in `docs/writing/STACKED_DIFFS.md`.
+- Stacked PRs include the stack section described in `agent-guidance/writing/STACKED_DIFFS.md`.
 - Any AI-generated sections were read and edited by a human or explicitly called out.

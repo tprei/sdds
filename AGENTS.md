@@ -36,9 +36,11 @@ AI code must be easy for a human to audit.
 - Do not create broad abstractions before there is repeated pain.
 - Do not add dependencies without explaining why.
 - Do not generate styling blobs.
+- Do not create or version Markdown artifacts unless a human explicitly asks for them.
+- Do not create `docs/*` trees. Architecture and product decisions belong in `README.md` unless a human explicitly chooses another home.
 - Do not hide business rules in UI components, hooks, middleware, or database triggers.
 - Do not mix unrelated refactors into feature work.
-- Follow the writing guides in `docs/writing/WRITING_GO.md`, `docs/writing/WRITING_REACT_NATIVE.md`, `docs/writing/WRITING_TYPESCRIPT.md`, and `docs/writing/STACKED_DIFFS.md`.
+- Follow the writing guides in `agent-guidance/writing/WRITING_GO.md`, `agent-guidance/writing/WRITING_REACT_NATIVE.md`, `agent-guidance/writing/WRITING_TYPESCRIPT.md`, and `agent-guidance/writing/STACKED_DIFFS.md`.
 
 ## Domain-Driven Design
 
@@ -101,10 +103,10 @@ Tests should verify behavior, not implementation details. Prefer a few clear tes
 
 ## Stacked Diffs
 
-For large work, follow `docs/writing/STACKED_DIFFS.md`.
+For large work, follow `agent-guidance/writing/STACKED_DIFFS.md`.
 
 Use Graphite CLI for stack management when it is available. If it is unavailable, use plain Git. Either way, the output must be normal GitHub PRs with the standard stack section, position-prefixed titles, passing CI, and human review.
 
 ## Documentation
 
-Update `README.md` when architecture decisions change. Update `CONTRIBUTING.md` when workflow rules change. Keep docs direct and current; do not write aspirational architecture that the repo does not follow.
+Update `README.md` when architecture decisions change. Update `CONTRIBUTING.md` when workflow rules change. Keep guidance direct and current; do not write aspirational architecture that the repo does not follow.

@@ -4,6 +4,7 @@
   "private": true,
   "packageManager": "pnpm@11.5.2",
   "scripts": {
+    "check": "pnpm typecheck:tokens && pnpm typecheck:mobile && pnpm test:api",
     "dev:api": "go run ./services/api/cmd/api",
     "dev:mobile": "pnpm --filter @sdds/mobile dev",
     "test:api": "go test ./...",

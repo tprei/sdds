@@ -69,6 +69,18 @@ This PR adds the HTTP routes for creating, listing, and searching notes.
 
 When PR numbers do not exist yet, use branch names. Update the stack section after PRs are opened.
 
+## Agent Workflow
+
+Agents should check for Graphite before creating any stacked branches:
+
+```bash
+gt --version
+```
+
+If Graphite is available, use Graphite from the first branch onward. Do not create the stack with `git checkout -b` and then switch to Graphite at submit time; Graphite will not know the parent relationship for those plain Git branches until they are manually tracked.
+
+Use plain Git only when Graphite is unavailable, when the human explicitly prefers plain Git, or when Graphite is blocked and the human accepts the fallback.
+
 ## Plain Git Workflow
 
 Use this when Graphite is unavailable or the author prefers plain Git:
@@ -97,8 +109,11 @@ Use Graphite CLI as the preferred helper for agent-driven stacks and for humans 
 ```bash
 gt init
 gt create sdds/notes-domain
+# make the first focused change and commit it
 gt create sdds/notes-api
+# make the second focused change and commit it
 gt create sdds/notes-mobile-list
+# continue one reviewable branch at a time
 gt log --stack
 gt submit --cli --edit
 ```
@@ -106,6 +121,30 @@ gt submit --cli --edit
 Graphite helps create, restack, sync, and submit the branches. It does not replace the GitHub PR description. The GitHub-visible stack section is still required.
 
 Use `gt submit --cli --edit` so PR metadata can be written from the terminal instead of the Graphite dashboard.
+
+### Recovering A Plain Git Stack
+
+If branches were already created with plain Git and need to be submitted with Graphite, track each branch with its intended parent before submitting:
+
+```bash
+gt track sdds/notes-domain --parent main
+gt track sdds/notes-api --parent sdds/notes-domain
+gt track sdds/notes-mobile-list --parent sdds/notes-api
+```
+
+After tracking, verify the shape:
+
+```bash
+gt log --stack
+```
+
+Then submit through Graphite:
+
+```bash
+gt submit --cli --edit
+```
+
+This recovery path is acceptable, but agents should avoid needing it by using `gt create` from the start when Graphite is available.
 
 ## Review Rules
 
@@ -119,7 +158,9 @@ Use `gt submit --cli --edit` so PR metadata can be written from the terminal ins
 
 ## Agent Rules
 
-- If `gt` is available, use Graphite CLI for stack management.
+- Check `gt --version` before creating stacked branches.
+- If `gt` is available, use Graphite CLI for stack management from the first branch onward.
+- Use `gt create` for new stack branches; do not use `git checkout -b` and expect Graphite to infer the stack later.
 - If `gt` is unavailable, use plain Git and preserve the same GitHub-visible structure.
 - Always include the stack order in PR descriptions.
 - Do not depend on the Graphite dashboard for reviewer context.

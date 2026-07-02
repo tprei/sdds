@@ -54,7 +54,7 @@ The local `design-system/` folder is ignored by Git. Production code should use 
 
 The mobile app uses Expo, React Native, and TypeScript. Expo gives us a fast path to Android and iOS while keeping most day-to-day code in reviewable TypeScript. We should keep the app boring: file-based routes, small screens, simple components, and no large state-management or UI-framework dependency until there is clear need.
 
-The current mobile app is a five-tab shell: `Início`, `Buscar`, `Escrever`, `Salvos`, and `Perfil`. It uses PT-BR placeholder copy and shared tokens, but it does not call the API yet.
+The current mobile app is a five-tab shell: `Início`, `Buscar`, `Escrever`, `Salvos`, and `Perfil`. `Início` reads recent notes from the API, while the other tabs stay deliberately small until their product flows are added.
 
 ### Backend
 
@@ -152,6 +152,12 @@ Run the mobile app:
 
 ```sh
 pnpm dev:mobile
+```
+
+By default, mobile API calls use `http://localhost:8080` on iOS/web and `http://10.0.2.2:8080` on Android emulator. Point Expo at another API host when needed:
+
+```sh
+EXPO_PUBLIC_SDDS_API_BASE_URL=http://localhost:8080 pnpm dev:mobile
 ```
 
 Run the checks:

@@ -10,5 +10,8 @@
     "test:api": "go test ./...",
     "typecheck:mobile": "pnpm --filter @sdds/mobile typecheck",
     "typecheck:tokens": "pnpm --filter @sdds/tokens typecheck"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1"
   }
 }

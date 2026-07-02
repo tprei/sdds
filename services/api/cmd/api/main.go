@@ -1,16 +1,17 @@
 package main
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/tprei/sdds/services/api/internal/httpapi"
+	"github.com/tprei/sdds/services/api/internal/sqlite"
 )
-
-const defaultHTTPAddr = ":8080"
 
 func main() {
 	if err := run(); err != nil {
@@ -20,25 +21,29 @@ func main() {
 }
 
 func run() error {
-	addr := httpAddr()
+	ctx := context.Background()
+	config := loadConfig()
+
+	db, err := sqlite.Open(config.databasePath)
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer db.Close()
+
+	if err := sqlite.ApplyMigrations(ctx, db); err != nil {
+		return fmt.Errorf("apply migrations: %w", err)
+	}
+
 	server := &http.Server{
-		Addr:              addr,
+		Addr:              config.httpAddr,
 		Handler:           httpapi.NewRouter(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	slog.Info("api listening", "addr", addr)
+	slog.Info("api listening", "addr", config.httpAddr)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 
 	return nil
-}
-
-func httpAddr() string {
-	addr := os.Getenv("SDDS_HTTP_ADDR")
-	if addr == "" {
-		return defaultHTTPAddr
-	}
-	return addr
 }

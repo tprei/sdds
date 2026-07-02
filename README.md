@@ -73,7 +73,7 @@ The current API only exposes operational endpoints:
 - `GET /healthz` returns `204 No Content`.
 - `GET /readyz` returns `204 No Content`.
 
-There are no product `/v1` endpoints yet.
+It opens SQLite at `SDDS_DATABASE_PATH`, defaulting to `sdds.db`, and applies migrations at startup. There are no product `/v1` endpoints yet.
 
 ### Data
 
@@ -125,6 +125,12 @@ Run the API:
 
 ```sh
 pnpm dev:api
+```
+
+Use a custom database path when needed:
+
+```sh
+SDDS_DATABASE_PATH=/tmp/sdds.db pnpm dev:api
 ```
 
 Check the health endpoint:

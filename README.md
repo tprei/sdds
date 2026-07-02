@@ -72,12 +72,17 @@ Protobuf is not the default for this phase of the product. We should only introd
 
 No background worker is needed at first. Jobs such as image processing, notifications, search reindexing, or moderation queues can be added when the product actually needs them.
 
-The current API only exposes operational endpoints:
+The current API exposes operational endpoints:
 
 - `GET /healthz` returns `204 No Content`.
 - `GET /readyz` returns `204 No Content`.
 
-It opens SQLite at `SDDS_DATABASE_PATH`, defaulting to `sdds.db`, and applies migrations at startup. There are no product `/v1` endpoints yet.
+It opens SQLite at `SDDS_DATABASE_PATH`, defaulting to `sdds.db`, and applies migrations at startup.
+
+The first product endpoints are:
+
+- `GET /v1/notes` returns recent notes.
+- `POST /v1/notes` creates a note with `title`, `body`, `category`, and `city`.
 
 ### Data
 

@@ -34,9 +34,10 @@ func run() error {
 		return fmt.Errorf("apply migrations: %w", err)
 	}
 
+	noteStore := sqlite.NewNoteStore(db)
 	server := &http.Server{
 		Addr:              config.httpAddr,
-		Handler:           httpapi.NewRouter(),
+		Handler:           httpapi.NewRouter(noteStore),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

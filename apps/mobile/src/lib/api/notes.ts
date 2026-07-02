@@ -19,6 +19,13 @@ export type Note = {
   updatedAt: string;
 };
 
+export type CreateNoteInput = {
+  body: string;
+  category: NoteCategorySlug;
+  city: NoteCitySlug;
+  title: string;
+};
+
 type NoteResponse = {
   body: string;
   category: NoteCategorySlug;
@@ -52,6 +59,27 @@ export async function listNotes(): Promise<Note[]> {
 
   const body: unknown = await response.json();
   return parseListNotesResponse(body);
+}
+
+export async function createNote(input: CreateNoteInput): Promise<Note> {
+  const response = await fetch(`${apiBaseURL()}/v1/notes`, {
+    body: JSON.stringify({
+      body: input.body,
+      category: input.category,
+      city: input.city,
+      title: input.title,
+    }),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    method: 'POST',
+  });
+  if (!response.ok) {
+    throw new APIRequestError(response.status);
+  }
+
+  const body: unknown = await response.json();
+  return parseNoteResponse(body);
 }
 
 function parseListNotesResponse(value: unknown): Note[] {

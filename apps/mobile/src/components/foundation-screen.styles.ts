@@ -10,10 +10,19 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.sp5,
     paddingVertical: spacing.sp4,
   },
+  buttonDisabled: {
+    backgroundColor: semanticColors.surfaceHover,
+  },
+  buttonPressed: {
+    backgroundColor: semanticColors.accentBorder,
+  },
   buttonText: {
     color: semanticColors.accentPress,
     fontSize: typography.sizeBody,
     fontWeight: typography.weightBold,
+  },
+  buttonTextDisabled: {
+    color: semanticColors.textMuted,
   },
   card: {
     backgroundColor: semanticColors.cardSurface,

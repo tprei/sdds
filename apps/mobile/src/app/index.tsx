@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 
 import { EmptyStateCard, FoundationScreen } from '@/components/foundation-screen';
 import { NoteCard } from '@/components/note-card';
@@ -14,29 +15,32 @@ type HomeState =
 export default function HomeScreen() {
   const [state, setState] = useState<HomeState>({ status: 'loading' });
 
-  useEffect(() => {
-    let isActive = true;
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      setState({ status: 'loading' });
 
-    listNotes()
-      .then((notes) => {
-        if (!isActive) {
-          return;
-        }
-        setState(
-          notes.length > 0 ? { status: 'ready', notes } : { status: 'empty' },
-        );
-      })
-      .catch(() => {
-        if (!isActive) {
-          return;
-        }
-        setState({ status: 'error' });
-      });
+      listNotes()
+        .then((notes) => {
+          if (!isActive) {
+            return;
+          }
+          setState(
+            notes.length > 0 ? { status: 'ready', notes } : { status: 'empty' },
+          );
+        })
+        .catch(() => {
+          if (!isActive) {
+            return;
+          }
+          setState({ status: 'error' });
+        });
 
-    return () => {
-      isActive = false;
-    };
-  }, []);
+      return () => {
+        isActive = false;
+      };
+    }, []),
+  );
 
   return (
     <FoundationScreen

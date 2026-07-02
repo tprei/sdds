@@ -1,0 +1,20 @@
+{
+  "name": "@sdds/tokens",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./assets/logomark.svg": "./assets/logomark.svg",
+    "./assets/logomark-light.svg": "./assets/logomark-light.svg"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.2"
+  }
+}

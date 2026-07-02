@@ -29,13 +29,12 @@ Use the standard workflow in `agent-guidance/writing/STACKED_DIFFS.md`. The GitH
 
 CI is the main feedback loop for preventing regressions.
 
-At minimum, CI should eventually run:
+CI currently runs:
 
 - Go formatting and tests.
 - TypeScript checks.
-- Frontend linting.
-- Unit/behavior tests.
-- Migration checks.
+
+CI should eventually add frontend linting, unit/behavior tests, and migration checks as those surfaces become real.
 
 Do not merge failing CI because "it is probably unrelated" without a clear human decision recorded on the PR.
 
@@ -66,6 +65,8 @@ Respect DDD principles, scaled to a small codebase:
 ## Dependencies
 
 New dependencies need a short justification in the PR description.
+
+JavaScript dependencies are managed with pnpm workspaces. Run `pnpm install` from the repo root and keep `pnpm-lock.yaml` committed.
 
 Before adding a dependency, ask:
 
@@ -101,7 +102,7 @@ Before requesting review:
 
 - The PR is under 1,000 changed lines, excluding generated code.
 - The change is scoped to one coherent idea.
-- CI passes locally or the expected CI path is documented.
+- CI passes locally with `pnpm check`, or the expected CI path is documented.
 - Tests prove behavior where risk justifies them.
 - New dependencies are justified.
 - The PR description explains what changed and why.

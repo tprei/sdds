@@ -1,0 +1,11 @@
+name: sdds
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    environment:
+      SDDS_HTTP_ADDR: :8080
+    ports:
+      - "8080:8080"

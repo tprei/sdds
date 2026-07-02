@@ -3,4 +3,7 @@
 
 # Tests / Validations
 
-Ok to be none.
+- [ ] `pnpm check`
+- [ ] Other:
+
+Ok to leave unchecked with a short reason.

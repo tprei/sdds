@@ -34,7 +34,7 @@ Out of scope for the first version:
 
 ## Architecture
 
-The project is a monorepo with a deliberately small stack:
+The project is a pnpm monorepo with a deliberately small stack:
 
 ```txt
 sdds/
@@ -43,15 +43,18 @@ sdds/
   services/
     api/             # Go HTTP API
   packages/
-    tokens/          # shared design tokens derived from design-system
+    tokens/          # shared design tokens for production code
   infra/
     compose/         # Docker Compose / Portainer deployment
-  design-system/     # brand, tokens, components, and prototype references
 ```
+
+The local `design-system/` folder is ignored by Git. Production code should use the audited subset committed in `packages/tokens`.
 
 ### Frontend
 
 The mobile app uses Expo, React Native, and TypeScript. Expo gives us a fast path to Android and iOS while keeping most day-to-day code in reviewable TypeScript. We should keep the app boring: file-based routes, small screens, simple components, and no large state-management or UI-framework dependency until there is clear need.
+
+The current mobile app is a five-tab shell: `Início`, `Buscar`, `Escrever`, `Salvos`, and `Perfil`. It uses PT-BR placeholder copy and shared tokens, but it does not call the API yet.
 
 ### Backend
 
@@ -64,6 +67,13 @@ The backend starts as a single Go service:
 - SQL migrations checked into the repo.
 
 No background worker is needed at first. Jobs such as image processing, notifications, search reindexing, or moderation queues can be added when the product actually needs them.
+
+The current API only exposes operational endpoints:
+
+- `GET /healthz` returns `204 No Content`.
+- `GET /readyz` returns `204 No Content`.
+
+There are no product `/v1` endpoints yet.
 
 ### Data
 
@@ -95,6 +105,59 @@ Scalability is not the first concern. Reviewability, operational simplicity, and
 - Prefer behavior tests over coverage theater.
 - Prefer domain language over framework language.
 - Prefer self-hosted/simple infrastructure until the product proves it needs more.
+
+## Local Development
+
+Required tools:
+
+- Go 1.26.
+- Node 24 or newer.
+- pnpm 11.5.2.
+- Docker, only when testing Compose.
+
+Install JavaScript dependencies from the repo root:
+
+```sh
+pnpm install
+```
+
+Run the API:
+
+```sh
+pnpm dev:api
+```
+
+Check the health endpoint:
+
+```sh
+curl -i http://localhost:8080/healthz
+```
+
+Run the mobile app:
+
+```sh
+pnpm dev:mobile
+```
+
+Run the checks:
+
+```sh
+pnpm check
+```
+
+Useful focused checks:
+
+```sh
+pnpm test:api
+pnpm typecheck:tokens
+pnpm typecheck:mobile
+```
+
+Run the API with Docker Compose:
+
+```sh
+docker compose -f infra/compose/compose.yaml up --build api
+```
 
 ## References
 

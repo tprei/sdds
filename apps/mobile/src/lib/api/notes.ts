@@ -27,13 +27,15 @@ export type CreateNoteInput = {
   title: string;
 };
 
-type CreateNoteRequest = components['schemas']['CreateNoteRequest'];
-type ListNotesResponse = components['schemas']['ListNotesResponse'];
-type NoteResponse = components['schemas']['Note'];
-type SchemaKeys<T> = Extract<keyof T, string>;
+type GeneratedSchemas = components['schemas'];
+type CreateNoteRequest = GeneratedSchemas['CreateNoteRequest'];
+type ListNotesResponse = GeneratedSchemas['ListNotesResponse'];
+type NoteResponse = GeneratedSchemas['Note'];
+type SchemaKey<T> = Extract<keyof T, string>;
+type SchemaKeyList<T> = readonly SchemaKey<T>[];
 type AssertNoMissingKeys<T extends never> = T;
 
-const listNotesResponseKeys = ['notes'] as const satisfies readonly SchemaKeys<ListNotesResponse>[];
+const listNotesResponseKeys = ['notes'] as const satisfies SchemaKeyList<ListNotesResponse>;
 const noteResponseKeys = [
   'body',
   'category_slug',
@@ -42,13 +44,13 @@ const noteResponseKeys = [
   'id',
   'title',
   'updated_at',
-] as const satisfies readonly SchemaKeys<NoteResponse>[];
+] as const satisfies SchemaKeyList<NoteResponse>;
 
 type MissingListNotesResponseKeys = AssertNoMissingKeys<
-  Exclude<SchemaKeys<ListNotesResponse>, (typeof listNotesResponseKeys)[number]>
+  Exclude<SchemaKey<ListNotesResponse>, (typeof listNotesResponseKeys)[number]>
 >;
 type MissingNoteResponseKeys = AssertNoMissingKeys<
-  Exclude<SchemaKeys<NoteResponse>, (typeof noteResponseKeys)[number]>
+  Exclude<SchemaKey<NoteResponse>, (typeof noteResponseKeys)[number]>
 >;
 
 export class APIRequestError extends Error {

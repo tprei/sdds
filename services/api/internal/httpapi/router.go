@@ -9,6 +9,7 @@ import (
 
 func NewRouter(notes note.Store) http.Handler {
 	router := chi.NewRouter()
+	router.Use(localBrowserCORS)
 	router.Get("/healthz", noContent)
 	router.Get("/readyz", noContent)
 

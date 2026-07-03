@@ -50,6 +50,81 @@ func TestHealthRoutesRejectUnsupportedMethods(t *testing.T) {
 	}
 }
 
+func TestRouterAllowsLocalBrowserOrigin(t *testing.T) {
+	router := NewRouter(fakeNoteStore{
+		listNotes: func(_ context.Context, _ int) ([]note.Note, error) {
+			return []note.Note{}, nil
+		},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/v1/notes", nil)
+	request.Header.Set("Origin", "http://localhost:8081")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+	if response.Header().Get("Access-Control-Allow-Origin") != "http://localhost:8081" {
+		t.Fatalf("access-control-allow-origin = %q, want local origin", response.Header().Get("Access-Control-Allow-Origin"))
+	}
+	if response.Header().Get("Access-Control-Allow-Methods") != corsAllowedMethods {
+		t.Fatalf("access-control-allow-methods = %q, want %q", response.Header().Get("Access-Control-Allow-Methods"), corsAllowedMethods)
+	}
+	if response.Header().Get("Access-Control-Allow-Headers") != corsAllowedHeaders {
+		t.Fatalf("access-control-allow-headers = %q, want %q", response.Header().Get("Access-Control-Allow-Headers"), corsAllowedHeaders)
+	}
+}
+
+func TestRouterRejectsNonLocalBrowserOrigin(t *testing.T) {
+	router := NewRouter(fakeNoteStore{
+		listNotes: func(_ context.Context, _ int) ([]note.Note, error) {
+			return []note.Note{}, nil
+		},
+	})
+	request := httptest.NewRequest(http.MethodGet, "/v1/notes", nil)
+	request.Header.Set("Origin", "https://example.com")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+	if response.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Fatalf("access-control-allow-origin = %q, want empty", response.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
+func TestRouterHandlesLocalBrowserPreflight(t *testing.T) {
+	router := NewRouter(fakeNoteStore{})
+	request := httptest.NewRequest(http.MethodOptions, "/v1/notes", nil)
+	request.Header.Set("Origin", "http://127.0.0.1:8081")
+	request.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusNoContent)
+	}
+	if response.Header().Get("Access-Control-Allow-Origin") != "http://127.0.0.1:8081" {
+		t.Fatalf("access-control-allow-origin = %q, want local origin", response.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
+func TestRouterRejectsPlainOptionsRequest(t *testing.T) {
+	router := NewRouter(fakeNoteStore{})
+	request := httptest.NewRequest(http.MethodOptions, "/v1/notes", nil)
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusMethodNotAllowed)
+	}
+}
+
 type fakeNoteStore struct {
 	createNote func(ctx context.Context, input note.CreateInput) (note.Note, error)
 	listNotes  func(ctx context.Context, limit int) ([]note.Note, error)

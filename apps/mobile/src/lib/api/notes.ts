@@ -31,6 +31,10 @@ type GeneratedSchemas = components['schemas'];
 type CreateNoteRequest = GeneratedSchemas['CreateNoteRequest'];
 type ListNotesResponse = GeneratedSchemas['ListNotesResponse'];
 type NoteResponse = GeneratedSchemas['Note'];
+type ParsedNoteResponse = Omit<NoteResponse, 'category_slug' | 'city_slug'> & {
+  category_slug: NoteCategorySlug;
+  city_slug: NoteCitySlug;
+};
 type SchemaKey<T> = Extract<keyof T, string>;
 type SchemaKeyList<T> = readonly SchemaKey<T>[];
 type AssertNoMissingKeys<T extends never> = T;
@@ -125,7 +129,7 @@ function parseNoteResponse(value: unknown): Note {
   };
 }
 
-function isNoteResponse(value: unknown): value is NoteResponse {
+function isNoteResponse(value: unknown): value is ParsedNoteResponse {
   return (
     isRecord(value) &&
     hasOnlyKeys(value, noteResponseKeys) &&

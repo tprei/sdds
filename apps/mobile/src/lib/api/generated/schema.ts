@@ -60,10 +60,8 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @enum {string} */
-        CategorySlug: "beleza" | "comida" | "viagem" | "achadinhos";
-        /** @enum {string} */
-        CitySlug: "sao-paulo" | "rio-de-janeiro" | "lisboa";
+        CategorySlug: string;
+        CitySlug: string;
         CreateNoteRequest: {
             title: string;
             body: string;

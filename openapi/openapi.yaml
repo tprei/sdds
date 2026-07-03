@@ -1,11 +1,11 @@
-openapi: 3.1.0
+openapi: 3.0.3
 info:
   title: sdds API
   version: 0.0.0
-  summary: HTTP JSON contract for the sdds API.
+  description: HTTP JSON contract for the sdds API.
   license:
     name: UNLICENSED
-    identifier: UNLICENSED
+    url: https://spdx.org/licenses/UNLICENSED.html
 servers:
   - url: /
     description: Active API origin
@@ -118,6 +118,11 @@ components:
           $ref: "#/components/schemas/CitySlug"
     ErrorCode:
       type: string
+      x-enum-varnames:
+        - ErrorCodeInternal
+        - ErrorCodeInvalidJSON
+        - ErrorCodeInvalidNote
+        - ErrorCodeRequestTooLarge
       enum:
         - internal_error
         - invalid_json
@@ -179,6 +184,11 @@ components:
           description: Unix timestamp in milliseconds.
     ValidationField:
       type: string
+      x-enum-varnames:
+        - ValidationFieldTitle
+        - ValidationFieldBody
+        - ValidationFieldCategorySlug
+        - ValidationFieldCitySlug
       enum:
         - title
         - body
@@ -195,6 +205,11 @@ components:
           $ref: "#/components/schemas/ValidationField"
         code:
           type: string
+          x-enum-varnames:
+            - ValidationProblemCodeRequired
+            - ValidationProblemCodeTooShort
+            - ValidationProblemCodeTooLong
+            - ValidationProblemCodeUnknown
           enum:
             - required
             - too_short

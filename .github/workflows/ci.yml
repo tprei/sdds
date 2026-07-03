@@ -48,6 +48,11 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
       - name: Install packages
         run: pnpm install --frozen-lockfile
 
@@ -56,6 +61,9 @@ jobs:
 
       - name: Check generated TypeScript API contract
         run: pnpm openapi:check:ts
+
+      - name: Check generated Go API contract
+        run: pnpm openapi:check:go
 
       - name: Typecheck tokens
         run: pnpm typecheck:tokens

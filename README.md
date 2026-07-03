@@ -174,6 +174,7 @@ pnpm test:api
 pnpm test:mobile
 pnpm openapi:lint
 pnpm openapi:check:ts
+pnpm openapi:check:go
 pnpm typecheck:tokens
 pnpm typecheck:mobile
 ```

@@ -93,17 +93,8 @@ components:
   schemas:
     CategorySlug:
       type: string
-      enum:
-        - beleza
-        - comida
-        - viagem
-        - achadinhos
     CitySlug:
       type: string
-      enum:
-        - sao-paulo
-        - rio-de-janeiro
-        - lisboa
     CreateNoteRequest:
       type: object
       additionalProperties: false

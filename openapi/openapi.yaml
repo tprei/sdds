@@ -25,6 +25,12 @@ paths:
       responses:
         "204":
           description: The API process is running.
+        "400":
+          description: The request does not match the API contract.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /readyz:
     get:
       operationId: getReadiness
@@ -34,6 +40,12 @@ paths:
       responses:
         "204":
           description: The API can serve traffic.
+        "400":
+          description: The request does not match the API contract.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/notes:
     get:
       operationId: listNotes
@@ -47,6 +59,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListNotesResponse"
+        "400":
+          description: The request does not match the API contract.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: The API could not list notes.
           content:

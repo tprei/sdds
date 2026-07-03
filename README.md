@@ -82,7 +82,7 @@ It opens SQLite at `SDDS_DATABASE_PATH`, defaulting to `sdds.db`, and applies mi
 The first product endpoints are:
 
 - `GET /v1/notes` returns recent notes.
-- `POST /v1/notes` creates a note with `title`, `body`, `category`, and `city`.
+- `POST /v1/notes` creates a note with `title`, `body`, `category_slug`, and `city_slug`.
 
 ### Data
 

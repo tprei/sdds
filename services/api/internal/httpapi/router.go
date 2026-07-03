@@ -1,19 +1,13 @@
 package httpapi
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tprei/sdds/services/api/internal/note"
 )
 
-type NoteStore interface {
-	CreateNote(ctx context.Context, input note.CreateInput) (note.Note, error)
-	ListRecentNotes(ctx context.Context, limit int) ([]note.Note, error)
-}
-
-func NewRouter(notes NoteStore) http.Handler {
+func NewRouter(notes note.Store) http.Handler {
 	router := chi.NewRouter()
 	router.Get("/healthz", noContent)
 	router.Get("/readyz", noContent)

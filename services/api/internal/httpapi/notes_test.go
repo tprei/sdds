@@ -48,8 +48,14 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 	if len(body.Notes) != 1 {
 		t.Fatalf("note count = %d, want 1", len(body.Notes))
 	}
-	if body.Notes[0].Category != "comida" {
-		t.Fatalf("category = %s, want comida", body.Notes[0].Category)
+	if body.Notes[0].CategorySlug != note.CategorySlugComida {
+		t.Fatalf("category_slug = %s, want %s", body.Notes[0].CategorySlug, note.CategorySlugComida)
+	}
+	if body.Notes[0].CreatedAt != now.UnixMilli() {
+		t.Fatalf("created_at = %d, want %d", body.Notes[0].CreatedAt, now.UnixMilli())
+	}
+	if body.Notes[0].UpdatedAt != now.UnixMilli() {
+		t.Fatalf("updated_at = %d, want %d", body.Notes[0].UpdatedAt, now.UnixMilli())
 	}
 }
 
@@ -75,7 +81,7 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 		},
 	})
 
-	requestBody := []byte(`{"title":" Café bom ","body":"Tem pão de queijo decente.","category":"comida","city":"sao-paulo"}`)
+	requestBody := []byte(`{"title":" Café bom ","body":"Tem pão de queijo decente.","category_slug":"comida","city_slug":"sao-paulo"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 
@@ -92,14 +98,20 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 	if body.ID == "" {
 		t.Fatal("id is empty")
 	}
-	if body.City != "sao-paulo" {
-		t.Fatalf("city = %s, want sao-paulo", body.City)
+	if body.CitySlug != note.CitySlugSaoPaulo {
+		t.Fatalf("city_slug = %s, want %s", body.CitySlug, note.CitySlugSaoPaulo)
+	}
+	if body.CreatedAt != now.UnixMilli() {
+		t.Fatalf("created_at = %d, want %d", body.CreatedAt, now.UnixMilli())
+	}
+	if body.UpdatedAt != now.UnixMilli() {
+		t.Fatalf("updated_at = %d, want %d", body.UpdatedAt, now.UnixMilli())
 	}
 }
 
 func TestCreateNoteRejectsValidationProblems(t *testing.T) {
 	router := NewRouter(fakeNoteStore{})
-	requestBody := []byte(`{"title":"","body":"Funciona.","category":"qualquer","city":"sao-paulo"}`)
+	requestBody := []byte(`{"title":"","body":"Funciona.","category_slug":"qualquer","city_slug":"sao-paulo"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 
@@ -113,11 +125,14 @@ func TestCreateNoteRejectsValidationProblems(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Error != "invalid_note" {
-		t.Fatalf("error = %s, want invalid_note", body.Error)
+	if body.Code != errorCodeInvalidNote {
+		t.Fatalf("code = %s, want %s", body.Code, errorCodeInvalidNote)
 	}
 	if len(body.Fields) != 2 {
 		t.Fatalf("field count = %d, want 2", len(body.Fields))
+	}
+	if body.Fields[0].Code == "" {
+		t.Fatal("first field code is empty")
 	}
 }
 
@@ -131,11 +146,19 @@ func TestCreateNoteRejectsInvalidJSON(t *testing.T) {
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
 	}
+
+	var body errorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != errorCodeInvalidJSON {
+		t.Fatalf("code = %s, want %s", body.Code, errorCodeInvalidJSON)
+	}
 }
 
 func TestCreateNoteRejectsTrailingJSON(t *testing.T) {
 	router := NewRouter(fakeNoteStore{})
-	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category":"comida","city":"sao-paulo"} {}`)
+	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"comida","city_slug":"sao-paulo"} {}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 
@@ -144,11 +167,19 @@ func TestCreateNoteRejectsTrailingJSON(t *testing.T) {
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
 	}
+
+	var body errorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != errorCodeInvalidJSON {
+		t.Fatalf("code = %s, want %s", body.Code, errorCodeInvalidJSON)
+	}
 }
 
 func TestCreateNoteRejectsOversizedRequestBody(t *testing.T) {
 	router := NewRouter(fakeNoteStore{})
-	requestBody := []byte(`{"title":"Café bom","body":"` + strings.Repeat("a", maxCreateNoteRequestBytes) + `","category":"comida","city":"sao-paulo"}`)
+	requestBody := []byte(`{"title":"Café bom","body":"` + strings.Repeat("a", int(maxCreateNoteRequestBytes)) + `","category_slug":"comida","city_slug":"sao-paulo"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 
@@ -162,8 +193,8 @@ func TestCreateNoteRejectsOversizedRequestBody(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Error != "request_too_large" {
-		t.Fatalf("error = %s, want request_too_large", body.Error)
+	if body.Code != errorCodeRequestTooLarge {
+		t.Fatalf("code = %s, want %s", body.Code, errorCodeRequestTooLarge)
 	}
 }
 

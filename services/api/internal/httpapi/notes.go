@@ -1,37 +1,33 @@
 package httpapi
 
 import (
-	"encoding/json"
-	"errors"
-	"io"
 	"net/http"
-	"time"
 
 	"github.com/tprei/sdds/services/api/internal/note"
 )
 
 const recentNotesLimit = 50
-const maxCreateNoteRequestBytes = 32 * 1024
+const maxCreateNoteRequestBytes int64 = 32 * 1024
 
 type noteHandler struct {
-	notes NoteStore
+	notes note.Store
 }
 
 type createNoteRequest struct {
-	Title    string `json:"title"`
-	Body     string `json:"body"`
-	Category string `json:"category"`
-	City     string `json:"city"`
+	Title        string            `json:"title"`
+	Body         string            `json:"body"`
+	CategorySlug note.CategorySlug `json:"category_slug"`
+	CitySlug     note.CitySlug     `json:"city_slug"`
 }
 
 type noteResponse struct {
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Body      string `json:"body"`
-	Category  string `json:"category"`
-	City      string `json:"city"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID           string            `json:"id"`
+	Title        string            `json:"title"`
+	Body         string            `json:"body"`
+	CategorySlug note.CategorySlug `json:"category_slug"`
+	CitySlug     note.CitySlug     `json:"city_slug"`
+	CreatedAt    int64             `json:"created_at"`
+	UpdatedAt    int64             `json:"updated_at"`
 }
 
 type listNotesResponse struct {
@@ -39,42 +35,32 @@ type listNotesResponse struct {
 }
 
 type validationProblemResponse struct {
-	Field   string `json:"field"`
-	Message string `json:"message"`
-}
-
-type errorResponse struct {
-	Error  string                      `json:"error"`
-	Fields []validationProblemResponse `json:"fields,omitempty"`
+	Field string `json:"field"`
+	Code  string `json:"code"`
 }
 
 func (handler noteHandler) listNotes(w http.ResponseWriter, r *http.Request) {
 	notes, err := handler.notes.ListRecentNotes(r.Context(), recentNotesLimit)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, errorResponse{Error: "internal_error"})
+		writeError(w, http.StatusInternalServerError, errorResponse{Code: errorCodeInternal})
 		return
 	}
 
 	response := listNotesResponse{Notes: make([]noteResponse, 0, len(notes))}
 	for _, found := range notes {
-		response.Notes = append(response.Notes, mapNoteResponse(found))
+		response.Notes = append(response.Notes, newNoteResponse(found))
 	}
 
 	writeJSON(w, http.StatusOK, response)
 }
 
 func (handler noteHandler) createNote(w http.ResponseWriter, r *http.Request) {
-	request, ok := decodeCreateNoteRequest(w, r)
-	if !ok {
+	var request createNoteRequest
+	if !decodeJSONRequest(w, r, maxCreateNoteRequestBytes, &request) {
 		return
 	}
 
-	input := note.NormalizeCreateInput(note.CreateInput{
-		Title:        request.Title,
-		Body:         request.Body,
-		CategorySlug: note.CategorySlug(request.Category),
-		CitySlug:     note.CitySlug(request.City),
-	})
+	input := request.input()
 	if problems := note.ValidateCreateInput(input); len(problems) > 0 {
 		writeError(w, http.StatusBadRequest, validationErrorResponse(problems))
 		return
@@ -82,75 +68,41 @@ func (handler noteHandler) createNote(w http.ResponseWriter, r *http.Request) {
 
 	created, err := handler.notes.CreateNote(r.Context(), input)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, errorResponse{Error: "internal_error"})
+		writeError(w, http.StatusInternalServerError, errorResponse{Code: errorCodeInternal})
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, mapNoteResponse(created))
-}
-
-func decodeCreateNoteRequest(w http.ResponseWriter, r *http.Request) (createNoteRequest, bool) {
-	var request createNoteRequest
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxCreateNoteRequestBytes))
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(&request); err != nil {
-		writeDecodeError(w, err)
-		return createNoteRequest{}, false
-	}
-
-	var trailing struct{}
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		writeDecodeError(w, err)
-		return createNoteRequest{}, false
-	}
-
-	return request, true
-}
-
-func writeDecodeError(w http.ResponseWriter, err error) {
-	var maxBytesError *http.MaxBytesError
-	if errors.As(err, &maxBytesError) {
-		writeError(w, http.StatusRequestEntityTooLarge, errorResponse{Error: "request_too_large"})
-		return
-	}
-
-	writeError(w, http.StatusBadRequest, errorResponse{Error: "invalid_json"})
+	writeJSON(w, http.StatusCreated, newNoteResponse(created))
 }
 
 func validationErrorResponse(problems []note.ValidationProblem) errorResponse {
 	fields := make([]validationProblemResponse, 0, len(problems))
 	for _, problem := range problems {
 		fields = append(fields, validationProblemResponse{
-			Field:   problem.Field,
-			Message: problem.Message,
+			Field: problem.Field,
+			Code:  problem.Message,
 		})
 	}
-	return errorResponse{Error: "invalid_note", Fields: fields}
+	return errorResponse{Code: errorCodeInvalidNote, Fields: fields}
 }
 
-func mapNoteResponse(found note.Note) noteResponse {
+func (request createNoteRequest) input() note.CreateInput {
+	return note.NormalizeCreateInput(note.CreateInput{
+		Title:        request.Title,
+		Body:         request.Body,
+		CategorySlug: request.CategorySlug,
+		CitySlug:     request.CitySlug,
+	})
+}
+
+func newNoteResponse(found note.Note) noteResponse {
 	return noteResponse{
-		ID:        found.ID,
-		Title:     found.Title,
-		Body:      found.Body,
-		Category:  string(found.CategorySlug),
-		City:      string(found.CitySlug),
-		CreatedAt: formatResponseTime(found.CreatedAt),
-		UpdatedAt: formatResponseTime(found.UpdatedAt),
+		ID:           found.ID,
+		Title:        found.Title,
+		Body:         found.Body,
+		CategorySlug: found.CategorySlug,
+		CitySlug:     found.CitySlug,
+		CreatedAt:    found.CreatedAt.UTC().UnixMilli(),
+		UpdatedAt:    found.UpdatedAt.UTC().UnixMilli(),
 	}
-}
-
-func formatResponseTime(value time.Time) string {
-	return value.UTC().Format(time.RFC3339Nano)
-}
-
-func writeJSON(w http.ResponseWriter, status int, body any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(body)
-}
-
-func writeError(w http.ResponseWriter, status int, body errorResponse) {
-	writeJSON(w, status, body)
 }

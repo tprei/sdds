@@ -49,8 +49,8 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 	if len(body.Notes) != 1 {
 		t.Fatalf("note count = %d, want 1", len(body.Notes))
 	}
-	if body.Notes[0].CategorySlug != openapi.CategorySlugComida {
-		t.Fatalf("category_slug = %s, want %s", body.Notes[0].CategorySlug, openapi.CategorySlugComida)
+	if body.Notes[0].CategorySlug != string(note.CategorySlugComida) {
+		t.Fatalf("category_slug = %s, want %s", body.Notes[0].CategorySlug, note.CategorySlugComida)
 	}
 	if body.Notes[0].CreatedAt != now.UnixMilli() {
 		t.Fatalf("created_at = %d, want %d", body.Notes[0].CreatedAt, now.UnixMilli())
@@ -114,8 +114,8 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 	if body.Id == "" {
 		t.Fatal("id is empty")
 	}
-	if body.CitySlug != openapi.CitySlugSaoPaulo {
-		t.Fatalf("city_slug = %s, want %s", body.CitySlug, openapi.CitySlugSaoPaulo)
+	if body.CitySlug != string(note.CitySlugSaoPaulo) {
+		t.Fatalf("city_slug = %s, want %s", body.CitySlug, note.CitySlugSaoPaulo)
 	}
 	if body.CreatedAt != now.UnixMilli() {
 		t.Fatalf("created_at = %d, want %d", body.CreatedAt, now.UnixMilli())

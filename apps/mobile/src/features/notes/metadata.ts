@@ -14,28 +14,25 @@ export const noteCities = [
 export type NoteCategorySlug = (typeof noteCategories)[number]['slug'];
 export type NoteCitySlug = (typeof noteCities)[number]['slug'];
 
+const categoryLabels: Record<NoteCategorySlug, string> = {
+  achadinhos: 'Achadinhos',
+  beleza: 'Beleza',
+  comida: 'Comida',
+  viagem: 'Viagem',
+};
+
+const cityLabels: Record<NoteCitySlug, string> = {
+  lisboa: 'Lisboa',
+  'rio-de-janeiro': 'Rio de Janeiro',
+  'sao-paulo': 'São Paulo',
+};
+
 export function categoryLabel(slug: NoteCategorySlug): string {
-  switch (slug) {
-    case 'beleza':
-      return 'Beleza';
-    case 'comida':
-      return 'Comida';
-    case 'viagem':
-      return 'Viagem';
-    case 'achadinhos':
-      return 'Achadinhos';
-  }
+  return categoryLabels[slug];
 }
 
 export function cityLabel(slug: NoteCitySlug): string {
-  switch (slug) {
-    case 'sao-paulo':
-      return 'São Paulo';
-    case 'rio-de-janeiro':
-      return 'Rio de Janeiro';
-    case 'lisboa':
-      return 'Lisboa';
-  }
+  return cityLabels[slug];
 }
 
 export function isNoteCategorySlug(value: string): value is NoteCategorySlug {

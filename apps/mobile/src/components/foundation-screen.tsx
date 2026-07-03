@@ -28,6 +28,7 @@ type FoundationTextInputProps = TextInputProps;
 type FoundationButtonProps = {
   disabled?: boolean;
   label: string;
+  onPress?: () => void;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -82,15 +83,27 @@ export function FoundationTextInput({
 export function FoundationButton({
   disabled,
   label,
+  onPress,
   style,
 }: FoundationButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(disabled) }}
       disabled={disabled}
-      style={[styles.button, style]}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.button,
+        pressed && !disabled ? styles.buttonPressed : null,
+        disabled ? styles.buttonDisabled : null,
+        style,
+      ]}
     >
-      <Text style={styles.buttonText}>{label}</Text>
+      <Text
+        style={[styles.buttonText, disabled ? styles.buttonTextDisabled : null]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }

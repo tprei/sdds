@@ -1,5 +1,6 @@
+import createClient from 'openapi-fetch';
+
 import { apiBaseURL } from './config';
-import { apiRoutes } from './routes';
 import {
   isNoteCategorySlug,
   isNoteCitySlug,
@@ -8,7 +9,7 @@ import type {
   NoteCategorySlug,
   NoteCitySlug,
 } from '@/features/notes/metadata';
-import type { components } from './generated/schema';
+import type { components, paths } from './generated/schema';
 
 export type Note = {
   body: string;
@@ -73,13 +74,12 @@ export class APIResponseError extends Error {
 }
 
 export async function listNotes(): Promise<Note[]> {
-  const response = await fetch(`${apiBaseURL()}${apiRoutes.notes}`);
+  const { data, response } = await apiClient().GET('/v1/notes');
   if (!response.ok) {
     throw new APIRequestError(response.status);
   }
 
-  const body: unknown = await response.json();
-  return parseListNotesResponse(body);
+  return parseListNotesResponse(data);
 }
 
 export async function createNote(input: CreateNoteInput): Promise<Note> {
@@ -90,19 +90,37 @@ export async function createNote(input: CreateNoteInput): Promise<Note> {
     title: input.title,
   };
 
-  const response = await fetch(`${apiBaseURL()}${apiRoutes.notes}`, {
-    body: JSON.stringify(request),
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    method: 'POST',
+  const { data, response } = await apiClient().POST('/v1/notes', {
+    body: request,
   });
   if (!response.ok) {
     throw new APIRequestError(response.status);
   }
 
-  const body: unknown = await response.json();
-  return parseNoteResponse(body);
+  return parseNoteResponse(data);
+}
+
+function apiClient() {
+  return createClient<paths>({
+    baseUrl: apiBaseURL(),
+    fetch: apiFetch,
+  });
+}
+
+async function apiFetch(request: Request): Promise<Response> {
+  const response = await fetch(request);
+  if (response.ok) {
+    return response;
+  }
+
+  const headers = new Headers(response.headers);
+  headers.delete('content-length');
+  headers.delete('transfer-encoding');
+  return new Response(null, {
+    headers,
+    status: response.status,
+    statusText: response.statusText,
+  });
 }
 
 function parseListNotesResponse(value: unknown): Note[] {

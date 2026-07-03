@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  APIRequestError,
   APIResponseError,
   createNote,
   listNotes,
@@ -16,14 +17,10 @@ vi.mock('react-native', () => ({
 const configuredAPIBaseURLEnvName = 'EXPO_PUBLIC_SDDS_API_BASE_URL';
 
 type FetchCall = {
-  init: RequestInit | undefined;
-  input: Request | URL | string;
+  request: Request;
 };
 
-type FetchHandler = (
-  input: Request | URL | string,
-  init?: RequestInit,
-) => Promise<Response>;
+type FetchHandler = (request: Request) => Promise<Response>;
 type ListNotesResponse = components['schemas']['ListNotesResponse'];
 type NoteResponse = components['schemas']['Note'];
 
@@ -38,8 +35,8 @@ describe('notes API client', () => {
 
   it('sends create note requests with API wire keys', async () => {
     const calls: FetchCall[] = [];
-    stubFetch(async (input, init) => {
-      calls.push({ input, init });
+    stubFetch(async (request) => {
+      calls.push({ request });
       return jsonResponse(apiNote(), httpStatusCreated);
     });
 
@@ -50,13 +47,11 @@ describe('notes API client', () => {
       title: 'Café bom',
     });
 
-    const call = onlyFetchCall(calls);
-    expect(call.input).toBe('http://localhost:8080/v1/notes');
-    expect(call.init?.method).toBe('POST');
-    expect(call.init?.headers).toEqual({
-      'Content-Type': 'application/json',
-    });
-    expect(requestJSON(call)).toEqual({
+    const request = onlyFetchCall(calls);
+    expect(request.url).toBe('http://localhost:8080/v1/notes');
+    expect(request.method).toBe('POST');
+    expect(request.headers.get('content-type')).toBe('application/json');
+    await expect(requestJSON(request)).resolves.toEqual({
       body: 'Tem pão de queijo decente.',
       category_slug: 'comida',
       city_slug: 'sao-paulo',
@@ -83,6 +78,19 @@ describe('notes API client', () => {
       title: 'Café bom',
       updatedAt: 1782993600000,
     });
+  });
+
+  it('raises request errors from status even when the error body fails', async () => {
+    stubFetch(async () => unreadableResponse(httpStatusBadRequest));
+
+    await expect(
+      createNote({
+        body: 'Tem pão de queijo decente.',
+        category: 'comida',
+        city: 'sao-paulo',
+        title: 'Café bom',
+      }),
+    ).rejects.toMatchObject(new APIRequestError(httpStatusBadRequest));
   });
 
   it('parses listed notes from the API list response shape', async () => {
@@ -172,6 +180,7 @@ describe('notes API client', () => {
 });
 
 const httpStatusCreated = 201;
+const httpStatusBadRequest = 400;
 
 function apiListNotesResponse(): ListNotesResponse {
   return {
@@ -200,7 +209,17 @@ function jsonResponse(value: unknown, status = 200): Response {
   });
 }
 
-function onlyFetchCall(calls: FetchCall[]): FetchCall {
+function unreadableResponse(status: number): Response {
+  const body = new ReadableStream({
+    start(controller) {
+      controller.error(new Error('body_unreadable'));
+    },
+  });
+
+  return new Response(body, { status });
+}
+
+function onlyFetchCall(calls: FetchCall[]): Request {
   if (calls.length !== 1) {
     throw new Error(`fetch call count = ${calls.length}, want 1`);
   }
@@ -210,15 +229,11 @@ function onlyFetchCall(calls: FetchCall[]): FetchCall {
     throw new Error('fetch call missing');
   }
 
-  return call;
+  return call.request;
 }
 
-function requestJSON(call: FetchCall): unknown {
-  if (typeof call.init?.body !== 'string') {
-    throw new Error('fetch body is not JSON text');
-  }
-
-  return JSON.parse(call.init.body);
+async function requestJSON(request: Request): Promise<unknown> {
+  return request.clone().json();
 }
 
 function stubFetch(handler: FetchHandler): void {

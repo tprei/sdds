@@ -153,6 +153,22 @@ describe('notes API client', () => {
 
     await expect(listNotes()).rejects.toThrow(APIResponseError);
   });
+
+  it('rejects unknown response slugs', async () => {
+    stubFetch(async () =>
+      jsonResponse({
+        notes: [
+          {
+            ...apiNote(),
+            category_slug: 'qualquer',
+            city_slug: 'qualquer',
+          },
+        ],
+      }),
+    );
+
+    await expect(listNotes()).rejects.toThrow(APIResponseError);
+  });
 });
 
 const httpStatusCreated = 201;

@@ -194,14 +194,6 @@ func TestCreateNoteRejectsOpenAPIRequestSchemaProblems(t *testing.T) {
 		body string
 	}{
 		{
-			name: "unknown category slug",
-			body: `{"title":"Café bom","body":"Funciona.","category_slug":"qualquer","city_slug":"sao-paulo"}`,
-		},
-		{
-			name: "unknown city slug",
-			body: `{"title":"Café bom","body":"Funciona.","category_slug":"comida","city_slug":"qualquer"}`,
-		},
-		{
 			name: "title too long",
 			body: `{"title":"` + strings.Repeat("a", note.TitleMaxLength+1) + `","body":"Funciona.","category_slug":"comida","city_slug":"sao-paulo"}`,
 		},
@@ -242,6 +234,35 @@ func TestCreateNoteRejectsOpenAPIRequestSchemaProblems(t *testing.T) {
 				t.Fatalf("fields = %#v, want nil", *body.Fields)
 			}
 		})
+	}
+}
+
+func TestCreateNoteRejectsUnknownSlugsThroughDomainValidation(t *testing.T) {
+	router := NewRouter(fakeNoteStore{})
+	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"qualquer","city_slug":"qualquer"}`)
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeInvalidNote {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidNote)
+	}
+	if body.Fields == nil {
+		t.Fatal("fields is nil")
+	}
+	if len(*body.Fields) != 2 {
+		t.Fatalf("field count = %d, want 2", len(*body.Fields))
 	}
 }
 

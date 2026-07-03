@@ -13,6 +13,11 @@ import (
 	"github.com/tprei/sdds/services/api/internal/sqlite"
 )
 
+const (
+	serverReadHeaderTimeout = 5 * time.Second
+	serverReadTimeout       = 15 * time.Second
+)
+
 func main() {
 	if err := run(); err != nil {
 		slog.Error("api stopped", "error", err)
@@ -35,11 +40,7 @@ func run() error {
 	}
 
 	noteStore := sqlite.NewNoteStore(db)
-	server := &http.Server{
-		Addr:              config.httpAddr,
-		Handler:           httpapi.NewRouter(noteStore),
-		ReadHeaderTimeout: 5 * time.Second,
-	}
+	server := newServer(config, httpapi.NewRouter(noteStore))
 
 	slog.Info("api listening", "addr", config.httpAddr)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -47,4 +48,13 @@ func run() error {
 	}
 
 	return nil
+}
+
+func newServer(config config, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              config.httpAddr,
+		Handler:           handler,
+		ReadHeaderTimeout: serverReadHeaderTimeout,
+		ReadTimeout:       serverReadTimeout,
+	}
 }

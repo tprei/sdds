@@ -9,6 +9,8 @@ import (
 	"github.com/tprei/sdds/services/api/internal/openapi"
 )
 
+const createNoteGeneratedOperationID = "CreateNote"
+
 func openAPIRequestValidator() func(http.Handler) http.Handler {
 	spec, err := openapi.GetSpec()
 	if err != nil {
@@ -38,8 +40,8 @@ func openAPIRequestValidator() func(http.Handler) http.Handler {
 				return
 			}
 
-			if r.Method == http.MethodPost && r.URL.Path == "/v1/notes" {
-				r.Body = http.MaxBytesReader(w, r.Body, maxCreateNoteRequestBytes)
+			if maxBytes, ok := requestBodyLimitForOperation(route.Operation.OperationID); ok {
+				r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 			}
 
 			err = openapi3filter.ValidateRequest(r.Context(), &openapi3filter.RequestValidationInput{
@@ -66,6 +68,15 @@ func writeOpenAPIRequestValidationError(w http.ResponseWriter, err error) {
 	}
 
 	writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidJSON})
+}
+
+func requestBodyLimitForOperation(operationID string) (int64, bool) {
+	switch operationID {
+	case createNoteGeneratedOperationID:
+		return maxCreateNoteRequestBytes, true
+	default:
+		return 0, false
+	}
 }
 
 func requestHasBody(r *http.Request) bool {

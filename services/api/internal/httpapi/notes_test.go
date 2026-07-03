@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/tprei/sdds/services/api/internal/note"
+	"github.com/tprei/sdds/services/api/internal/openapi"
 )
 
 func TestListNotesReturnsRecentNotes(t *testing.T) {
@@ -41,14 +42,14 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 
-	var body listNotesResponse
+	var body openapi.ListNotesResponse
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if len(body.Notes) != 1 {
 		t.Fatalf("note count = %d, want 1", len(body.Notes))
 	}
-	if body.Notes[0].CategorySlug != note.CategorySlugComida {
+	if body.Notes[0].CategorySlug != string(note.CategorySlugComida) {
 		t.Fatalf("category_slug = %s, want %s", body.Notes[0].CategorySlug, note.CategorySlugComida)
 	}
 	if body.Notes[0].CreatedAt != now.UnixMilli() {
@@ -106,14 +107,14 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusCreated)
 	}
 
-	var body noteResponse
+	var body openapi.Note
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.ID == "" {
+	if body.Id == "" {
 		t.Fatal("id is empty")
 	}
-	if body.CitySlug != note.CitySlugSaoPaulo {
+	if body.CitySlug != string(note.CitySlugSaoPaulo) {
 		t.Fatalf("city_slug = %s, want %s", body.CitySlug, note.CitySlugSaoPaulo)
 	}
 	if body.CreatedAt != now.UnixMilli() {
@@ -136,17 +137,20 @@ func TestCreateNoteRejectsValidationProblems(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
 	}
 
-	var body errorResponse
+	var body openapi.ErrorResponse
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Code != errorCodeInvalidNote {
-		t.Fatalf("code = %s, want %s", body.Code, errorCodeInvalidNote)
+	if body.Code != openapi.ErrorCodeInvalidNote {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidNote)
 	}
-	if len(body.Fields) != 2 {
-		t.Fatalf("field count = %d, want 2", len(body.Fields))
+	if body.Fields == nil {
+		t.Fatal("fields is nil")
 	}
-	if body.Fields[0].Code == "" {
+	if len(*body.Fields) != 2 {
+		t.Fatalf("field count = %d, want 2", len(*body.Fields))
+	}
+	if (*body.Fields)[0].Code == "" {
 		t.Fatal("first field code is empty")
 	}
 
@@ -182,12 +186,38 @@ func TestCreateNoteRejectsInvalidJSON(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
 	}
 
-	var body errorResponse
+	var body openapi.ErrorResponse
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Code != errorCodeInvalidJSON {
-		t.Fatalf("code = %s, want %s", body.Code, errorCodeInvalidJSON)
+	if body.Code != openapi.ErrorCodeInvalidJSON {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidJSON)
+	}
+}
+
+func TestCreateNoteRejectsUnknownJSONFields(t *testing.T) {
+	router := NewRouter(fakeNoteStore{
+		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
+			t.Fatal("CreateNote should not be called")
+			return note.Note{}, nil
+		},
+	})
+	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"comida","city_slug":"sao-paulo","unexpected":true}`)
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeInvalidJSON {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidJSON)
 	}
 }
 
@@ -203,12 +233,12 @@ func TestCreateNoteRejectsTrailingJSON(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
 	}
 
-	var body errorResponse
+	var body openapi.ErrorResponse
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Code != errorCodeInvalidJSON {
-		t.Fatalf("code = %s, want %s", body.Code, errorCodeInvalidJSON)
+	if body.Code != openapi.ErrorCodeInvalidJSON {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidJSON)
 	}
 }
 
@@ -224,12 +254,12 @@ func TestCreateNoteRejectsOversizedRequestBody(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusRequestEntityTooLarge)
 	}
 
-	var body errorResponse
+	var body openapi.ErrorResponse
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Code != errorCodeRequestTooLarge {
-		t.Fatalf("code = %s, want %s", body.Code, errorCodeRequestTooLarge)
+	if body.Code != openapi.ErrorCodeRequestTooLarge {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeRequestTooLarge)
 	}
 }
 

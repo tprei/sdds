@@ -5,21 +5,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
+
+	"github.com/tprei/sdds/services/api/internal/openapi"
 )
-
-type errorCode string
-
-const (
-	errorCodeInternal        errorCode = "internal_error"
-	errorCodeInvalidJSON     errorCode = "invalid_json"
-	errorCodeInvalidNote     errorCode = "invalid_note"
-	errorCodeRequestTooLarge errorCode = "request_too_large"
-)
-
-type errorResponse struct {
-	Code   errorCode                   `json:"code"`
-	Fields []validationProblemResponse `json:"fields,omitempty"`
-}
 
 func decodeJSONRequest(w http.ResponseWriter, r *http.Request, maxBytes int64, target any) bool {
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBytes))
@@ -42,11 +30,11 @@ func decodeJSONRequest(w http.ResponseWriter, r *http.Request, maxBytes int64, t
 func writeDecodeError(w http.ResponseWriter, err error) {
 	var maxBytesError *http.MaxBytesError
 	if errors.As(err, &maxBytesError) {
-		writeError(w, http.StatusRequestEntityTooLarge, errorResponse{Code: errorCodeRequestTooLarge})
+		writeError(w, http.StatusRequestEntityTooLarge, openapi.ErrorResponse{Code: openapi.ErrorCodeRequestTooLarge})
 		return
 	}
 
-	writeError(w, http.StatusBadRequest, errorResponse{Code: errorCodeInvalidJSON})
+	writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidJSON})
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
@@ -55,6 +43,6 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	json.NewEncoder(w).Encode(body)
 }
 
-func writeError(w http.ResponseWriter, status int, body errorResponse) {
+func writeError(w http.ResponseWriter, status int, body openapi.ErrorResponse) {
 	writeJSON(w, status, body)
 }

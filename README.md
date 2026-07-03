@@ -44,6 +44,7 @@ sdds/
     api/             # Go HTTP API
   packages/
     tokens/          # shared design tokens for production code
+  openapi/           # source-of-truth HTTP JSON contract
   infra/
     compose/         # Docker Compose / Portainer deployment
 ```
@@ -66,7 +67,7 @@ The backend starts as a single Go service:
 - SQLite FTS5 for MVP search.
 - SQL migrations checked into the repo.
 
-The API contract standard is OpenAPI-first over JSON/HTTP. Product endpoints should describe the external contract with OpenAPI and keep JSON on the wire. Mobile can then consume generated TypeScript types, or a thin generated client, while Go keeps hand-owned domain and persistence code behind the HTTP boundary.
+The API contract standard is OpenAPI-first over JSON/HTTP. Product endpoints describe the external contract in `openapi/openapi.yaml` and keep JSON on the wire. Mobile can then consume generated TypeScript types, or a thin generated client, while Go keeps hand-owned domain and persistence code behind the HTTP boundary.
 
 Protobuf is not the default for this phase of the product. We should only introduce protobuf or gRPC when the product needs stricter multi-client or multi-service contracts badly enough to justify the extra workflow and review overhead.
 
@@ -170,6 +171,7 @@ Useful focused checks:
 
 ```sh
 pnpm test:api
+pnpm openapi:lint
 pnpm typecheck:tokens
 pnpm typecheck:mobile
 ```

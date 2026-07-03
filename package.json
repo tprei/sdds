@@ -4,14 +4,16 @@
   "private": true,
   "packageManager": "pnpm@11.5.2",
   "scripts": {
-    "check": "pnpm typecheck:tokens && pnpm typecheck:mobile && pnpm test:api",
+    "check": "pnpm openapi:lint && pnpm typecheck:tokens && pnpm typecheck:mobile && pnpm test:api",
     "dev:api": "go run ./services/api/cmd/api",
     "dev:mobile": "pnpm --filter @sdds/mobile dev",
+    "openapi:lint": "redocly lint openapi/openapi.yaml",
     "test:api": "go test ./...",
     "typecheck:mobile": "pnpm --filter @sdds/mobile typecheck",
     "typecheck:tokens": "pnpm --filter @sdds/tokens typecheck"
   },
   "devDependencies": {
+    "@redocly/cli": "^2.36.0",
     "playwright": "^1.61.1"
   }
 }

@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/getkin/kin-openapi/routers/legacy"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
 )
@@ -37,6 +39,7 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/v1/notes", nil)
 
 	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
 
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
@@ -73,6 +76,8 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 		t.Fatalf("note = %T, want map[string]any", notesValue[0])
 	}
 	requireJSONKeys(t, noteValue, "id", "title", "body", "category_slug", "city_slug", "created_at", "updated_at")
+	requireJSONNumber(t, noteValue, "created_at", now.UnixMilli())
+	requireJSONNumber(t, noteValue, "updated_at", now.UnixMilli())
 }
 
 func TestCreateNoteReturnsCreatedNote(t *testing.T) {
@@ -100,8 +105,10 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 	requestBody := []byte(`{"title":" Café bom ","body":"Tem pão de queijo decente.","category_slug":"comida","city_slug":"sao-paulo"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
 
 	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
 
 	if response.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusCreated)
@@ -123,15 +130,21 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 	if body.UpdatedAt != now.UnixMilli() {
 		t.Fatalf("updated_at = %d, want %d", body.UpdatedAt, now.UnixMilli())
 	}
+
+	wireBody := decodeResponseObject(t, response.Body.Bytes())
+	requireJSONNumber(t, wireBody, "created_at", now.UnixMilli())
+	requireJSONNumber(t, wireBody, "updated_at", now.UnixMilli())
 }
 
 func TestCreateNoteRejectsValidationProblems(t *testing.T) {
 	router := NewRouter(fakeNoteStore{})
-	requestBody := []byte(`{"title":"","body":"Funciona.","category_slug":"qualquer","city_slug":"sao-paulo"}`)
+	requestBody := []byte(`{"title":"   ","body":"   ","category_slug":"comida","city_slug":"sao-paulo"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
 
 	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
 
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
@@ -175,12 +188,142 @@ func TestCreateNoteRejectsValidationProblems(t *testing.T) {
 	requireJSONKeys(t, firstField, "field", "code")
 }
 
+func TestCreateNoteRejectsOpenAPIRequestSchemaProblems(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "unknown category slug",
+			body: `{"title":"Café bom","body":"Funciona.","category_slug":"qualquer","city_slug":"sao-paulo"}`,
+		},
+		{
+			name: "unknown city slug",
+			body: `{"title":"Café bom","body":"Funciona.","category_slug":"comida","city_slug":"qualquer"}`,
+		},
+		{
+			name: "title too long",
+			body: `{"title":"` + strings.Repeat("a", note.TitleMaxLength+1) + `","body":"Funciona.","category_slug":"comida","city_slug":"sao-paulo"}`,
+		},
+		{
+			name: "body too long",
+			body: `{"title":"Café bom","body":"` + strings.Repeat("a", note.BodyMaxLength+1) + `","category_slug":"comida","city_slug":"sao-paulo"}`,
+		},
+	}
+
+	router := NewRouter(fakeNoteStore{
+		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
+			t.Fatal("CreateNote should not be called")
+			return note.Note{}, nil
+		},
+	})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(tt.body))
+			request.Header.Set("Content-Type", "application/json")
+
+			router.ServeHTTP(response, request)
+			requireOpenAPIResponse(t, request, response)
+
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+			}
+
+			var body openapi.ErrorResponse
+			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if body.Code != openapi.ErrorCodeInvalidJSON {
+				t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidJSON)
+			}
+			if body.Fields != nil {
+				t.Fatalf("fields = %#v, want nil", *body.Fields)
+			}
+		})
+	}
+}
+
 func TestCreateNoteRejectsInvalidJSON(t *testing.T) {
 	router := NewRouter(fakeNoteStore{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader([]byte(`{"title":`)))
+	request.Header.Set("Content-Type", "application/json")
 
 	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeInvalidJSON {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidJSON)
+	}
+}
+
+func TestCreateNoteRejectsMissingOrUnsupportedContentType(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+	}{
+		{name: "missing"},
+		{name: "unsupported", contentType: "text/plain"},
+	}
+
+	router := NewRouter(fakeNoteStore{
+		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
+			t.Fatal("CreateNote should not be called")
+			return note.Note{}, nil
+		},
+	})
+	requestBody := `{"title":"Café bom","body":"Funciona.","category_slug":"comida","city_slug":"sao-paulo"}`
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(requestBody))
+			if tt.contentType != "" {
+				request.Header.Set("Content-Type", tt.contentType)
+			}
+
+			router.ServeHTTP(response, request)
+			requireOpenAPIResponse(t, request, response)
+
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+			}
+
+			var body openapi.ErrorResponse
+			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if body.Code != openapi.ErrorCodeInvalidJSON {
+				t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidJSON)
+			}
+		})
+	}
+}
+
+func TestCreateNoteRejectsOldMobileShapedJSON(t *testing.T) {
+	router := NewRouter(fakeNoteStore{
+		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
+			t.Fatal("CreateNote should not be called")
+			return note.Note{}, nil
+		},
+	})
+	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category":"comida","city":"sao-paulo"}`)
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
 
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
@@ -205,8 +348,10 @@ func TestCreateNoteRejectsUnknownJSONFields(t *testing.T) {
 	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"comida","city_slug":"sao-paulo","unexpected":true}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
 
 	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
 
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
@@ -226,8 +371,10 @@ func TestCreateNoteRejectsTrailingJSON(t *testing.T) {
 	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"comida","city_slug":"sao-paulo"} {}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
 
 	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
 
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
@@ -247,8 +394,10 @@ func TestCreateNoteRejectsOversizedRequestBody(t *testing.T) {
 	requestBody := []byte(`{"title":"Café bom","body":"` + strings.Repeat("a", int(maxCreateNoteRequestBytes)) + `","category_slug":"comida","city_slug":"sao-paulo"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
+	request.Header.Set("Content-Type", "application/json")
 
 	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
 
 	if response.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusRequestEntityTooLarge)
@@ -260,6 +409,33 @@ func TestCreateNoteRejectsOversizedRequestBody(t *testing.T) {
 	}
 	if body.Code != openapi.ErrorCodeRequestTooLarge {
 		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeRequestTooLarge)
+	}
+}
+
+func TestListNotesRejectsRequestBody(t *testing.T) {
+	router := NewRouter(fakeNoteStore{
+		listNotes: func(context.Context, int) ([]note.Note, error) {
+			t.Fatal("ListRecentNotes should not be called")
+			return nil, nil
+		},
+	})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/notes", strings.NewReader(`{"unexpected":true}`))
+	request.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeInvalidJSON {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidJSON)
 	}
 }
 
@@ -275,6 +451,45 @@ func TestNoteRoutesRejectUnsupportedMethods(t *testing.T) {
 	}
 }
 
+func requireOpenAPIResponse(t *testing.T, request *http.Request, response *httptest.ResponseRecorder) {
+	t.Helper()
+
+	spec, err := openapi.GetSpec()
+	if err != nil {
+		t.Fatalf("load OpenAPI spec: %v", err)
+	}
+	spec.Servers = nil
+
+	router, err := legacy.NewRouter(spec)
+	if err != nil {
+		t.Fatalf("build OpenAPI router: %v", err)
+	}
+
+	route, pathParams, err := router.FindRoute(request)
+	if err != nil {
+		t.Fatalf("find OpenAPI route: %v", err)
+	}
+
+	options := &openapi3filter.Options{
+		AuthenticationFunc:    openapi3filter.NoopAuthenticationFunc,
+		IncludeResponseStatus: true,
+	}
+	err = openapi3filter.ValidateResponse(request.Context(), (&openapi3filter.ResponseValidationInput{
+		RequestValidationInput: &openapi3filter.RequestValidationInput{
+			Request:    request,
+			PathParams: pathParams,
+			Route:      route,
+			Options:    options,
+		},
+		Status:  response.Code,
+		Header:  response.Header(),
+		Options: options,
+	}).SetBodyBytes(response.Body.Bytes()))
+	if err != nil {
+		t.Fatalf("response does not match OpenAPI contract: %v", err)
+	}
+}
+
 func decodeResponseObject(t *testing.T, body []byte) map[string]any {
 	t.Helper()
 
@@ -283,6 +498,18 @@ func decodeResponseObject(t *testing.T, body []byte) map[string]any {
 		t.Fatalf("decode wire response: %v", err)
 	}
 	return value
+}
+
+func requireJSONNumber(t *testing.T, value map[string]any, key string, want int64) {
+	t.Helper()
+
+	got, ok := value[key].(float64)
+	if !ok {
+		t.Fatalf("%s = %T, want JSON number", key, value[key])
+	}
+	if got != float64(want) {
+		t.Fatalf("%s = %v, want %d", key, got, want)
+	}
 }
 
 func requireJSONKeys(t *testing.T, value map[string]any, keys ...string) {

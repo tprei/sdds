@@ -17,6 +17,7 @@ var _ openapi.ServerInterface = server{}
 func NewRouter(notes note.Store) http.Handler {
 	router := chi.NewRouter()
 	router.Use(localBrowserCORS)
+	router.Use(openAPIRequestValidator())
 
 	return openapi.HandlerFromMux(server{notes: notes}, router)
 }

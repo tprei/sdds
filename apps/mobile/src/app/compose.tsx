@@ -27,12 +27,15 @@ type SubmitState =
   | { status: 'success' }
   | { status: 'error'; message: string };
 
+const defaultCategorySlug: NoteCategorySlug = 'comida';
+const defaultCitySlug: NoteCitySlug = 'sao-paulo';
+
 export default function ComposeScreen() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [category, setCategory] = useState<NoteCategorySlug>('comida');
-  const [city, setCity] = useState<NoteCitySlug>('sao-paulo');
+  const [category, setCategory] = useState<NoteCategorySlug>(defaultCategorySlug);
+  const [city, setCity] = useState<NoteCitySlug>(defaultCitySlug);
   const [submitState, setSubmitState] = useState<SubmitState>({
     status: 'idle',
   });
@@ -88,7 +91,7 @@ export default function ComposeScreen() {
 
       setSubmitState({
         status: 'error',
-        message: 'Não deu pra publicar agora. Confere se a API tá rodando.',
+        message: 'Não deu pra publicar agora. Tenta de novo em instantes.',
       });
     }
   }

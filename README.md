@@ -171,7 +171,9 @@ Useful focused checks:
 
 ```sh
 pnpm test:api
+pnpm test:mobile
 pnpm openapi:lint
+pnpm openapi:check:ts
 pnpm typecheck:tokens
 pnpm typecheck:mobile
 ```

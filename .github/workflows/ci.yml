@@ -54,8 +54,14 @@ jobs:
       - name: Lint OpenAPI contract
         run: pnpm openapi:lint
 
+      - name: Check generated TypeScript API contract
+        run: pnpm openapi:check:ts
+
       - name: Typecheck tokens
         run: pnpm typecheck:tokens
 
       - name: Typecheck mobile
         run: pnpm typecheck:mobile
+
+      - name: Test mobile
+        run: pnpm test:mobile

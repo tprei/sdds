@@ -8,6 +8,7 @@ import type {
   NoteCategorySlug,
   NoteCitySlug,
 } from '@/features/notes/metadata';
+import type { components } from './generated/schema';
 
 export type Note = {
   body: string;
@@ -26,22 +27,29 @@ export type CreateNoteInput = {
   title: string;
 };
 
-type NoteResponse = {
-  body: string;
-  category_slug: NoteCategorySlug;
-  city_slug: NoteCitySlug;
-  created_at: number;
-  id: string;
-  title: string;
-  updated_at: number;
-};
+type CreateNoteRequest = components['schemas']['CreateNoteRequest'];
+type ListNotesResponse = components['schemas']['ListNotesResponse'];
+type NoteResponse = components['schemas']['Note'];
+type SchemaKeys<T> = Extract<keyof T, string>;
+type AssertNoMissingKeys<T extends never> = T;
 
-type CreateNoteRequest = {
-  body: string;
-  category_slug: NoteCategorySlug;
-  city_slug: NoteCitySlug;
-  title: string;
-};
+const listNotesResponseKeys = ['notes'] as const satisfies readonly SchemaKeys<ListNotesResponse>[];
+const noteResponseKeys = [
+  'body',
+  'category_slug',
+  'city_slug',
+  'created_at',
+  'id',
+  'title',
+  'updated_at',
+] as const satisfies readonly SchemaKeys<NoteResponse>[];
+
+type MissingListNotesResponseKeys = AssertNoMissingKeys<
+  Exclude<SchemaKeys<ListNotesResponse>, (typeof listNotesResponseKeys)[number]>
+>;
+type MissingNoteResponseKeys = AssertNoMissingKeys<
+  Exclude<SchemaKeys<NoteResponse>, (typeof noteResponseKeys)[number]>
+>;
 
 export class APIRequestError extends Error {
   readonly status: number;
@@ -92,7 +100,7 @@ export async function createNote(input: CreateNoteInput): Promise<Note> {
 }
 
 function parseListNotesResponse(value: unknown): Note[] {
-  if (!isRecord(value) || !Array.isArray(value.notes)) {
+  if (!isListNotesResponse(value)) {
     throw new APIResponseError();
   }
 
@@ -118,6 +126,7 @@ function parseNoteResponse(value: unknown): Note {
 function isNoteResponse(value: unknown): value is NoteResponse {
   return (
     isRecord(value) &&
+    hasOnlyKeys(value, noteResponseKeys) &&
     typeof value.id === 'string' &&
     typeof value.title === 'string' &&
     typeof value.body === 'string' &&
@@ -125,11 +134,34 @@ function isNoteResponse(value: unknown): value is NoteResponse {
     isNoteCategorySlug(value.category_slug) &&
     typeof value.city_slug === 'string' &&
     isNoteCitySlug(value.city_slug) &&
-    typeof value.created_at === 'number' &&
-    typeof value.updated_at === 'number'
+    isUnixMillisecondTimestamp(value.created_at) &&
+    isUnixMillisecondTimestamp(value.updated_at)
+  );
+}
+
+function isListNotesResponse(value: unknown): value is ListNotesResponse {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, listNotesResponseKeys) &&
+    Array.isArray(value.notes)
   );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasOnlyKeys(
+  value: Record<string, unknown>,
+  expectedKeys: readonly string[],
+): boolean {
+  const keys = Object.keys(value);
+  return (
+    keys.length === expectedKeys.length &&
+    expectedKeys.every((key) => Object.prototype.hasOwnProperty.call(value, key))
+  );
+}
+
+function isUnixMillisecondTimestamp(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
 }

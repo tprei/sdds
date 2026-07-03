@@ -1,0 +1,202 @@
+openapi: 3.1.0
+info:
+  title: sdds API
+  version: 0.0.0
+  summary: HTTP JSON contract for the sdds API.
+  license:
+    name: UNLICENSED
+    identifier: UNLICENSED
+servers:
+  - url: /
+    description: Active API origin
+security: []
+tags:
+  - name: Operations
+    description: Runtime health endpoints.
+  - name: Notes
+    description: Text-first recommendation notes.
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Check process health
+      tags:
+        - Operations
+      responses:
+        "204":
+          description: The API process is running.
+  /readyz:
+    get:
+      operationId: getReadiness
+      summary: Check API readiness
+      tags:
+        - Operations
+      responses:
+        "204":
+          description: The API can serve traffic.
+  /v1/notes:
+    get:
+      operationId: listNotes
+      summary: List recent notes
+      tags:
+        - Notes
+      responses:
+        "200":
+          description: Recent notes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListNotesResponse"
+        "500":
+          description: The API could not list notes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: createNote
+      summary: Create a note
+      tags:
+        - Notes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNoteRequest"
+      responses:
+        "201":
+          description: The note was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+        "400":
+          description: The request JSON or note content is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: The request body is too large.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not create the note.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    CategorySlug:
+      type: string
+    CitySlug:
+      type: string
+    CreateNoteRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - body
+        - category_slug
+        - city_slug
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        body:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        category_slug:
+          $ref: "#/components/schemas/CategorySlug"
+        city_slug:
+          $ref: "#/components/schemas/CitySlug"
+    ErrorCode:
+      type: string
+      enum:
+        - internal_error
+        - invalid_json
+        - invalid_note
+        - request_too_large
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationProblem"
+    ListNotesResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - notes
+      properties:
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Note"
+    Note:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - body
+        - category_slug
+        - city_slug
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        category_slug:
+          $ref: "#/components/schemas/CategorySlug"
+        city_slug:
+          $ref: "#/components/schemas/CitySlug"
+        created_at:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Unix timestamp in milliseconds.
+        updated_at:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Unix timestamp in milliseconds.
+    ValidationField:
+      type: string
+      enum:
+        - title
+        - body
+        - category_slug
+        - city_slug
+    ValidationProblem:
+      type: object
+      additionalProperties: false
+      required:
+        - field
+        - code
+      properties:
+        field:
+          $ref: "#/components/schemas/ValidationField"
+        code:
+          type: string
+          enum:
+            - required
+            - too_short
+            - too_long
+            - unknown

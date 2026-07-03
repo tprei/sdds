@@ -264,6 +264,8 @@ func TestCreateNoteRejectsUnknownSlugsThroughDomainValidation(t *testing.T) {
 	if len(*body.Fields) != 2 {
 		t.Fatalf("field count = %d, want 2", len(*body.Fields))
 	}
+	requireValidationProblem(t, *body.Fields, openapi.ValidationFieldCategorySlug, openapi.ValidationProblemCodeUnknown)
+	requireValidationProblem(t, *body.Fields, openapi.ValidationFieldCitySlug, openapi.ValidationProblemCodeUnknown)
 }
 
 func TestCreateNoteRejectsInvalidJSON(t *testing.T) {
@@ -531,6 +533,17 @@ func requireJSONNumber(t *testing.T, value map[string]any, key string, want int6
 	if got != float64(want) {
 		t.Fatalf("%s = %v, want %d", key, got, want)
 	}
+}
+
+func requireValidationProblem(t *testing.T, problems []openapi.ValidationProblem, field openapi.ValidationField, code openapi.ValidationProblemCode) {
+	t.Helper()
+
+	for _, problem := range problems {
+		if problem.Field == field && problem.Code == code {
+			return
+		}
+	}
+	t.Fatalf("missing validation problem %s/%s in %#v", field, code, problems)
 }
 
 func requireJSONKeys(t *testing.T, value map[string]any, keys ...string) {

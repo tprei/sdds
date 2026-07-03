@@ -90,6 +90,8 @@ Avoid dependencies that introduce hidden services, unnecessary global state, or 
 ## Backend Review Rules
 
 - Keep handlers thin.
+- Define product-facing HTTP contracts with OpenAPI and keep JSON on the wire.
+- Keep generated contract types or clients at the boundary; keep domain and persistence code hand-owned.
 - Put validation and domain decisions outside routing code.
 - Prefer explicit SQL and migrations.
 - Keep database access boring and testable.
@@ -106,5 +108,6 @@ Before requesting review:
 - Tests prove behavior where risk justifies them.
 - New dependencies are justified.
 - The PR description explains what changed and why.
+- If the PR changes a product-facing HTTP contract, it explains the OpenAPI impact and any generated client or type updates.
 - Stacked PRs include the stack section described in `agent-guidance/writing/STACKED_DIFFS.md`.
 - Any AI-generated sections were read and edited by a human or explicitly called out.

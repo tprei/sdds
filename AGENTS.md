@@ -12,11 +12,12 @@ Use this as the default architecture:
 
 - Mobile: Expo + React Native + TypeScript.
 - Backend: Go with `net/http` and `chi`.
+- API contracts: OpenAPI-first over JSON/HTTP.
 - Database: SQLite.
 - Search: SQLite FTS5 for the MVP.
 - Deployment: Docker Compose / Portainer on a small VM.
 
-Do not introduce Postgres, Redis, object storage, a background worker, or a dedicated search service unless the user explicitly asks or the product requirement makes it unavoidable.
+Do not introduce Postgres, Redis, object storage, a background worker, a dedicated search service, or protobuf/gRPC unless the user explicitly asks or the product requirement makes it unavoidable.
 
 ## Product Constraints
 
@@ -71,6 +72,7 @@ Do not create generic `manager`, `processor`, `util`, or `service` packages when
 - Avoid animation libraries at first.
 - Avoid Tailwind/NativeWind at first.
 - Use design-system tokens and small local primitives.
+- Prefer generated TypeScript types, or a thin generated client, from the OpenAPI contract for API boundaries.
 - Put API calls in `lib/api` or feature-specific API modules.
 - Keep screens mostly orchestration; move reusable presentation into components.
 
@@ -78,7 +80,9 @@ Do not create generic `manager`, `processor`, `util`, or `service` packages when
 
 - Use Go standard library features where practical.
 - Use `chi` for routing.
+- Keep the external HTTP contract in OpenAPI and JSON.
 - Keep handlers thin.
+- Keep transport DTOs separate from domain and persistence code.
 - Keep SQL explicit.
 - Use migrations for schema changes.
 - Keep SQLite access isolated enough that moving to Postgres later remains possible.

@@ -3,6 +3,8 @@ package sqlite
 import (
 	"context"
 	"testing"
+
+	"github.com/tprei/sdds/services/api/internal/note"
 )
 
 func TestApplyMigrationsCreatesInitialSchema(t *testing.T) {
@@ -39,19 +41,23 @@ func TestApplyMigrationsSeedsControlledMetadata(t *testing.T) {
 	db := openMigratedDatabase(t, ctx)
 	defer db.Close()
 
-	var categoryCount int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM categories`).Scan(&categoryCount); err != nil {
-		t.Fatalf("count categories: %v", err)
-	}
-	if categoryCount != 4 {
-		t.Fatalf("category count = %d, want 4", categoryCount)
+	for _, category := range note.Categories {
+		var label string
+		if err := db.QueryRowContext(ctx, `SELECT label FROM categories WHERE slug = ?`, category.Slug).Scan(&label); err != nil {
+			t.Fatalf("query category %s: %v", category.Slug, err)
+		}
+		if label != category.Label {
+			t.Fatalf("category %s label = %s, want %s", category.Slug, label, category.Label)
+		}
 	}
 
-	var cityCount int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM cities`).Scan(&cityCount); err != nil {
-		t.Fatalf("count cities: %v", err)
-	}
-	if cityCount != 3 {
-		t.Fatalf("city count = %d, want 3", cityCount)
+	for _, city := range note.Cities {
+		var label string
+		if err := db.QueryRowContext(ctx, `SELECT label FROM cities WHERE slug = ?`, city.Slug).Scan(&label); err != nil {
+			t.Fatalf("query city %s: %v", city.Slug, err)
+		}
+		if label != city.Label {
+			t.Fatalf("city %s label = %s, want %s", city.Slug, label, city.Label)
+		}
 	}
 }

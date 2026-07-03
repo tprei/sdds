@@ -5,23 +5,6 @@ import (
 	"time"
 )
 
-type CategorySlug string
-
-const (
-	CategorySlugBeleza     CategorySlug = "beleza"
-	CategorySlugComida     CategorySlug = "comida"
-	CategorySlugViagem     CategorySlug = "viagem"
-	CategorySlugAchadinhos CategorySlug = "achadinhos"
-)
-
-type CitySlug string
-
-const (
-	CitySlugSaoPaulo     CitySlug = "sao-paulo"
-	CitySlugRioDeJaneiro CitySlug = "rio-de-janeiro"
-	CitySlugLisboa       CitySlug = "lisboa"
-)
-
 type Note struct {
 	ID           string
 	Title        string

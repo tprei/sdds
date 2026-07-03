@@ -57,6 +57,21 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 	if body.Notes[0].UpdatedAt != now.UnixMilli() {
 		t.Fatalf("updated_at = %d, want %d", body.Notes[0].UpdatedAt, now.UnixMilli())
 	}
+
+	wireBody := decodeResponseObject(t, response.Body.Bytes())
+	notesValue, ok := wireBody["notes"].([]any)
+	if !ok {
+		t.Fatalf("notes = %T, want []any", wireBody["notes"])
+	}
+	if len(notesValue) != 1 {
+		t.Fatalf("wire note count = %d, want 1", len(notesValue))
+	}
+
+	noteValue, ok := notesValue[0].(map[string]any)
+	if !ok {
+		t.Fatalf("note = %T, want map[string]any", notesValue[0])
+	}
+	requireJSONKeys(t, noteValue, "id", "title", "body", "category_slug", "city_slug", "created_at", "updated_at")
 }
 
 func TestCreateNoteReturnsCreatedNote(t *testing.T) {
@@ -134,6 +149,26 @@ func TestCreateNoteRejectsValidationProblems(t *testing.T) {
 	if body.Fields[0].Code == "" {
 		t.Fatal("first field code is empty")
 	}
+
+	wireBody := decodeResponseObject(t, response.Body.Bytes())
+	requireJSONKeys(t, wireBody, "code", "fields")
+	if _, ok := wireBody["error"]; ok {
+		t.Fatal("unexpected error key in response body")
+	}
+
+	fieldsValue, ok := wireBody["fields"].([]any)
+	if !ok {
+		t.Fatalf("fields = %T, want []any", wireBody["fields"])
+	}
+	if len(fieldsValue) != 2 {
+		t.Fatalf("wire field count = %d, want 2", len(fieldsValue))
+	}
+
+	firstField, ok := fieldsValue[0].(map[string]any)
+	if !ok {
+		t.Fatalf("first field = %T, want map[string]any", fieldsValue[0])
+	}
+	requireJSONKeys(t, firstField, "field", "code")
 }
 
 func TestCreateNoteRejectsInvalidJSON(t *testing.T) {
@@ -207,5 +242,25 @@ func TestNoteRoutesRejectUnsupportedMethods(t *testing.T) {
 
 	if response.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func decodeResponseObject(t *testing.T, body []byte) map[string]any {
+	t.Helper()
+
+	var value map[string]any
+	if err := json.Unmarshal(body, &value); err != nil {
+		t.Fatalf("decode wire response: %v", err)
+	}
+	return value
+}
+
+func requireJSONKeys(t *testing.T, value map[string]any, keys ...string) {
+	t.Helper()
+
+	for _, key := range keys {
+		if _, ok := value[key]; !ok {
+			t.Fatalf("missing JSON key %q in %#v", key, value)
+		}
 	}
 }

@@ -13,10 +13,10 @@ export type Note = {
   body: string;
   category: NoteCategorySlug;
   city: NoteCitySlug;
-  createdAt: string;
+  createdAt: number;
   id: string;
   title: string;
-  updatedAt: string;
+  updatedAt: number;
 };
 
 export type CreateNoteInput = {
@@ -28,12 +28,19 @@ export type CreateNoteInput = {
 
 type NoteResponse = {
   body: string;
-  category: NoteCategorySlug;
-  city: NoteCitySlug;
-  created_at: string;
+  category_slug: NoteCategorySlug;
+  city_slug: NoteCitySlug;
+  created_at: number;
   id: string;
   title: string;
-  updated_at: string;
+  updated_at: number;
+};
+
+type CreateNoteRequest = {
+  body: string;
+  category_slug: NoteCategorySlug;
+  city_slug: NoteCitySlug;
+  title: string;
 };
 
 export class APIRequestError extends Error {
@@ -62,13 +69,15 @@ export async function listNotes(): Promise<Note[]> {
 }
 
 export async function createNote(input: CreateNoteInput): Promise<Note> {
-  const response = await fetch(`${apiBaseURL()}/v1/notes`, {
-    body: JSON.stringify({
-      body: input.body,
-      category: input.category,
-      city: input.city,
-      title: input.title,
-    }),
+  const request: CreateNoteRequest = {
+    body: input.body,
+    category_slug: input.category,
+    city_slug: input.city,
+    title: input.title,
+  };
+
+  const response = await fetch(`${apiBaseURL()}${apiRoutes.notes}`, {
+    body: JSON.stringify(request),
     headers: {
       'Content-Type': 'application/json',
     },
@@ -97,8 +106,8 @@ function parseNoteResponse(value: unknown): Note {
 
   return {
     body: value.body,
-    category: value.category,
-    city: value.city,
+    category: value.category_slug,
+    city: value.city_slug,
     createdAt: value.created_at,
     id: value.id,
     title: value.title,
@@ -112,12 +121,12 @@ function isNoteResponse(value: unknown): value is NoteResponse {
     typeof value.id === 'string' &&
     typeof value.title === 'string' &&
     typeof value.body === 'string' &&
-    typeof value.category === 'string' &&
-    isNoteCategorySlug(value.category) &&
-    typeof value.city === 'string' &&
-    isNoteCitySlug(value.city) &&
-    typeof value.created_at === 'string' &&
-    typeof value.updated_at === 'string'
+    typeof value.category_slug === 'string' &&
+    isNoteCategorySlug(value.category_slug) &&
+    typeof value.city_slug === 'string' &&
+    isNoteCitySlug(value.city_slug) &&
+    typeof value.created_at === 'number' &&
+    typeof value.updated_at === 'number'
   );
 }
 

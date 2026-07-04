@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/tprei/sdds/services/api/internal/note"
@@ -23,6 +24,20 @@ func (handler server) ListNotes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+func (handler server) GetNote(w http.ResponseWriter, r *http.Request, noteID string) {
+	found, err := handler.notes.FindNote(r.Context(), noteID)
+	if errors.Is(err, note.ErrNoteNotFound) {
+		writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, newNoteResponse(found))
 }
 
 func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {

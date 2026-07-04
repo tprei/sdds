@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -19,6 +20,11 @@ const (
 		FROM notes
 		ORDER BY created_at DESC, id DESC
 		LIMIT ?
+	`
+	findNoteSQL = `
+		SELECT id, title, body, category_slug, city_slug, created_at, updated_at
+		FROM notes
+		WHERE id = ?
 	`
 )
 
@@ -71,6 +77,17 @@ func (store *NoteStore) CreateNote(ctx context.Context, input note.CreateInput) 
 	return created, nil
 }
 
+func (store *NoteStore) FindNote(ctx context.Context, id string) (note.Note, error) {
+	found, err := scanNoteRow(store.db.QueryRowContext(ctx, findNoteSQL, id))
+	if err == nil {
+		return found, nil
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return note.Note{}, note.ErrNoteNotFound
+	}
+	return note.Note{}, fmt.Errorf("find note: %w", err)
+}
+
 func (store *NoteStore) ListRecentNotes(ctx context.Context, limit int) (notes []note.Note, err error) {
 	if limit < 1 {
 		return nil, fmt.Errorf("list recent notes: limit must be positive")
@@ -106,13 +123,21 @@ func (store *NoteStore) ListRecentNotes(ctx context.Context, limit int) (notes [
 }
 
 func scanNote(rows *sql.Rows) (note.Note, error) {
+	return scanNoteValues(rows.Scan)
+}
+
+func scanNoteRow(row *sql.Row) (note.Note, error) {
+	return scanNoteValues(row.Scan)
+}
+
+func scanNoteValues(scan func(dest ...any) error) (note.Note, error) {
 	var found note.Note
 	var categorySlug string
 	var citySlug string
 	var createdAt int64
 	var updatedAt int64
 
-	if err := rows.Scan(
+	if err := scan(
 		&found.ID,
 		&found.Title,
 		&found.Body,

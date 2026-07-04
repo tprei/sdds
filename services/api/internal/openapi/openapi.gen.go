@@ -17,6 +17,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
+	"github.com/oapi-codegen/runtime"
 )
 
 // Defines values for ErrorCode.
@@ -24,6 +25,7 @@ const (
 	ErrorCodeInternal        ErrorCode = "internal_error"
 	ErrorCodeInvalidJSON     ErrorCode = "invalid_json"
 	ErrorCodeInvalidNote     ErrorCode = "invalid_note"
+	ErrorCodeNotFound        ErrorCode = "not_found"
 	ErrorCodeRequestTooLarge ErrorCode = "request_too_large"
 )
 
@@ -35,6 +37,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeInvalidJSON:
 		return true
 	case ErrorCodeInvalidNote:
+		return true
+	case ErrorCodeNotFound:
 		return true
 	case ErrorCodeRequestTooLarge:
 		return true
@@ -163,6 +167,9 @@ type ServerInterface interface {
 	// Create a note
 	// (POST /v1/notes)
 	CreateNote(w http.ResponseWriter, r *http.Request)
+	// Get a note
+	// (GET /v1/notes/{note_id})
+	GetNote(w http.ResponseWriter, r *http.Request, noteId string)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -190,6 +197,12 @@ func (_ Unimplemented) ListNotes(w http.ResponseWriter, r *http.Request) {
 // Create a note
 // (POST /v1/notes)
 func (_ Unimplemented) CreateNote(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get a note
+// (GET /v1/notes/{note_id})
+func (_ Unimplemented) GetNote(w http.ResponseWriter, r *http.Request, noteId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -249,6 +262,32 @@ func (siw *ServerInterfaceWrapper) CreateNote(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateNote(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetNote operation middleware
+func (siw *ServerInterfaceWrapper) GetNote(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "note_id" -------------
+	var noteId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "note_id", chi.URLParam(r, "note_id"), &noteId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "note_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetNote(w, r, noteId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -382,6 +421,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/v1/notes", wrapper.CreateNote)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/notes/{note_id}", wrapper.GetNote)
 	})
 
 	return r
@@ -558,6 +600,70 @@ func (response CreateNote500JSONResponse) VisitCreateNoteResponse(w http.Respons
 	return err
 }
 
+type GetNoteRequestObject struct {
+	NoteId string `json:"note_id"`
+}
+
+type GetNoteResponseObject interface {
+	VisitGetNoteResponse(w http.ResponseWriter) error
+}
+
+type GetNote200JSONResponse Note
+
+func (response GetNote200JSONResponse) VisitGetNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNote400JSONResponse ErrorResponse
+
+func (response GetNote400JSONResponse) VisitGetNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNote404JSONResponse ErrorResponse
+
+func (response GetNote404JSONResponse) VisitGetNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNote500JSONResponse ErrorResponse
+
+func (response GetNote500JSONResponse) VisitGetNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Check process health
@@ -572,6 +678,9 @@ type StrictServerInterface interface {
 	// Create a note
 	// (POST /v1/notes)
 	CreateNote(ctx context.Context, request CreateNoteRequestObject) (CreateNoteResponseObject, error)
+	// Get a note
+	// (GET /v1/notes/{note_id})
+	GetNote(ctx context.Context, request GetNoteRequestObject) (GetNoteResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -706,30 +815,58 @@ func (sh *strictHandler) CreateNote(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetNote operation middleware
+func (sh *strictHandler) GetNote(w http.ResponseWriter, r *http.Request, noteId string) {
+	var request GetNoteRequestObject
+
+	request.NoteId = noteId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetNote(ctx, request.(GetNoteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetNote")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetNoteResponseObject); ok {
+		if err := validResponse.VisitGetNoteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"1Fdfb9s2EP8qxG2PquW02R701mbdmiFIg8TdSxEYjHi22EqkSlJuvMDffTiSkmVL+YugzZ4skzze7373",
-	"lzeQ66rWCpWzkN2AzQusuP884g6X2qwvymZJ/926RsjAOiPVEjYJHEl3x6ZB7vBUOzzHbw1aR6e4ENJJ",
-	"rXh5ZnSNxkm0kC14aTGBurd0A1darOm34tcnqJaugOxwOp0mUEnVLhwkQ715RD23EdmvBheQwS/p1tA0",
-	"WpnumEjC0j1QsDV9k4CTrsQ9qAev70O6ScDgt0YaFJB9jpckwex9K/rALrub9NUXzB0heG+MNkdaeBSo",
-	"mopulMqhUbycI+1CAlKteCnF/IvVqvdXaUeKTfDS3Gk9L7lZYk9TxJzA9Su6/dWKG8Ur8tPnre7jqA+S",
-	"/prX8ffFx9OR5dOguVuOgTLT+iQAaE07R1trZfGRIZRHRu5y5Ja6TQILiaXwotJhZe+T/YeM4ATmzOir",
-	"EisfDYEybgxfD7zsEY158ERaR3TYJ5pKTnw4cE/8fVjDlWNgvfjTsvkFpGvuC5OYc1+RBNrcyJrMgAw+",
-	"KXnNnKzQOl7VTCpWybKUFnOthJ1AAgttKpKk9Pr9EHySy4oybtoxRZm3REPKpBi1uisZg52mFj8K3Z6/",
-	"pYDk4WVoh8cd2GMRs82UPynF+mXqCYXvrnK0p2kWb99bfheU7a3uhNdwt42hyx2D2tR/WmlqWegckQAV",
-	"YFto4+J3qb2tjfqq9Hf1aBoivra+RiWj+zOtL6Li2/ZPApjR7U8twraSPrx+hqjYj8hwSXJb1aTjUi30",
-	"MFE+zGZnjJoOy7VyhueOLbRhrkBmhbDs7dkxZUspc4ylloijDDs9OT56f3rx/g9i3JSQQeFcbbM0tbW4",
-	"nmizTKOUTbeHJ4Wryl5eQ6sFElihsQHVdDKdTOmUrlHxWkIGbybTyRtIoOau8HGRFshLV/xL30v0NYDC",
-	"xpN0LCCDv9B98Ed8yw69wku+nh4OiZgVSDBYbXSO1jJpmWmUkmo5ISCH02kIRuVQhQGtrkuZe3WpnxO6",
-	"kfBBjbTrXt45QyxxyGBCo2VKO1ZxlxfeMQSz9dbEh4JtqoqbNWRwVGD+tTOiaO13fOmD/WPLkIVLEkwN",
-	"crG+k8Nz5EIqtPZRNOZcMYtmhcwZvljI/H/IIp0wPetvJXF1kHZTxSiN3cwy5PD5CBkORiOknGOOyjEP",
-	"96W7JIHffjS4gKAphUdWSrulaidAiGtmelz2wiM4mkp7re1IMGyfe9u3xLs49D2LpcP35Ga3XzjT4GYQ",
-	"iQfPBiAMzeMME1vsO7csDkU/Nwh959MmoIrqqfTHF18Ad/Dm54CjOY/AOK2Zf2e+hJwIbvPpSqQNKmfY",
-	"5iy+lfeTwp+mvmBoeb97vM2dXAWN2silVN1skcLmsrttX+y8UTTrx3bHUIlaS+X8nB/HlV7N3iSDpoXX",
-	"7tVCmpDTuqpQhWGrTf7ummDG5nLzXwAAAP//",
+	"1FhNb9s4E/4rBN/3qFpOk92Dbm02bbMI3CBx91IEBiONJbYSqZIjN97A/30xJCXLluN8IJtmT7b5Nc88",
+	"88xw6Fue6qrWChRantxymxZQCff1WCDk2iwvyyan37isgSfcopEq56uIH0vcM2lAIEw0wgX8aMAirRJZ",
+	"JlFqJcpzo2swKMHyZC5KCxGve0O3/FpnS/qsxM0ZqBwLnhyNx+OIV1K1AwfR0G4aUM9sQPZ/A3Oe8P/F",
+	"a0fj4GW84SJtlvjAja3rq4ijxBK2oB68vQ/pKuIGfjTSQMaTr+GQyLu97UUf2FV3kr7+BikSghNjtDnW",
+	"mUMBqqnoRKkQjBLlDGiWR1yqhShlNvtmter9VBrJsNI4m+tGZdwDA4sz1HpWCpNDz2rAH/GbN2TpzUIY",
+	"JSqK2dc1jtNgm0f9MWfvz8vPkx3DE4+iG55o/BDQdGNBSFOtzzyo1vULsLVWFh4psTQwti/Qa2pXEZ9L",
+	"KDO3VSJU9r69f5FjgsCcG31dQuXU4mkUxojlQAUO0a4In0mLRJF9oqsU5IcDd8G4D6s/chdYt/1p2f4K",
+	"0jl1hSubCVexMrCpkTW5wRP+RckbhrICi6KqmVSskmUpLaRaZXbEIz7XpqKdlH6/H3FXBGRFGTnumKLM",
+	"zMGQMZnt9LorKYOZps5eCt1WvCXl4oPL1AaPG7B3KWadKR8oxfpl7AmFcV+J2rI0DadvDb/3xrZGN+Q1",
+	"nG01dLXhUJv6TytNLQtdICJORdkW2mD4Xmrna6O+K/1TPZqGgK+tr8HIzvmp1pfB8F3zZx7MzukvLcK2",
+	"kj68fnpVbCvSHxLdVTVpuVRzPUyUT9PpOaOLiKVaoREpsrk2DAtgNssse3d+StlSyhRCqSXiKMMmZ6fH",
+	"J5PLkz+IcVPyhBeItU3i2NbZzUibPA67bLxePCqwKnt5zVsrPOILMNajGo/GozGt0jUoUUue8MPReHTI",
+	"I14LLJwu4gJEicXf9D0HVwNINo6k04wn/CPgJ7fEXeP+rnA7346PhkRMCyAYrDY6BWuZtMw0SkmVjwjI",
+	"0XjsxagQlG/g6rqUqTMXuz6iaxkfdJF2t5cLzhBLaDxYpsEypZFVAtPCBYZgttEaOSnYpqqEWfKEHxeQ",
+	"fu+cKFr/UeRO7J9bhiy/oo2xAZEt93J4ASKTCqx9FI2pUMyCWQBDI+Zzmf4HWaQVpuf9nSQuDuKuq9hJ",
+	"Y9ezDDl8PkKGjdEOUi4gBYXMwX3tIYn4by8NziNoyswhK6VdU7UhEOKamR6XPXn4QFNpr7XdIYb1c3D9",
+	"vngfmr5n8XT43lxt3hdoGlgNlHjwbAB807ybYWKL/RSWhabo14rQ3XzaeFTBPJX+8CL04A4Ofw046vMI",
+	"DGrN3NvzNeSED5tLVyJtUDn9tGDhLb2dFP1yGd/Sx0xmq333T0iUWhhRAYKh4265JHTUC9B73Xck4TC+",
+	"rfSoR8b2Pw9X/2I9vi8LXn/5PfI3/MuB64oDAXN/wbwGyeeAd+r9I+AesdNSaoKCaDcNvUtRLrwtbWQu",
+	"VddIx5yEGU7b3nbRKHrYht6OgcpqLRW6R23IhF6DsooGHRrc4Ju5NP4C01UFyr8s2puuO8a7sbpa/RMA",
+	"AP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

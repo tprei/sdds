@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,6 +19,8 @@ import (
 	"github.com/tprei/sdds/services/api/internal/openapi"
 )
 
+const exampleNoteID = "018ff5b8-0000-7000-8000-000000000000"
+
 func TestListNotesReturnsRecentNotes(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	router := NewRouter(fakeNoteStore{
@@ -26,7 +29,7 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 				t.Fatalf("limit = %d, want %d", limit, recentNotesLimit)
 			}
 			return []note.Note{{
-				ID:           "018ff5b8-0000-7000-8000-000000000000",
+				ID:           exampleNoteID,
 				Title:        "Café bom",
 				Body:         "Tem pão de queijo decente.",
 				CategorySlug: "comida",
@@ -52,7 +55,7 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	want := openapi.ListNotesResponse{Notes: []openapi.Note{{
-		Id:           "018ff5b8-0000-7000-8000-000000000000",
+		Id:           exampleNoteID,
 		Title:        "Café bom",
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugComida),
@@ -82,6 +85,105 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 	requireJSONNumber(t, noteValue, "updated_at", now.UnixMilli())
 }
 
+func TestGetNoteReturnsNote(t *testing.T) {
+	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
+	router := NewRouter(fakeNoteStore{
+		findNote: func(_ context.Context, id string) (note.Note, error) {
+			if id != exampleNoteID {
+				t.Fatalf("id = %q, want note id", id)
+			}
+			return note.Note{
+				ID:           id,
+				Title:        "Café bom",
+				Body:         "Tem pão de queijo decente.",
+				CategorySlug: "comida",
+				CitySlug:     "sao-paulo",
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			}, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/notes/"+exampleNoteID, nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	var body openapi.Note
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	want := openapi.Note{
+		Id:           exampleNoteID,
+		Title:        "Café bom",
+		Body:         "Tem pão de queijo decente.",
+		CategorySlug: string(note.CategorySlugComida),
+		CitySlug:     string(note.CitySlugSaoPaulo),
+		CreatedAt:    now.UnixMilli(),
+		UpdatedAt:    now.UnixMilli(),
+	}
+	if diff := cmp.Diff(want, body); diff != "" {
+		t.Fatalf("response body mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestGetNoteReturnsNotFound(t *testing.T) {
+	router := NewRouter(fakeNoteStore{
+		findNote: func(context.Context, string) (note.Note, error) {
+			return note.Note{}, note.ErrNoteNotFound
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/notes/missing-note", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusNotFound)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeNotFound {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeNotFound)
+	}
+}
+
+func TestGetNoteReturnsInternalError(t *testing.T) {
+	router := NewRouter(fakeNoteStore{
+		findNote: func(context.Context, string) (note.Note, error) {
+			return note.Note{}, errors.New("database unavailable")
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/notes/"+exampleNoteID, nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusInternalServerError)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeInternal {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInternal)
+	}
+}
+
 func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	router := NewRouter(fakeNoteStore{
@@ -93,7 +195,7 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 				t.Fatalf("category = %q, want comida", input.CategorySlug)
 			}
 			return note.Note{
-				ID:           "018ff5b8-0000-7000-8000-000000000000",
+				ID:           exampleNoteID,
 				Title:        input.Title,
 				Body:         input.Body,
 				CategorySlug: input.CategorySlug,
@@ -121,7 +223,7 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	want := openapi.Note{
-		Id:           "018ff5b8-0000-7000-8000-000000000000",
+		Id:           exampleNoteID,
 		Title:        "Café bom",
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugComida),

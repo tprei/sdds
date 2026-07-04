@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/oapi-codegen/runtime"
 )
 
 // Defines values for ErrorCode.
@@ -19,6 +21,7 @@ const (
 	ErrorCodeInternal        ErrorCode = "internal_error"
 	ErrorCodeInvalidJSON     ErrorCode = "invalid_json"
 	ErrorCodeInvalidNote     ErrorCode = "invalid_note"
+	ErrorCodeNotFound        ErrorCode = "not_found"
 	ErrorCodeRequestTooLarge ErrorCode = "request_too_large"
 )
 
@@ -30,6 +33,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeInvalidJSON:
 		return true
 	case ErrorCodeInvalidNote:
+		return true
+	case ErrorCodeNotFound:
 		return true
 	case ErrorCodeRequestTooLarge:
 		return true
@@ -230,6 +235,9 @@ type ClientInterface interface {
 	CreateNoteWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	CreateNote(ctx context.Context, body CreateNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetNote request
+	GetNote(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -282,6 +290,18 @@ func (c *Client) CreateNoteWithBody(ctx context.Context, contentType string, bod
 
 func (c *Client) CreateNote(ctx context.Context, body CreateNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateNoteRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetNote(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNoteRequest(c.Server, noteId)
 	if err != nil {
 		return nil, err
 	}
@@ -413,6 +433,40 @@ func NewCreateNoteRequestWithBody(server string, contentType string, body io.Rea
 	return req, nil
 }
 
+// NewGetNoteRequest generates requests for GetNote
+func NewGetNoteRequest(server string, noteId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "note_id", noteId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/notes/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -469,6 +523,9 @@ type ClientWithResponsesInterface interface {
 	CreateNoteWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateNoteHTTPResponse, error)
 
 	CreateNoteWithResponse(ctx context.Context, body CreateNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateNoteHTTPResponse, error)
+
+	// GetNoteWithResponse request
+	GetNoteWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*GetNoteHTTPResponse, error)
 }
 
 type GetHealthHTTPResponse struct {
@@ -596,6 +653,39 @@ func (r CreateNoteHTTPResponse) ContentType() string {
 	return ""
 }
 
+type GetNoteHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Note
+	JSON400      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNoteHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNoteHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetNoteHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetHealthWithResponse request returning *GetHealthHTTPResponse
 func (c *ClientWithResponses) GetHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetHealthHTTPResponse, error) {
 	rsp, err := c.GetHealth(ctx, reqEditors...)
@@ -638,6 +728,15 @@ func (c *ClientWithResponses) CreateNoteWithResponse(ctx context.Context, body C
 		return nil, err
 	}
 	return ParseCreateNoteHTTPResponse(rsp)
+}
+
+// GetNoteWithResponse request returning *GetNoteHTTPResponse
+func (c *ClientWithResponses) GetNoteWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*GetNoteHTTPResponse, error) {
+	rsp, err := c.GetNote(ctx, noteId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNoteHTTPResponse(rsp)
 }
 
 // ParseGetHealthHTTPResponse parses an HTTP response from a GetHealthWithResponse call
@@ -766,6 +865,53 @@ func ParseCreateNoteHTTPResponse(rsp *http.Response) (*CreateNoteHTTPResponse, e
 			return nil, err
 		}
 		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetNoteHTTPResponse parses an HTTP response from a GetNoteWithResponse call
+func ParseGetNoteHTTPResponse(rsp *http.Response) (*GetNoteHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNoteHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Note
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse

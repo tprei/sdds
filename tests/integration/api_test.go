@@ -60,6 +60,18 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	if updatedNotes.Notes[0].Id != created.Id {
 		t.Fatalf("listed note id = %q, want %q", updatedNotes.Notes[0].Id, created.Id)
 	}
+
+	fetched := getNote(t, client, created.Id)
+	requireCreatedNote(t, fetched, request)
+	if fetched.Id != created.Id {
+		t.Fatalf("fetched note id = %q, want %q", fetched.Id, created.Id)
+	}
+	if fetched.CreatedAt != created.CreatedAt {
+		t.Fatalf("fetched created_at = %d, want %d", fetched.CreatedAt, created.CreatedAt)
+	}
+	if fetched.UpdatedAt != created.UpdatedAt {
+		t.Fatalf("fetched updated_at = %d, want %d", fetched.UpdatedAt, created.UpdatedAt)
+	}
 }
 
 func newAPIClient(t *testing.T) *openapi.ClientWithResponses {
@@ -137,6 +149,20 @@ func createNote(t *testing.T, client *openapi.ClientWithResponses, request opena
 		t.Fatal("POST /v1/notes returned 201 without JSON body")
 	}
 	return *response.JSON201
+}
+
+func getNote(t *testing.T, client *openapi.ClientWithResponses, id string) openapi.Note {
+	t.Helper()
+
+	response, err := client.GetNoteWithResponse(context.Background(), id)
+	if err != nil {
+		t.Fatalf("GET /v1/notes/{note_id}: %v", err)
+	}
+	requireStatus(t, "GET /v1/notes/{note_id}", response.StatusCode(), http.StatusOK, response.Body)
+	if response.JSON200 == nil {
+		t.Fatal("GET /v1/notes/{note_id} returned 200 without JSON body")
+	}
+	return *response.JSON200
 }
 
 func requireStatus(t *testing.T, operation string, got int, want int, body []byte) {

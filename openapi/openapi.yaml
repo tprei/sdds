@@ -107,6 +107,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/notes/{note_id}:
+    get:
+      operationId: getNote
+      summary: Get a note
+      tags:
+        - Notes
+      parameters:
+        - name: note_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The note.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+        "400":
+          description: The request does not match the API contract.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The note was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not get the note.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     CategorySlug:
@@ -140,11 +177,13 @@ components:
         - ErrorCodeInternal
         - ErrorCodeInvalidJSON
         - ErrorCodeInvalidNote
+        - ErrorCodeNotFound
         - ErrorCodeRequestTooLarge
       enum:
         - internal_error
         - invalid_json
         - invalid_note
+        - not_found
         - request_too_large
     ErrorResponse:
       type: object

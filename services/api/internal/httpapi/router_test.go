@@ -132,6 +132,7 @@ func TestRouterRejectsPlainOptionsRequest(t *testing.T) {
 
 type fakeNoteStore struct {
 	createNote func(ctx context.Context, input note.CreateInput) (note.Note, error)
+	findNote   func(ctx context.Context, id string) (note.Note, error)
 	listNotes  func(ctx context.Context, limit int) ([]note.Note, error)
 }
 
@@ -140,6 +141,13 @@ func (store fakeNoteStore) CreateNote(ctx context.Context, input note.CreateInpu
 		return note.Note{}, fmt.Errorf("create note not implemented")
 	}
 	return store.createNote(ctx, input)
+}
+
+func (store fakeNoteStore) FindNote(ctx context.Context, id string) (note.Note, error) {
+	if store.findNote == nil {
+		return note.Note{}, fmt.Errorf("find note not implemented")
+	}
+	return store.findNote(ctx, id)
 }
 
 func (store fakeNoteStore) ListRecentNotes(ctx context.Context, limit int) ([]note.Note, error) {

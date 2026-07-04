@@ -2,8 +2,11 @@ package note
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+var ErrNoteNotFound = errors.New("note not found")
 
 type Note struct {
 	ID           string
@@ -24,5 +27,6 @@ type CreateInput struct {
 
 type Store interface {
 	CreateNote(ctx context.Context, input CreateInput) (Note, error)
+	FindNote(ctx context.Context, id string) (Note, error)
 	ListRecentNotes(ctx context.Context, limit int) ([]Note, error)
 }

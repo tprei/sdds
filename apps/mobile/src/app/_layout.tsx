@@ -39,6 +39,7 @@ export default function RootLayout() {
         <Tabs.Screen name="compose" options={{ title: 'Escrever' }} />
         <Tabs.Screen name="saved" options={{ title: 'Salvos' }} />
         <Tabs.Screen name="profile" options={{ title: 'Perfil' }} />
+        <Tabs.Screen name="notes/[id]" options={{ href: null, title: 'Nota' }} />
       </Tabs>
       <StatusBar style="dark" />
     </>

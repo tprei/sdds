@@ -4,6 +4,7 @@ import {
   APIRequestError,
   APIResponseError,
   createNote,
+  getNote,
   listNotes,
 } from './notes';
 import type { components } from './generated/schema';
@@ -111,6 +112,59 @@ describe('notes API client', () => {
     ]);
   });
 
+  it('sends get note requests with the note id in the path', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return jsonResponse(apiNote());
+    });
+
+    await getNote('018ff5b8-0000-7000-8000-000000000000');
+
+    const request = onlyFetchCall(calls);
+    expect(request.url).toBe(
+      'http://localhost:8080/v1/notes/018ff5b8-0000-7000-8000-000000000000',
+    );
+    expect(request.method).toBe('GET');
+  });
+
+  it('parses fetched notes from the API wire shape', async () => {
+    stubFetch(async () => jsonResponse(apiNote()));
+
+    const note = await getNote('018ff5b8-0000-7000-8000-000000000000');
+
+    expect(note).toEqual({
+      body: 'Tem pão de queijo decente.',
+      category: 'comida',
+      city: 'sao-paulo',
+      createdAt: 1782993600000,
+      id: '018ff5b8-0000-7000-8000-000000000000',
+      title: 'Café bom',
+      updatedAt: 1782993600000,
+    });
+  });
+
+  it('raises request errors for missing fetched notes', async () => {
+    stubFetch(async () => jsonResponse({ code: 'not_found' }, httpStatusNotFound));
+
+    await expect(getNote('missing-note')).rejects.toMatchObject(
+      new APIRequestError(httpStatusNotFound),
+    );
+  });
+
+  it('rejects invalid fetched note response shapes', async () => {
+    stubFetch(async () =>
+      jsonResponse({
+        ...apiNote(),
+        category_slug: 'qualquer',
+      }),
+    );
+
+    await expect(
+      getNote('018ff5b8-0000-7000-8000-000000000000'),
+    ).rejects.toThrow(APIResponseError);
+  });
+
   it('rejects unexpected response shapes', async () => {
     stubFetch(async () =>
       jsonResponse({
@@ -181,6 +235,7 @@ describe('notes API client', () => {
 
 const httpStatusCreated = 201;
 const httpStatusBadRequest = 400;
+const httpStatusNotFound = 404;
 
 function apiListNotesResponse(): ListNotesResponse {
   return {

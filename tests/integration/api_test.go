@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/tprei/sdds/services/api/openapi"
 )
 
@@ -155,8 +156,8 @@ func requireCreatedNote(t *testing.T, got openapi.Note, want openapi.CreateNoteR
 
 	gotFields := noteFieldsFromResponse(got)
 	wantFields := noteFieldsFromRequest(want)
-	if gotFields != wantFields {
-		t.Fatalf("note fields = %#v, want %#v", gotFields, wantFields)
+	if diff := cmp.Diff(wantFields, gotFields); diff != "" {
+		t.Fatalf("note fields mismatch (-want +got):\n%s", diff)
 	}
 	if got.CreatedAt <= 0 {
 		t.Fatalf("created_at = %d, want positive timestamp", got.CreatedAt)

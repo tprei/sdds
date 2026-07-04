@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/tprei/sdds/services/api/internal/note"
 )
 
@@ -54,11 +55,10 @@ func TestNoteStoreCreatesAndListsRecentNotes(t *testing.T) {
 	if len(found) != 2 {
 		t.Fatalf("note count = %d, want 2", len(found))
 	}
-	if found[0].ID != second.ID {
-		t.Fatalf("first recent note id = %s, want %s", found[0].ID, second.ID)
-	}
-	if found[1].ID != first.ID {
-		t.Fatalf("second recent note id = %s, want %s", found[1].ID, first.ID)
+	gotIDs := []string{found[0].ID, found[1].ID}
+	wantIDs := []string{second.ID, first.ID}
+	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
+		t.Fatalf("recent note ids mismatch (-want +got):\n%s", diff)
 	}
 	if found[0].CreatedAt != times[1] {
 		t.Fatalf("created_at = %s, want %s", found[0].CreatedAt, times[1])
@@ -138,11 +138,10 @@ func TestNoteStoreListsFractionalSecondNotesInRecentOrder(t *testing.T) {
 	if len(found) != 2 {
 		t.Fatalf("note count = %d, want 2", len(found))
 	}
-	if found[0].ID != newer.ID {
-		t.Fatalf("first recent note id = %s, want %s", found[0].ID, newer.ID)
-	}
-	if found[1].ID != older.ID {
-		t.Fatalf("second recent note id = %s, want %s", found[1].ID, older.ID)
+	gotIDs := []string{found[0].ID, found[1].ID}
+	wantIDs := []string{newer.ID, older.ID}
+	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
+		t.Fatalf("recent note ids mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -171,11 +170,10 @@ func TestNoteStoreStoresUnixMillisecondTimestamps(t *testing.T) {
 	if err := db.QueryRowContext(ctx, `SELECT created_at, updated_at FROM notes WHERE id = ?`, created.ID).Scan(&storedCreatedAt, &storedUpdatedAt); err != nil {
 		t.Fatalf("query stored timestamps: %v", err)
 	}
-	if storedCreatedAt != now.UnixMilli() {
-		t.Fatalf("created_at = %d, want %d", storedCreatedAt, now.UnixMilli())
-	}
-	if storedUpdatedAt != now.UnixMilli() {
-		t.Fatalf("updated_at = %d, want %d", storedUpdatedAt, now.UnixMilli())
+	gotStoredTimestamps := []int64{storedCreatedAt, storedUpdatedAt}
+	wantStoredTimestamps := []int64{now.UnixMilli(), now.UnixMilli()}
+	if diff := cmp.Diff(wantStoredTimestamps, gotStoredTimestamps); diff != "" {
+		t.Fatalf("stored timestamps mismatch (-want +got):\n%s", diff)
 	}
 	if created.CreatedAt != time.UnixMilli(now.UnixMilli()).UTC() {
 		t.Fatalf("created.CreatedAt = %s, want %s", created.CreatedAt, time.UnixMilli(now.UnixMilli()).UTC())

@@ -12,6 +12,8 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers/legacy"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
 )
@@ -49,17 +51,17 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if len(body.Notes) != 1 {
-		t.Fatalf("note count = %d, want 1", len(body.Notes))
-	}
-	if body.Notes[0].CategorySlug != string(note.CategorySlugComida) {
-		t.Fatalf("category_slug = %s, want %s", body.Notes[0].CategorySlug, note.CategorySlugComida)
-	}
-	if body.Notes[0].CreatedAt != now.UnixMilli() {
-		t.Fatalf("created_at = %d, want %d", body.Notes[0].CreatedAt, now.UnixMilli())
-	}
-	if body.Notes[0].UpdatedAt != now.UnixMilli() {
-		t.Fatalf("updated_at = %d, want %d", body.Notes[0].UpdatedAt, now.UnixMilli())
+	want := openapi.ListNotesResponse{Notes: []openapi.Note{{
+		Id:           "018ff5b8-0000-7000-8000-000000000000",
+		Title:        "Café bom",
+		Body:         "Tem pão de queijo decente.",
+		CategorySlug: string(note.CategorySlugComida),
+		CitySlug:     string(note.CitySlugSaoPaulo),
+		CreatedAt:    now.UnixMilli(),
+		UpdatedAt:    now.UnixMilli(),
+	}}}
+	if diff := cmp.Diff(want, body); diff != "" {
+		t.Fatalf("response body mismatch (-want +got):\n%s", diff)
 	}
 
 	wireBody := decodeResponseObject(t, response.Body.Bytes())
@@ -118,17 +120,17 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if body.Id == "" {
-		t.Fatal("id is empty")
+	want := openapi.Note{
+		Id:           "018ff5b8-0000-7000-8000-000000000000",
+		Title:        "Café bom",
+		Body:         "Tem pão de queijo decente.",
+		CategorySlug: string(note.CategorySlugComida),
+		CitySlug:     string(note.CitySlugSaoPaulo),
+		CreatedAt:    now.UnixMilli(),
+		UpdatedAt:    now.UnixMilli(),
 	}
-	if body.CitySlug != string(note.CitySlugSaoPaulo) {
-		t.Fatalf("city_slug = %s, want %s", body.CitySlug, note.CitySlugSaoPaulo)
-	}
-	if body.CreatedAt != now.UnixMilli() {
-		t.Fatalf("created_at = %d, want %d", body.CreatedAt, now.UnixMilli())
-	}
-	if body.UpdatedAt != now.UnixMilli() {
-		t.Fatalf("updated_at = %d, want %d", body.UpdatedAt, now.UnixMilli())
+	if diff := cmp.Diff(want, body); diff != "" {
+		t.Fatalf("response body mismatch (-want +got):\n%s", diff)
 	}
 
 	wireBody := decodeResponseObject(t, response.Body.Bytes())
@@ -157,15 +159,10 @@ func TestCreateNoteRejectsValidationProblems(t *testing.T) {
 	if body.Code != openapi.ErrorCodeInvalidNote {
 		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidNote)
 	}
-	if body.Fields == nil {
-		t.Fatal("fields is nil")
-	}
-	if len(*body.Fields) != 2 {
-		t.Fatalf("field count = %d, want 2", len(*body.Fields))
-	}
-	if (*body.Fields)[0].Code == "" {
-		t.Fatal("first field code is empty")
-	}
+	requireValidationProblems(t, body.Fields, []openapi.ValidationProblem{
+		{Field: openapi.ValidationFieldTitle, Code: openapi.ValidationProblemCodeRequired},
+		{Field: openapi.ValidationFieldBody, Code: openapi.ValidationProblemCodeRequired},
+	})
 
 	wireBody := decodeResponseObject(t, response.Body.Bytes())
 	requireJSONKeys(t, wireBody, "code", "fields")
@@ -258,14 +255,10 @@ func TestCreateNoteRejectsUnknownSlugsThroughDomainValidation(t *testing.T) {
 	if body.Code != openapi.ErrorCodeInvalidNote {
 		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidNote)
 	}
-	if body.Fields == nil {
-		t.Fatal("fields is nil")
-	}
-	if len(*body.Fields) != 2 {
-		t.Fatalf("field count = %d, want 2", len(*body.Fields))
-	}
-	requireValidationProblem(t, *body.Fields, openapi.ValidationFieldCategorySlug, openapi.ValidationProblemCodeUnknown)
-	requireValidationProblem(t, *body.Fields, openapi.ValidationFieldCitySlug, openapi.ValidationProblemCodeUnknown)
+	requireValidationProblems(t, body.Fields, []openapi.ValidationProblem{
+		{Field: openapi.ValidationFieldCategorySlug, Code: openapi.ValidationProblemCodeUnknown},
+		{Field: openapi.ValidationFieldCitySlug, Code: openapi.ValidationProblemCodeUnknown},
+	})
 }
 
 func TestCreateNoteRejectsInvalidJSON(t *testing.T) {
@@ -535,15 +528,21 @@ func requireJSONNumber(t *testing.T, value map[string]any, key string, want int6
 	}
 }
 
-func requireValidationProblem(t *testing.T, problems []openapi.ValidationProblem, field openapi.ValidationField, code openapi.ValidationProblemCode) {
+func requireValidationProblems(t *testing.T, got *[]openapi.ValidationProblem, want []openapi.ValidationProblem) {
 	t.Helper()
 
-	for _, problem := range problems {
-		if problem.Field == field && problem.Code == code {
-			return
-		}
+	if got == nil {
+		t.Fatal("fields is nil")
 	}
-	t.Fatalf("missing validation problem %s/%s in %#v", field, code, problems)
+	sortProblems := cmpopts.SortSlices(func(left openapi.ValidationProblem, right openapi.ValidationProblem) bool {
+		if left.Field != right.Field {
+			return left.Field < right.Field
+		}
+		return left.Code < right.Code
+	})
+	if diff := cmp.Diff(want, *got, sortProblems); diff != "" {
+		t.Fatalf("validation problems mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func requireJSONKeys(t *testing.T, value map[string]any, keys ...string) {

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/tprei/sdds/services/api/internal/note"
 )
 
@@ -65,14 +66,18 @@ func TestRouterAllowsLocalBrowserOrigin(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
-	if response.Header().Get("Access-Control-Allow-Origin") != "http://localhost:8081" {
-		t.Fatalf("access-control-allow-origin = %q, want local origin", response.Header().Get("Access-Control-Allow-Origin"))
+	gotHeaders := map[string]string{
+		"Access-Control-Allow-Origin":  response.Header().Get("Access-Control-Allow-Origin"),
+		"Access-Control-Allow-Methods": response.Header().Get("Access-Control-Allow-Methods"),
+		"Access-Control-Allow-Headers": response.Header().Get("Access-Control-Allow-Headers"),
 	}
-	if response.Header().Get("Access-Control-Allow-Methods") != corsAllowedMethods {
-		t.Fatalf("access-control-allow-methods = %q, want %q", response.Header().Get("Access-Control-Allow-Methods"), corsAllowedMethods)
+	wantHeaders := map[string]string{
+		"Access-Control-Allow-Origin":  "http://localhost:8081",
+		"Access-Control-Allow-Methods": corsAllowedMethods,
+		"Access-Control-Allow-Headers": corsAllowedHeaders,
 	}
-	if response.Header().Get("Access-Control-Allow-Headers") != corsAllowedHeaders {
-		t.Fatalf("access-control-allow-headers = %q, want %q", response.Header().Get("Access-Control-Allow-Headers"), corsAllowedHeaders)
+	if diff := cmp.Diff(wantHeaders, gotHeaders); diff != "" {
+		t.Fatalf("CORS headers mismatch (-want +got):\n%s", diff)
 	}
 }
 

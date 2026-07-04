@@ -13,6 +13,7 @@
     "openapi:generate:ts": "openapi-typescript openapi/openapi.yaml -o apps/mobile/src/lib/api/generated/schema.ts",
     "openapi:lint": "redocly lint openapi/openapi.yaml",
     "test:api": "go test ./...",
+    "test:api:integration": "go test -count=1 -tags=integration ./tests/integration",
     "test:mobile": "pnpm --filter @sdds/mobile test",
     "typecheck:mobile": "pnpm --filter @sdds/mobile typecheck",
     "typecheck:tokens": "pnpm --filter @sdds/tokens typecheck"

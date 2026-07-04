@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -61,6 +62,46 @@ func TestNoteStoreCreatesAndListsRecentNotes(t *testing.T) {
 	}
 	if found[0].CreatedAt != times[1] {
 		t.Fatalf("created_at = %s, want %s", found[0].CreatedAt, times[1])
+	}
+}
+
+func TestNoteStoreFindsNoteByID(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+
+	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
+	store := newNoteStore(db, func() time.Time {
+		return now
+	})
+
+	created, err := store.CreateNote(ctx, note.CreateInput{
+		Title:        "Café com pão de queijo",
+		Body:         "Bom para trabalhar de manhã.",
+		CategorySlug: "comida",
+		CitySlug:     "sao-paulo",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	found, err := store.FindNote(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("find note: %v", err)
+	}
+
+	if diff := cmp.Diff(created, found); diff != "" {
+		t.Fatalf("found note mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestNoteStoreFindsUnknownNoteAsNotFound(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+
+	store := NewNoteStore(db)
+	_, err := store.FindNote(ctx, "missing-note")
+	if !errors.Is(err, note.ErrNoteNotFound) {
+		t.Fatalf("find note error = %v, want ErrNoteNotFound", err)
 	}
 }
 

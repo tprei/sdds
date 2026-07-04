@@ -62,6 +62,8 @@ Use API Docker integration tests when a change affects assembled runtime behavio
 
 Use Playwright synthetics when a change affects a critical product loop across Expo web and the real API. Keep them narrow and user-visible: start Expo web through Playwright, point it at the Dockerized API, complete the workflow through the UI, and assert the API-backed state that a user sees. Prefer one high-signal path over a broad browser matrix.
 
+Build synthetics around durable product behavior, not runtime DOM details. Use roles for controls and content that are real accessibility contracts. Do not add accessibility roles only for test convenience. Use a focused `testID` when a non-semantic screen landmark needs a stable anchor. Avoid order-dependent locators like broad `nth()` or `last()` calls, and reset API state for flows that depend on empty-state or creation behavior.
+
 `pnpm check` stays the fast local gate and does not start Docker or browsers. Run `pnpm test:api:integration` or `pnpm test:synthetics` locally when touching the surfaces above, and call that out in the PR validation notes when Docker is unavailable.
 
 ## Domain-Driven Design

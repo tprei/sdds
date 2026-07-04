@@ -111,13 +111,28 @@ function ReadyNoteDetail({ note }: { note: Note }) {
   return (
     <>
       <View style={styles.metaRow}>
-        <View style={styles.pill}>
+        <View
+          accessibilityLabel={`Categoria da nota: ${categoryLabel(note.category)}`}
+          style={styles.pill}
+        >
           <Text style={styles.pillText}>{categoryLabel(note.category)}</Text>
         </View>
-        <Text style={styles.city}>{cityLabel(note.city)}</Text>
+        <Text
+          accessibilityLabel={`Cidade da nota: ${cityLabel(note.city)}`}
+          style={styles.city}
+        >
+          {cityLabel(note.city)}
+        </Text>
       </View>
-      <Text style={styles.title}>{note.title}</Text>
-      <Text style={styles.body}>{note.body}</Text>
+      <Text accessibilityRole="header" style={styles.title}>
+        {note.title}
+      </Text>
+      <Text
+        accessibilityLabel={`Texto da nota: ${note.body}`}
+        style={styles.body}
+      >
+        {note.body}
+      </Text>
       <View style={styles.dateCard}>
         <View style={styles.dateRow}>
           <Text style={styles.dateLabel}>Publicado</Text>

@@ -31,10 +31,10 @@ CI is the main feedback loop for preventing regressions.
 
 CI currently runs:
 
-- Go formatting and tests.
-- TypeScript checks.
+- `pnpm lint`, which gates Go formatting, OpenAPI linting, and TypeScript/mobile linting.
+- Generated contract checks, TypeScript checks, and tests.
 
-CI should eventually add frontend linting, unit/behavior tests, and migration checks as those surfaces become real.
+CI should eventually add migration checks as that surface becomes real.
 
 Do not merge failing CI because "it is probably unrelated" without a clear human decision recorded on the PR.
 
@@ -66,7 +66,7 @@ Respect DDD principles, scaled to a small codebase:
 
 New dependencies need a short justification in the PR description.
 
-JavaScript dependencies are managed with pnpm workspaces. Run `pnpm install` from the repo root and keep `pnpm-lock.yaml` committed.
+JavaScript dependencies are managed with pnpm workspaces. Run `pnpm install` from the repo root to install packages and set up the pre-commit hook, and keep `pnpm-lock.yaml` committed.
 
 Before adding a dependency, ask:
 

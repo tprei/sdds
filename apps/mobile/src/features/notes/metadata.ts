@@ -22,7 +22,7 @@ const categoryLabels: Record<NoteCategorySlug, string> = {
 };
 
 const cityLabels: Record<NoteCitySlug, string> = {
-  lisboa: 'Lisboa',
+  'lisboa': 'Lisboa',
   'rio-de-janeiro': 'Rio de Janeiro',
   'sao-paulo': 'São Paulo',
 };

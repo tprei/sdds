@@ -11,7 +11,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(page.getByText('Ainda tá quietinho')).toBeVisible();
 
   await page.getByText('Escrever', { exact: true }).click();
-  await expect(page.getByText('Conta um achado')).toBeVisible();
+  await expect(page.getByText('Conta uma dica')).toBeVisible();
 
   await page.getByLabel('Título da nota').fill(title);
   await page.getByLabel('Texto da nota').fill(body);

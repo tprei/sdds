@@ -32,7 +32,7 @@ export default function NoteDetailScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (noteID === undefined || noteID.trim() === '') {
+      if (!noteID?.trim()) {
         setState({ status: 'notFound' });
         return undefined;
       }
@@ -66,7 +66,7 @@ export default function NoteDetailScreen() {
 
   return (
     <FoundationScreen
-      description="Leia o achado completo, com cidade, categoria e data."
+      description="Leia a nota completa, com cidade, categoria e data."
       eyebrow="Nota"
       title="Nota"
     >
@@ -81,7 +81,7 @@ function renderNoteDetailState(state: NoteDetailState) {
     return (
       <EmptyStateCard
         title="Carregando a nota"
-        body="Buscando esse achado completo."
+        body="Buscando essa nota completa."
       />
     );
   }
@@ -90,7 +90,7 @@ function renderNoteDetailState(state: NoteDetailState) {
     return (
       <EmptyStateCard
         title="Nota não encontrada"
-        body="Esse achado não existe mais ou o link tá incompleto."
+        body="Essa nota não existe mais ou o link tá incompleto."
       />
     );
   }
@@ -99,7 +99,7 @@ function renderNoteDetailState(state: NoteDetailState) {
     return (
       <EmptyStateCard
         title="Não deu pra abrir"
-        body="Confere sua conexão e tenta de novo em instantes."
+        body="Confira sua conexão e tente novamente em instantes."
       />
     );
   }

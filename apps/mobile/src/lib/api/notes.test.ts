@@ -16,6 +16,7 @@ vi.mock('react-native', () => ({
 }));
 
 const configuredAPIBaseURLEnvName = 'EXPO_PUBLIC_SDDS_API_BASE_URL';
+const exampleNoteID = '018ff5b8-0000-7000-8000-000000000000';
 
 type FetchCall = {
   request: Request;
@@ -75,7 +76,7 @@ describe('notes API client', () => {
       category: 'comida',
       city: 'sao-paulo',
       createdAt: 1782993600000,
-      id: '018ff5b8-0000-7000-8000-000000000000',
+      id: exampleNoteID,
       title: 'Café bom',
       updatedAt: 1782993600000,
     });
@@ -105,7 +106,7 @@ describe('notes API client', () => {
         category: 'comida',
         city: 'sao-paulo',
         createdAt: 1782993600000,
-        id: '018ff5b8-0000-7000-8000-000000000000',
+        id: exampleNoteID,
         title: 'Café bom',
         updatedAt: 1782993600000,
       },
@@ -119,11 +120,11 @@ describe('notes API client', () => {
       return jsonResponse(apiNote());
     });
 
-    await getNote('018ff5b8-0000-7000-8000-000000000000');
+    await getNote(exampleNoteID);
 
     const request = onlyFetchCall(calls);
     expect(request.url).toBe(
-      'http://localhost:8080/v1/notes/018ff5b8-0000-7000-8000-000000000000',
+      `http://localhost:8080/v1/notes/${exampleNoteID}`,
     );
     expect(request.method).toBe('GET');
   });
@@ -131,14 +132,14 @@ describe('notes API client', () => {
   it('parses fetched notes from the API wire shape', async () => {
     stubFetch(async () => jsonResponse(apiNote()));
 
-    const note = await getNote('018ff5b8-0000-7000-8000-000000000000');
+    const note = await getNote(exampleNoteID);
 
     expect(note).toEqual({
       body: 'Tem pão de queijo decente.',
       category: 'comida',
       city: 'sao-paulo',
       createdAt: 1782993600000,
-      id: '018ff5b8-0000-7000-8000-000000000000',
+      id: exampleNoteID,
       title: 'Café bom',
       updatedAt: 1782993600000,
     });
@@ -161,7 +162,7 @@ describe('notes API client', () => {
     );
 
     await expect(
-      getNote('018ff5b8-0000-7000-8000-000000000000'),
+      getNote(exampleNoteID),
     ).rejects.toThrow(APIResponseError);
   });
 
@@ -174,7 +175,7 @@ describe('notes API client', () => {
             category: 'comida',
             city: 'sao-paulo',
             created_at: 1782993600000,
-            id: '018ff5b8-0000-7000-8000-000000000000',
+            id: exampleNoteID,
             title: 'Café bom',
             updated_at: 1782993600000,
           },
@@ -249,7 +250,7 @@ function apiNote(): NoteResponse {
     category_slug: 'comida',
     city_slug: 'sao-paulo',
     created_at: 1782993600000,
-    id: '018ff5b8-0000-7000-8000-000000000000',
+    id: exampleNoteID,
     title: 'Café bom',
     updated_at: 1782993600000,
   };

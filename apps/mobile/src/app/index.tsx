@@ -47,7 +47,7 @@ export default function HomeScreen() {
     <FoundationScreen
       eyebrow="sdds."
       title="Início"
-      description="Achados recentes de gente real, separados por cidade e categoria."
+      description="Notas recentes de gente real, separadas por cidade e categoria."
     >
       {renderHomeState(state, (note) => {
         router.push({
@@ -63,8 +63,8 @@ function renderHomeState(state: HomeState, onOpenNote: (note: Note) => void) {
   if (state.status === 'loading') {
     return (
       <EmptyStateCard
-        title="Carregando os achados"
-        body="Buscando os achados mais recentes."
+        title="Carregando as notas"
+        body="Buscando as notas mais recentes."
       />
     );
   }

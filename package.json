@@ -15,12 +15,13 @@
     "test:api": "go test ./...",
     "test:api:integration": "go test -count=1 -tags=integration ./tests/integration",
     "test:mobile": "pnpm --filter @sdds/mobile test",
+    "test:synthetics": "playwright test",
     "typecheck:mobile": "pnpm --filter @sdds/mobile typecheck",
     "typecheck:tokens": "pnpm --filter @sdds/tokens typecheck"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@redocly/cli": "^2.36.0",
-    "openapi-typescript": "^7.13.0",
-    "playwright": "^1.61.1"
+    "openapi-typescript": "^7.13.0"
   }
 }

@@ -185,6 +185,17 @@ Run the API with Docker Compose:
 docker compose -f infra/compose/compose.yaml up --build api
 ```
 
+Run the browser-level synthetic against the Dockerized API:
+
+```sh
+docker compose -p sdds-synthetics -f infra/compose/compose.yaml down -v
+SDDS_HTTP_PORT=18080 docker compose -p sdds-synthetics -f infra/compose/compose.yaml up --build -d api
+pnpm test:synthetics
+docker compose -p sdds-synthetics -f infra/compose/compose.yaml down -v
+```
+
+`pnpm test:synthetics` starts Expo web on `http://localhost:19006` and points it at `http://127.0.0.1:18080`. Keep the API on the Compose path for this check so it exercises `services/api/Dockerfile`, `infra/compose/compose.yaml`, the real HTTP API, and the web client together.
+
 ## References
 
 - Expo: https://docs.expo.dev/

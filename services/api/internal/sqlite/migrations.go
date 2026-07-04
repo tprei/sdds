@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"path"
@@ -24,7 +25,7 @@ const (
 	checkMigrationSQL  = `SELECT COUNT(*) FROM schema_migrations WHERE version = ?`
 )
 
-func ApplyMigrations(ctx context.Context, db *sql.DB) error {
+func ApplyMigrations(ctx context.Context, db *sql.DB) (err error) {
 	entries, err := fs.ReadDir(migrations, "migrations")
 	if err != nil {
 		return fmt.Errorf("read migrations: %w", err)
@@ -34,7 +35,11 @@ func ApplyMigrations(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("begin migrations: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && err == nil {
+			err = fmt.Errorf("rollback migrations: %w", rollbackErr)
+		}
+	}()
 
 	if _, err := tx.ExecContext(ctx, createSchemaMigrationsSQL); err != nil {
 		return fmt.Errorf("create schema_migrations: %w", err)

@@ -4,15 +4,19 @@
   "private": true,
   "packageManager": "pnpm@11.5.2",
   "scripts": {
-    "check": "pnpm openapi:lint && pnpm openapi:check:ts && pnpm openapi:check:go && pnpm typecheck:tokens && pnpm typecheck:mobile && pnpm test:mobile && pnpm test:api",
+    "check": "pnpm lint && pnpm openapi:check:ts && pnpm openapi:check:go && pnpm typecheck:tokens && pnpm typecheck:mobile && pnpm test:mobile && pnpm test:api",
     "dev:api": "go run ./services/api/cmd/api",
     "dev:mobile": "pnpm --filter @sdds/mobile dev",
+    "lint": "pnpm lint:go && pnpm openapi:lint && pnpm lint:ts",
+    "lint:go": "files=$(gofmt -l services/api tests/integration); if [ -n \"$files\" ]; then printf '%s\\n' \"$files\"; exit 1; fi; go tool golangci-lint run ./services/api/... ./tests/integration",
+    "lint:ts": "eslint apps/mobile packages/tokens --max-warnings 0",
     "openapi:check:go": "git ls-files --error-unmatch openapi/oapi-codegen.yaml openapi/oapi-codegen.public.yaml && pnpm openapi:generate:go && git ls-files --error-unmatch services/api/internal/openapi/openapi.gen.go services/api/openapi/openapi.gen.go && git diff --exit-code -- services/api/internal/openapi/openapi.gen.go services/api/openapi/openapi.gen.go",
     "openapi:check:ts": "pnpm openapi:generate:ts && git ls-files --error-unmatch apps/mobile/src/lib/api/generated/schema.ts && git diff --exit-code -- apps/mobile/src/lib/api/generated/schema.ts",
     "openapi:generate:go": "go tool oapi-codegen -config openapi/oapi-codegen.yaml openapi/openapi.yaml && go tool oapi-codegen -config openapi/oapi-codegen.public.yaml openapi/openapi.yaml",
     "openapi:generate:ts": "openapi-typescript openapi/openapi.yaml -o apps/mobile/src/lib/api/generated/schema.ts",
     "openapi:lint": "redocly lint openapi/openapi.yaml",
-    "test:api": "go test ./...",
+    "prepare": "husky",
+    "test:api": "go test ./services/api/...",
     "test:api:integration": "go test -count=1 -tags=integration ./tests/integration",
     "test:mobile": "pnpm --filter @sdds/mobile test",
     "test:synthetics": "playwright test",
@@ -22,6 +26,9 @@
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "@redocly/cli": "^2.36.0",
+    "eslint": "^9.39.4",
+    "eslint-config-expo": "^57.0.0",
+    "husky": "^9.1.7",
     "openapi-typescript": "^7.13.0"
   }
 }

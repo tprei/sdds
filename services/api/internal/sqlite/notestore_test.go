@@ -14,7 +14,6 @@ import (
 func TestNoteStoreCreatesAndListsRecentNotes(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
-	defer db.Close()
 
 	times := []time.Time{
 		time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
@@ -68,7 +67,6 @@ func TestNoteStoreCreatesAndListsRecentNotes(t *testing.T) {
 func TestNoteStoreRespectsRecentLimit(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
-	defer db.Close()
 
 	store := newNoteStore(db, func() time.Time {
 		return time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
@@ -97,7 +95,6 @@ func TestNoteStoreRespectsRecentLimit(t *testing.T) {
 func TestNoteStoreListsFractionalSecondNotesInRecentOrder(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
-	defer db.Close()
 
 	times := []time.Time{
 		time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
@@ -148,7 +145,6 @@ func TestNoteStoreListsFractionalSecondNotesInRecentOrder(t *testing.T) {
 func TestNoteStoreStoresUnixMillisecondTimestamps(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
-	defer db.Close()
 
 	now := time.Date(2026, 7, 2, 12, 0, 0, 123_456_789, time.UTC)
 	store := newNoteStore(db, func() time.Time {
@@ -183,7 +179,6 @@ func TestNoteStoreStoresUnixMillisecondTimestamps(t *testing.T) {
 func TestNoteStoreRejectsUnknownCategory(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
-	defer db.Close()
 
 	store := NewNoteStore(db)
 	_, err := store.CreateNote(ctx, note.CreateInput{
@@ -203,7 +198,6 @@ func TestNoteStoreRejectsUnknownCategory(t *testing.T) {
 func TestNoteStoreRejectsUnknownCity(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
-	defer db.Close()
 
 	store := NewNoteStore(db)
 	_, err := store.CreateNote(ctx, note.CreateInput{
@@ -227,8 +221,12 @@ func openMigratedDatabase(t *testing.T, ctx context.Context) *sql.DB {
 	if err != nil {
 		t.Fatalf("open database: %v", err)
 	}
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close database: %v", err)
+		}
+	})
 	if err := ApplyMigrations(ctx, db); err != nil {
-		db.Close()
 		t.Fatalf("apply migrations: %v", err)
 	}
 	return db

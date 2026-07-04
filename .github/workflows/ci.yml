@@ -19,16 +19,8 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Check Go formatting
-        run: |
-          files="$(gofmt -l services/api tests/integration)"
-          if [ -n "$files" ]; then
-            echo "$files"
-            exit 1
-          fi
-
       - name: Test API
-        run: go test ./...
+        run: go test ./services/api/...
 
   api-docker-integration:
     name: API Docker Integration
@@ -97,8 +89,8 @@ jobs:
       - name: Install packages
         run: pnpm install --frozen-lockfile
 
-      - name: Lint OpenAPI contract
-        run: pnpm openapi:lint
+      - name: Lint
+        run: pnpm lint
 
       - name: Check generated TypeScript API contract
         run: pnpm openapi:check:ts

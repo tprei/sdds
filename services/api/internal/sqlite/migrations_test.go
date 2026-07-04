@@ -11,7 +11,6 @@ import (
 func TestApplyMigrationsCreatesInitialSchema(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
-	defer db.Close()
 
 	tables := []string{"schema_migrations", "categories", "cities", "notes"}
 	for _, table := range tables {
@@ -30,7 +29,6 @@ func TestApplyMigrationsCreatesInitialSchema(t *testing.T) {
 func TestApplyMigrationsIsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
-	defer db.Close()
 
 	if err := ApplyMigrations(ctx, db); err != nil {
 		t.Fatalf("apply migrations again: %v", err)
@@ -40,7 +38,6 @@ func TestApplyMigrationsIsIdempotent(t *testing.T) {
 func TestApplyMigrationsSeedsControlledMetadata(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
-	defer db.Close()
 
 	wantCategories := make(map[string]string, len(note.Categories))
 	gotCategories := make(map[string]string, len(note.Categories))

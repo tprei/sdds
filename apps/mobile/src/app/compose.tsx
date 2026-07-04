@@ -99,7 +99,7 @@ export default function ComposeScreen() {
   return (
     <FoundationScreen
       eyebrow="Escrever"
-      title="Conta um achado"
+      title="Conta uma dica"
       description="Uma nota curta, útil e com cara de indicação de amigo."
     >
       <FoundationTextInput

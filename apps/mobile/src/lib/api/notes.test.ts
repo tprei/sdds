@@ -4,6 +4,7 @@ import {
   APIRequestError,
   APIResponseError,
   createNote,
+  getNote,
   listNotes,
 } from './notes';
 import type { components } from './generated/schema';
@@ -15,6 +16,7 @@ vi.mock('react-native', () => ({
 }));
 
 const configuredAPIBaseURLEnvName = 'EXPO_PUBLIC_SDDS_API_BASE_URL';
+const exampleNoteID = '018ff5b8-0000-7000-8000-000000000000';
 
 type FetchCall = {
   request: Request;
@@ -74,7 +76,7 @@ describe('notes API client', () => {
       category: 'comida',
       city: 'sao-paulo',
       createdAt: 1782993600000,
-      id: '018ff5b8-0000-7000-8000-000000000000',
+      id: exampleNoteID,
       title: 'Café bom',
       updatedAt: 1782993600000,
     });
@@ -104,11 +106,64 @@ describe('notes API client', () => {
         category: 'comida',
         city: 'sao-paulo',
         createdAt: 1782993600000,
-        id: '018ff5b8-0000-7000-8000-000000000000',
+        id: exampleNoteID,
         title: 'Café bom',
         updatedAt: 1782993600000,
       },
     ]);
+  });
+
+  it('sends get note requests with the note id in the path', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return jsonResponse(apiNote());
+    });
+
+    await getNote(exampleNoteID);
+
+    const request = onlyFetchCall(calls);
+    expect(request.url).toBe(
+      `http://localhost:8080/v1/notes/${exampleNoteID}`,
+    );
+    expect(request.method).toBe('GET');
+  });
+
+  it('parses fetched notes from the API wire shape', async () => {
+    stubFetch(async () => jsonResponse(apiNote()));
+
+    const note = await getNote(exampleNoteID);
+
+    expect(note).toEqual({
+      body: 'Tem pão de queijo decente.',
+      category: 'comida',
+      city: 'sao-paulo',
+      createdAt: 1782993600000,
+      id: exampleNoteID,
+      title: 'Café bom',
+      updatedAt: 1782993600000,
+    });
+  });
+
+  it('raises request errors for missing fetched notes', async () => {
+    stubFetch(async () => jsonResponse({ code: 'not_found' }, httpStatusNotFound));
+
+    await expect(getNote('missing-note')).rejects.toMatchObject(
+      new APIRequestError(httpStatusNotFound),
+    );
+  });
+
+  it('rejects invalid fetched note response shapes', async () => {
+    stubFetch(async () =>
+      jsonResponse({
+        ...apiNote(),
+        category_slug: 'qualquer',
+      }),
+    );
+
+    await expect(
+      getNote(exampleNoteID),
+    ).rejects.toThrow(APIResponseError);
   });
 
   it('rejects unexpected response shapes', async () => {
@@ -120,7 +175,7 @@ describe('notes API client', () => {
             category: 'comida',
             city: 'sao-paulo',
             created_at: 1782993600000,
-            id: '018ff5b8-0000-7000-8000-000000000000',
+            id: exampleNoteID,
             title: 'Café bom',
             updated_at: 1782993600000,
           },
@@ -181,6 +236,7 @@ describe('notes API client', () => {
 
 const httpStatusCreated = 201;
 const httpStatusBadRequest = 400;
+const httpStatusNotFound = 404;
 
 function apiListNotesResponse(): ListNotesResponse {
   return {
@@ -194,7 +250,7 @@ function apiNote(): NoteResponse {
     category_slug: 'comida',
     city_slug: 'sao-paulo',
     created_at: 1782993600000,
-    id: '018ff5b8-0000-7000-8000-000000000000',
+    id: exampleNoteID,
     title: 'Café bom',
     updated_at: 1782993600000,
   };

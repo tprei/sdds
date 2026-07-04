@@ -13,7 +13,7 @@ export default function SearchScreen() {
     >
       <FoundationTextInput
         accessibilityLabel="Buscar"
-        placeholder="Buscar um achado"
+        placeholder="Buscar uma dica"
       />
 
       <EmptyStateCard

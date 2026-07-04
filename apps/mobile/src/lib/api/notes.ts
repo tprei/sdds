@@ -76,6 +76,21 @@ export async function listNotes(): Promise<Note[]> {
   return parseListNotesResponse(data);
 }
 
+export async function getNote(id: string): Promise<Note> {
+  const { data, response } = await apiClient().GET('/v1/notes/{note_id}', {
+    params: {
+      path: {
+        note_id: id,
+      },
+    },
+  });
+  if (!response.ok) {
+    throw new APIRequestError(response.status);
+  }
+
+  return parseNoteResponse(data);
+}
+
 export async function createNote(input: CreateNoteInput): Promise<Note> {
   const request: CreateNoteRequest = {
     body: input.body,

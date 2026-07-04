@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { EmptyStateCard, FoundationScreen } from '@/components/foundation-screen';
 import { NoteCard } from '@/components/note-card';
@@ -13,6 +13,7 @@ type HomeState =
   | { status: 'error' };
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [state, setState] = useState<HomeState>({ status: 'loading' });
 
   useFocusEffect(
@@ -46,19 +47,24 @@ export default function HomeScreen() {
     <FoundationScreen
       eyebrow="sdds."
       title="Início"
-      description="Achados recentes de gente real, separados por cidade e categoria."
+      description="Notas recentes de gente real, separadas por cidade e categoria."
     >
-      {renderHomeState(state)}
+      {renderHomeState(state, (note) => {
+        router.push({
+          pathname: '/notes/[id]',
+          params: { id: note.id },
+        });
+      })}
     </FoundationScreen>
   );
 }
 
-function renderHomeState(state: HomeState) {
+function renderHomeState(state: HomeState, onOpenNote: (note: Note) => void) {
   if (state.status === 'loading') {
     return (
       <EmptyStateCard
-        title="Carregando os achados"
-        body="Buscando os achados mais recentes."
+        title="Carregando as notas"
+        body="Buscando as notas mais recentes."
       />
     );
   }
@@ -81,5 +87,7 @@ function renderHomeState(state: HomeState) {
     );
   }
 
-  return state.notes.map((note) => <NoteCard key={note.id} note={note} />);
+  return state.notes.map((note) => (
+    <NoteCard key={note.id} note={note} onPress={() => onOpenNote(note)} />
+  ));
 }

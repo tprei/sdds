@@ -5,16 +5,28 @@ import { radius, semanticColors, spacing, typography } from '@sdds/tokens';
 export const styles = StyleSheet.create({
   body: {
     color: semanticColors.textBody,
-    fontSize: typography.sizeBody,
-    lineHeight: 22,
+    fontSize: typography.sizeBodyLarge,
+    lineHeight: 27,
   },
-  card: {
-    backgroundColor: semanticColors.cardSurface,
+  dateCard: {
+    backgroundColor: semanticColors.sunkenBackground,
     borderColor: semanticColors.borderSubtle,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     borderWidth: 1,
-    gap: spacing.sp4,
+    gap: spacing.sp3,
     padding: spacing.sp5,
+  },
+  dateLabel: {
+    color: semanticColors.textMuted,
+    fontSize: typography.sizeSmall,
+    fontWeight: typography.weightBold,
+  },
+  dateRow: {
+    gap: spacing.sp1,
+  },
+  dateValue: {
+    color: semanticColors.textStrong,
+    fontSize: typography.sizeBody,
   },
   city: {
     color: semanticColors.textMuted,
@@ -41,17 +53,10 @@ export const styles = StyleSheet.create({
     letterSpacing: 0,
     textTransform: 'uppercase',
   },
-  pressable: {
-    borderRadius: radius.lg,
-  },
-  pressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.99 }],
-  },
   title: {
     color: semanticColors.textStrong,
-    fontSize: typography.sizeTitle,
-    fontWeight: typography.weightBold,
-    lineHeight: 24,
+    fontSize: typography.sizeH2,
+    fontWeight: typography.weightExtraBold,
+    lineHeight: 31,
   },
 });

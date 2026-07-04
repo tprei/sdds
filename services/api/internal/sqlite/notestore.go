@@ -71,7 +71,7 @@ func (store *NoteStore) CreateNote(ctx context.Context, input note.CreateInput) 
 	return created, nil
 }
 
-func (store *NoteStore) ListRecentNotes(ctx context.Context, limit int) ([]note.Note, error) {
+func (store *NoteStore) ListRecentNotes(ctx context.Context, limit int) (notes []note.Note, err error) {
 	if limit < 1 {
 		return nil, fmt.Errorf("list recent notes: limit must be positive")
 	}
@@ -84,9 +84,13 @@ func (store *NoteStore) ListRecentNotes(ctx context.Context, limit int) ([]note.
 	if err != nil {
 		return nil, fmt.Errorf("query recent notes: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close recent notes rows: %w", closeErr)
+		}
+	}()
 
-	notes := make([]note.Note, 0)
+	notes = make([]note.Note, 0)
 	for rows.Next() {
 		found, err := scanNote(rows)
 		if err != nil {

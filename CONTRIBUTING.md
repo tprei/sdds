@@ -31,7 +31,7 @@ CI is the main feedback loop for preventing regressions.
 
 CI currently runs:
 
-- `pnpm lint`, which gates Go formatting, OpenAPI linting, and TypeScript/mobile linting.
+- `pnpm lint`, which gates Go formatting, Go linting, OpenAPI linting, and TypeScript/mobile linting.
 - Generated contract checks, TypeScript checks, and tests.
 
 CI should eventually add migration checks as that surface becomes real.

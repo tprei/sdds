@@ -25,7 +25,7 @@ func main() {
 	}
 }
 
-func run() error {
+func run() (err error) {
 	ctx := context.Background()
 	config := loadConfig()
 
@@ -33,7 +33,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
-	defer db.Close()
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close database: %w", closeErr)
+		}
+	}()
 
 	if err := sqlite.ApplyMigrations(ctx, db); err != nil {
 		return fmt.Errorf("apply migrations: %w", err)

@@ -8,7 +8,7 @@
     "dev:api": "go run ./services/api/cmd/api",
     "dev:mobile": "pnpm --filter @sdds/mobile dev",
     "lint": "pnpm lint:go && pnpm openapi:lint && pnpm lint:ts",
-    "lint:go": "files=$(gofmt -l services/api tests/integration); if [ -n \"$files\" ]; then printf '%s\\n' \"$files\"; exit 1; fi",
+    "lint:go": "files=$(gofmt -l services/api tests/integration); if [ -n \"$files\" ]; then printf '%s\\n' \"$files\"; exit 1; fi; go tool golangci-lint run ./services/api/... ./tests/integration",
     "lint:ts": "eslint apps/mobile packages/tokens --max-warnings 0",
     "openapi:check:go": "git ls-files --error-unmatch openapi/oapi-codegen.yaml openapi/oapi-codegen.public.yaml && pnpm openapi:generate:go && git ls-files --error-unmatch services/api/internal/openapi/openapi.gen.go services/api/openapi/openapi.gen.go && git diff --exit-code -- services/api/internal/openapi/openapi.gen.go services/api/openapi/openapi.gen.go",
     "openapi:check:ts": "pnpm openapi:generate:ts && git ls-files --error-unmatch apps/mobile/src/lib/api/generated/schema.ts && git diff --exit-code -- apps/mobile/src/lib/api/generated/schema.ts",

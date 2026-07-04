@@ -3,21 +3,34 @@ package main
 import (
 	"net/http"
 	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestNewServerSetsReadTimeouts(t *testing.T) {
 	server := newServer(config{httpAddr: ":9090"}, http.NotFoundHandler())
 
-	if server.Addr != ":9090" {
-		t.Fatalf("addr = %q, want :9090", server.Addr)
+	got := serverSettings{
+		Addr:              server.Addr,
+		ReadHeaderTimeout: server.ReadHeaderTimeout,
+		ReadTimeout:       server.ReadTimeout,
 	}
-	if server.ReadHeaderTimeout != serverReadHeaderTimeout {
-		t.Fatalf("read header timeout = %s, want %s", server.ReadHeaderTimeout, serverReadHeaderTimeout)
+	want := serverSettings{
+		Addr:              ":9090",
+		ReadHeaderTimeout: serverReadHeaderTimeout,
+		ReadTimeout:       serverReadTimeout,
 	}
-	if server.ReadTimeout != serverReadTimeout {
-		t.Fatalf("read timeout = %s, want %s", server.ReadTimeout, serverReadTimeout)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("server settings mismatch (-want +got):\n%s", diff)
 	}
 	if server.Handler == nil {
 		t.Fatal("handler is nil")
 	}
+}
+
+type serverSettings struct {
+	Addr              string
+	ReadHeaderTimeout time.Duration
+	ReadTimeout       time.Duration
 }

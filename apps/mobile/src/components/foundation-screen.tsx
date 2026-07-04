@@ -46,7 +46,9 @@ export function FoundationScreen({
       >
         <View style={styles.header}>
           <Text style={styles.eyebrow}>{eyebrow}</Text>
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.title} testID="screen-title">
+            {title}
+          </Text>
           <Text style={styles.description}>{description}</Text>
         </View>
         <View style={styles.stack}>{children}</View>

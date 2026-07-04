@@ -19,4 +19,13 @@ test('creates a note and reads it from the API-backed home feed', async ({
 
   await expect(page.getByText(title)).toBeVisible();
   await expect(page.getByText(body)).toBeVisible();
+
+  await page.getByRole('button', { name: `Abrir nota: ${title}` }).click();
+
+  await expect(page).toHaveURL(/\/notes\/[^/?#]+$/);
+  await expect(page.getByRole('heading', { name: 'Nota' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: title })).toBeVisible();
+  await expect(page.getByLabel(`Texto da nota: ${body}`)).toBeVisible();
+  await expect(page.getByLabel('Categoria da nota: Comida')).toBeVisible();
+  await expect(page.getByLabel('Cidade da nota: São Paulo')).toBeVisible();
 });

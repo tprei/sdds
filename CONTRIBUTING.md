@@ -32,7 +32,11 @@ CI is the main feedback loop for preventing regressions.
 CI currently runs:
 
 - `pnpm lint`, which gates Go formatting, Go linting, OpenAPI linting, and TypeScript/mobile linting.
-- Generated contract checks, TypeScript checks, and tests.
+- Generated contract checks, TypeScript checks, API tests, and mobile tests.
+- API Docker integration tests against the assembled service.
+- Playwright synthetics against Expo web and the Dockerized API.
+
+Synthetics also run on a daily schedule and can be started manually from GitHub Actions.
 
 CI should eventually add migration checks as that surface becomes real.
 
@@ -51,6 +55,14 @@ Good tests:
 - Prefer a few high-value tests over many brittle tests.
 
 Avoid tests that only verify mocks, implementation details, or framework wiring without proving product behavior.
+
+During development, choose the highest test layer needed to prove the product risk before opening a PR. New or changed product-facing API endpoints need API Docker integration coverage that calls the endpoint through HTTP after Compose startup. If that endpoint powers a critical Expo web user flow, add or update a Playwright synthetic for the visible workflow too.
+
+Use API Docker integration tests when a change affects assembled runtime behavior: Dockerfile or Compose wiring, startup, migrations, routing, SQLite persistence, generated public API clients, new endpoints, or HTTP contract behavior that unit tests cannot prove. Keep these tests black-box: start the API through Compose, wait for readiness, call public HTTP endpoints, and rely on migrated reference data instead of direct database setup or seed shortcuts.
+
+Use Playwright synthetics when a change affects a critical product loop across Expo web and the real API. Keep them narrow and user-visible: start Expo web through Playwright, point it at the Dockerized API, complete the workflow through the UI, and assert the API-backed state that a user sees. Prefer one high-signal path over a broad browser matrix.
+
+`pnpm check` stays the fast local gate and does not start Docker or browsers. Run `pnpm test:api:integration` or `pnpm test:synthetics` locally when touching the surfaces above, and call that out in the PR validation notes when Docker is unavailable.
 
 ## Domain-Driven Design
 
@@ -106,6 +118,7 @@ Before requesting review:
 - The change is scoped to one coherent idea.
 - CI passes locally with `pnpm check`, or the expected CI path is documented.
 - Tests prove behavior where risk justifies them.
+- New or changed product-facing API endpoints include API Docker integration coverage, and critical Expo web flows include synthetic coverage.
 - New dependencies are justified.
 - The PR description explains what changed and why.
 - If the PR changes a product-facing HTTP contract, it explains the OpenAPI impact and any generated client or type updates.

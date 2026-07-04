@@ -172,7 +172,9 @@ Useful focused checks:
 ```sh
 pnpm lint
 pnpm test:api
+pnpm test:api:integration
 pnpm test:mobile
+pnpm test:synthetics
 pnpm openapi:lint
 pnpm openapi:check:ts
 pnpm openapi:check:go
@@ -185,6 +187,17 @@ Run the API with Docker Compose:
 ```sh
 docker compose -f infra/compose/compose.yaml up --build api
 ```
+
+Run the API integration test against the Dockerized API:
+
+```sh
+docker compose -p sdds-api-integration -f infra/compose/compose.yaml down -v
+SDDS_HTTP_PORT=18080 docker compose -p sdds-api-integration -f infra/compose/compose.yaml up --build -d api
+SDDS_API_BASE_URL=http://127.0.0.1:18080 pnpm test:api:integration
+docker compose -p sdds-api-integration -f infra/compose/compose.yaml down -v
+```
+
+`pnpm test:api:integration` expects a live API and exercises public HTTP endpoints through the generated Go OpenAPI client. Keep it on the Compose path when checking runtime boundaries so it covers the built image, migrations, routing, SQLite persistence, and JSON contract together.
 
 Run the browser-level synthetic against the Dockerized API:
 

@@ -170,6 +170,7 @@ pnpm check
 Useful focused checks:
 
 ```sh
+pnpm lint
 pnpm test:api
 pnpm test:mobile
 pnpm openapi:lint

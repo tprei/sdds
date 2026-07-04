@@ -40,7 +40,9 @@ func writeDecodeError(w http.ResponseWriter, err error) {
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(body)
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		return
+	}
 }
 
 func writeError(w http.ResponseWriter, status int, body openapi.ErrorResponse) {

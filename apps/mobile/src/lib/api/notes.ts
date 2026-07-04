@@ -38,10 +38,11 @@ type ParsedNoteResponse = Omit<NoteResponse, 'category_slug' | 'city_slug'> & {
 };
 type SchemaKey<T> = Extract<keyof T, string>;
 type SchemaKeyList<T> = readonly SchemaKey<T>[];
-type AssertNoMissingKeys<T extends never> = T;
+type ExhaustiveSchemaKeyList<T, K extends SchemaKeyList<T>> =
+  Exclude<SchemaKey<T>, K[number]> extends never ? K : never;
 
-const listNotesResponseKeys = ['notes'] as const satisfies SchemaKeyList<ListNotesResponse>;
-const noteResponseKeys = [
+const listNotesResponseKeys = schemaKeyList<ListNotesResponse>()(['notes']);
+const noteResponseKeys = schemaKeyList<NoteResponse>()([
   'body',
   'category_slug',
   'city_slug',
@@ -49,14 +50,7 @@ const noteResponseKeys = [
   'id',
   'title',
   'updated_at',
-] as const satisfies SchemaKeyList<NoteResponse>;
-
-type MissingListNotesResponseKeys = AssertNoMissingKeys<
-  Exclude<SchemaKey<ListNotesResponse>, (typeof listNotesResponseKeys)[number]>
->;
-type MissingNoteResponseKeys = AssertNoMissingKeys<
-  Exclude<SchemaKey<NoteResponse>, (typeof noteResponseKeys)[number]>
->;
+]);
 
 export class APIRequestError extends Error {
   readonly status: number;
@@ -184,6 +178,10 @@ function hasOnlyKeys(
     keys.length === expectedKeys.length &&
     expectedKeys.every((key) => Object.prototype.hasOwnProperty.call(value, key))
   );
+}
+
+function schemaKeyList<T>() {
+  return <const K extends SchemaKeyList<T>>(keys: ExhaustiveSchemaKeyList<T, K>) => keys;
 }
 
 function isUnixMillisecondTimestamp(value: unknown): value is number {

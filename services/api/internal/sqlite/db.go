@@ -21,11 +21,15 @@ func Open(path string) (*sql.DB, error) {
 	db.SetMaxOpenConns(1)
 
 	if _, err := db.Exec(enableForeignKeysSQL); err != nil {
-		db.Close()
+		if closeErr := db.Close(); closeErr != nil {
+			return nil, fmt.Errorf("enable foreign keys: %w; close sqlite: %v", err, closeErr)
+		}
 		return nil, fmt.Errorf("enable foreign keys: %w", err)
 	}
 	if _, err := db.Exec(setBusyTimeoutSQL); err != nil {
-		db.Close()
+		if closeErr := db.Close(); closeErr != nil {
+			return nil, fmt.Errorf("set busy timeout: %w; close sqlite: %v", err, closeErr)
+		}
 		return nil, fmt.Errorf("set busy timeout: %w", err)
 	}
 

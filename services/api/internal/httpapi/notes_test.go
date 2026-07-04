@@ -19,6 +19,8 @@ import (
 	"github.com/tprei/sdds/services/api/internal/openapi"
 )
 
+const exampleNoteID = "018ff5b8-0000-7000-8000-000000000000"
+
 func TestListNotesReturnsRecentNotes(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	router := NewRouter(fakeNoteStore{
@@ -27,7 +29,7 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 				t.Fatalf("limit = %d, want %d", limit, recentNotesLimit)
 			}
 			return []note.Note{{
-				ID:           "018ff5b8-0000-7000-8000-000000000000",
+				ID:           exampleNoteID,
 				Title:        "Café bom",
 				Body:         "Tem pão de queijo decente.",
 				CategorySlug: "comida",
@@ -53,7 +55,7 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	want := openapi.ListNotesResponse{Notes: []openapi.Note{{
-		Id:           "018ff5b8-0000-7000-8000-000000000000",
+		Id:           exampleNoteID,
 		Title:        "Café bom",
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugComida),
@@ -87,7 +89,7 @@ func TestGetNoteReturnsNote(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	router := NewRouter(fakeNoteStore{
 		findNote: func(_ context.Context, id string) (note.Note, error) {
-			if id != "018ff5b8-0000-7000-8000-000000000000" {
+			if id != exampleNoteID {
 				t.Fatalf("id = %q, want note id", id)
 			}
 			return note.Note{
@@ -103,7 +105,7 @@ func TestGetNoteReturnsNote(t *testing.T) {
 	})
 
 	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/v1/notes/018ff5b8-0000-7000-8000-000000000000", nil)
+	request := httptest.NewRequest(http.MethodGet, "/v1/notes/"+exampleNoteID, nil)
 
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)
@@ -117,7 +119,7 @@ func TestGetNoteReturnsNote(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	want := openapi.Note{
-		Id:           "018ff5b8-0000-7000-8000-000000000000",
+		Id:           exampleNoteID,
 		Title:        "Café bom",
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugComida),
@@ -164,7 +166,7 @@ func TestGetNoteReturnsInternalError(t *testing.T) {
 	})
 
 	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/v1/notes/018ff5b8-0000-7000-8000-000000000000", nil)
+	request := httptest.NewRequest(http.MethodGet, "/v1/notes/"+exampleNoteID, nil)
 
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)
@@ -193,7 +195,7 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 				t.Fatalf("category = %q, want comida", input.CategorySlug)
 			}
 			return note.Note{
-				ID:           "018ff5b8-0000-7000-8000-000000000000",
+				ID:           exampleNoteID,
 				Title:        input.Title,
 				Body:         input.Body,
 				CategorySlug: input.CategorySlug,
@@ -221,7 +223,7 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	want := openapi.Note{
-		Id:           "018ff5b8-0000-7000-8000-000000000000",
+		Id:           exampleNoteID,
 		Title:        "Café bom",
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugComida),

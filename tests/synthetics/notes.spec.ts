@@ -8,7 +8,9 @@ test('creates a note and reads it from the API-backed home feed', async ({
   const body = `Coado gostoso, balcão simpático e pão na chapa no ponto ${timestamp}.`;
 
   await page.goto('/');
-  await expect(page.getByText('Ainda tá quietinho')).toBeVisible();
+  await expect(
+    page.getByTestId('screen-title').filter({ hasText: /^Início$/ }),
+  ).toBeVisible();
 
   await page.getByText('Escrever', { exact: true }).click();
   await expect(page.getByText('Conta uma dica')).toBeVisible();
@@ -17,10 +19,25 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await page.getByLabel('Texto da nota').fill(body);
   await page.getByRole('button', { name: 'Publicar' }).click();
 
-  await expect(page.getByText(title)).toBeVisible();
-  await expect(page.getByText(body)).toBeVisible();
+  const publishedNote = page.getByRole('button', {
+    name: `Abrir nota: ${title}`,
+  });
+  await expect(publishedNote).toBeVisible();
+  await expect(publishedNote).toContainText(body);
 
-  await page.getByRole('button', { name: `Abrir nota: ${title}` }).click();
+  await page.getByText('Buscar', { exact: true }).click();
+  await expect(page.getByText('Procure uma nota')).toBeVisible();
+
+  await page.getByLabel('Buscar').fill(title);
+  await page.getByRole('button', { name: 'Buscar' }).click();
+
+  const searchResult = page.getByRole('button', {
+    name: `Abrir nota: ${title}`,
+  });
+  await expect(searchResult).toBeVisible();
+  await expect(searchResult).toContainText(body);
+
+  await searchResult.click();
 
   await expect(page).toHaveURL(/\/notes\/[^/?#]+$/);
   await expect(

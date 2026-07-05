@@ -21,6 +21,7 @@ const (
 	ErrorCodeInternal        ErrorCode = "internal_error"
 	ErrorCodeInvalidJSON     ErrorCode = "invalid_json"
 	ErrorCodeInvalidNote     ErrorCode = "invalid_note"
+	ErrorCodeInvalidSearch   ErrorCode = "invalid_search"
 	ErrorCodeNotFound        ErrorCode = "not_found"
 	ErrorCodeRequestTooLarge ErrorCode = "request_too_large"
 )
@@ -33,6 +34,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeInvalidJSON:
 		return true
 	case ErrorCodeInvalidNote:
+		return true
+	case ErrorCodeInvalidSearch:
 		return true
 	case ErrorCodeNotFound:
 		return true
@@ -48,6 +51,7 @@ const (
 	ValidationFieldBody         ValidationField = "body"
 	ValidationFieldCategorySlug ValidationField = "category_slug"
 	ValidationFieldCitySlug     ValidationField = "city_slug"
+	ValidationFieldQ            ValidationField = "q"
 	ValidationFieldTitle        ValidationField = "title"
 )
 
@@ -59,6 +63,8 @@ func (e ValidationField) Valid() bool {
 	case ValidationFieldCategorySlug:
 		return true
 	case ValidationFieldCitySlug:
+		return true
+	case ValidationFieldQ:
 		return true
 	case ValidationFieldTitle:
 		return true
@@ -145,6 +151,12 @@ type ValidationProblem struct {
 
 // ValidationProblemCode defines model for ValidationProblem.Code.
 type ValidationProblemCode string
+
+// SearchNotesParams defines parameters for SearchNotes.
+type SearchNotesParams struct {
+	// Q Raw user search text. Missing, blank, or overlong values return invalid_search.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+}
 
 // CreateNoteJSONRequestBody defines body for CreateNote for application/json ContentType.
 type CreateNoteJSONRequestBody = CreateNoteRequest
@@ -238,6 +250,9 @@ type ClientInterface interface {
 
 	// GetNote request
 	GetNote(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SearchNotes request
+	SearchNotes(ctx context.Context, params *SearchNotesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -302,6 +317,18 @@ func (c *Client) CreateNote(ctx context.Context, body CreateNoteJSONRequestBody,
 
 func (c *Client) GetNote(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetNoteRequest(c.Server, noteId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SearchNotes(ctx context.Context, params *SearchNotesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSearchNotesRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -467,6 +494,60 @@ func NewGetNoteRequest(server string, noteId string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewSearchNotesRequest generates requests for SearchNotes
+func NewSearchNotesRequest(server string, params *SearchNotesParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/search/notes")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Q != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -526,6 +607,9 @@ type ClientWithResponsesInterface interface {
 
 	// GetNoteWithResponse request
 	GetNoteWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*GetNoteHTTPResponse, error)
+
+	// SearchNotesWithResponse request
+	SearchNotesWithResponse(ctx context.Context, params *SearchNotesParams, reqEditors ...RequestEditorFn) (*SearchNotesHTTPResponse, error)
 }
 
 type GetHealthHTTPResponse struct {
@@ -686,6 +770,38 @@ func (r GetNoteHTTPResponse) ContentType() string {
 	return ""
 }
 
+type SearchNotesHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListNotesResponse
+	JSON400      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r SearchNotesHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SearchNotesHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SearchNotesHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetHealthWithResponse request returning *GetHealthHTTPResponse
 func (c *ClientWithResponses) GetHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetHealthHTTPResponse, error) {
 	rsp, err := c.GetHealth(ctx, reqEditors...)
@@ -737,6 +853,15 @@ func (c *ClientWithResponses) GetNoteWithResponse(ctx context.Context, noteId st
 		return nil, err
 	}
 	return ParseGetNoteHTTPResponse(rsp)
+}
+
+// SearchNotesWithResponse request returning *SearchNotesHTTPResponse
+func (c *ClientWithResponses) SearchNotesWithResponse(ctx context.Context, params *SearchNotesParams, reqEditors ...RequestEditorFn) (*SearchNotesHTTPResponse, error) {
+	rsp, err := c.SearchNotes(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSearchNotesHTTPResponse(rsp)
 }
 
 // ParseGetHealthHTTPResponse parses an HTTP response from a GetHealthWithResponse call
@@ -912,6 +1037,46 @@ func ParseGetNoteHTTPResponse(rsp *http.Response) (*GetNoteHTTPResponse, error) 
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSearchNotesHTTPResponse parses an HTTP response from a SearchNotesWithResponse call
+func ParseSearchNotesHTTPResponse(rsp *http.Response) (*SearchNotesHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SearchNotesHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListNotesResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse

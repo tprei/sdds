@@ -144,6 +144,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/search/notes:
+    get:
+      operationId: searchNotes
+      summary: Search notes
+      tags:
+        - Notes
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Raw user search text. Missing, blank, or overlong values return invalid_search.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching notes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListNotesResponse"
+        "400":
+          description: The search query is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not search notes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     CategorySlug:
@@ -177,12 +209,14 @@ components:
         - ErrorCodeInternal
         - ErrorCodeInvalidJSON
         - ErrorCodeInvalidNote
+        - ErrorCodeInvalidSearch
         - ErrorCodeNotFound
         - ErrorCodeRequestTooLarge
       enum:
         - internal_error
         - invalid_json
         - invalid_note
+        - invalid_search
         - not_found
         - request_too_large
     ErrorResponse:
@@ -246,11 +280,13 @@ components:
         - ValidationFieldBody
         - ValidationFieldCategorySlug
         - ValidationFieldCitySlug
+        - ValidationFieldQ
       enum:
         - title
         - body
         - category_slug
         - city_slug
+        - q
     ValidationProblem:
       type: object
       additionalProperties: false

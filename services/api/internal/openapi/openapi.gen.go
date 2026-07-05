@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -25,6 +26,7 @@ const (
 	ErrorCodeInternal        ErrorCode = "internal_error"
 	ErrorCodeInvalidJSON     ErrorCode = "invalid_json"
 	ErrorCodeInvalidNote     ErrorCode = "invalid_note"
+	ErrorCodeInvalidSearch   ErrorCode = "invalid_search"
 	ErrorCodeNotFound        ErrorCode = "not_found"
 	ErrorCodeRequestTooLarge ErrorCode = "request_too_large"
 )
@@ -37,6 +39,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeInvalidJSON:
 		return true
 	case ErrorCodeInvalidNote:
+		return true
+	case ErrorCodeInvalidSearch:
 		return true
 	case ErrorCodeNotFound:
 		return true
@@ -52,6 +56,7 @@ const (
 	ValidationFieldBody         ValidationField = "body"
 	ValidationFieldCategorySlug ValidationField = "category_slug"
 	ValidationFieldCitySlug     ValidationField = "city_slug"
+	ValidationFieldQ            ValidationField = "q"
 	ValidationFieldTitle        ValidationField = "title"
 )
 
@@ -63,6 +68,8 @@ func (e ValidationField) Valid() bool {
 	case ValidationFieldCategorySlug:
 		return true
 	case ValidationFieldCitySlug:
+		return true
+	case ValidationFieldQ:
 		return true
 	case ValidationFieldTitle:
 		return true
@@ -150,6 +157,12 @@ type ValidationProblem struct {
 // ValidationProblemCode defines model for ValidationProblem.Code.
 type ValidationProblemCode string
 
+// SearchNotesParams defines parameters for SearchNotes.
+type SearchNotesParams struct {
+	// Q Raw user search text. Missing, blank, or overlong values return invalid_search.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+}
+
 // CreateNoteJSONRequestBody defines body for CreateNote for application/json ContentType.
 type CreateNoteJSONRequestBody = CreateNoteRequest
 
@@ -170,6 +183,9 @@ type ServerInterface interface {
 	// Get a note
 	// (GET /v1/notes/{note_id})
 	GetNote(w http.ResponseWriter, r *http.Request, noteId string)
+	// Search notes
+	// (GET /v1/search/notes)
+	SearchNotes(w http.ResponseWriter, r *http.Request, params SearchNotesParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -203,6 +219,12 @@ func (_ Unimplemented) CreateNote(w http.ResponseWriter, r *http.Request) {
 // Get a note
 // (GET /v1/notes/{note_id})
 func (_ Unimplemented) GetNote(w http.ResponseWriter, r *http.Request, noteId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Search notes
+// (GET /v1/search/notes)
+func (_ Unimplemented) SearchNotes(w http.ResponseWriter, r *http.Request, params SearchNotesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -288,6 +310,39 @@ func (siw *ServerInterfaceWrapper) GetNote(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetNote(w, r, noteId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SearchNotes operation middleware
+func (siw *ServerInterfaceWrapper) SearchNotes(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SearchNotesParams
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SearchNotes(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -424,6 +479,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/notes/{note_id}", wrapper.GetNote)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/search/notes", wrapper.SearchNotes)
 	})
 
 	return r
@@ -664,6 +722,56 @@ func (response GetNote500JSONResponse) VisitGetNoteResponse(w http.ResponseWrite
 	return err
 }
 
+type SearchNotesRequestObject struct {
+	Params SearchNotesParams
+}
+
+type SearchNotesResponseObject interface {
+	VisitSearchNotesResponse(w http.ResponseWriter) error
+}
+
+type SearchNotes200JSONResponse ListNotesResponse
+
+func (response SearchNotes200JSONResponse) VisitSearchNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchNotes400JSONResponse ErrorResponse
+
+func (response SearchNotes400JSONResponse) VisitSearchNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchNotes500JSONResponse ErrorResponse
+
+func (response SearchNotes500JSONResponse) VisitSearchNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Check process health
@@ -681,6 +789,9 @@ type StrictServerInterface interface {
 	// Get a note
 	// (GET /v1/notes/{note_id})
 	GetNote(ctx context.Context, request GetNoteRequestObject) (GetNoteResponseObject, error)
+	// Search notes
+	// (GET /v1/search/notes)
+	SearchNotes(ctx context.Context, request SearchNotesRequestObject) (SearchNotesResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -841,32 +952,60 @@ func (sh *strictHandler) GetNote(w http.ResponseWriter, r *http.Request, noteId 
 	}
 }
 
+// SearchNotes operation middleware
+func (sh *strictHandler) SearchNotes(w http.ResponseWriter, r *http.Request, params SearchNotesParams) {
+	var request SearchNotesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SearchNotes(ctx, request.(SearchNotesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SearchNotes")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SearchNotesResponseObject); ok {
+		if err := validResponse.VisitSearchNotesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"1FhNb9s4E/4rBN/3qFpOk92Dbm02bbMI3CBx91IEBiONJbYSqZIjN97A/30xJCXLluN8IJtmT7b5Nc88",
-	"88xw6Fue6qrWChRantxymxZQCff1WCDk2iwvyyan37isgSfcopEq56uIH0vcM2lAIEw0wgX8aMAirRJZ",
-	"JlFqJcpzo2swKMHyZC5KCxGve0O3/FpnS/qsxM0ZqBwLnhyNx+OIV1K1AwfR0G4aUM9sQPZ/A3Oe8P/F",
-	"a0fj4GW84SJtlvjAja3rq4ijxBK2oB68vQ/pKuIGfjTSQMaTr+GQyLu97UUf2FV3kr7+BikSghNjtDnW",
-	"mUMBqqnoRKkQjBLlDGiWR1yqhShlNvtmter9VBrJsNI4m+tGZdwDA4sz1HpWCpNDz2rAH/GbN2TpzUIY",
-	"JSqK2dc1jtNgm0f9MWfvz8vPkx3DE4+iG55o/BDQdGNBSFOtzzyo1vULsLVWFh4psTQwti/Qa2pXEZ9L",
-	"KDO3VSJU9r69f5FjgsCcG31dQuXU4mkUxojlQAUO0a4In0mLRJF9oqsU5IcDd8G4D6s/chdYt/1p2f4K",
-	"0jl1hSubCVexMrCpkTW5wRP+RckbhrICi6KqmVSskmUpLaRaZXbEIz7XpqKdlH6/H3FXBGRFGTnumKLM",
-	"zMGQMZnt9LorKYOZps5eCt1WvCXl4oPL1AaPG7B3KWadKR8oxfpl7AmFcV+J2rI0DadvDb/3xrZGN+Q1",
-	"nG01dLXhUJv6TytNLQtdICJORdkW2mD4Xmrna6O+K/1TPZqGgK+tr8HIzvmp1pfB8F3zZx7MzukvLcK2",
-	"kj68fnpVbCvSHxLdVTVpuVRzPUyUT9PpOaOLiKVaoREpsrk2DAtgNssse3d+StlSyhRCqSXiKMMmZ6fH",
-	"J5PLkz+IcVPyhBeItU3i2NbZzUibPA67bLxePCqwKnt5zVsrPOILMNajGo/GozGt0jUoUUue8MPReHTI",
-	"I14LLJwu4gJEicXf9D0HVwNINo6k04wn/CPgJ7fEXeP+rnA7346PhkRMCyAYrDY6BWuZtMw0SkmVjwjI",
-	"0XjsxagQlG/g6rqUqTMXuz6iaxkfdJF2t5cLzhBLaDxYpsEypZFVAtPCBYZgttEaOSnYpqqEWfKEHxeQ",
-	"fu+cKFr/UeRO7J9bhiy/oo2xAZEt93J4ASKTCqx9FI2pUMyCWQBDI+Zzmf4HWaQVpuf9nSQuDuKuq9hJ",
-	"Y9ezDDl8PkKGjdEOUi4gBYXMwX3tIYn4by8NziNoyswhK6VdU7UhEOKamR6XPXn4QFNpr7XdIYb1c3D9",
-	"vngfmr5n8XT43lxt3hdoGlgNlHjwbAB807ybYWKL/RSWhabo14rQ3XzaeFTBPJX+8CL04A4Ofw046vMI",
-	"DGrN3NvzNeSED5tLVyJtUDn9tGDhLb2dFP1yGd/Sx0xmq333T0iUWhhRAYKh4265JHTUC9B73Xck4TC+",
-	"rfSoR8b2Pw9X/2I9vi8LXn/5PfI3/MuB64oDAXN/wbwGyeeAd+r9I+AesdNSaoKCaDcNvUtRLrwtbWQu",
-	"VddIx5yEGU7b3nbRKHrYht6OgcpqLRW6R23IhF6DsooGHRrc4Ju5NP4C01UFyr8s2puuO8a7sbpa/RMA",
-	"AP//",
+	"1FhNc9s2EP0rGLRHRpITtwfeEjcf7jiOazu9ZDwamFyRSEiABpaKVY/+e2cBkKJI2pYzqe2eJOJr3z68",
+	"XSxwwxNdVlqBQsvjG26THErh/h4IhEyb1VlRZ/SNqwp4zC0aqTK+jviBxDs6DQiEY41wClc1WKRRIk0l",
+	"Sq1EcWJ0BQYlWB4vRGEh4lWn6YZf6nRFv6W4PgKVYc7j/dlsFvFSqqZhLxraTQLquQ3IfjWw4DH/Zbpx",
+	"dBq8nG65SJMl7jixcX0dcZRYQA/q3sv7kK4jbuCqlgZSHn8Ji0Te7b4XXWAX7Ur68iskSAjeGqPNgU4d",
+	"ClB1SStKhWCUKOZAvTziUi1FIdP5V6tV51NphM6nBWGSnEdcaZwvdK1S7pGCxTlqPS+EyaADIzgU8esX",
+	"ZPrFUhglStrELxtghwEMj7ptzuKfZ5+OR5qPPax+81kDr+041vguwGzbguTOtT7yaBuSTsFWWll4oBiT",
+	"wO1dkthswjriCwlF6qZKhNLeN/dvck0QmBOjLwsona48v8IYsRroxSEa08KRtEjc2R90leSwO3C3S/dh",
+	"9UuOgXXTfywvPIPAT1yKS+fC5bYUbGJkRW7wmH9W8pqhLMGiKCsmFStlUUgLiVapnfCIL7QpaSYF6u/7",
+	"3KULWVLszlqmKIYzMGRMpqNet8ln0FNX6WOh6+23pFjcOaFt8bgFe0wxm0h5RyHWTXgPsHi1Y/7qWTsP",
+	"FnrNb7zBXuuWxIa9jY4GPX+5bDXMCD+WsRpy2v2JOCVxm2uD4X+hnfu1+qb0d/VgZgK+Ju0GI6P951qf",
+	"BcO39R95MKPdnxuETYLdPa16sfSF6heJbkumNFyqhR7Gz4fz8xNGBxdLtEIjEmQLbRjmwGyaWvb65JCC",
+	"qJAJhAxMxFHgHR8dHrw9Pnv7BzFuCh7zHLGy8XRqq/R6ok02DbPsdDN4kmNZdMKdN1Z4xJdgrEc1m8wm",
+	"MxqlK1CikjzmryazySse8Upg7nQxzUEUmP9D/zNwqYFk40g6THnM3wN+cEPcse+PEDfz5Wx/SMR5DgSD",
+	"VUYnYC2TlplaKamyCQHZn828GBWC8hVgVRUyceamrhBpa86dztf2UHObM8QSChWWarBMaWSlwCR3G0Mw",
+	"m92aOCnYuiyFWfGYH+SQfGudyBv/UWRO7J8ahiy/oIlTAyJd3cnhKYhUKrD2QTQmQjELZgkMjVgsZPI/",
+	"ZJFGmI73t5K43Ju2xcYojW0pM+Tw5xEyrJdGSDmFBBQyB/e5b0nEf3tscB5BXaQOWSHthqotgRDXzHS4",
+	"7MjDbzSl9krbETFs7pOb+8ibUAv+FE+HF9b19nmBpob1QIl7Pw2Ar6XHGSa22HdhWaiVnlaE7uTTxqMK",
+	"5in1hzukB7f36mnAUflHYFBr5u6qzyEm/La5cCXSBpnTdwsWLuP9oOimy+kN/cxlur7r/AmBUgkjSkAw",
+	"tNwNl4SOagG63/uKJCzG+0qPOmT0ny4u/sN8fF8UPP/0u+9P+McD1yYHAuaebJ6D5DPAW/X+HvBesfuH",
+	"qHtKBP8c1BQJPbX3znDxndUWDPMLM4RrnLCP0lqpsohdFkJ9iyir6SUYuhOxpShqsMwA1kax7QeyiXsy",
+	"4zG/qsGsNuF0xZ8qcHYqZD6SbKXKnrKUCfw74vqnxhNrNkAbLV7OOn1jqqXBVLqPiu91gnLprWkjM6na",
+	"69+UkyrCagPN1gplCeFGwkCllZYK3QtNEFynrF5Hg3sFXOOLhTS+7NJlCcrfhxsX22W8G+uL9b8BAAD/",
+	"/w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

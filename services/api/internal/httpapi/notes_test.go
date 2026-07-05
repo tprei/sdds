@@ -85,6 +85,202 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 	requireJSONNumber(t, noteValue, "updated_at", now.UnixMilli())
 }
 
+func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
+	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
+	router := NewRouter(fakeNoteStore{
+		searchNotes: func(_ context.Context, input note.SearchInput) ([]note.Note, error) {
+			if input.Query != "café" {
+				t.Fatalf("query = %q, want café", input.Query)
+			}
+			if input.Limit != searchNotesLimit {
+				t.Fatalf("limit = %d, want %d", input.Limit, searchNotesLimit)
+			}
+			return []note.Note{{
+				ID:           exampleNoteID,
+				Title:        "Café bom",
+				Body:         "Tem pão de queijo decente.",
+				CategorySlug: "comida",
+				CitySlug:     "sao-paulo",
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			}}, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=+caf%C3%A9+", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	var body openapi.ListNotesResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	want := openapi.ListNotesResponse{Notes: []openapi.Note{{
+		Id:           exampleNoteID,
+		Title:        "Café bom",
+		Body:         "Tem pão de queijo decente.",
+		CategorySlug: string(note.CategorySlugComida),
+		CitySlug:     string(note.CitySlugSaoPaulo),
+		CreatedAt:    now.UnixMilli(),
+		UpdatedAt:    now.UnixMilli(),
+	}}}
+	if diff := cmp.Diff(want, body); diff != "" {
+		t.Fatalf("response body mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestSearchNotesRejectsEmptyQuery(t *testing.T) {
+	router := NewRouter(fakeNoteStore{
+		searchNotes: func(context.Context, note.SearchInput) ([]note.Note, error) {
+			t.Fatal("SearchNotes should not be called")
+			return nil, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=+%09+", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeInvalidSearch {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidSearch)
+	}
+	requireValidationProblems(t, body.Fields, []openapi.ValidationProblem{
+		{Field: openapi.ValidationFieldQ, Code: openapi.ValidationProblemCodeRequired},
+	})
+}
+
+func TestSearchNotesRejectsMissingQuery(t *testing.T) {
+	router := NewRouter(fakeNoteStore{
+		searchNotes: func(context.Context, note.SearchInput) ([]note.Note, error) {
+			t.Fatal("SearchNotes should not be called")
+			return nil, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeInvalidSearch {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidSearch)
+	}
+	requireValidationProblems(t, body.Fields, []openapi.ValidationProblem{
+		{Field: openapi.ValidationFieldQ, Code: openapi.ValidationProblemCodeRequired},
+	})
+}
+
+func TestSearchNotesRejectsLongQuery(t *testing.T) {
+	router := NewRouter(fakeNoteStore{
+		searchNotes: func(context.Context, note.SearchInput) ([]note.Note, error) {
+			t.Fatal("SearchNotes should not be called")
+			return nil, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q="+strings.Repeat("a", note.SearchQueryMaxLength+1), nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeInvalidSearch {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidSearch)
+	}
+	requireValidationProblems(t, body.Fields, []openapi.ValidationProblem{
+		{Field: openapi.ValidationFieldQ, Code: openapi.ValidationProblemCodeTooLong},
+	})
+}
+
+func TestSearchNotesRejectsDuplicateQuery(t *testing.T) {
+	router := NewRouter(fakeNoteStore{
+		searchNotes: func(context.Context, note.SearchInput) ([]note.Note, error) {
+			t.Fatal("SearchNotes should not be called")
+			return nil, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=cafe&q=pao", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeInvalidSearch {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidSearch)
+	}
+	if body.Fields != nil {
+		t.Fatalf("fields = %#v, want nil", *body.Fields)
+	}
+}
+
+func TestSearchNotesReturnsInternalError(t *testing.T) {
+	router := NewRouter(fakeNoteStore{
+		searchNotes: func(context.Context, note.SearchInput) ([]note.Note, error) {
+			return nil, errors.New("database unavailable")
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=caf%C3%A9", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusInternalServerError)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeInternal {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInternal)
+	}
+}
+
 func TestGetNoteReturnsNote(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	router := NewRouter(fakeNoteStore{

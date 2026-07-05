@@ -33,12 +33,11 @@ CI currently runs:
 
 - `pnpm lint`, which gates Go formatting, Go linting, OpenAPI linting, and TypeScript/mobile linting.
 - Generated contract checks, TypeScript checks, API tests, and mobile tests.
+- API migration validation against the Dockerized service.
 - API Docker integration tests against the assembled service.
 - Playwright synthetics against Expo web and the Dockerized API.
 
 Synthetics also run on a daily schedule and can be started manually from GitHub Actions.
-
-CI should eventually add migration checks as that surface becomes real.
 
 Do not merge failing CI because "it is probably unrelated" without a clear human decision recorded on the PR.
 

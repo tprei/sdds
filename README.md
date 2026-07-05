@@ -137,6 +137,12 @@ Run the API:
 pnpm dev:api
 ```
 
+Apply migrations and exit:
+
+```sh
+SDDS_DATABASE_PATH=/tmp/sdds.db go run ./services/api/cmd/api migrate
+```
+
 Use a custom database path when needed:
 
 ```sh
@@ -186,6 +192,14 @@ Run the API with Docker Compose:
 
 ```sh
 docker compose -f infra/compose/compose.yaml up --build api
+```
+
+Validate migrations with Docker Compose:
+
+```sh
+docker compose -p sdds-migrations -f infra/compose/compose.yaml down -v
+docker compose -p sdds-migrations -f infra/compose/compose.yaml run --build --rm api migrate
+docker compose -p sdds-migrations -f infra/compose/compose.yaml down -v
 ```
 
 Run the API integration test against the Dockerized API:

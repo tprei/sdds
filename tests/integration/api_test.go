@@ -72,6 +72,20 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	if fetched.UpdatedAt != created.UpdatedAt {
 		t.Fatalf("fetched updated_at = %d, want %d", fetched.UpdatedAt, created.UpdatedAt)
 	}
+
+	searchResults := searchNotes(t, client, "pao")
+	if len(searchResults.Notes) != 1 {
+		t.Fatalf("search note count = %d, want 1", len(searchResults.Notes))
+	}
+	requireCreatedNote(t, searchResults.Notes[0], request)
+	if searchResults.Notes[0].Id != created.Id {
+		t.Fatalf("search note id = %q, want %q", searchResults.Notes[0].Id, created.Id)
+	}
+
+	emptySearchResults := searchNotes(t, client, "necessaire")
+	if len(emptySearchResults.Notes) != 0 {
+		t.Fatalf("empty search note count = %d, want 0", len(emptySearchResults.Notes))
+	}
 }
 
 func newAPIClient(t *testing.T) *openapi.ClientWithResponses {
@@ -161,6 +175,20 @@ func getNote(t *testing.T, client *openapi.ClientWithResponses, id string) opena
 	requireStatus(t, "GET /v1/notes/{note_id}", response.StatusCode(), http.StatusOK, response.Body)
 	if response.JSON200 == nil {
 		t.Fatal("GET /v1/notes/{note_id} returned 200 without JSON body")
+	}
+	return *response.JSON200
+}
+
+func searchNotes(t *testing.T, client *openapi.ClientWithResponses, query string) openapi.ListNotesResponse {
+	t.Helper()
+
+	response, err := client.SearchNotesWithResponse(context.Background(), &openapi.SearchNotesParams{Q: &query})
+	if err != nil {
+		t.Fatalf("GET /v1/search/notes: %v", err)
+	}
+	requireStatus(t, "GET /v1/search/notes", response.StatusCode(), http.StatusOK, response.Body)
+	if response.JSON200 == nil {
+		t.Fatal("GET /v1/search/notes returned 200 without JSON body")
 	}
 	return *response.JSON200
 }

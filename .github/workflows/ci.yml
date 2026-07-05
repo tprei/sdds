@@ -22,10 +22,31 @@ jobs:
       - name: Test API
         run: go test ./services/api/...
 
+  api-migrations:
+    name: API Migrations
+    runs-on: ubuntu-latest
+    needs: api
+    timeout-minutes: 10
+    env:
+      COMPOSE_PROJECT_NAME: sdds-ci-migrations-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Reset API migration state
+        run: docker compose -f infra/compose/compose.yaml down --volumes
+
+      - name: Validate API migrations
+        run: docker compose -f infra/compose/compose.yaml run --build --rm api migrate
+
+      - name: Stop API migrations
+        if: always()
+        run: docker compose -f infra/compose/compose.yaml down --volumes
+
   api-docker-integration:
     name: API Docker Integration
     runs-on: ubuntu-latest
-    needs: api
+    needs: api-migrations
     timeout-minutes: 15
     env:
       COMPOSE_PROJECT_NAME: sdds-ci-${{ github.run_id }}-${{ github.run_attempt }}

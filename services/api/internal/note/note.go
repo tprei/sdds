@@ -29,4 +29,5 @@ type Store interface {
 	CreateNote(ctx context.Context, input CreateInput) (Note, error)
 	FindNote(ctx context.Context, id string) (Note, error)
 	ListRecentNotes(ctx context.Context, limit int) ([]Note, error)
+	SearchNotes(ctx context.Context, input SearchInput) ([]Note, error)
 }

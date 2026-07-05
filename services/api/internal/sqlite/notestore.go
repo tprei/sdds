@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/tprei/sdds/services/api/internal/note"
 )
@@ -14,6 +16,10 @@ const (
 	insertNoteSQL = `
 		INSERT INTO notes (id, title, body, category_slug, city_slug, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`
+	insertNoteSearchSQL = `
+		INSERT INTO note_search (note_id, title, body)
+		VALUES (?, ?, ?)
 	`
 	listRecentNotesSQL = `
 		SELECT id, title, body, category_slug, city_slug, created_at, updated_at
@@ -25,6 +31,14 @@ const (
 		SELECT id, title, body, category_slug, city_slug, created_at, updated_at
 		FROM notes
 		WHERE id = ?
+	`
+	searchNotesSQL = `
+		SELECT notes.id, notes.title, notes.body, notes.category_slug, notes.city_slug, notes.created_at, notes.updated_at
+		FROM note_search
+		JOIN notes ON notes.id = note_search.note_id
+		WHERE note_search MATCH ?
+		ORDER BY bm25(note_search), notes.created_at DESC, notes.id DESC
+		LIMIT ?
 	`
 )
 
@@ -43,14 +57,14 @@ func newNoteStore(db *sql.DB, clock func() time.Time) *NoteStore {
 	return &NoteStore{db: db, clock: clock}
 }
 
-func (store *NoteStore) CreateNote(ctx context.Context, input note.CreateInput) (note.Note, error) {
+func (store *NoteStore) CreateNote(ctx context.Context, input note.CreateInput) (created note.Note, err error) {
 	now := normalizeTime(store.clock())
 	id, err := note.NewID()
 	if err != nil {
 		return note.Note{}, fmt.Errorf("create note id: %w", err)
 	}
 
-	created := note.Note{
+	created = note.Note{
 		ID:           id,
 		Title:        input.Title,
 		Body:         input.Body,
@@ -60,7 +74,17 @@ func (store *NoteStore) CreateNote(ctx context.Context, input note.CreateInput) 
 		UpdatedAt:    now,
 	}
 
-	if _, err := store.db.ExecContext(
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return note.Note{}, fmt.Errorf("begin create note: %w", err)
+	}
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && err == nil {
+			err = fmt.Errorf("rollback create note: %w", rollbackErr)
+		}
+	}()
+
+	if _, err := tx.ExecContext(
 		ctx,
 		insertNoteSQL,
 		created.ID,
@@ -72,6 +96,20 @@ func (store *NoteStore) CreateNote(ctx context.Context, input note.CreateInput) 
 		unixMillis(created.UpdatedAt),
 	); err != nil {
 		return note.Note{}, fmt.Errorf("insert note: %w", err)
+	}
+
+	if _, err := tx.ExecContext(
+		ctx,
+		insertNoteSearchSQL,
+		created.ID,
+		created.Title,
+		created.Body,
+	); err != nil {
+		return note.Note{}, fmt.Errorf("insert note search: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return note.Note{}, fmt.Errorf("commit create note: %w", err)
 	}
 
 	return created, nil
@@ -120,6 +158,79 @@ func (store *NoteStore) ListRecentNotes(ctx context.Context, limit int) (notes [
 	}
 
 	return notes, nil
+}
+
+func (store *NoteStore) SearchNotes(ctx context.Context, input note.SearchInput) (notes []note.Note, err error) {
+	normalized := note.NormalizeSearchInput(input)
+	if problems := note.ValidateSearchInput(normalized); len(problems) > 0 {
+		return nil, fmt.Errorf("search notes: invalid input")
+	}
+
+	matchExpression := noteSearchMatchExpression(normalized.Query)
+	if matchExpression == "" {
+		return []note.Note{}, nil
+	}
+
+	rows, err := store.db.QueryContext(
+		ctx,
+		searchNotesSQL,
+		matchExpression,
+		normalized.Limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query note search: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close search notes rows: %w", closeErr)
+		}
+	}()
+
+	notes = make([]note.Note, 0)
+	for rows.Next() {
+		found, err := scanNote(rows)
+		if err != nil {
+			return nil, err
+		}
+		notes = append(notes, found)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read search notes: %w", err)
+	}
+
+	return notes, nil
+}
+
+func noteSearchMatchExpression(query string) string {
+	tokens := noteSearchTokens(query)
+	quoted := make([]string, 0, len(tokens))
+	for _, token := range tokens {
+		quoted = append(quoted, quoteNoteSearchToken(token))
+	}
+	return strings.Join(quoted, " AND ")
+}
+
+func noteSearchTokens(query string) []string {
+	tokens := make([]string, 0)
+	var current strings.Builder
+	for _, value := range query {
+		if unicode.IsLetter(value) || unicode.IsDigit(value) {
+			current.WriteRune(value)
+			continue
+		}
+		if current.Len() > 0 {
+			tokens = append(tokens, current.String())
+			current.Reset()
+		}
+	}
+	if current.Len() > 0 {
+		tokens = append(tokens, current.String())
+	}
+	return tokens
+}
+
+func quoteNoteSearchToken(token string) string {
+	return `"` + strings.ReplaceAll(token, `"`, `""`) + `"`
 }
 
 func scanNote(rows *sql.Rows) (note.Note, error) {

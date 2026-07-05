@@ -22,10 +22,14 @@ export type Note = {
 };
 
 export type CreateNoteInput = {
-  body: string;
-  category: NoteCategorySlug;
-  city: NoteCitySlug;
-  title: string;
+	body: string;
+	category: NoteCategorySlug;
+	city: NoteCitySlug;
+	title: string;
+};
+
+export type SearchNotesInput = {
+	query: string;
 };
 
 type GeneratedSchemas = components['schemas'];
@@ -88,7 +92,22 @@ export async function getNote(id: string): Promise<Note> {
     throw new APIRequestError(response.status);
   }
 
-  return parseNoteResponse(data);
+	return parseNoteResponse(data);
+}
+
+export async function searchNotes(input: SearchNotesInput): Promise<Note[]> {
+	const { data, response } = await apiClient().GET('/v1/search/notes', {
+		params: {
+			query: {
+				q: input.query,
+			},
+		},
+	});
+	if (!response.ok) {
+		throw new APIRequestError(response.status);
+	}
+
+	return parseListNotesResponse(data);
 }
 
 export async function createNote(input: CreateNoteInput): Promise<Note> {

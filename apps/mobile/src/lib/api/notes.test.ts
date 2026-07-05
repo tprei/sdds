@@ -6,6 +6,7 @@ import {
   createNote,
   getNote,
   listNotes,
+  searchNotes,
 } from './notes';
 import type { components } from './generated/schema';
 
@@ -164,6 +165,82 @@ describe('notes API client', () => {
     await expect(
       getNote(exampleNoteID),
     ).rejects.toThrow(APIResponseError);
+  });
+
+  it('sends search note requests with the raw query parameter', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return jsonResponse(apiListNotesResponse());
+    });
+
+    await searchNotes({ query: 'restaurante brasileiro Dublin 12 barato' });
+
+    const request = onlyFetchCall(calls);
+    const url = new URL(request.url);
+    expect(url.origin).toBe('http://localhost:8080');
+    expect(url.pathname).toBe('/v1/search/notes');
+    expect(url.searchParams.get('q')).toBe(
+      'restaurante brasileiro Dublin 12 barato',
+    );
+    expect(request.method).toBe('GET');
+  });
+
+  it('sends accented and spaced search text without client-side parsing', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return jsonResponse(apiListNotesResponse());
+    });
+
+    await searchNotes({ query: '  café bom  ' });
+
+    const request = onlyFetchCall(calls);
+    const url = new URL(request.url);
+    expect(url.searchParams.get('q')).toBe('  café bom  ');
+  });
+
+  it('parses searched notes from the API list response shape', async () => {
+    stubFetch(async () => jsonResponse(apiListNotesResponse()));
+
+    const notes = await searchNotes({ query: 'café' });
+
+    expect(notes).toEqual([
+      {
+        body: 'Tem pão de queijo decente.',
+        category: 'comida',
+        city: 'sao-paulo',
+        createdAt: 1782993600000,
+        id: exampleNoteID,
+        title: 'Café bom',
+        updatedAt: 1782993600000,
+      },
+    ]);
+  });
+
+  it('raises request errors from search status codes', async () => {
+    stubFetch(async () => jsonResponse({ code: 'invalid_search' }, httpStatusBadRequest));
+
+    await expect(searchNotes({ query: '' })).rejects.toMatchObject(
+      new APIRequestError(httpStatusBadRequest),
+    );
+  });
+
+  it('rejects invalid searched note response shapes', async () => {
+    stubFetch(async () =>
+      jsonResponse({
+        notes: [
+          {
+            ...apiNote(),
+            city_slug: 'qualquer',
+          },
+        ],
+      }),
+    );
+
+    await expect(searchNotes({ query: 'café' })).rejects.toThrow(
+      APIResponseError,
+    );
   });
 
   it('rejects unexpected response shapes', async () => {

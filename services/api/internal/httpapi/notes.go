@@ -9,6 +9,7 @@ import (
 )
 
 const recentNotesLimit = 50
+const searchNotesLimit = note.SearchDefaultLimit
 const maxCreateNoteRequestBytes int64 = 32 * 1024
 
 func (handler server) ListNotes(w http.ResponseWriter, r *http.Request) {
@@ -18,12 +19,7 @@ func (handler server) ListNotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := openapi.ListNotesResponse{Notes: make([]openapi.Note, 0, len(notes))}
-	for _, found := range notes {
-		response.Notes = append(response.Notes, newNoteResponse(found))
-	}
-
-	writeJSON(w, http.StatusOK, response)
+	writeJSON(w, http.StatusOK, newListNotesResponse(notes))
 }
 
 func (handler server) GetNote(w http.ResponseWriter, r *http.Request, noteID string) {
@@ -48,7 +44,7 @@ func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {
 
 	input := createNoteInput(request)
 	if problems := note.ValidateCreateInput(input); len(problems) > 0 {
-		writeError(w, http.StatusBadRequest, validationErrorResponse(problems))
+		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, problems))
 		return
 	}
 
@@ -61,7 +57,23 @@ func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, newNoteResponse(created))
 }
 
-func validationErrorResponse(problems []note.ValidationProblem) openapi.ErrorResponse {
+func (handler server) SearchNotes(w http.ResponseWriter, r *http.Request, params openapi.SearchNotesParams) {
+	input := searchNoteInput(params)
+	if problems := note.ValidateSearchInput(input); len(problems) > 0 {
+		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidSearch, problems))
+		return
+	}
+
+	notes, err := handler.notes.SearchNotes(r.Context(), input)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, newListNotesResponse(notes))
+}
+
+func validationErrorResponse(code openapi.ErrorCode, problems []note.ValidationProblem) openapi.ErrorResponse {
 	fields := make([]openapi.ValidationProblem, 0, len(problems))
 	for _, problem := range problems {
 		fields = append(fields, openapi.ValidationProblem{
@@ -69,7 +81,7 @@ func validationErrorResponse(problems []note.ValidationProblem) openapi.ErrorRes
 			Code:  openapi.ValidationProblemCode(problem.Message),
 		})
 	}
-	return openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidNote, Fields: &fields}
+	return openapi.ErrorResponse{Code: code, Fields: &fields}
 }
 
 func createNoteInput(request openapi.CreateNoteRequest) note.CreateInput {
@@ -79,6 +91,25 @@ func createNoteInput(request openapi.CreateNoteRequest) note.CreateInput {
 		CategorySlug: note.CategorySlug(request.CategorySlug),
 		CitySlug:     note.CitySlug(request.CitySlug),
 	})
+}
+
+func searchNoteInput(params openapi.SearchNotesParams) note.SearchInput {
+	query := ""
+	if params.Q != nil {
+		query = *params.Q
+	}
+	return note.NormalizeSearchInput(note.SearchInput{
+		Query: query,
+		Limit: searchNotesLimit,
+	})
+}
+
+func newListNotesResponse(notes []note.Note) openapi.ListNotesResponse {
+	response := openapi.ListNotesResponse{Notes: make([]openapi.Note, 0, len(notes))}
+	for _, found := range notes {
+		response.Notes = append(response.Notes, newNoteResponse(found))
+	}
+	return response
 }
 
 func newNoteResponse(found note.Note) openapi.Note {

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -19,7 +20,20 @@ func NewRouter(notes note.Store) http.Handler {
 	router.Use(localBrowserCORS)
 	router.Use(openAPIRequestValidator())
 
-	return openapi.HandlerFromMux(server{notes: notes}, router)
+	return openapi.HandlerWithOptions(server{notes: notes}, openapi.ChiServerOptions{
+		BaseRouter:       router,
+		ErrorHandlerFunc: writeGeneratedOpenAPIError,
+	})
+}
+
+func writeGeneratedOpenAPIError(w http.ResponseWriter, _ *http.Request, err error) {
+	var invalidParamError *openapi.InvalidParamFormatError
+	if errors.As(err, &invalidParamError) && invalidParamError.ParamName == "q" {
+		writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidSearch})
+		return
+	}
+
+	writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidJSON})
 }
 
 func noContent(w http.ResponseWriter, _ *http.Request) {

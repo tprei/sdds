@@ -12,7 +12,7 @@ func TestApplyMigrationsCreatesInitialSchema(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	tables := []string{"schema_migrations", "categories", "cities", "notes"}
+	tables := []string{"schema_migrations", "categories", "cities", "notes", "note_search"}
 	for _, table := range tables {
 		t.Run(table, func(t *testing.T) {
 			var count int
@@ -65,5 +65,68 @@ func TestApplyMigrationsSeedsControlledMetadata(t *testing.T) {
 	}
 	if diff := cmp.Diff(wantCities, gotCities); diff != "" {
 		t.Fatalf("cities mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestApplyMigrationsIndexesExistingNotes(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close database: %v", err)
+		}
+	})
+
+	if _, err := db.ExecContext(ctx, createSchemaMigrationsSQL); err != nil {
+		t.Fatalf("create schema_migrations: %v", err)
+	}
+	initialMigration, err := migrations.ReadFile("migrations/000001_initial_notes.sql")
+	if err != nil {
+		t.Fatalf("read initial migration: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, string(initialMigration)); err != nil {
+		t.Fatalf("apply initial migration: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, recordMigrationSQL, "000001_initial_notes"); err != nil {
+		t.Fatalf("record initial migration: %v", err)
+	}
+	if _, err := db.ExecContext(
+		ctx,
+		`
+			INSERT INTO notes (id, title, body, category_slug, city_slug, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`,
+		"existing-note",
+		"Café bom",
+		"Tem pão de queijo decente.",
+		note.CategorySlugComida,
+		note.CitySlugSaoPaulo,
+		int64(1782993600000),
+		int64(1782993600000),
+	); err != nil {
+		t.Fatalf("insert existing note: %v", err)
+	}
+
+	if err := ApplyMigrations(ctx, db); err != nil {
+		t.Fatalf("apply remaining migrations: %v", err)
+	}
+
+	found, err := NewNoteStore(db).SearchNotes(ctx, note.SearchInput{
+		Query: "cafe",
+		Limit: 10,
+	})
+	if err != nil {
+		t.Fatalf("search notes: %v", err)
+	}
+	gotIDs := make([]string, 0, len(found))
+	for _, existing := range found {
+		gotIDs = append(gotIDs, existing.ID)
+	}
+	wantIDs := []string{"existing-note"}
+	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
+		t.Fatalf("search note ids mismatch (-want +got):\n%s", diff)
 	}
 }

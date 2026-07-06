@@ -6,13 +6,16 @@ import {
   FoundationScreen,
 } from '@/components/foundation-screen';
 import { NoteCard } from '@/components/note-card';
+import { buildNoteCatalog, labelNotes } from '@/features/notes/catalog';
+import type { LabelledNote } from '@/features/notes/catalog';
+import { listCatalogs } from '@/lib/api/catalogs';
 import { listNotes } from '@/lib/api/notes';
 import type { Note } from '@/lib/api/notes';
 
 type HomeState =
   | { status: 'loading' }
   | { status: 'empty' }
-  | { status: 'ready'; notes: Note[] }
+  | { status: 'ready'; notes: LabelledNote[] }
   | { status: 'error' };
 
 export default function HomeScreen() {
@@ -24,13 +27,21 @@ export default function HomeScreen() {
       let isActive = true;
       setState({ status: 'loading' });
 
-      listNotes()
-        .then((notes) => {
+      Promise.all([listCatalogs(), listNotes()])
+        .then(([catalogs, notes]) => {
           if (!isActive) {
             return;
           }
+          const catalog = buildNoteCatalog(catalogs);
+          const labelledNotes = labelNotes(catalog, notes);
+          if (labelledNotes === null) {
+            setState({ status: 'error' });
+            return;
+          }
           setState(
-            notes.length > 0 ? { status: 'ready', notes } : { status: 'empty' },
+            labelledNotes.length > 0
+              ? { status: 'ready', notes: labelledNotes }
+              : { status: 'empty' },
           );
         })
         .catch(() => {
@@ -90,7 +101,13 @@ function renderHomeState(state: HomeState, onOpenNote: (note: Note) => void) {
     );
   }
 
-  return state.notes.map((note) => (
-    <NoteCard key={note.id} note={note} onPress={() => onOpenNote(note)} />
+  return state.notes.map((labelledNote) => (
+    <NoteCard
+      categoryLabel={labelledNote.categoryLabel}
+      key={labelledNote.note.id}
+      note={labelledNote.note}
+      onPress={() => onOpenNote(labelledNote.note)}
+      placeLabel={labelledNote.placeLabel}
+    />
   ));
 }

@@ -1,28 +1,30 @@
 import { Pressable, Text, View } from 'react-native';
 
 import type { Note } from '@/lib/api/notes';
-import { categoryLabel, placeLabel } from '@/features/notes/metadata';
 
 import { styles } from './note-card.styles';
 
 type NoteCardProps = {
+  categoryLabel: string;
   note: Note;
   onPress?: () => void;
+  placeLabel: string | null;
 };
 
-export function NoteCard({ note, onPress }: NoteCardProps) {
-  const resolvedCategoryLabel = categoryLabel(note.categorySlug);
-  const resolvedPlaceLabel = placeLabel(note.placeSlug);
+export function NoteCard({
+  categoryLabel,
+  note,
+  onPress,
+  placeLabel,
+}: NoteCardProps) {
   const content = (
     <View style={styles.card}>
       <View style={styles.metaRow}>
         <View style={styles.pill}>
-          <Text style={styles.pillText}>
-            {resolvedCategoryLabel ?? note.categorySlug}
-          </Text>
+          <Text style={styles.pillText}>{categoryLabel}</Text>
         </View>
-        {resolvedPlaceLabel === null ? null : (
-          <Text style={styles.place}>{resolvedPlaceLabel}</Text>
+        {placeLabel === null ? null : (
+          <Text style={styles.place}>{placeLabel}</Text>
         )}
       </View>
       <Text style={styles.title}>{note.title}</Text>

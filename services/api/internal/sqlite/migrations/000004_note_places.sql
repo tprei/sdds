@@ -21,26 +21,47 @@ CREATE TABLE places (
 	display_order INTEGER NOT NULL DEFAULT 0
 );
 
-INSERT INTO categories (slug, label, active, display_order) VALUES
-	('beauty', 'Beleza', 1, 10),
-	('food', 'Comida', 1, 20),
-	('travel', 'Viagem', 1, 30),
-	('finds', 'Achadinhos', 1, 40);
+INSERT OR IGNORE INTO categories (slug, label, active, display_order)
+SELECT
+	CASE slug
+		WHEN 'beleza' THEN 'beauty'
+		WHEN 'comida' THEN 'food'
+		WHEN 'viagem' THEN 'travel'
+		WHEN 'achadinhos' THEN 'finds'
+		ELSE slug
+	END,
+	label,
+	active,
+	display_order
+FROM categories_legacy
+ORDER BY CASE slug
+	WHEN 'beleza' THEN 0
+	WHEN 'comida' THEN 0
+	WHEN 'viagem' THEN 0
+	WHEN 'achadinhos' THEN 0
+	ELSE 1
+END;
 
 INSERT INTO categories (slug, label, active, display_order)
-SELECT slug, label, active, display_order
-FROM categories_legacy
-WHERE slug NOT IN ('beleza', 'comida', 'viagem', 'achadinhos', 'beauty', 'food', 'travel', 'finds');
+SELECT 'beauty', 'Beleza', 1, 10
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE slug = 'beauty');
 
-INSERT INTO places (slug, label, active, display_order) VALUES
-	('sao-paulo', 'São Paulo', 1, 10),
-	('rio-de-janeiro', 'Rio de Janeiro', 1, 20),
-	('lisboa', 'Lisboa', 1, 30);
+INSERT INTO categories (slug, label, active, display_order)
+SELECT 'food', 'Comida', 1, 20
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE slug = 'food');
+
+INSERT INTO categories (slug, label, active, display_order)
+SELECT 'travel', 'Viagem', 1, 30
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE slug = 'travel');
+
+INSERT INTO categories (slug, label, active, display_order)
+SELECT 'finds', 'Achadinhos', 1, 40
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE slug = 'finds');
 
 INSERT INTO places (slug, label, active, display_order)
 SELECT slug, label, active, display_order
 FROM places_legacy
-WHERE slug NOT IN ('sao-paulo', 'rio-de-janeiro', 'lisboa');
+ORDER BY display_order ASC, label ASC, slug ASC;
 
 INSERT INTO places (slug, label, active, display_order)
 SELECT cities.slug, cities.label, 1, 0

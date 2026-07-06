@@ -131,7 +131,14 @@ func TestNotePlaceMigrationPreservesExistingNotes(t *testing.T) {
 			t.Fatalf("close database: %v", err)
 		}
 	})
-	applyMigrationFiles(t, ctx, db, "000001_initial_notes")
+	applyMigrationFiles(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs")
+
+	if _, err := db.ExecContext(ctx, `UPDATE categories SET label = ?, active = 0, display_order = 99 WHERE slug = ?`, "Comida guardada", "comida"); err != nil {
+		t.Fatalf("update legacy category: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE places SET label = ?, active = 0, display_order = 88 WHERE slug = ?`, "São Paulo guardado", "sao-paulo"); err != nil {
+		t.Fatalf("update legacy place: %v", err)
+	}
 
 	if _, err := db.ExecContext(
 		ctx,
@@ -173,6 +180,38 @@ func TestNotePlaceMigrationPreservesExistingNotes(t *testing.T) {
 	}
 	if gotNote.PlaceSlug != note.PlaceSlugSaoPaulo {
 		t.Fatalf("search note place = %q, want %q", gotNote.PlaceSlug, note.PlaceSlugSaoPaulo)
+	}
+
+	var category note.Category
+	var categorySlug string
+	if err := db.QueryRowContext(ctx, `SELECT slug, label, active, display_order FROM categories WHERE slug = ?`, note.CategorySlugFood).Scan(&categorySlug, &category.Label, &category.Active, &category.DisplayOrder); err != nil {
+		t.Fatalf("query migrated category: %v", err)
+	}
+	category.Slug = note.CategorySlug(categorySlug)
+	wantCategory := note.Category{
+		Slug:         note.CategorySlugFood,
+		Label:        "Comida guardada",
+		Active:       false,
+		DisplayOrder: 99,
+	}
+	if diff := cmp.Diff(wantCategory, category); diff != "" {
+		t.Fatalf("category mismatch (-want +got):\n%s", diff)
+	}
+
+	var place note.Place
+	var placeSlug string
+	if err := db.QueryRowContext(ctx, `SELECT slug, label, active, display_order FROM places WHERE slug = ?`, note.PlaceSlugSaoPaulo).Scan(&placeSlug, &place.Label, &place.Active, &place.DisplayOrder); err != nil {
+		t.Fatalf("query migrated place: %v", err)
+	}
+	place.Slug = note.PlaceSlug(placeSlug)
+	wantPlace := note.Place{
+		Slug:         note.PlaceSlugSaoPaulo,
+		Label:        "São Paulo guardado",
+		Active:       false,
+		DisplayOrder: 88,
+	}
+	if diff := cmp.Diff(wantPlace, place); diff != "" {
+		t.Fatalf("place mismatch (-want +got):\n%s", diff)
 	}
 }
 

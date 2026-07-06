@@ -11,6 +11,10 @@ import (
 	"github.com/tprei/sdds/services/api/internal/note"
 )
 
+func newTestRouter(notes fakeNoteStore) http.Handler {
+	return NewRouter(notes, fakeCatalog{})
+}
+
 func TestHealthRoutesReturnNoContent(t *testing.T) {
 	tests := []struct {
 		name string
@@ -20,7 +24,7 @@ func TestHealthRoutesReturnNoContent(t *testing.T) {
 		{name: "ready", path: "/readyz"},
 	}
 
-	router := NewRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -40,7 +44,7 @@ func TestHealthRoutesReturnNoContent(t *testing.T) {
 }
 
 func TestHealthRoutesRejectUnsupportedMethods(t *testing.T) {
-	router := NewRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 	request := httptest.NewRequest(http.MethodPost, "/healthz", nil)
 	response := httptest.NewRecorder()
 
@@ -52,7 +56,7 @@ func TestHealthRoutesRejectUnsupportedMethods(t *testing.T) {
 }
 
 func TestRouterAllowsLocalBrowserOrigin(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		listNotes: func(_ context.Context, _ int) ([]note.Note, error) {
 			return []note.Note{}, nil
 		},
@@ -82,7 +86,7 @@ func TestRouterAllowsLocalBrowserOrigin(t *testing.T) {
 }
 
 func TestRouterRejectsNonLocalBrowserOrigin(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		listNotes: func(_ context.Context, _ int) ([]note.Note, error) {
 			return []note.Note{}, nil
 		},
@@ -102,7 +106,7 @@ func TestRouterRejectsNonLocalBrowserOrigin(t *testing.T) {
 }
 
 func TestRouterHandlesLocalBrowserPreflight(t *testing.T) {
-	router := NewRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 	request := httptest.NewRequest(http.MethodOptions, "/v1/notes", nil)
 	request.Header.Set("Origin", "http://127.0.0.1:8081")
 	request.Header.Set("Access-Control-Request-Method", http.MethodPost)
@@ -119,7 +123,7 @@ func TestRouterHandlesLocalBrowserPreflight(t *testing.T) {
 }
 
 func TestRouterRejectsPlainOptionsRequest(t *testing.T) {
-	router := NewRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 	request := httptest.NewRequest(http.MethodOptions, "/v1/notes", nil)
 	response := httptest.NewRecorder()
 
@@ -163,4 +167,49 @@ func (store fakeNoteStore) SearchNotes(ctx context.Context, input note.SearchInp
 		return nil, fmt.Errorf("search notes not implemented")
 	}
 	return store.searchNotes(ctx, input)
+}
+
+type fakeCatalog struct {
+	findActiveCategory func(ctx context.Context, slug note.CategorySlug) (note.Category, error)
+	findActivePlace    func(ctx context.Context, slug note.PlaceSlug) (note.Place, error)
+	listCategories     func(ctx context.Context) ([]note.Category, error)
+	listPlaces         func(ctx context.Context) ([]note.Place, error)
+}
+
+func (catalog fakeCatalog) ListCategories(ctx context.Context) ([]note.Category, error) {
+	if catalog.listCategories != nil {
+		return catalog.listCategories(ctx)
+	}
+	return note.Categories, nil
+}
+
+func (catalog fakeCatalog) ListPlaces(ctx context.Context) ([]note.Place, error) {
+	if catalog.listPlaces != nil {
+		return catalog.listPlaces(ctx)
+	}
+	return note.Places, nil
+}
+
+func (catalog fakeCatalog) FindActiveCategory(ctx context.Context, slug note.CategorySlug) (note.Category, error) {
+	if catalog.findActiveCategory != nil {
+		return catalog.findActiveCategory(ctx, slug)
+	}
+	for _, category := range note.Categories {
+		if category.Slug == slug && category.Active {
+			return category, nil
+		}
+	}
+	return note.Category{}, note.ErrCategoryNotFound
+}
+
+func (catalog fakeCatalog) FindActivePlace(ctx context.Context, slug note.PlaceSlug) (note.Place, error) {
+	if catalog.findActivePlace != nil {
+		return catalog.findActivePlace(ctx, slug)
+	}
+	for _, place := range note.Places {
+		if place.Slug == slug && place.Active {
+			return place, nil
+		}
+	}
+	return note.Place{}, note.ErrPlaceNotFound
 }

@@ -10,17 +10,18 @@ import (
 )
 
 type server struct {
-	notes note.Store
+	notes   note.Store
+	catalog note.Catalog
 }
 
 var _ openapi.ServerInterface = server{}
 
-func NewRouter(notes note.Store) http.Handler {
+func NewRouter(notes note.Store, catalog note.Catalog) http.Handler {
 	router := chi.NewRouter()
 	router.Use(localBrowserCORS)
 	router.Use(openAPIRequestValidator())
 
-	return openapi.HandlerWithOptions(server{notes: notes}, openapi.ChiServerOptions{
+	return openapi.HandlerWithOptions(server{notes: notes, catalog: catalog}, openapi.ChiServerOptions{
 		BaseRouter:       router,
 		ErrorHandlerFunc: writeGeneratedOpenAPIError,
 	})

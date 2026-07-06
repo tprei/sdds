@@ -7,12 +7,24 @@ import (
 	"github.com/tprei/sdds/services/api/internal/openapi"
 )
 
-func (server) ListCategories(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, newListCategoriesResponse(note.Categories))
+func (handler server) ListCategories(w http.ResponseWriter, r *http.Request) {
+	categories, err := handler.catalog.ListCategories(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, newListCategoriesResponse(categories))
 }
 
-func (server) ListPlaces(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, newListPlacesResponse(note.Places))
+func (handler server) ListPlaces(w http.ResponseWriter, r *http.Request) {
+	places, err := handler.catalog.ListPlaces(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, newListPlacesResponse(places))
 }
 
 func newListCategoriesResponse(categories []note.Category) openapi.ListCategoriesResponse {

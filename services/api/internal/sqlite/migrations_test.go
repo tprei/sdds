@@ -12,7 +12,7 @@ func TestApplyMigrationsCreatesInitialSchema(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	tables := []string{"schema_migrations", "categories", "cities", "notes", "note_search"}
+	tables := []string{"schema_migrations", "categories", "cities", "places", "notes", "note_search"}
 	for _, table := range tables {
 		t.Run(table, func(t *testing.T) {
 			var count int
@@ -39,15 +39,17 @@ func TestApplyMigrationsSeedsControlledMetadata(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	wantCategories := make(map[string]string, len(note.Categories))
-	gotCategories := make(map[string]string, len(note.Categories))
+	wantCategories := make(map[string]note.Category, len(note.Categories))
+	gotCategories := make(map[string]note.Category, len(note.Categories))
 	for _, category := range note.Categories {
-		wantCategories[string(category.Slug)] = category.Label
-		var label string
-		if err := db.QueryRowContext(ctx, `SELECT label FROM categories WHERE slug = ?`, category.Slug).Scan(&label); err != nil {
+		wantCategories[string(category.Slug)] = category
+		var got note.Category
+		var slug string
+		if err := db.QueryRowContext(ctx, `SELECT slug, label, active, display_order FROM categories WHERE slug = ?`, category.Slug).Scan(&slug, &got.Label, &got.Active, &got.DisplayOrder); err != nil {
 			t.Fatalf("query category %s: %v", category.Slug, err)
 		}
-		gotCategories[string(category.Slug)] = label
+		got.Slug = note.CategorySlug(slug)
+		gotCategories[string(category.Slug)] = got
 	}
 	if diff := cmp.Diff(wantCategories, gotCategories); diff != "" {
 		t.Fatalf("categories mismatch (-want +got):\n%s", diff)
@@ -65,6 +67,22 @@ func TestApplyMigrationsSeedsControlledMetadata(t *testing.T) {
 	}
 	if diff := cmp.Diff(wantCities, gotCities); diff != "" {
 		t.Fatalf("cities mismatch (-want +got):\n%s", diff)
+	}
+
+	wantPlaces := make(map[string]note.Place, len(note.Places))
+	gotPlaces := make(map[string]note.Place, len(note.Places))
+	for _, place := range note.Places {
+		wantPlaces[string(place.Slug)] = place
+		var got note.Place
+		var slug string
+		if err := db.QueryRowContext(ctx, `SELECT slug, label, active, display_order FROM places WHERE slug = ?`, place.Slug).Scan(&slug, &got.Label, &got.Active, &got.DisplayOrder); err != nil {
+			t.Fatalf("query place %s: %v", place.Slug, err)
+		}
+		got.Slug = note.PlaceSlug(slug)
+		gotPlaces[string(place.Slug)] = got
+	}
+	if diff := cmp.Diff(wantPlaces, gotPlaces); diff != "" {
+		t.Fatalf("places mismatch (-want +got):\n%s", diff)
 	}
 }
 

@@ -104,9 +104,9 @@ function renderHomeState(state: HomeState, onOpenNote: (note: Note) => void) {
   return state.notes.map((labelledNote) => (
     <NoteCard
       categoryLabel={labelledNote.categoryLabel}
-      key={labelledNote.note.id}
-      note={labelledNote.note}
-      onPress={() => onOpenNote(labelledNote.note)}
+      key={labelledNote.id}
+      note={labelledNote}
+      onPress={() => onOpenNote(labelledNote)}
       placeLabel={labelledNote.placeLabel}
     />
   ));

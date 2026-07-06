@@ -12,9 +12,8 @@ export type NoteCatalog = {
   placeLabels: ReadonlyMap<string, string>;
 };
 
-export type LabelledNote = {
+export type LabelledNote = Note & {
   categoryLabel: string;
-  note: Note;
   placeLabel: string | null;
 };
 
@@ -60,8 +59,8 @@ export function labelNote(
   }
 
   return {
+    ...note,
     categoryLabel: resolvedCategoryLabel,
-    note,
     placeLabel: resolvedPlaceLabel,
   };
 }
@@ -88,4 +87,31 @@ function labelMap(
   rows: readonly { label: string; slug: string }[],
 ): ReadonlyMap<string, string> {
   return new Map(rows.map((row) => [row.slug, row.label]));
+}
+
+export function resolveSelectedCategorySlug(
+  catalog: NoteCatalog,
+  currentSlug: string | null,
+): string | null {
+  if (
+    currentSlug !== null &&
+    catalog.activeCategories.some((category) => category.slug === currentSlug)
+  ) {
+    return currentSlug;
+  }
+
+  return catalog.activeCategories[0]?.slug ?? null;
+}
+
+export function resolveSelectedPlaceSlug(
+  catalog: NoteCatalog,
+  currentSlug: string | null,
+): string | null {
+  if (currentSlug === null) {
+    return null;
+  }
+
+  return catalog.activePlaces.some((place) => place.slug === currentSlug)
+    ? currentSlug
+    : null;
 }

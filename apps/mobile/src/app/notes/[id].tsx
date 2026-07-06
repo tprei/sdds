@@ -134,26 +134,22 @@ function ReadyNoteDetail({ note }: { note: LabelledNote }) {
         )}
       </View>
       <Text accessibilityRole="header" style={styles.title}>
-        {note.note.title}
+        {note.title}
       </Text>
       <Text
-        accessibilityLabel={`Texto da nota: ${note.note.body}`}
+        accessibilityLabel={`Texto da nota: ${note.body}`}
         style={styles.body}
       >
-        {note.note.body}
+        {note.body}
       </Text>
       <View style={styles.dateCard}>
         <View style={styles.dateRow}>
           <Text style={styles.dateLabel}>Publicado</Text>
-          <Text style={styles.dateValue}>
-            {formatTimestamp(note.note.createdAt)}
-          </Text>
+          <Text style={styles.dateValue}>{formatTimestamp(note.createdAt)}</Text>
         </View>
         <View style={styles.dateRow}>
           <Text style={styles.dateLabel}>Atualizado</Text>
-          <Text style={styles.dateValue}>
-            {formatTimestamp(note.note.updatedAt)}
-          </Text>
+          <Text style={styles.dateValue}>{formatTimestamp(note.updatedAt)}</Text>
         </View>
       </View>
     </>

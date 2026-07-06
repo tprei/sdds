@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
@@ -7,7 +7,11 @@ import {
   FoundationScreen,
   FoundationTextInput,
 } from '@/components/foundation-screen';
-import { buildNoteCatalog } from '@/features/notes/catalog';
+import {
+  buildNoteCatalog,
+  resolveSelectedCategorySlug,
+  resolveSelectedPlaceSlug,
+} from '@/features/notes/catalog';
 import type { NoteCatalog } from '@/features/notes/catalog';
 import { listCatalogs } from '@/lib/api/catalogs';
 import { APIRequestError, createNote } from '@/lib/api/notes';
@@ -29,6 +33,8 @@ export default function ComposeScreen() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const categorySlugRef = useRef<string | null>(null);
+  const placeSlugRef = useRef<string | null>(null);
   const [categorySlug, setCategorySlug] = useState<string | null>(null);
   const [placeSlug, setPlaceSlug] = useState<string | null>(null);
   const [catalogState, setCatalogState] = useState<CatalogState>({
@@ -52,6 +58,16 @@ export default function ComposeScreen() {
     categorySlug !== null &&
     !isSubmitting;
 
+  const selectCategorySlug = useCallback((nextSlug: string | null) => {
+    categorySlugRef.current = nextSlug;
+    setCategorySlug(nextSlug);
+  }, []);
+
+  const selectPlaceSlug = useCallback((nextSlug: string | null) => {
+    placeSlugRef.current = nextSlug;
+    setPlaceSlug(nextSlug);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
@@ -62,14 +78,19 @@ export default function ComposeScreen() {
             return;
           }
           const catalog = buildNoteCatalog(catalogs);
-          const defaultCategory = catalog.activeCategories[0];
-          if (defaultCategory === undefined) {
-            setCategorySlug(null);
+          const nextCategorySlug = resolveSelectedCategorySlug(
+            catalog,
+            categorySlugRef.current,
+          );
+          if (nextCategorySlug === null) {
+            selectCategorySlug(null);
             setCatalogState({ status: 'error' });
             return;
           }
-          setCategorySlug(defaultCategory.slug);
-          setPlaceSlug(null);
+          selectCategorySlug(nextCategorySlug);
+          selectPlaceSlug(
+            resolveSelectedPlaceSlug(catalog, placeSlugRef.current),
+          );
           setCatalogState({ status: 'ready', catalog });
         })
         .catch(() => {
@@ -85,7 +106,7 @@ export default function ComposeScreen() {
           current.status === 'success' ? { status: 'idle' } : current,
         );
       };
-    }, []),
+    }, [selectCategorySlug, selectPlaceSlug]),
   );
 
   async function handleSubmit() {
@@ -161,7 +182,7 @@ export default function ComposeScreen() {
                     selected: option.slug === categorySlug,
                   }}
                   key={option.slug}
-                  onPress={() => setCategorySlug(option.slug)}
+                  onPress={() => selectCategorySlug(option.slug)}
                   style={[
                     styles.option,
                     option.slug === categorySlug ? styles.optionSelected : null,
@@ -187,7 +208,7 @@ export default function ComposeScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ selected: placeSlug === null }}
-                onPress={() => setPlaceSlug(null)}
+                onPress={() => selectPlaceSlug(null)}
                 style={[
                   styles.option,
                   placeSlug === null ? styles.optionSelected : null,
@@ -207,7 +228,7 @@ export default function ComposeScreen() {
                   accessibilityRole="button"
                   accessibilityState={{ selected: option.slug === placeSlug }}
                   key={option.slug}
-                  onPress={() => setPlaceSlug(option.slug)}
+                  onPress={() => selectPlaceSlug(option.slug)}
                   style={[
                     styles.option,
                     option.slug === placeSlug ? styles.optionSelected : null,

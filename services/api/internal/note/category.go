@@ -12,15 +12,17 @@ const (
 )
 
 type Category struct {
-	Slug  CategorySlug
-	Label string
+	Slug         CategorySlug
+	Label        string
+	Active       bool
+	DisplayOrder int
 }
 
 var Categories = []Category{
-	{Slug: CategorySlugBeleza, Label: "Beleza"},
-	{Slug: CategorySlugComida, Label: "Comida"},
-	{Slug: CategorySlugViagem, Label: "Viagem"},
-	{Slug: CategorySlugAchadinhos, Label: "Achadinhos"},
+	{Slug: CategorySlugBeleza, Label: "Beleza", Active: true, DisplayOrder: 10},
+	{Slug: CategorySlugComida, Label: "Comida", Active: true, DisplayOrder: 20},
+	{Slug: CategorySlugViagem, Label: "Viagem", Active: true, DisplayOrder: 30},
+	{Slug: CategorySlugAchadinhos, Label: "Achadinhos", Active: true, DisplayOrder: 40},
 }
 
 func NormalizeCategorySlug(slug CategorySlug) CategorySlug {

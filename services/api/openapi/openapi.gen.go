@@ -97,6 +97,22 @@ func (e ValidationProblemCode) Valid() bool {
 	}
 }
 
+// CatalogCategory defines model for CatalogCategory.
+type CatalogCategory struct {
+	Active       bool         `json:"active"`
+	DisplayOrder int32        `json:"display_order"`
+	Label        string       `json:"label"`
+	Slug         CategorySlug `json:"slug"`
+}
+
+// CatalogPlace defines model for CatalogPlace.
+type CatalogPlace struct {
+	Active       bool      `json:"active"`
+	DisplayOrder int32     `json:"display_order"`
+	Label        string    `json:"label"`
+	Slug         PlaceSlug `json:"slug"`
+}
+
 // CategorySlug defines model for CategorySlug.
 type CategorySlug = string
 
@@ -120,9 +136,19 @@ type ErrorResponse struct {
 	Fields *[]ValidationProblem `json:"fields,omitempty"`
 }
 
+// ListCategoriesResponse defines model for ListCategoriesResponse.
+type ListCategoriesResponse struct {
+	Categories []CatalogCategory `json:"categories"`
+}
+
 // ListNotesResponse defines model for ListNotesResponse.
 type ListNotesResponse struct {
 	Notes []Note `json:"notes"`
+}
+
+// ListPlacesResponse defines model for ListPlacesResponse.
+type ListPlacesResponse struct {
+	Places []CatalogPlace `json:"places"`
 }
 
 // Note defines model for Note.
@@ -139,6 +165,9 @@ type Note struct {
 	// UpdatedAt Unix timestamp in milliseconds.
 	UpdatedAt int64 `json:"updated_at"`
 }
+
+// PlaceSlug defines model for PlaceSlug.
+type PlaceSlug = string
 
 // ValidationField defines model for ValidationField.
 type ValidationField string
@@ -240,6 +269,9 @@ type ClientInterface interface {
 	// GetReadiness request
 	GetReadiness(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListCategories request
+	ListCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListNotes request
 	ListNotes(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -250,6 +282,9 @@ type ClientInterface interface {
 
 	// GetNote request
 	GetNote(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListPlaces request
+	ListPlaces(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchNotes request
 	SearchNotes(ctx context.Context, params *SearchNotesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -269,6 +304,18 @@ func (c *Client) GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (
 
 func (c *Client) GetReadiness(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetReadinessRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListCategoriesRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -317,6 +364,18 @@ func (c *Client) CreateNote(ctx context.Context, body CreateNoteJSONRequestBody,
 
 func (c *Client) GetNote(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetNoteRequest(c.Server, noteId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListPlaces(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPlacesRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -376,6 +435,33 @@ func NewGetReadinessRequest(server string) (*http.Request, error) {
 	}
 
 	operationPath := fmt.Sprintf("/readyz")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListCategoriesRequest generates requests for ListCategories
+func NewListCategoriesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/categories")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -477,6 +563,33 @@ func NewGetNoteRequest(server string, noteId string) (*http.Request, error) {
 	}
 
 	operationPath := fmt.Sprintf("/v1/notes/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListPlacesRequest generates requests for ListPlaces
+func NewListPlacesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/places")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -597,6 +710,9 @@ type ClientWithResponsesInterface interface {
 	// GetReadinessWithResponse request
 	GetReadinessWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetReadinessHTTPResponse, error)
 
+	// ListCategoriesWithResponse request
+	ListCategoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCategoriesHTTPResponse, error)
+
 	// ListNotesWithResponse request
 	ListNotesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListNotesHTTPResponse, error)
 
@@ -607,6 +723,9 @@ type ClientWithResponsesInterface interface {
 
 	// GetNoteWithResponse request
 	GetNoteWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*GetNoteHTTPResponse, error)
+
+	// ListPlacesWithResponse request
+	ListPlacesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPlacesHTTPResponse, error)
 
 	// SearchNotesWithResponse request
 	SearchNotesWithResponse(ctx context.Context, params *SearchNotesParams, reqEditors ...RequestEditorFn) (*SearchNotesHTTPResponse, error)
@@ -666,6 +785,38 @@ func (r GetReadinessHTTPResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetReadinessHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListCategoriesHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListCategoriesResponse
+	JSON400      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r ListCategoriesHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListCategoriesHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListCategoriesHTTPResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -770,6 +921,38 @@ func (r GetNoteHTTPResponse) ContentType() string {
 	return ""
 }
 
+type ListPlacesHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListPlacesResponse
+	JSON400      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r ListPlacesHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListPlacesHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListPlacesHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type SearchNotesHTTPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -820,6 +1003,15 @@ func (c *ClientWithResponses) GetReadinessWithResponse(ctx context.Context, reqE
 	return ParseGetReadinessHTTPResponse(rsp)
 }
 
+// ListCategoriesWithResponse request returning *ListCategoriesHTTPResponse
+func (c *ClientWithResponses) ListCategoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCategoriesHTTPResponse, error) {
+	rsp, err := c.ListCategories(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListCategoriesHTTPResponse(rsp)
+}
+
 // ListNotesWithResponse request returning *ListNotesHTTPResponse
 func (c *ClientWithResponses) ListNotesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListNotesHTTPResponse, error) {
 	rsp, err := c.ListNotes(ctx, reqEditors...)
@@ -853,6 +1045,15 @@ func (c *ClientWithResponses) GetNoteWithResponse(ctx context.Context, noteId st
 		return nil, err
 	}
 	return ParseGetNoteHTTPResponse(rsp)
+}
+
+// ListPlacesWithResponse request returning *ListPlacesHTTPResponse
+func (c *ClientWithResponses) ListPlacesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPlacesHTTPResponse, error) {
+	rsp, err := c.ListPlaces(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListPlacesHTTPResponse(rsp)
 }
 
 // SearchNotesWithResponse request returning *SearchNotesHTTPResponse
@@ -910,6 +1111,46 @@ func ParseGetReadinessHTTPResponse(rsp *http.Response) (*GetReadinessHTTPRespons
 			return nil, err
 		}
 		response.JSON400 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListCategoriesHTTPResponse parses an HTTP response from a ListCategoriesWithResponse call
+func ParseListCategoriesHTTPResponse(rsp *http.Response) (*ListCategoriesHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListCategoriesHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListCategoriesResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 
@@ -1037,6 +1278,46 @@ func ParseGetNoteHTTPResponse(rsp *http.Response) (*GetNoteHTTPResponse, error) 
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListPlacesHTTPResponse parses an HTTP response from a ListPlacesWithResponse call
+func ParseListPlacesHTTPResponse(rsp *http.Response) (*ListPlacesHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListPlacesHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListPlacesResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse

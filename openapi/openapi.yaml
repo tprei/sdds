@@ -13,6 +13,8 @@ security: []
 tags:
   - name: Operations
     description: Runtime health endpoints.
+  - name: Catalog
+    description: Backend-owned category and place catalogs.
   - name: Notes
     description: Text-first recommendation notes.
 paths:
@@ -42,6 +44,56 @@ paths:
           description: The API can serve traffic.
         "400":
           description: The request does not match the API contract.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/categories:
+    get:
+      operationId: listCategories
+      summary: List category catalog
+      tags:
+        - Catalog
+      responses:
+        "200":
+          description: Category catalog rows.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCategoriesResponse"
+        "400":
+          description: The request does not match the API contract.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not list categories.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/places:
+    get:
+      operationId: listPlaces
+      summary: List place catalog
+      tags:
+        - Catalog
+      responses:
+        "200":
+          description: Place catalog rows.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListPlacesResponse"
+        "400":
+          description: The request does not match the API contract.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not list places.
           content:
             application/json:
               schema:
@@ -182,6 +234,44 @@ components:
       type: string
     CitySlug:
       type: string
+    PlaceSlug:
+      type: string
+    CatalogCategory:
+      type: object
+      additionalProperties: false
+      required:
+        - slug
+        - label
+        - active
+        - display_order
+      properties:
+        slug:
+          $ref: "#/components/schemas/CategorySlug"
+        label:
+          type: string
+        active:
+          type: boolean
+        display_order:
+          type: integer
+          format: int32
+    CatalogPlace:
+      type: object
+      additionalProperties: false
+      required:
+        - slug
+        - label
+        - active
+        - display_order
+      properties:
+        slug:
+          $ref: "#/components/schemas/PlaceSlug"
+        label:
+          type: string
+        active:
+          type: boolean
+        display_order:
+          type: integer
+          format: int32
     CreateNoteRequest:
       type: object
       additionalProperties: false
@@ -241,6 +331,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Note"
+    ListCategoriesResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - categories
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogCategory"
+    ListPlacesResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - places
+      properties:
+        places:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogPlace"
     Note:
       type: object
       additionalProperties: false

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -47,6 +48,13 @@ func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, problems))
 		return
 	}
+	if problems, err := handler.validateCreateNoteCatalogs(r.Context(), input); err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	} else if len(problems) > 0 {
+		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, problems))
+		return
+	}
 
 	created, err := handler.notes.CreateNote(r.Context(), input)
 	if err != nil {
@@ -85,12 +93,38 @@ func validationErrorResponse(code openapi.ErrorCode, problems []note.ValidationP
 }
 
 func createNoteInput(request openapi.CreateNoteRequest) note.CreateInput {
+	placeSlug := note.PlaceSlug("")
+	if request.PlaceSlug != nil {
+		placeSlug = note.PlaceSlug(*request.PlaceSlug)
+	}
 	return note.NormalizeCreateInput(note.CreateInput{
 		Title:        request.Title,
 		Body:         request.Body,
 		CategorySlug: note.CategorySlug(request.CategorySlug),
-		CitySlug:     note.CitySlug(request.CitySlug),
+		PlaceSlug:    placeSlug,
 	})
+}
+
+func (handler server) validateCreateNoteCatalogs(ctx context.Context, input note.CreateInput) ([]note.ValidationProblem, error) {
+	problems := make([]note.ValidationProblem, 0, 2)
+
+	if input.CategorySlug != "" {
+		if _, err := handler.catalog.FindActiveCategory(ctx, input.CategorySlug); errors.Is(err, note.ErrCategoryNotFound) {
+			problems = append(problems, note.ValidationProblem{Field: "category_slug", Message: "unknown"})
+		} else if err != nil {
+			return nil, err
+		}
+	}
+
+	if input.PlaceSlug != "" {
+		if _, err := handler.catalog.FindActivePlace(ctx, input.PlaceSlug); errors.Is(err, note.ErrPlaceNotFound) {
+			problems = append(problems, note.ValidationProblem{Field: "place_slug", Message: "unknown"})
+		} else if err != nil {
+			return nil, err
+		}
+	}
+
+	return problems, nil
 }
 
 func searchNoteInput(params openapi.SearchNotesParams) note.SearchInput {
@@ -113,12 +147,17 @@ func newListNotesResponse(notes []note.Note) openapi.ListNotesResponse {
 }
 
 func newNoteResponse(found note.Note) openapi.Note {
+	placeSlug := openapi.PlaceSlug(found.PlaceSlug)
+	placeSlugPointer := &placeSlug
+	if found.PlaceSlug == "" {
+		placeSlugPointer = nil
+	}
 	return openapi.Note{
 		Id:           found.ID,
 		Title:        found.Title,
 		Body:         found.Body,
 		CategorySlug: openapi.CategorySlug(found.CategorySlug),
-		CitySlug:     openapi.CitySlug(found.CitySlug),
+		PlaceSlug:    placeSlugPointer,
 		CreatedAt:    found.CreatedAt.UTC().UnixMilli(),
 		UpdatedAt:    found.UpdatedAt.UTC().UnixMilli(),
 	}

@@ -16,7 +16,7 @@ export const styles = StyleSheet.create({
     gap: spacing.sp4,
     padding: spacing.sp5,
   },
-  city: {
+  place: {
     color: semanticColors.textMuted,
     fontSize: typography.sizeSmall,
     fontWeight: typography.weightSemibold,

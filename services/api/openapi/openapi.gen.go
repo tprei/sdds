@@ -50,7 +50,7 @@ func (e ErrorCode) Valid() bool {
 const (
 	ValidationFieldBody         ValidationField = "body"
 	ValidationFieldCategorySlug ValidationField = "category_slug"
-	ValidationFieldCitySlug     ValidationField = "city_slug"
+	ValidationFieldPlaceSlug    ValidationField = "place_slug"
 	ValidationFieldQ            ValidationField = "q"
 	ValidationFieldTitle        ValidationField = "title"
 )
@@ -62,7 +62,7 @@ func (e ValidationField) Valid() bool {
 		return true
 	case ValidationFieldCategorySlug:
 		return true
-	case ValidationFieldCitySlug:
+	case ValidationFieldPlaceSlug:
 		return true
 	case ValidationFieldQ:
 		return true
@@ -116,14 +116,11 @@ type CatalogPlace struct {
 // CategorySlug defines model for CategorySlug.
 type CategorySlug = string
 
-// CitySlug defines model for CitySlug.
-type CitySlug = string
-
 // CreateNoteRequest defines model for CreateNoteRequest.
 type CreateNoteRequest struct {
 	Body         string       `json:"body"`
 	CategorySlug CategorySlug `json:"category_slug"`
-	CitySlug     CitySlug     `json:"city_slug"`
+	PlaceSlug    *PlaceSlug   `json:"place_slug,omitempty"`
 	Title        string       `json:"title"`
 }
 
@@ -155,12 +152,12 @@ type ListPlacesResponse struct {
 type Note struct {
 	Body         string       `json:"body"`
 	CategorySlug CategorySlug `json:"category_slug"`
-	CitySlug     CitySlug     `json:"city_slug"`
 
 	// CreatedAt Unix timestamp in milliseconds.
-	CreatedAt int64  `json:"created_at"`
-	Id        string `json:"id"`
-	Title     string `json:"title"`
+	CreatedAt int64      `json:"created_at"`
+	Id        string     `json:"id"`
+	PlaceSlug *PlaceSlug `json:"place_slug"`
+	Title     string     `json:"title"`
 
 	// UpdatedAt Unix timestamp in milliseconds.
 	UpdatedAt int64 `json:"updated_at"`

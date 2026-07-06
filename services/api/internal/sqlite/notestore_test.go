@@ -30,8 +30,8 @@ func TestNoteStoreCreatesAndListsRecentNotes(t *testing.T) {
 	first, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Café com pão de queijo",
 		Body:         "Bom para trabalhar de manhã.",
-		CategorySlug: "comida",
-		CitySlug:     "sao-paulo",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
 	})
 	if err != nil {
 		t.Fatalf("create first note: %v", err)
@@ -40,8 +40,8 @@ func TestNoteStoreCreatesAndListsRecentNotes(t *testing.T) {
 	second, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Necessaire de viagem",
 		Body:         "Cabe tudo e não vaza.",
-		CategorySlug: "viagem",
-		CitySlug:     "rio-de-janeiro",
+		CategorySlug: "travel",
+		PlaceSlug:    "rio-de-janeiro",
 	})
 	if err != nil {
 		t.Fatalf("create second note: %v", err)
@@ -77,8 +77,8 @@ func TestNoteStoreFindsNoteByID(t *testing.T) {
 	created, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Café com pão de queijo",
 		Body:         "Bom para trabalhar de manhã.",
-		CategorySlug: "comida",
-		CitySlug:     "sao-paulo",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
 	})
 	if err != nil {
 		t.Fatalf("create note: %v", err)
@@ -113,8 +113,8 @@ func TestNoteStoreSearchesNoteTitles(t *testing.T) {
 	created, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Café com pão de queijo",
 		Body:         "Bom para trabalhar de manhã.",
-		CategorySlug: "comida",
-		CitySlug:     "sao-paulo",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
 	})
 	if err != nil {
 		t.Fatalf("create note: %v", err)
@@ -143,8 +143,8 @@ func TestNoteStoreSearchesNoteBodies(t *testing.T) {
 	created, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Lugar bom",
 		Body:         "Tem brigadeiro decente.",
-		CategorySlug: "comida",
-		CitySlug:     "sao-paulo",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
 	})
 	if err != nil {
 		t.Fatalf("create note: %v", err)
@@ -173,8 +173,8 @@ func TestNoteStoreSearchReturnsEmptyResults(t *testing.T) {
 	if _, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Café com pão de queijo",
 		Body:         "Bom para trabalhar de manhã.",
-		CategorySlug: "comida",
-		CitySlug:     "sao-paulo",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
 	}); err != nil {
 		t.Fatalf("create note: %v", err)
 	}
@@ -209,8 +209,8 @@ func TestNoteStoreSearchOrdersTiesByRecency(t *testing.T) {
 	older, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Café bom",
 		Body:         "Um achado de bairro.",
-		CategorySlug: "comida",
-		CitySlug:     "sao-paulo",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
 	})
 	if err != nil {
 		t.Fatalf("create older note: %v", err)
@@ -219,8 +219,8 @@ func TestNoteStoreSearchOrdersTiesByRecency(t *testing.T) {
 	newer, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Café bom",
 		Body:         "Um achado de bairro.",
-		CategorySlug: "comida",
-		CitySlug:     "sao-paulo",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
 	})
 	if err != nil {
 		t.Fatalf("create newer note: %v", err)
@@ -249,8 +249,8 @@ func TestNoteStoreSearchMatchesAccentedText(t *testing.T) {
 	created, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Café bom",
 		Body:         "Tem pão de queijo decente.",
-		CategorySlug: "comida",
-		CitySlug:     "sao-paulo",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
 	})
 	if err != nil {
 		t.Fatalf("create note: %v", err)
@@ -279,8 +279,8 @@ func TestNoteStoreSearchIgnoresFTSOperatorsFromUserInput(t *testing.T) {
 	created, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Restaurante brasileiro",
 		Body:         "Barato em Dublin 12.",
-		CategorySlug: "comida",
-		CitySlug:     "lisboa",
+		CategorySlug: "food",
+		PlaceSlug:    "lisboa",
 	})
 	if err != nil {
 		t.Fatalf("create note: %v", err)
@@ -313,8 +313,8 @@ func TestNoteStoreRespectsRecentLimit(t *testing.T) {
 		if _, err := store.CreateNote(ctx, note.CreateInput{
 			Title:        title,
 			Body:         "Um corpo de nota.",
-			CategorySlug: "achadinhos",
-			CitySlug:     "lisboa",
+			CategorySlug: "finds",
+			PlaceSlug:    "lisboa",
 		}); err != nil {
 			t.Fatalf("create note %s: %v", title, err)
 		}
@@ -347,8 +347,8 @@ func TestNoteStoreListsFractionalSecondNotesInRecentOrder(t *testing.T) {
 	older, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Nota exata",
 		Body:         "Criada no segundo exato.",
-		CategorySlug: "comida",
-		CitySlug:     "sao-paulo",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
 	})
 	if err != nil {
 		t.Fatalf("create older note: %v", err)
@@ -357,8 +357,8 @@ func TestNoteStoreListsFractionalSecondNotesInRecentOrder(t *testing.T) {
 	newer, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Nota fracionada",
 		Body:         "Criada um pouco depois.",
-		CategorySlug: "comida",
-		CitySlug:     "sao-paulo",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
 	})
 	if err != nil {
 		t.Fatalf("create newer note: %v", err)
@@ -391,8 +391,8 @@ func TestNoteStoreStoresUnixMillisecondTimestamps(t *testing.T) {
 	created, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Café bom",
 		Body:         "Tem pão de queijo decente.",
-		CategorySlug: note.CategorySlugComida,
-		CitySlug:     note.CitySlugSaoPaulo,
+		CategorySlug: note.CategorySlugFood,
+		PlaceSlug:    note.PlaceSlugSaoPaulo,
 	})
 	if err != nil {
 		t.Fatalf("create note: %v", err)
@@ -422,7 +422,7 @@ func TestNoteStoreRejectsUnknownCategory(t *testing.T) {
 		Title:        "Produto bom",
 		Body:         "Funcionou bem.",
 		CategorySlug: "qualquer-coisa",
-		CitySlug:     "sao-paulo",
+		PlaceSlug:    "sao-paulo",
 	})
 	if err == nil {
 		t.Fatal("create note error = nil, want foreign key error")
@@ -432,7 +432,7 @@ func TestNoteStoreRejectsUnknownCategory(t *testing.T) {
 	}
 }
 
-func TestNoteStoreRejectsUnknownCity(t *testing.T) {
+func TestNoteStoreRejectsUnknownPlace(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
@@ -440,8 +440,8 @@ func TestNoteStoreRejectsUnknownCity(t *testing.T) {
 	_, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Produto bom",
 		Body:         "Funcionou bem.",
-		CategorySlug: "achadinhos",
-		CitySlug:     "qualquer-lugar",
+		CategorySlug: "finds",
+		PlaceSlug:    "qualquer-lugar",
 	})
 	if err == nil {
 		t.Fatal("create note error = nil, want foreign key error")

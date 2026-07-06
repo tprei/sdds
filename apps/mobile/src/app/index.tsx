@@ -1,7 +1,10 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import { EmptyStateCard, FoundationScreen } from '@/components/foundation-screen';
+import {
+  EmptyStateCard,
+  FoundationScreen,
+} from '@/components/foundation-screen';
 import { NoteCard } from '@/components/note-card';
 import { listNotes } from '@/lib/api/notes';
 import type { Note } from '@/lib/api/notes';
@@ -47,7 +50,7 @@ export default function HomeScreen() {
     <FoundationScreen
       eyebrow="sdds."
       title="Início"
-      description="Notas recentes de gente real, separadas por cidade e categoria."
+      description="Notas recentes de gente real, separadas por lugar e categoria."
     >
       {renderHomeState(state, (note) => {
         router.push({

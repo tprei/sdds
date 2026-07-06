@@ -129,7 +129,6 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         CategorySlug: string;
-        CitySlug: string;
         PlaceSlug: string;
         CatalogCategory: {
             slug: components["schemas"]["CategorySlug"];
@@ -149,7 +148,7 @@ export interface components {
             title: string;
             body: string;
             category_slug: components["schemas"]["CategorySlug"];
-            city_slug: components["schemas"]["CitySlug"];
+            place_slug?: (string & components["schemas"]["PlaceSlug"]) | null;
         };
         /** @enum {string} */
         ErrorCode: "internal_error" | "invalid_json" | "invalid_note" | "invalid_search" | "not_found" | "request_too_large";
@@ -171,7 +170,7 @@ export interface components {
             title: string;
             body: string;
             category_slug: components["schemas"]["CategorySlug"];
-            city_slug: components["schemas"]["CitySlug"];
+            place_slug: (string & components["schemas"]["PlaceSlug"]) | null;
             /**
              * Format: int64
              * @description Unix timestamp in milliseconds.
@@ -184,7 +183,7 @@ export interface components {
             updated_at: number;
         };
         /** @enum {string} */
-        ValidationField: "title" | "body" | "category_slug" | "city_slug" | "q";
+        ValidationField: "title" | "body" | "category_slug" | "place_slug" | "q";
         ValidationProblem: {
             field: components["schemas"]["ValidationField"];
             /** @enum {string} */

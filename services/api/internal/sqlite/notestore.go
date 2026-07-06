@@ -14,7 +14,7 @@ import (
 
 const (
 	insertNoteSQL = `
-		INSERT INTO notes (id, title, body, category_slug, city_slug, created_at, updated_at)
+		INSERT INTO notes (id, title, body, category_slug, place_slug, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 	insertNoteSearchSQL = `
@@ -22,18 +22,18 @@ const (
 		VALUES (?, ?, ?)
 	`
 	listRecentNotesSQL = `
-		SELECT id, title, body, category_slug, city_slug, created_at, updated_at
+		SELECT id, title, body, category_slug, place_slug, created_at, updated_at
 		FROM notes
 		ORDER BY created_at DESC, id DESC
 		LIMIT ?
 	`
 	findNoteSQL = `
-		SELECT id, title, body, category_slug, city_slug, created_at, updated_at
+		SELECT id, title, body, category_slug, place_slug, created_at, updated_at
 		FROM notes
 		WHERE id = ?
 	`
 	searchNotesSQL = `
-		SELECT notes.id, notes.title, notes.body, notes.category_slug, notes.city_slug, notes.created_at, notes.updated_at
+		SELECT notes.id, notes.title, notes.body, notes.category_slug, notes.place_slug, notes.created_at, notes.updated_at
 		FROM note_search
 		JOIN notes ON notes.id = note_search.note_id
 		WHERE note_search MATCH ?
@@ -69,7 +69,7 @@ func (store *NoteStore) CreateNote(ctx context.Context, input note.CreateInput) 
 		Title:        input.Title,
 		Body:         input.Body,
 		CategorySlug: input.CategorySlug,
-		CitySlug:     input.CitySlug,
+		PlaceSlug:    input.PlaceSlug,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -91,7 +91,7 @@ func (store *NoteStore) CreateNote(ctx context.Context, input note.CreateInput) 
 		created.Title,
 		created.Body,
 		string(created.CategorySlug),
-		string(created.CitySlug),
+		nullablePlaceSlug(created.PlaceSlug),
 		unixMillis(created.CreatedAt),
 		unixMillis(created.UpdatedAt),
 	); err != nil {
@@ -244,7 +244,7 @@ func scanNoteRow(row *sql.Row) (note.Note, error) {
 func scanNoteValues(scan func(dest ...any) error) (note.Note, error) {
 	var found note.Note
 	var categorySlug string
-	var citySlug string
+	var placeSlug sql.NullString
 	var createdAt int64
 	var updatedAt int64
 
@@ -253,7 +253,7 @@ func scanNoteValues(scan func(dest ...any) error) (note.Note, error) {
 		&found.Title,
 		&found.Body,
 		&categorySlug,
-		&citySlug,
+		&placeSlug,
 		&createdAt,
 		&updatedAt,
 	); err != nil {
@@ -261,10 +261,19 @@ func scanNoteValues(scan func(dest ...any) error) (note.Note, error) {
 	}
 
 	found.CategorySlug = note.CategorySlug(categorySlug)
-	found.CitySlug = note.CitySlug(citySlug)
+	if placeSlug.Valid {
+		found.PlaceSlug = note.PlaceSlug(placeSlug.String)
+	}
 	found.CreatedAt = timeFromUnixMillis(createdAt)
 	found.UpdatedAt = timeFromUnixMillis(updatedAt)
 	return found, nil
+}
+
+func nullablePlaceSlug(slug note.PlaceSlug) any {
+	if slug == "" {
+		return nil
+	}
+	return string(slug)
 }
 
 func normalizeTime(value time.Time) time.Time {

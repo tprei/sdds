@@ -1,45 +1,33 @@
 import createClient from 'openapi-fetch';
 
 import { apiBaseURL } from './config';
-import {
-  isNoteCategorySlug,
-  isNoteCitySlug,
-} from '@/features/notes/metadata';
-import type {
-  NoteCategorySlug,
-  NoteCitySlug,
-} from '@/features/notes/metadata';
 import type { components, paths } from './generated/schema';
 
 export type Note = {
   body: string;
-  category: NoteCategorySlug;
-  city: NoteCitySlug;
+  categorySlug: string;
   createdAt: number;
   id: string;
+  placeSlug: string | null;
   title: string;
   updatedAt: number;
 };
 
 export type CreateNoteInput = {
-	body: string;
-	category: NoteCategorySlug;
-	city: NoteCitySlug;
-	title: string;
+  body: string;
+  categorySlug: string;
+  placeSlug?: string | null;
+  title: string;
 };
 
 export type SearchNotesInput = {
-	query: string;
+  query: string;
 };
 
 type GeneratedSchemas = components['schemas'];
 type CreateNoteRequest = GeneratedSchemas['CreateNoteRequest'];
 type ListNotesResponse = GeneratedSchemas['ListNotesResponse'];
 type NoteResponse = GeneratedSchemas['Note'];
-type ParsedNoteResponse = Omit<NoteResponse, 'category_slug' | 'city_slug'> & {
-  category_slug: NoteCategorySlug;
-  city_slug: NoteCitySlug;
-};
 type SchemaKey<T> = Extract<keyof T, string>;
 type SchemaKeyList<T> = readonly SchemaKey<T>[];
 type ExhaustiveSchemaKeyList<T, K extends SchemaKeyList<T>> =
@@ -49,9 +37,9 @@ const listNotesResponseKeys = schemaKeyList<ListNotesResponse>()(['notes']);
 const noteResponseKeys = schemaKeyList<NoteResponse>()([
   'body',
   'category_slug',
-  'city_slug',
   'created_at',
   'id',
+  'place_slug',
   'title',
   'updated_at',
 ]);
@@ -92,29 +80,29 @@ export async function getNote(id: string): Promise<Note> {
     throw new APIRequestError(response.status);
   }
 
-	return parseNoteResponse(data);
+  return parseNoteResponse(data);
 }
 
 export async function searchNotes(input: SearchNotesInput): Promise<Note[]> {
-	const { data, response } = await apiClient().GET('/v1/search/notes', {
-		params: {
-			query: {
-				q: input.query,
-			},
-		},
-	});
-	if (!response.ok) {
-		throw new APIRequestError(response.status);
-	}
+  const { data, response } = await apiClient().GET('/v1/search/notes', {
+    params: {
+      query: {
+        q: input.query,
+      },
+    },
+  });
+  if (!response.ok) {
+    throw new APIRequestError(response.status);
+  }
 
-	return parseListNotesResponse(data);
+  return parseListNotesResponse(data);
 }
 
 export async function createNote(input: CreateNoteInput): Promise<Note> {
   const request: CreateNoteRequest = {
     body: input.body,
-    category_slug: input.category,
-    city_slug: input.city,
+    category_slug: input.categorySlug,
+    place_slug: input.placeSlug ?? null,
     title: input.title,
   };
 
@@ -166,16 +154,16 @@ function parseNoteResponse(value: unknown): Note {
 
   return {
     body: value.body,
-    category: value.category_slug,
-    city: value.city_slug,
+    categorySlug: value.category_slug,
     createdAt: value.created_at,
     id: value.id,
+    placeSlug: value.place_slug,
     title: value.title,
     updatedAt: value.updated_at,
   };
 }
 
-function isNoteResponse(value: unknown): value is ParsedNoteResponse {
+function isNoteResponse(value: unknown): value is NoteResponse {
   return (
     isRecord(value) &&
     hasOnlyKeys(value, noteResponseKeys) &&
@@ -183,9 +171,7 @@ function isNoteResponse(value: unknown): value is ParsedNoteResponse {
     typeof value.title === 'string' &&
     typeof value.body === 'string' &&
     typeof value.category_slug === 'string' &&
-    isNoteCategorySlug(value.category_slug) &&
-    typeof value.city_slug === 'string' &&
-    isNoteCitySlug(value.city_slug) &&
+    (typeof value.place_slug === 'string' || value.place_slug === null) &&
     isUnixMillisecondTimestamp(value.created_at) &&
     isUnixMillisecondTimestamp(value.updated_at)
   );
@@ -210,12 +196,16 @@ function hasOnlyKeys(
   const keys = Object.keys(value);
   return (
     keys.length === expectedKeys.length &&
-    expectedKeys.every((key) => Object.prototype.hasOwnProperty.call(value, key))
+    expectedKeys.every((key) =>
+      Object.prototype.hasOwnProperty.call(value, key),
+    )
   );
 }
 
 function schemaKeyList<T>() {
-  return <const K extends SchemaKeyList<T>>(keys: ExhaustiveSchemaKeyList<T, K>) => keys;
+  return <const K extends SchemaKeyList<T>>(
+    keys: ExhaustiveSchemaKeyList<T, K>,
+  ) => keys;
 }
 
 function isUnixMillisecondTimestamp(value: unknown): value is number {

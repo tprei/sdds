@@ -3,7 +3,7 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,15 +13,8 @@ import (
 	"github.com/tprei/sdds/services/api/internal/openapi"
 )
 
-func TestListCategoriesReturnsCatalog(t *testing.T) {
-	router := NewRouter(fakeNoteStore{}, fakeCatalog{
-		listCategories: func(context.Context) ([]note.Category, error) {
-			return []note.Category{
-				{Slug: note.CategorySlugComida, Label: "Comida", Active: true, DisplayOrder: 20},
-				{Slug: note.CategorySlugBeleza, Label: "Beleza", Active: false, DisplayOrder: 10},
-			}, nil
-		},
-	})
+func TestListCategoriesReturnsCatalogRows(t *testing.T) {
+	router := newTestRouter(fakeNoteStore{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/categories", nil)
 
@@ -36,26 +29,14 @@ func TestListCategoriesReturnsCatalog(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	want := openapi.ListCategoriesResponse{
-		Categories: []openapi.CatalogCategory{
-			{Slug: "comida", Label: "Comida", Active: true, DisplayOrder: 20},
-			{Slug: "beleza", Label: "Beleza", Active: false, DisplayOrder: 10},
-		},
-	}
+	want := newListCategoriesResponse(note.Categories)
 	if diff := cmp.Diff(want, body); diff != "" {
-		t.Fatalf("response mismatch (-want +got):\n%s", diff)
+		t.Fatalf("response body mismatch (-want +got):\n%s", diff)
 	}
 }
 
-func TestListPlacesReturnsCatalog(t *testing.T) {
-	router := NewRouter(fakeNoteStore{}, fakeCatalog{
-		listPlaces: func(context.Context) ([]note.Place, error) {
-			return []note.Place{
-				{Slug: note.PlaceSlugSaoPaulo, Label: "São Paulo", Active: true, DisplayOrder: 10},
-				{Slug: note.PlaceSlugLisboa, Label: "Lisboa", Active: false, DisplayOrder: 30},
-			}, nil
-		},
-	})
+func TestListPlacesReturnsCatalogRows(t *testing.T) {
+	router := newTestRouter(fakeNoteStore{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/places", nil)
 
@@ -70,21 +51,16 @@ func TestListPlacesReturnsCatalog(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	want := openapi.ListPlacesResponse{
-		Places: []openapi.CatalogPlace{
-			{Slug: "sao-paulo", Label: "São Paulo", Active: true, DisplayOrder: 10},
-			{Slug: "lisboa", Label: "Lisboa", Active: false, DisplayOrder: 30},
-		},
-	}
+	want := newListPlacesResponse(note.Places)
 	if diff := cmp.Diff(want, body); diff != "" {
-		t.Fatalf("response mismatch (-want +got):\n%s", diff)
+		t.Fatalf("response body mismatch (-want +got):\n%s", diff)
 	}
 }
 
-func TestListCategoriesHandlesStoreErrors(t *testing.T) {
+func TestListCategoriesReturnsInternalError(t *testing.T) {
 	router := NewRouter(fakeNoteStore{}, fakeCatalog{
 		listCategories: func(context.Context) ([]note.Category, error) {
-			return nil, fmt.Errorf("catalog failed")
+			return nil, errors.New("catalog unavailable")
 		},
 	})
 	response := httptest.NewRecorder()
@@ -98,10 +74,10 @@ func TestListCategoriesHandlesStoreErrors(t *testing.T) {
 	}
 }
 
-func TestListPlacesHandlesStoreErrors(t *testing.T) {
+func TestListPlacesReturnsInternalError(t *testing.T) {
 	router := NewRouter(fakeNoteStore{}, fakeCatalog{
 		listPlaces: func(context.Context) ([]note.Place, error) {
-			return nil, fmt.Errorf("catalog failed")
+			return nil, errors.New("catalog unavailable")
 		},
 	})
 	response := httptest.NewRecorder()

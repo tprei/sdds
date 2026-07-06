@@ -28,7 +28,7 @@ export const styles = StyleSheet.create({
     color: semanticColors.textStrong,
     fontSize: typography.sizeBody,
   },
-  city: {
+  place: {
     color: semanticColors.textMuted,
     fontSize: typography.sizeSmall,
     fontWeight: typography.weightSemibold,

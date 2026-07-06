@@ -13,7 +13,7 @@ type Note struct {
 	Title        string
 	Body         string
 	CategorySlug CategorySlug
-	CitySlug     CitySlug
+	PlaceSlug    PlaceSlug
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
@@ -22,7 +22,7 @@ type CreateInput struct {
 	Title        string
 	Body         string
 	CategorySlug CategorySlug
-	CitySlug     CitySlug
+	PlaceSlug    PlaceSlug
 }
 
 type Store interface {

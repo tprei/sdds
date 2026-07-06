@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 import type { Note } from '@/lib/api/notes';
-import { categoryLabel, cityLabel } from '@/features/notes/metadata';
+import { categoryLabel, placeLabel } from '@/features/notes/metadata';
 
 import { styles } from './note-card.styles';
 
@@ -11,13 +11,19 @@ type NoteCardProps = {
 };
 
 export function NoteCard({ note, onPress }: NoteCardProps) {
+  const resolvedCategoryLabel = categoryLabel(note.categorySlug);
+  const resolvedPlaceLabel = placeLabel(note.placeSlug);
   const content = (
     <View style={styles.card}>
       <View style={styles.metaRow}>
         <View style={styles.pill}>
-          <Text style={styles.pillText}>{categoryLabel(note.category)}</Text>
+          <Text style={styles.pillText}>
+            {resolvedCategoryLabel ?? note.categorySlug}
+          </Text>
         </View>
-        <Text style={styles.city}>{cityLabel(note.city)}</Text>
+        {resolvedPlaceLabel === null ? null : (
+          <Text style={styles.place}>{resolvedPlaceLabel}</Text>
+        )}
       </View>
       <Text style={styles.title}>{note.title}</Text>
       <Text style={styles.body}>{note.body}</Text>

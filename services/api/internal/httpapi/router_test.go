@@ -170,10 +170,10 @@ func (store fakeNoteStore) SearchNotes(ctx context.Context, input note.SearchInp
 }
 
 type fakeCatalog struct {
-	findActiveCategory func(ctx context.Context, slug note.CategorySlug) (note.Category, error)
-	findActivePlace    func(ctx context.Context, slug note.PlaceSlug) (note.Place, error)
 	listCategories     func(ctx context.Context) ([]note.Category, error)
 	listPlaces         func(ctx context.Context) ([]note.Place, error)
+	findActiveCategory func(ctx context.Context, slug note.CategorySlug) (note.Category, error)
+	findActivePlace    func(ctx context.Context, slug note.PlaceSlug) (note.Place, error)
 }
 
 func (catalog fakeCatalog) ListCategories(ctx context.Context) ([]note.Category, error) {

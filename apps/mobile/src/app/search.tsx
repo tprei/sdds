@@ -64,7 +64,7 @@ export default function SearchScreen() {
     <FoundationScreen
       eyebrow="Buscar"
       title="Procure uma nota"
-      description="Busca por dica, lugar, produto ou cidade."
+      description="Busca pelo texto da dica ou produto."
     >
       <FoundationTextInput
         accessibilityLabel="Buscar"
@@ -97,7 +97,7 @@ function renderSearchState(
     return (
       <EmptyStateCard
         title="Nada pesquisado ainda"
-        body="Busca por dica, lugar, produto ou cidade."
+        body="Busca pelo texto da dica ou produto."
       />
     );
   }

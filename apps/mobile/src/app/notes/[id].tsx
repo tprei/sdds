@@ -7,14 +7,15 @@ import {
   FoundationButton,
   FoundationScreen,
 } from '@/components/foundation-screen';
-import { categoryLabel, placeLabel } from '@/features/notes/metadata';
+import { buildNoteCatalog, labelNote } from '@/features/notes/catalog';
+import type { LabelledNote } from '@/features/notes/catalog';
 import { styles } from '@/features/notes/detail-screen.styles';
+import { listCatalogs } from '@/lib/api/catalogs';
 import { APIRequestError, getNote } from '@/lib/api/notes';
-import type { Note } from '@/lib/api/notes';
 
 type NoteDetailState =
   | { status: 'loading' }
-  | { status: 'ready'; note: Note }
+  | { status: 'ready'; note: LabelledNote }
   | { status: 'notFound' }
   | { status: 'error' };
 
@@ -40,12 +41,18 @@ export default function NoteDetailScreen() {
       let isActive = true;
       setState({ status: 'loading' });
 
-      getNote(noteID)
-        .then((note) => {
+      Promise.all([listCatalogs(), getNote(noteID)])
+        .then(([catalogs, note]) => {
           if (!isActive) {
             return;
           }
-          setState({ status: 'ready', note });
+          const catalog = buildNoteCatalog(catalogs);
+          const labelledNote = labelNote(catalog, note);
+          setState(
+            labelledNote === null
+              ? { status: 'error' }
+              : { status: 'ready', note: labelledNote },
+          );
         })
         .catch((error) => {
           if (!isActive) {
@@ -107,26 +114,22 @@ function renderNoteDetailState(state: NoteDetailState) {
   return <ReadyNoteDetail note={state.note} />;
 }
 
-function ReadyNoteDetail({ note }: { note: Note }) {
-  const resolvedCategoryLabel =
-    categoryLabel(note.categorySlug) ?? note.categorySlug;
-  const resolvedPlaceLabel = placeLabel(note.placeSlug);
-
+function ReadyNoteDetail({ note }: { note: LabelledNote }) {
   return (
     <>
       <View style={styles.metaRow}>
         <View
-          accessibilityLabel={`Categoria da nota: ${resolvedCategoryLabel}`}
+          accessibilityLabel={`Categoria da nota: ${note.categoryLabel}`}
           style={styles.pill}
         >
-          <Text style={styles.pillText}>{resolvedCategoryLabel}</Text>
+          <Text style={styles.pillText}>{note.categoryLabel}</Text>
         </View>
-        {resolvedPlaceLabel === null ? null : (
+        {note.placeLabel === null ? null : (
           <Text
-            accessibilityLabel={`Lugar da nota: ${resolvedPlaceLabel}`}
+            accessibilityLabel={`Lugar da nota: ${note.placeLabel}`}
             style={styles.place}
           >
-            {resolvedPlaceLabel}
+            {note.placeLabel}
           </Text>
         )}
       </View>
@@ -142,15 +145,11 @@ function ReadyNoteDetail({ note }: { note: Note }) {
       <View style={styles.dateCard}>
         <View style={styles.dateRow}>
           <Text style={styles.dateLabel}>Publicado</Text>
-          <Text style={styles.dateValue}>
-            {formatTimestamp(note.createdAt)}
-          </Text>
+          <Text style={styles.dateValue}>{formatTimestamp(note.createdAt)}</Text>
         </View>
         <View style={styles.dateRow}>
           <Text style={styles.dateLabel}>Atualizado</Text>
-          <Text style={styles.dateValue}>
-            {formatTimestamp(note.updatedAt)}
-          </Text>
+          <Text style={styles.dateValue}>{formatTimestamp(note.updatedAt)}</Text>
         </View>
       </View>
     </>

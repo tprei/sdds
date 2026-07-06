@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
@@ -8,15 +8,12 @@ import {
   FoundationTextInput,
 } from '@/components/foundation-screen';
 import {
-  categoryLabel,
-  noteCategories,
-  notePlaces,
-  placeLabel,
-} from '@/features/notes/metadata';
-import type {
-  NoteCategorySlug,
-  NotePlaceSlug,
-} from '@/features/notes/metadata';
+  buildNoteCatalog,
+  resolveSelectedCategorySlug,
+  resolveSelectedPlaceSlug,
+} from '@/features/notes/catalog';
+import type { NoteCatalog } from '@/features/notes/catalog';
+import { listCatalogs } from '@/lib/api/catalogs';
 import { APIRequestError, createNote } from '@/lib/api/notes';
 
 import { styles } from '@/features/notes/compose-screen.styles';
@@ -27,15 +24,22 @@ type SubmitState =
   | { status: 'success' }
   | { status: 'error'; message: string };
 
-const defaultCategorySlug: NoteCategorySlug = 'food';
+type CatalogState =
+  | { status: 'loading' }
+  | { status: 'ready'; catalog: NoteCatalog }
+  | { status: 'error' };
 
 export default function ComposeScreen() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [categorySlug, setCategorySlug] =
-    useState<NoteCategorySlug>(defaultCategorySlug);
-  const [placeSlug, setPlaceSlug] = useState<NotePlaceSlug | null>(null);
+  const categorySlugRef = useRef<string | null>(null);
+  const placeSlugRef = useRef<string | null>(null);
+  const [categorySlug, setCategorySlug] = useState<string | null>(null);
+  const [placeSlug, setPlaceSlug] = useState<string | null>(null);
+  const [catalogState, setCatalogState] = useState<CatalogState>({
+    status: 'loading',
+  });
   const [submitState, setSubmitState] = useState<SubmitState>({
     status: 'idle',
   });
@@ -50,20 +54,63 @@ export default function ComposeScreen() {
     titleLength <= 120 &&
     bodyLength > 0 &&
     bodyLength <= 4000 &&
+    catalogState.status === 'ready' &&
+    categorySlug !== null &&
     !isSubmitting;
+
+  const selectCategorySlug = useCallback((nextSlug: string | null) => {
+    categorySlugRef.current = nextSlug;
+    setCategorySlug(nextSlug);
+  }, []);
+
+  const selectPlaceSlug = useCallback((nextSlug: string | null) => {
+    placeSlugRef.current = nextSlug;
+    setPlaceSlug(nextSlug);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
+      let isActive = true;
+      setCatalogState({ status: 'loading' });
+      listCatalogs()
+        .then((catalogs) => {
+          if (!isActive) {
+            return;
+          }
+          const catalog = buildNoteCatalog(catalogs);
+          const nextCategorySlug = resolveSelectedCategorySlug(
+            catalog,
+            categorySlugRef.current,
+          );
+          if (nextCategorySlug === null) {
+            selectCategorySlug(null);
+            setCatalogState({ status: 'error' });
+            return;
+          }
+          selectCategorySlug(nextCategorySlug);
+          selectPlaceSlug(
+            resolveSelectedPlaceSlug(catalog, placeSlugRef.current),
+          );
+          setCatalogState({ status: 'ready', catalog });
+        })
+        .catch(() => {
+          if (!isActive) {
+            return;
+          }
+          setCatalogState({ status: 'error' });
+        });
+
       return () => {
+        isActive = false;
         setSubmitState((current) =>
           current.status === 'success' ? { status: 'idle' } : current,
         );
       };
-    }, []),
+    }, [selectCategorySlug, selectPlaceSlug]),
   );
 
   async function handleSubmit() {
-    if (!canSubmit) {
+    if (!canSubmit || categorySlug === null) {
       return;
     }
 
@@ -115,78 +162,94 @@ export default function ComposeScreen() {
         placeholder="O que você testou, gostou ou recomenda?"
         value={body}
       />
-      <View style={styles.field}>
-        <Text style={styles.label}>Categoria</Text>
-        <View style={styles.optionRow}>
-          {noteCategories.map((option) => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: option.slug === categorySlug }}
-              key={option.slug}
-              onPress={() => setCategorySlug(option.slug)}
-              style={[
-                styles.option,
-                option.slug === categorySlug ? styles.optionSelected : null,
-              ]}
-            >
-              <Text
+      {catalogState.status === 'loading' ? (
+        <Text style={styles.statusSuccess}>Carregando categorias...</Text>
+      ) : null}
+      {catalogState.status === 'error' ? (
+        <Text style={styles.statusError}>
+          Não deu pra carregar categorias e lugares.
+        </Text>
+      ) : null}
+      {catalogState.status === 'ready' ? (
+        <>
+          <View style={styles.field}>
+            <Text style={styles.label}>Categoria</Text>
+            <View style={styles.optionRow}>
+              {catalogState.catalog.activeCategories.map((option) => (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{
+                    selected: option.slug === categorySlug,
+                  }}
+                  key={option.slug}
+                  onPress={() => selectCategorySlug(option.slug)}
+                  style={[
+                    styles.option,
+                    option.slug === categorySlug ? styles.optionSelected : null,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      option.slug === categorySlug
+                        ? styles.optionTextSelected
+                        : null,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+          <View style={styles.field}>
+            <Text style={styles.label}>Lugar</Text>
+            <View style={styles.optionRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: placeSlug === null }}
+                onPress={() => selectPlaceSlug(null)}
                 style={[
-                  styles.optionText,
-                  option.slug === categorySlug
-                    ? styles.optionTextSelected
-                    : null,
+                  styles.option,
+                  placeSlug === null ? styles.optionSelected : null,
                 ]}
               >
-                {categoryLabel(option.slug) ?? option.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-      <View style={styles.field}>
-        <Text style={styles.label}>Lugar</Text>
-        <View style={styles.optionRow}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: placeSlug === null }}
-            onPress={() => setPlaceSlug(null)}
-            style={[
-              styles.option,
-              placeSlug === null ? styles.optionSelected : null,
-            ]}
-          >
-            <Text
-              style={[
-                styles.optionText,
-                placeSlug === null ? styles.optionTextSelected : null,
-              ]}
-            >
-              Sem lugar específico
-            </Text>
-          </Pressable>
-          {notePlaces.map((option) => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: option.slug === placeSlug }}
-              key={option.slug}
-              onPress={() => setPlaceSlug(option.slug)}
-              style={[
-                styles.option,
-                option.slug === placeSlug ? styles.optionSelected : null,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.optionText,
-                  option.slug === placeSlug ? styles.optionTextSelected : null,
-                ]}
-              >
-                {placeLabel(option.slug) ?? option.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
+                <Text
+                  style={[
+                    styles.optionText,
+                    placeSlug === null ? styles.optionTextSelected : null,
+                  ]}
+                >
+                  Sem lugar específico
+                </Text>
+              </Pressable>
+              {catalogState.catalog.activePlaces.map((option) => (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: option.slug === placeSlug }}
+                  key={option.slug}
+                  onPress={() => selectPlaceSlug(option.slug)}
+                  style={[
+                    styles.option,
+                    option.slug === placeSlug ? styles.optionSelected : null,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      option.slug === placeSlug
+                        ? styles.optionTextSelected
+                        : null,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </>
+      ) : null}
       {submitState.status === 'success' ? (
         <Text style={styles.statusSuccess}>Publicado. Indo pro início...</Text>
       ) : null}

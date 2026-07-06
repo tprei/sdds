@@ -8,13 +8,16 @@ import {
   FoundationTextInput,
 } from '@/components/foundation-screen';
 import { NoteCard } from '@/components/note-card';
+import { buildNoteCatalog, labelNotes } from '@/features/notes/catalog';
+import type { LabelledNote } from '@/features/notes/catalog';
+import { listCatalogs } from '@/lib/api/catalogs';
 import { searchNotes } from '@/lib/api/notes';
 import type { Note } from '@/lib/api/notes';
 
 type SearchScreenState =
   | { status: 'idle' }
   | { status: 'loading'; query: string }
-  | { status: 'ready'; query: string; notes: Note[] }
+  | { status: 'ready'; query: string; notes: LabelledNote[] }
   | { status: 'empty'; query: string }
   | { status: 'error'; query: string };
 
@@ -41,14 +44,20 @@ export default function SearchScreen() {
     }
 
     setState({ status: 'loading', query: submittedQuery });
-    searchNotes({ query: submittedQuery })
-      .then((notes) => {
+    Promise.all([listCatalogs(), searchNotes({ query: submittedQuery })])
+      .then(([catalogs, notes]) => {
         if (requestIDRef.current !== requestID) {
           return;
         }
+        const catalog = buildNoteCatalog(catalogs);
+        const labelledNotes = labelNotes(catalog, notes);
+        if (labelledNotes === null) {
+          setState({ status: 'error', query: submittedQuery });
+          return;
+        }
         setState(
-          notes.length > 0
-            ? { status: 'ready', query: submittedQuery, notes }
+          labelledNotes.length > 0
+            ? { status: 'ready', query: submittedQuery, notes: labelledNotes }
             : { status: 'empty', query: submittedQuery },
         );
       })
@@ -129,7 +138,13 @@ function renderSearchState(
     );
   }
 
-  return state.notes.map((note) => (
-    <NoteCard key={note.id} note={note} onPress={() => onOpenNote(note)} />
+  return state.notes.map((labelledNote) => (
+    <NoteCard
+      categoryLabel={labelledNote.categoryLabel}
+      key={labelledNote.id}
+      note={labelledNote}
+      onPress={() => onOpenNote(labelledNote)}
+      placeLabel={labelledNote.placeLabel}
+    />
   ));
 }

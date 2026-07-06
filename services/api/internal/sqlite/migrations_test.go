@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -12,7 +13,7 @@ func TestApplyMigrationsCreatesInitialSchema(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	tables := []string{"schema_migrations", "categories", "cities", "notes", "note_search"}
+	tables := []string{"schema_migrations", "categories", "cities", "places", "notes", "note_search"}
 	for _, table := range tables {
 		t.Run(table, func(t *testing.T) {
 			var count int
@@ -39,15 +40,17 @@ func TestApplyMigrationsSeedsControlledMetadata(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	wantCategories := make(map[string]string, len(note.Categories))
-	gotCategories := make(map[string]string, len(note.Categories))
+	wantCategories := make(map[string]note.Category, len(note.Categories))
+	gotCategories := make(map[string]note.Category, len(note.Categories))
 	for _, category := range note.Categories {
-		wantCategories[string(category.Slug)] = category.Label
-		var label string
-		if err := db.QueryRowContext(ctx, `SELECT label FROM categories WHERE slug = ?`, category.Slug).Scan(&label); err != nil {
+		wantCategories[string(category.Slug)] = category
+		var got note.Category
+		var slug string
+		if err := db.QueryRowContext(ctx, `SELECT slug, label, active, display_order FROM categories WHERE slug = ?`, category.Slug).Scan(&slug, &got.Label, &got.Active, &got.DisplayOrder); err != nil {
 			t.Fatalf("query category %s: %v", category.Slug, err)
 		}
-		gotCategories[string(category.Slug)] = label
+		got.Slug = note.CategorySlug(slug)
+		gotCategories[string(category.Slug)] = got
 	}
 	if diff := cmp.Diff(wantCategories, gotCategories); diff != "" {
 		t.Fatalf("categories mismatch (-want +got):\n%s", diff)
@@ -66,6 +69,51 @@ func TestApplyMigrationsSeedsControlledMetadata(t *testing.T) {
 	if diff := cmp.Diff(wantCities, gotCities); diff != "" {
 		t.Fatalf("cities mismatch (-want +got):\n%s", diff)
 	}
+
+	wantPlaces := make(map[string]note.Place, len(note.Places))
+	gotPlaces := make(map[string]note.Place, len(note.Places))
+	for _, place := range note.Places {
+		wantPlaces[string(place.Slug)] = place
+		var got note.Place
+		var slug string
+		if err := db.QueryRowContext(ctx, `SELECT slug, label, active, display_order FROM places WHERE slug = ?`, place.Slug).Scan(&slug, &got.Label, &got.Active, &got.DisplayOrder); err != nil {
+			t.Fatalf("query place %s: %v", place.Slug, err)
+		}
+		got.Slug = note.PlaceSlug(slug)
+		gotPlaces[string(place.Slug)] = got
+	}
+	if diff := cmp.Diff(wantPlaces, gotPlaces); diff != "" {
+		t.Fatalf("places mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestCatalogMigrationRequiresPlacesToReferenceCities(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close database: %v", err)
+		}
+	})
+	applyMigrationFiles(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs")
+
+	_, err = db.ExecContext(
+		ctx,
+		`
+			INSERT INTO places (slug, label, active, display_order)
+			VALUES (?, ?, ?, ?)
+		`,
+		"curitiba",
+		"Curitiba",
+		true,
+		40,
+	)
+	if err == nil {
+		t.Fatal("insert place error = nil, want foreign key error")
+	}
 }
 
 func TestApplyMigrationsIndexesExistingNotes(t *testing.T) {
@@ -79,20 +127,8 @@ func TestApplyMigrationsIndexesExistingNotes(t *testing.T) {
 			t.Fatalf("close database: %v", err)
 		}
 	})
+	applyMigrationFiles(t, ctx, db, "000001_initial_notes")
 
-	if _, err := db.ExecContext(ctx, createSchemaMigrationsSQL); err != nil {
-		t.Fatalf("create schema_migrations: %v", err)
-	}
-	initialMigration, err := migrations.ReadFile("migrations/000001_initial_notes.sql")
-	if err != nil {
-		t.Fatalf("read initial migration: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, string(initialMigration)); err != nil {
-		t.Fatalf("apply initial migration: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, recordMigrationSQL, "000001_initial_notes"); err != nil {
-		t.Fatalf("record initial migration: %v", err)
-	}
 	if _, err := db.ExecContext(
 		ctx,
 		`
@@ -128,5 +164,26 @@ func TestApplyMigrationsIndexesExistingNotes(t *testing.T) {
 	wantIDs := []string{"existing-note"}
 	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
 		t.Fatalf("search note ids mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func applyMigrationFiles(t *testing.T, ctx context.Context, db *sql.DB, versions ...string) {
+	t.Helper()
+
+	if _, err := db.ExecContext(ctx, createSchemaMigrationsSQL); err != nil {
+		t.Fatalf("create schema_migrations: %v", err)
+	}
+
+	for _, version := range versions {
+		contents, err := migrations.ReadFile("migrations/" + version + ".sql")
+		if err != nil {
+			t.Fatalf("read migration %s: %v", version, err)
+		}
+		if _, err := db.ExecContext(ctx, string(contents)); err != nil {
+			t.Fatalf("apply migration %s: %v", version, err)
+		}
+		if _, err := db.ExecContext(ctx, recordMigrationSQL, version); err != nil {
+			t.Fatalf("record migration %s: %v", version, err)
+		}
 	}
 }

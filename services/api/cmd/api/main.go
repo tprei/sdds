@@ -68,7 +68,8 @@ func runServer(ctx context.Context, config config) (err error) {
 	}()
 
 	noteStore := sqlite.NewNoteStore(db)
-	server := newServer(config, httpapi.NewRouter(noteStore))
+	catalogStore := sqlite.NewCatalogStore(db)
+	server := newServer(config, httpapi.NewRouter(noteStore, catalogStore))
 
 	slog.Info("api listening", "addr", config.httpAddr)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

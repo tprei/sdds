@@ -23,7 +23,7 @@ const exampleNoteID = "018ff5b8-0000-7000-8000-000000000000"
 
 func TestListNotesReturnsRecentNotes(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		listNotes: func(_ context.Context, limit int) ([]note.Note, error) {
 			if limit != recentNotesLimit {
 				t.Fatalf("limit = %d, want %d", limit, recentNotesLimit)
@@ -87,7 +87,7 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 
 func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		searchNotes: func(_ context.Context, input note.SearchInput) ([]note.Note, error) {
 			if input.Query != "café" {
 				t.Fatalf("query = %q, want café", input.Query)
@@ -136,7 +136,7 @@ func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 }
 
 func TestSearchNotesRejectsEmptyQuery(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		searchNotes: func(context.Context, note.SearchInput) ([]note.Note, error) {
 			t.Fatal("SearchNotes should not be called")
 			return nil, nil
@@ -166,7 +166,7 @@ func TestSearchNotesRejectsEmptyQuery(t *testing.T) {
 }
 
 func TestSearchNotesRejectsMissingQuery(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		searchNotes: func(context.Context, note.SearchInput) ([]note.Note, error) {
 			t.Fatal("SearchNotes should not be called")
 			return nil, nil
@@ -196,7 +196,7 @@ func TestSearchNotesRejectsMissingQuery(t *testing.T) {
 }
 
 func TestSearchNotesRejectsLongQuery(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		searchNotes: func(context.Context, note.SearchInput) ([]note.Note, error) {
 			t.Fatal("SearchNotes should not be called")
 			return nil, nil
@@ -226,7 +226,7 @@ func TestSearchNotesRejectsLongQuery(t *testing.T) {
 }
 
 func TestSearchNotesRejectsDuplicateQuery(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		searchNotes: func(context.Context, note.SearchInput) ([]note.Note, error) {
 			t.Fatal("SearchNotes should not be called")
 			return nil, nil
@@ -256,7 +256,7 @@ func TestSearchNotesRejectsDuplicateQuery(t *testing.T) {
 }
 
 func TestSearchNotesReturnsInternalError(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		searchNotes: func(context.Context, note.SearchInput) ([]note.Note, error) {
 			return nil, errors.New("database unavailable")
 		},
@@ -283,7 +283,7 @@ func TestSearchNotesReturnsInternalError(t *testing.T) {
 
 func TestGetNoteReturnsNote(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		findNote: func(_ context.Context, id string) (note.Note, error) {
 			if id != exampleNoteID {
 				t.Fatalf("id = %q, want note id", id)
@@ -329,7 +329,7 @@ func TestGetNoteReturnsNote(t *testing.T) {
 }
 
 func TestGetNoteReturnsNotFound(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		findNote: func(context.Context, string) (note.Note, error) {
 			return note.Note{}, note.ErrNoteNotFound
 		},
@@ -355,7 +355,7 @@ func TestGetNoteReturnsNotFound(t *testing.T) {
 }
 
 func TestGetNoteReturnsInternalError(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		findNote: func(context.Context, string) (note.Note, error) {
 			return note.Note{}, errors.New("database unavailable")
 		},
@@ -382,7 +382,7 @@ func TestGetNoteReturnsInternalError(t *testing.T) {
 
 func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
 			if input.Title != "Café bom" {
 				t.Fatalf("title = %q, want Café bom", input.Title)
@@ -437,7 +437,7 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 }
 
 func TestCreateNoteRejectsValidationProblems(t *testing.T) {
-	router := NewRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 	requestBody := []byte(`{"title":"   ","body":"   ","category_slug":"comida","city_slug":"sao-paulo"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
@@ -498,7 +498,7 @@ func TestCreateNoteRejectsOpenAPIRequestSchemaProblems(t *testing.T) {
 		},
 	}
 
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
 			t.Fatal("CreateNote should not be called")
 			return note.Note{}, nil
@@ -533,7 +533,7 @@ func TestCreateNoteRejectsOpenAPIRequestSchemaProblems(t *testing.T) {
 }
 
 func TestCreateNoteRejectsUnknownSlugsThroughDomainValidation(t *testing.T) {
-	router := NewRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"qualquer","city_slug":"qualquer"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
@@ -560,7 +560,7 @@ func TestCreateNoteRejectsUnknownSlugsThroughDomainValidation(t *testing.T) {
 }
 
 func TestCreateNoteRejectsInvalidJSON(t *testing.T) {
-	router := NewRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader([]byte(`{"title":`)))
 	request.Header.Set("Content-Type", "application/json")
@@ -590,7 +590,7 @@ func TestCreateNoteRejectsMissingOrUnsupportedContentType(t *testing.T) {
 		{name: "unsupported", contentType: "text/plain"},
 	}
 
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
 			t.Fatal("CreateNote should not be called")
 			return note.Note{}, nil
@@ -625,7 +625,7 @@ func TestCreateNoteRejectsMissingOrUnsupportedContentType(t *testing.T) {
 }
 
 func TestCreateNoteRejectsOldMobileShapedJSON(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
 			t.Fatal("CreateNote should not be called")
 			return note.Note{}, nil
@@ -653,7 +653,7 @@ func TestCreateNoteRejectsOldMobileShapedJSON(t *testing.T) {
 }
 
 func TestCreateNoteRejectsUnknownJSONFields(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
 			t.Fatal("CreateNote should not be called")
 			return note.Note{}, nil
@@ -681,7 +681,7 @@ func TestCreateNoteRejectsUnknownJSONFields(t *testing.T) {
 }
 
 func TestCreateNoteRejectsTrailingJSON(t *testing.T) {
-	router := NewRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"comida","city_slug":"sao-paulo"} {}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
@@ -704,7 +704,7 @@ func TestCreateNoteRejectsTrailingJSON(t *testing.T) {
 }
 
 func TestCreateNoteRejectsOversizedRequestBody(t *testing.T) {
-	router := NewRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 	requestBody := []byte(`{"title":"Café bom","body":"` + strings.Repeat("a", int(maxCreateNoteRequestBytes)) + `","category_slug":"comida","city_slug":"sao-paulo"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
@@ -727,7 +727,7 @@ func TestCreateNoteRejectsOversizedRequestBody(t *testing.T) {
 }
 
 func TestListNotesRejectsRequestBody(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		listNotes: func(context.Context, int) ([]note.Note, error) {
 			t.Fatal("ListRecentNotes should not be called")
 			return nil, nil
@@ -754,7 +754,7 @@ func TestListNotesRejectsRequestBody(t *testing.T) {
 }
 
 func TestNoteRoutesRejectUnsupportedMethods(t *testing.T) {
-	router := NewRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPut, "/v1/notes", nil)
 

@@ -232,8 +232,6 @@ components:
   schemas:
     CategorySlug:
       type: string
-    CitySlug:
-      type: string
     PlaceSlug:
       type: string
     CatalogCategory:
@@ -279,7 +277,6 @@ components:
         - title
         - body
         - category_slug
-        - city_slug
       properties:
         title:
           type: string
@@ -291,8 +288,11 @@ components:
           maxLength: 4000
         category_slug:
           $ref: "#/components/schemas/CategorySlug"
-        city_slug:
-          $ref: "#/components/schemas/CitySlug"
+        place_slug:
+          type: string
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/PlaceSlug"
     ErrorCode:
       type: string
       x-enum-varnames:
@@ -359,7 +359,7 @@ components:
         - title
         - body
         - category_slug
-        - city_slug
+        - place_slug
         - created_at
         - updated_at
       properties:
@@ -371,8 +371,11 @@ components:
           type: string
         category_slug:
           $ref: "#/components/schemas/CategorySlug"
-        city_slug:
-          $ref: "#/components/schemas/CitySlug"
+        place_slug:
+          type: string
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/PlaceSlug"
         created_at:
           type: integer
           format: int64
@@ -389,13 +392,13 @@ components:
         - ValidationFieldTitle
         - ValidationFieldBody
         - ValidationFieldCategorySlug
-        - ValidationFieldCitySlug
+        - ValidationFieldPlaceSlug
         - ValidationFieldQ
       enum:
         - title
         - body
         - category_slug
-        - city_slug
+        - place_slug
         - q
     ValidationProblem:
       type: object

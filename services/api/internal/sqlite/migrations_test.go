@@ -13,7 +13,7 @@ func TestApplyMigrationsCreatesInitialSchema(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	tables := []string{"schema_migrations", "categories", "cities", "places", "notes", "note_search"}
+	tables := []string{"schema_migrations", "categories", "places", "notes", "note_search"}
 	for _, table := range tables {
 		t.Run(table, func(t *testing.T) {
 			var count int
@@ -22,6 +22,24 @@ func TestApplyMigrationsCreatesInitialSchema(t *testing.T) {
 			}
 			if count != 1 {
 				t.Fatalf("table %s count = %d, want 1", table, count)
+			}
+		})
+	}
+}
+
+func TestApplyMigrationsCreatesCatalogIndexes(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+
+	indexes := []string{"notes_recent_idx", "notes_category_idx", "notes_place_idx"}
+	for _, index := range indexes {
+		t.Run(index, func(t *testing.T) {
+			var count int
+			if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?`, index).Scan(&count); err != nil {
+				t.Fatalf("query index %s: %v", index, err)
+			}
+			if count != 1 {
+				t.Fatalf("index %s count = %d, want 1", index, count)
 			}
 		})
 	}
@@ -36,7 +54,7 @@ func TestApplyMigrationsIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestApplyMigrationsSeedsControlledMetadata(t *testing.T) {
+func TestApplyMigrationsSeedsCatalogs(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
@@ -54,20 +72,6 @@ func TestApplyMigrationsSeedsControlledMetadata(t *testing.T) {
 	}
 	if diff := cmp.Diff(wantCategories, gotCategories); diff != "" {
 		t.Fatalf("categories mismatch (-want +got):\n%s", diff)
-	}
-
-	wantCities := make(map[string]string, len(note.Cities))
-	gotCities := make(map[string]string, len(note.Cities))
-	for _, city := range note.Cities {
-		wantCities[string(city.Slug)] = city.Label
-		var label string
-		if err := db.QueryRowContext(ctx, `SELECT label FROM cities WHERE slug = ?`, city.Slug).Scan(&label); err != nil {
-			t.Fatalf("query city %s: %v", city.Slug, err)
-		}
-		gotCities[string(city.Slug)] = label
-	}
-	if diff := cmp.Diff(wantCities, gotCities); diff != "" {
-		t.Fatalf("cities mismatch (-want +got):\n%s", diff)
 	}
 
 	wantPlaces := make(map[string]note.Place, len(note.Places))
@@ -116,7 +120,7 @@ func TestCatalogMigrationRequiresPlacesToReferenceCities(t *testing.T) {
 	}
 }
 
-func TestApplyMigrationsIndexesExistingNotes(t *testing.T) {
+func TestNotePlaceMigrationPreservesExistingNotes(t *testing.T) {
 	ctx := context.Background()
 	db, err := Open(":memory:")
 	if err != nil {
@@ -127,7 +131,14 @@ func TestApplyMigrationsIndexesExistingNotes(t *testing.T) {
 			t.Fatalf("close database: %v", err)
 		}
 	})
-	applyMigrationFiles(t, ctx, db, "000001_initial_notes")
+	applyMigrationFiles(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs")
+
+	if _, err := db.ExecContext(ctx, `UPDATE categories SET label = ?, active = 0, display_order = 99 WHERE slug = ?`, "Comida guardada", "comida"); err != nil {
+		t.Fatalf("update legacy category: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE places SET label = ?, active = 0, display_order = 88 WHERE slug = ?`, "São Paulo guardado", "sao-paulo"); err != nil {
+		t.Fatalf("update legacy place: %v", err)
+	}
 
 	if _, err := db.ExecContext(
 		ctx,
@@ -138,8 +149,8 @@ func TestApplyMigrationsIndexesExistingNotes(t *testing.T) {
 		"existing-note",
 		"Café bom",
 		"Tem pão de queijo decente.",
-		note.CategorySlugComida,
-		note.CitySlugSaoPaulo,
+		"comida",
+		"sao-paulo",
 		int64(1782993600000),
 		int64(1782993600000),
 	); err != nil {
@@ -157,13 +168,63 @@ func TestApplyMigrationsIndexesExistingNotes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("search notes: %v", err)
 	}
-	gotIDs := make([]string, 0, len(found))
-	for _, existing := range found {
-		gotIDs = append(gotIDs, existing.ID)
+	if len(found) != 1 {
+		t.Fatalf("search note count = %d, want 1", len(found))
 	}
-	wantIDs := []string{"existing-note"}
-	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
-		t.Fatalf("search note ids mismatch (-want +got):\n%s", diff)
+	gotNote := found[0]
+	if gotNote.ID != "existing-note" {
+		t.Fatalf("search note id = %q, want existing-note", gotNote.ID)
+	}
+	if gotNote.CategorySlug != note.CategorySlugFood {
+		t.Fatalf("search note category = %q, want %q", gotNote.CategorySlug, note.CategorySlugFood)
+	}
+	if gotNote.PlaceSlug != note.PlaceSlugSaoPaulo {
+		t.Fatalf("search note place = %q, want %q", gotNote.PlaceSlug, note.PlaceSlugSaoPaulo)
+	}
+
+	var category note.Category
+	var categorySlug string
+	if err := db.QueryRowContext(ctx, `SELECT slug, label, active, display_order FROM categories WHERE slug = ?`, note.CategorySlugFood).Scan(&categorySlug, &category.Label, &category.Active, &category.DisplayOrder); err != nil {
+		t.Fatalf("query migrated category: %v", err)
+	}
+	category.Slug = note.CategorySlug(categorySlug)
+	wantCategory := note.Category{
+		Slug:         note.CategorySlugFood,
+		Label:        "Comida guardada",
+		Active:       false,
+		DisplayOrder: 99,
+	}
+	if diff := cmp.Diff(wantCategory, category); diff != "" {
+		t.Fatalf("category mismatch (-want +got):\n%s", diff)
+	}
+
+	var place note.Place
+	var placeSlug string
+	if err := db.QueryRowContext(ctx, `SELECT slug, label, active, display_order FROM places WHERE slug = ?`, note.PlaceSlugSaoPaulo).Scan(&placeSlug, &place.Label, &place.Active, &place.DisplayOrder); err != nil {
+		t.Fatalf("query migrated place: %v", err)
+	}
+	place.Slug = note.PlaceSlug(placeSlug)
+	wantPlace := note.Place{
+		Slug:         note.PlaceSlugSaoPaulo,
+		Label:        "São Paulo guardado",
+		Active:       false,
+		DisplayOrder: 88,
+	}
+	if diff := cmp.Diff(wantPlace, place); diff != "" {
+		t.Fatalf("place mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestApplyMigrationsCreatesEmptySearchIndex(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+
+	found, err := NewNoteStore(db).SearchNotes(ctx, note.SearchInput{Query: "cafe", Limit: 10})
+	if err != nil {
+		t.Fatalf("search notes: %v", err)
+	}
+	if len(found) != 0 {
+		t.Fatalf("search note count = %d, want 0", len(found))
 	}
 }
 

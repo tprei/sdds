@@ -21,7 +21,7 @@ func NormalizeCreateInput(input CreateInput) CreateInput {
 		Title:        strings.TrimSpace(input.Title),
 		Body:         strings.TrimSpace(input.Body),
 		CategorySlug: NormalizeCategorySlug(input.CategorySlug),
-		CitySlug:     NormalizeCitySlug(input.CitySlug),
+		PlaceSlug:    NormalizePlaceSlug(input.PlaceSlug),
 	}
 }
 
@@ -31,7 +31,6 @@ func ValidateCreateInput(input CreateInput) []ValidationProblem {
 	problems = appendTitleValidationProblems(problems, normalized.Title)
 	problems = appendBodyValidationProblems(problems, normalized.Body)
 	problems = appendCategoryValidationProblems(problems, normalized.CategorySlug)
-	problems = appendCityValidationProblems(problems, normalized.CitySlug)
 	return problems
 }
 
@@ -63,19 +62,6 @@ func appendBodyValidationProblems(problems []ValidationProblem, body string) []V
 func appendCategoryValidationProblems(problems []ValidationProblem, slug CategorySlug) []ValidationProblem {
 	if slug == "" {
 		return append(problems, ValidationProblem{Field: "category_slug", Message: "required"})
-	}
-	if !KnownCategorySlug(slug) {
-		return append(problems, ValidationProblem{Field: "category_slug", Message: "unknown"})
-	}
-	return problems
-}
-
-func appendCityValidationProblems(problems []ValidationProblem, slug CitySlug) []ValidationProblem {
-	if slug == "" {
-		return append(problems, ValidationProblem{Field: "city_slug", Message: "required"})
-	}
-	if !KnownCitySlug(slug) {
-		return append(problems, ValidationProblem{Field: "city_slug", Message: "unknown"})
 	}
 	return problems
 }

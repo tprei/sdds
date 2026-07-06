@@ -41,7 +41,7 @@ func TestCatalogStoreFindsActiveCategory(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	found, err := NewCatalogStore(db).FindActiveCategory(ctx, note.CategorySlugComida)
+	found, err := NewCatalogStore(db).FindActiveCategory(ctx, note.CategorySlugFood)
 	if err != nil {
 		t.Fatalf("find active category: %v", err)
 	}
@@ -78,11 +78,11 @@ func TestCatalogStoreTreatsUnknownCategoryAsNotFound(t *testing.T) {
 func TestCatalogStoreTreatsInactiveCategoryAsNotFound(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
-	if _, err := db.ExecContext(ctx, `UPDATE categories SET active = 0 WHERE slug = ?`, note.CategorySlugComida); err != nil {
+	if _, err := db.ExecContext(ctx, `UPDATE categories SET active = 0 WHERE slug = ?`, note.CategorySlugFood); err != nil {
 		t.Fatalf("deactivate category: %v", err)
 	}
 
-	_, err := NewCatalogStore(db).FindActiveCategory(ctx, note.CategorySlugComida)
+	_, err := NewCatalogStore(db).FindActiveCategory(ctx, note.CategorySlugFood)
 	if !errors.Is(err, note.ErrCategoryNotFound) {
 		t.Fatalf("find active category error = %v, want ErrCategoryNotFound", err)
 	}

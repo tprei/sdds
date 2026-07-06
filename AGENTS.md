@@ -25,7 +25,7 @@ Do not introduce Postgres, Redis, object storage, a background worker, a dedicat
 - Keep user-facing copy informal, Brazilian, and useful.
 - Do not introduce competitor references into product docs or user-facing copy.
 - MVP is text-first. Do not add image infrastructure unless requested.
-- Location is not core MVP. If needed, start with manual city selection and simple city filtering.
+- Location is not core MVP. If needed, start with manual place selection and simple place filtering.
 
 ## Reviewability Rules
 
@@ -53,7 +53,7 @@ Use product language in code and boundaries:
 - `category`
 - `search`
 - `moderation`
-- `city`
+- `place`
 
 Keep domain rules separate from delivery mechanisms:
 

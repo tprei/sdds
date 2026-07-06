@@ -203,7 +203,9 @@ function hasOnlyKeys(
   const keys = Object.keys(value);
   return (
     keys.length === expectedKeys.length &&
-    expectedKeys.every((key) => Object.prototype.hasOwnProperty.call(value, key))
+    expectedKeys.every((key) =>
+      Object.prototype.hasOwnProperty.call(value, key),
+    )
   );
 }
 

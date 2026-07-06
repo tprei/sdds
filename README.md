@@ -82,8 +82,10 @@ It opens SQLite at `SDDS_DATABASE_PATH`, defaulting to `sdds.db`, and applies mi
 
 The first product endpoints are:
 
+- `GET /v1/categories` returns the category catalog.
+- `GET /v1/places` returns the place catalog.
 - `GET /v1/notes` returns recent notes.
-- `POST /v1/notes` creates a note with `title`, `body`, `category_slug`, and `city_slug`.
+- `POST /v1/notes` creates a note with `title`, `body`, `category_slug`, and optional `place_slug`.
 
 ### Data
 
@@ -95,7 +97,7 @@ The initial schema should stay portable enough that we can later migrate to Post
 
 Search starts with SQLite FTS5. This is enough to build and tune the first product loop.
 
-Long-term social search will depend less on the engine and more on ranking signals: note text, saves, usefulness, freshness, category, author trust, city context, and Brazilian vocabulary. When those signals become clearer, we can evaluate a dedicated search engine such as Meilisearch, Typesense, OpenSearch, or Postgres full-text search.
+Long-term social search will depend less on the engine and more on ranking signals: note text, saves, usefulness, freshness, category, author trust, place context, and Brazilian vocabulary. When those signals become clearer, we can evaluate a dedicated search engine such as Meilisearch, Typesense, OpenSearch, or Postgres full-text search.
 
 ### Deployment
 

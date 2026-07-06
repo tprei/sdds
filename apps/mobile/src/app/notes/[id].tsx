@@ -7,7 +7,7 @@ import {
   FoundationButton,
   FoundationScreen,
 } from '@/components/foundation-screen';
-import { categoryLabel, cityLabel } from '@/features/notes/metadata';
+import { categoryLabel, placeLabel } from '@/features/notes/metadata';
 import { styles } from '@/features/notes/detail-screen.styles';
 import { APIRequestError, getNote } from '@/lib/api/notes';
 import type { Note } from '@/lib/api/notes';
@@ -66,7 +66,7 @@ export default function NoteDetailScreen() {
 
   return (
     <FoundationScreen
-      description="Leia a nota completa, com cidade, categoria e data."
+      description="Leia a nota completa, com lugar, categoria e data."
       eyebrow="Nota"
       title="Nota"
     >
@@ -108,21 +108,27 @@ function renderNoteDetailState(state: NoteDetailState) {
 }
 
 function ReadyNoteDetail({ note }: { note: Note }) {
+  const resolvedCategoryLabel =
+    categoryLabel(note.categorySlug) ?? note.categorySlug;
+  const resolvedPlaceLabel = placeLabel(note.placeSlug);
+
   return (
     <>
       <View style={styles.metaRow}>
         <View
-          accessibilityLabel={`Categoria da nota: ${categoryLabel(note.category)}`}
+          accessibilityLabel={`Categoria da nota: ${resolvedCategoryLabel}`}
           style={styles.pill}
         >
-          <Text style={styles.pillText}>{categoryLabel(note.category)}</Text>
+          <Text style={styles.pillText}>{resolvedCategoryLabel}</Text>
         </View>
-        <Text
-          accessibilityLabel={`Cidade da nota: ${cityLabel(note.city)}`}
-          style={styles.city}
-        >
-          {cityLabel(note.city)}
-        </Text>
+        {resolvedPlaceLabel === null ? null : (
+          <Text
+            accessibilityLabel={`Lugar da nota: ${resolvedPlaceLabel}`}
+            style={styles.place}
+          >
+            {resolvedPlaceLabel}
+          </Text>
+        )}
       </View>
       <Text accessibilityRole="header" style={styles.title}>
         {note.title}
@@ -136,11 +142,15 @@ function ReadyNoteDetail({ note }: { note: Note }) {
       <View style={styles.dateCard}>
         <View style={styles.dateRow}>
           <Text style={styles.dateLabel}>Publicado</Text>
-          <Text style={styles.dateValue}>{formatTimestamp(note.createdAt)}</Text>
+          <Text style={styles.dateValue}>
+            {formatTimestamp(note.createdAt)}
+          </Text>
         </View>
         <View style={styles.dateRow}>
           <Text style={styles.dateLabel}>Atualizado</Text>
-          <Text style={styles.dateValue}>{formatTimestamp(note.updatedAt)}</Text>
+          <Text style={styles.dateValue}>
+            {formatTimestamp(note.updatedAt)}
+          </Text>
         </View>
       </View>
     </>

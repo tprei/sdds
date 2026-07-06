@@ -9,13 +9,13 @@ import {
 } from '@/components/foundation-screen';
 import {
   categoryLabel,
-  cityLabel,
   noteCategories,
-  noteCities,
+  notePlaces,
+  placeLabel,
 } from '@/features/notes/metadata';
 import type {
   NoteCategorySlug,
-  NoteCitySlug,
+  NotePlaceSlug,
 } from '@/features/notes/metadata';
 import { APIRequestError, createNote } from '@/lib/api/notes';
 
@@ -27,15 +27,15 @@ type SubmitState =
   | { status: 'success' }
   | { status: 'error'; message: string };
 
-const defaultCategorySlug: NoteCategorySlug = 'comida';
-const defaultCitySlug: NoteCitySlug = 'sao-paulo';
+const defaultCategorySlug: NoteCategorySlug = 'food';
 
 export default function ComposeScreen() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [category, setCategory] = useState<NoteCategorySlug>(defaultCategorySlug);
-  const [city, setCity] = useState<NoteCitySlug>(defaultCitySlug);
+  const [categorySlug, setCategorySlug] =
+    useState<NoteCategorySlug>(defaultCategorySlug);
+  const [placeSlug, setPlaceSlug] = useState<NotePlaceSlug | null>(null);
   const [submitState, setSubmitState] = useState<SubmitState>({
     status: 'idle',
   });
@@ -72,8 +72,8 @@ export default function ComposeScreen() {
     try {
       await createNote({
         body: trimmedBody,
-        category,
-        city,
+        categorySlug,
+        placeSlug,
         title: trimmedTitle,
       });
       setTitle('');
@@ -84,7 +84,7 @@ export default function ComposeScreen() {
       if (error instanceof APIRequestError && error.status === 400) {
         setSubmitState({
           status: 'error',
-          message: 'Revisa o título, o texto, a categoria e a cidade.',
+          message: 'Revisa o título, o texto, a categoria e o lugar.',
         });
         return;
       }
@@ -121,47 +121,67 @@ export default function ComposeScreen() {
           {noteCategories.map((option) => (
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ selected: option.slug === category }}
+              accessibilityState={{ selected: option.slug === categorySlug }}
               key={option.slug}
-              onPress={() => setCategory(option.slug)}
+              onPress={() => setCategorySlug(option.slug)}
               style={[
                 styles.option,
-                option.slug === category ? styles.optionSelected : null,
+                option.slug === categorySlug ? styles.optionSelected : null,
               ]}
             >
               <Text
                 style={[
                   styles.optionText,
-                  option.slug === category ? styles.optionTextSelected : null,
+                  option.slug === categorySlug
+                    ? styles.optionTextSelected
+                    : null,
                 ]}
               >
-                {categoryLabel(option.slug)}
+                {categoryLabel(option.slug) ?? option.label}
               </Text>
             </Pressable>
           ))}
         </View>
       </View>
       <View style={styles.field}>
-        <Text style={styles.label}>Cidade</Text>
+        <Text style={styles.label}>Lugar</Text>
         <View style={styles.optionRow}>
-          {noteCities.map((option) => (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: placeSlug === null }}
+            onPress={() => setPlaceSlug(null)}
+            style={[
+              styles.option,
+              placeSlug === null ? styles.optionSelected : null,
+            ]}
+          >
+            <Text
+              style={[
+                styles.optionText,
+                placeSlug === null ? styles.optionTextSelected : null,
+              ]}
+            >
+              Sem lugar específico
+            </Text>
+          </Pressable>
+          {notePlaces.map((option) => (
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ selected: option.slug === city }}
+              accessibilityState={{ selected: option.slug === placeSlug }}
               key={option.slug}
-              onPress={() => setCity(option.slug)}
+              onPress={() => setPlaceSlug(option.slug)}
               style={[
                 styles.option,
-                option.slug === city ? styles.optionSelected : null,
+                option.slug === placeSlug ? styles.optionSelected : null,
               ]}
             >
               <Text
                 style={[
                   styles.optionText,
-                  option.slug === city ? styles.optionTextSelected : null,
+                  option.slug === placeSlug ? styles.optionTextSelected : null,
                 ]}
               >
-                {cityLabel(option.slug)}
+                {placeLabel(option.slug) ?? option.label}
               </Text>
             </Pressable>
           ))}

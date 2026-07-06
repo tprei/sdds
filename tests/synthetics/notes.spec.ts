@@ -17,6 +17,9 @@ test('creates a note and reads it from the API-backed home feed', async ({
 
   await page.getByLabel('Título da nota').fill(title);
   await page.getByLabel('Texto da nota').fill(body);
+  await expect(page.getByRole('button', { name: 'Comida' })).toBeVisible();
+  await page.getByRole('button', { name: 'Comida' }).click();
+  await page.getByRole('button', { name: 'São Paulo' }).click();
   await page.getByRole('button', { name: 'Publicar' }).click();
 
   const publishedNote = page.getByRole('button', {
@@ -24,6 +27,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   });
   await expect(publishedNote).toBeVisible();
   await expect(publishedNote).toContainText(body);
+  await expect(publishedNote).toContainText('São Paulo');
 
   await page.getByText('Buscar', { exact: true }).click();
   await expect(page.getByText('Procure uma nota')).toBeVisible();
@@ -36,6 +40,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   });
   await expect(searchResult).toBeVisible();
   await expect(searchResult).toContainText(body);
+  await expect(searchResult).toContainText('São Paulo');
 
   await searchResult.click();
 
@@ -46,5 +51,5 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(page.getByLabel(`Texto da nota: ${body}`)).toBeVisible();
   await expect(page.getByLabel('Categoria da nota: Comida')).toBeVisible();
-  await expect(page.getByLabel('Cidade da nota: São Paulo')).toBeVisible();
+  await expect(page.getByLabel('Lugar da nota: São Paulo')).toBeVisible();
 });

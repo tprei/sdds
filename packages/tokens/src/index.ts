@@ -62,14 +62,10 @@ export const semanticColors = {
 } as const;
 
 export const categoryColors = {
-  beleza: { ink: '#C0577F', background: '#F8E2EC' },
-  moda: { ink: '#7A5AB8', background: '#ECE6F8' },
-  comida: { ink: '#2A7049', background: '#E6F0E9' },
-  viagem: { ink: '#33508D', background: '#E8EDF6' },
-  casa: { ink: '#B0633E', background: '#F5E3D7' },
-  pets: { ink: '#B07A06', background: '#FCE9B8' },
-  fitness: { ink: '#1C7E78', background: '#DCF0EE' },
-  achadinhos: { ink: '#4B57A8', background: '#E6E7F6' },
+  beauty: { ink: '#C0577F', background: '#F8E2EC' },
+  food: { ink: '#2A7049', background: '#E6F0E9' },
+  travel: { ink: '#33508D', background: '#E8EDF6' },
+  finds: { ink: '#4B57A8', background: '#E6E7F6' },
 } as const;
 
 export const spacing = {

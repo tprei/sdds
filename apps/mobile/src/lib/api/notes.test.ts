@@ -44,10 +44,10 @@ describe('notes API client', () => {
     });
 
     await createNote({
-      body: 'Tem pão de queijo decente.',
-      category: 'comida',
-      city: 'sao-paulo',
-      title: 'Café bom',
+      body: 'Tem pao de queijo decente.',
+      categorySlug: 'food',
+      placeSlug: 'sao-paulo',
+      title: 'Cafe bom',
     });
 
     const request = onlyFetchCall(calls);
@@ -55,10 +55,28 @@ describe('notes API client', () => {
     expect(request.method).toBe('POST');
     expect(request.headers.get('content-type')).toBe('application/json');
     await expect(requestJSON(request)).resolves.toEqual({
-      body: 'Tem pão de queijo decente.',
-      category_slug: 'comida',
-      city_slug: 'sao-paulo',
-      title: 'Café bom',
+      body: 'Tem pao de queijo decente.',
+      category_slug: 'food',
+      place_slug: 'sao-paulo',
+      title: 'Cafe bom',
+    });
+  });
+
+  it('sends null place when create note input omits place', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return jsonResponse(apiNote({ place_slug: null }), httpStatusCreated);
+    });
+
+    await createNote({
+      body: 'Tem pao de queijo decente.',
+      categorySlug: 'food',
+      title: 'Cafe bom',
+    });
+
+    await expect(requestJSON(onlyFetchCall(calls))).resolves.toMatchObject({
+      place_slug: null,
     });
   });
 
@@ -66,20 +84,28 @@ describe('notes API client', () => {
     stubFetch(async () => jsonResponse(apiNote(), httpStatusCreated));
 
     const note = await createNote({
-      body: 'Tem pão de queijo decente.',
-      category: 'comida',
-      city: 'sao-paulo',
-      title: 'Café bom',
+      body: 'Tem pao de queijo decente.',
+      categorySlug: 'food',
+      placeSlug: 'sao-paulo',
+      title: 'Cafe bom',
     });
 
     expect(note).toEqual({
-      body: 'Tem pão de queijo decente.',
-      category: 'comida',
-      city: 'sao-paulo',
+      body: 'Tem pao de queijo decente.',
+      categorySlug: 'food',
       createdAt: 1782993600000,
       id: exampleNoteID,
-      title: 'Café bom',
+      placeSlug: 'sao-paulo',
+      title: 'Cafe bom',
       updatedAt: 1782993600000,
+    });
+  });
+
+  it('parses notes without a place', async () => {
+    stubFetch(async () => jsonResponse(apiNote({ place_slug: null })));
+
+    await expect(getNote(exampleNoteID)).resolves.toMatchObject({
+      placeSlug: null,
     });
   });
 
@@ -88,10 +114,10 @@ describe('notes API client', () => {
 
     await expect(
       createNote({
-        body: 'Tem pão de queijo decente.',
-        category: 'comida',
-        city: 'sao-paulo',
-        title: 'Café bom',
+        body: 'Tem pao de queijo decente.',
+        categorySlug: 'food',
+        placeSlug: 'sao-paulo',
+        title: 'Cafe bom',
       }),
     ).rejects.toMatchObject(new APIRequestError(httpStatusBadRequest));
   });
@@ -103,12 +129,12 @@ describe('notes API client', () => {
 
     expect(notes).toEqual([
       {
-        body: 'Tem pão de queijo decente.',
-        category: 'comida',
-        city: 'sao-paulo',
+        body: 'Tem pao de queijo decente.',
+        categorySlug: 'food',
         createdAt: 1782993600000,
         id: exampleNoteID,
-        title: 'Café bom',
+        placeSlug: 'sao-paulo',
+        title: 'Cafe bom',
         updatedAt: 1782993600000,
       },
     ]);
@@ -124,9 +150,7 @@ describe('notes API client', () => {
     await getNote(exampleNoteID);
 
     const request = onlyFetchCall(calls);
-    expect(request.url).toBe(
-      `http://localhost:8080/v1/notes/${exampleNoteID}`,
-    );
+    expect(request.url).toBe(`http://localhost:8080/v1/notes/${exampleNoteID}`);
     expect(request.method).toBe('GET');
   });
 
@@ -136,35 +160,40 @@ describe('notes API client', () => {
     const note = await getNote(exampleNoteID);
 
     expect(note).toEqual({
-      body: 'Tem pão de queijo decente.',
-      category: 'comida',
-      city: 'sao-paulo',
+      body: 'Tem pao de queijo decente.',
+      categorySlug: 'food',
       createdAt: 1782993600000,
       id: exampleNoteID,
-      title: 'Café bom',
+      placeSlug: 'sao-paulo',
+      title: 'Cafe bom',
       updatedAt: 1782993600000,
     });
   });
 
   it('raises request errors for missing fetched notes', async () => {
-    stubFetch(async () => jsonResponse({ code: 'not_found' }, httpStatusNotFound));
+    stubFetch(async () =>
+      jsonResponse({ code: 'not_found' }, httpStatusNotFound),
+    );
 
     await expect(getNote('missing-note')).rejects.toMatchObject(
       new APIRequestError(httpStatusNotFound),
     );
   });
 
-  it('rejects invalid fetched note response shapes', async () => {
+  it('accepts API-owned slugs without client catalog membership checks', async () => {
     stubFetch(async () =>
-      jsonResponse({
-        ...apiNote(),
-        category_slug: 'qualquer',
-      }),
+      jsonResponse(
+        apiNote({
+          category_slug: 'future-category',
+          place_slug: 'future-place',
+        }),
+      ),
     );
 
-    await expect(
-      getNote(exampleNoteID),
-    ).rejects.toThrow(APIResponseError);
+    await expect(getNote(exampleNoteID)).resolves.toMatchObject({
+      categorySlug: 'future-category',
+      placeSlug: 'future-place',
+    });
   });
 
   it('sends search note requests with the raw query parameter', async () => {
@@ -193,33 +222,35 @@ describe('notes API client', () => {
       return jsonResponse(apiListNotesResponse());
     });
 
-    await searchNotes({ query: '  café bom  ' });
+    await searchNotes({ query: '  cafe bom  ' });
 
     const request = onlyFetchCall(calls);
     const url = new URL(request.url);
-    expect(url.searchParams.get('q')).toBe('  café bom  ');
+    expect(url.searchParams.get('q')).toBe('  cafe bom  ');
   });
 
   it('parses searched notes from the API list response shape', async () => {
     stubFetch(async () => jsonResponse(apiListNotesResponse()));
 
-    const notes = await searchNotes({ query: 'café' });
+    const notes = await searchNotes({ query: 'cafe' });
 
     expect(notes).toEqual([
       {
-        body: 'Tem pão de queijo decente.',
-        category: 'comida',
-        city: 'sao-paulo',
+        body: 'Tem pao de queijo decente.',
+        categorySlug: 'food',
         createdAt: 1782993600000,
         id: exampleNoteID,
-        title: 'Café bom',
+        placeSlug: 'sao-paulo',
+        title: 'Cafe bom',
         updatedAt: 1782993600000,
       },
     ]);
   });
 
   it('raises request errors from search status codes', async () => {
-    stubFetch(async () => jsonResponse({ code: 'invalid_search' }, httpStatusBadRequest));
+    stubFetch(async () =>
+      jsonResponse({ code: 'invalid_search' }, httpStatusBadRequest),
+    );
 
     await expect(searchNotes({ query: '' })).rejects.toMatchObject(
       new APIRequestError(httpStatusBadRequest),
@@ -232,13 +263,13 @@ describe('notes API client', () => {
         notes: [
           {
             ...apiNote(),
-            city_slug: 'qualquer',
+            place_slug: 42,
           },
         ],
       }),
     );
 
-    await expect(searchNotes({ query: 'café' })).rejects.toThrow(
+    await expect(searchNotes({ query: 'cafe' })).rejects.toThrow(
       APIResponseError,
     );
   });
@@ -248,12 +279,12 @@ describe('notes API client', () => {
       jsonResponse({
         notes: [
           {
-            body: 'Tem pão de queijo decente.',
-            category: 'comida',
-            city: 'sao-paulo',
+            body: 'Tem pao de queijo decente.',
+            category: 'food',
             created_at: 1782993600000,
             id: exampleNoteID,
-            title: 'Café bom',
+            place: 'sao-paulo',
+            title: 'Cafe bom',
             updated_at: 1782993600000,
           },
         ],
@@ -294,14 +325,13 @@ describe('notes API client', () => {
     await expect(listNotes()).rejects.toThrow(APIResponseError);
   });
 
-  it('rejects unknown response slugs', async () => {
+  it('rejects legacy city slug response fields', async () => {
     stubFetch(async () =>
       jsonResponse({
         notes: [
           {
             ...apiNote(),
-            category_slug: 'qualquer',
-            city_slug: 'qualquer',
+            city_slug: 'sao-paulo',
           },
         ],
       }),
@@ -321,15 +351,16 @@ function apiListNotesResponse(): ListNotesResponse {
   };
 }
 
-function apiNote(): NoteResponse {
+function apiNote(overrides: Partial<NoteResponse> = {}): NoteResponse {
   return {
-    body: 'Tem pão de queijo decente.',
-    category_slug: 'comida',
-    city_slug: 'sao-paulo',
+    body: 'Tem pao de queijo decente.',
+    category_slug: 'food',
     created_at: 1782993600000,
     id: exampleNoteID,
-    title: 'Café bom',
+    place_slug: 'sao-paulo',
+    title: 'Cafe bom',
     updated_at: 1782993600000,
+    ...overrides,
   };
 }
 

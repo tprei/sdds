@@ -47,7 +47,7 @@ describe('catalogs API client', () => {
         active: true,
         displayOrder: 20,
         label: 'Comida',
-        slug: 'comida',
+        slug: 'food',
       },
     ]);
 
@@ -69,7 +69,7 @@ describe('catalogs API client', () => {
       {
         active: true,
         displayOrder: 10,
-        label: 'São Paulo',
+        label: 'Sao Paulo',
         slug: 'sao-paulo',
       },
     ]);
@@ -105,14 +105,14 @@ describe('catalogs API client', () => {
           active: true,
           displayOrder: 20,
           label: 'Comida',
-          slug: 'comida',
+          slug: 'food',
         },
       ],
       places: [
         {
           active: true,
           displayOrder: 10,
-          label: 'São Paulo',
+          label: 'Sao Paulo',
           slug: 'sao-paulo',
         },
       ],
@@ -171,7 +171,7 @@ function apiCategory(
     active: true,
     display_order: 20,
     label: 'Comida',
-    slug: 'comida',
+    slug: 'food',
     ...overrides,
   };
 }
@@ -182,7 +182,7 @@ function apiPlace(
   return {
     active: true,
     display_order: 10,
-    label: 'São Paulo',
+    label: 'Sao Paulo',
     slug: 'sao-paulo',
     ...overrides,
   };

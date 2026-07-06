@@ -24,9 +24,12 @@ const exampleNoteID = "018ff5b8-0000-7000-8000-000000000000"
 func TestListNotesReturnsRecentNotes(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	router := newTestRouter(fakeNoteStore{
-		listNotes: func(_ context.Context, limit int) ([]note.Note, error) {
-			if limit != recentNotesLimit {
-				t.Fatalf("limit = %d, want %d", limit, recentNotesLimit)
+		listNotes: func(_ context.Context, input note.ListInput) ([]note.Note, error) {
+			if input.Limit != recentNotesLimit {
+				t.Fatalf("limit = %d, want %d", input.Limit, recentNotesLimit)
+			}
+			if input.CategorySlug != "" {
+				t.Fatalf("category slug = %q, want empty", input.CategorySlug)
 			}
 			return []note.Note{{
 				ID:           exampleNoteID,
@@ -85,6 +88,116 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 	requireJSONNumber(t, noteValue, "updated_at", now.UnixMilli())
 }
 
+func TestListNotesFiltersByCategory(t *testing.T) {
+	router := newTestRouter(fakeNoteStore{
+		listNotes: func(_ context.Context, input note.ListInput) ([]note.Note, error) {
+			if input.CategorySlug != note.CategorySlugFood {
+				t.Fatalf("category slug = %q, want %q", input.CategorySlug, note.CategorySlugFood)
+			}
+			if input.Limit != recentNotesLimit {
+				t.Fatalf("limit = %d, want %d", input.Limit, recentNotesLimit)
+			}
+			return []note.Note{}, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/notes?category_slug=+food+", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+}
+
+func TestListNotesTreatsBlankCategoryFilterAsUnfiltered(t *testing.T) {
+	router := NewRouter(fakeNoteStore{
+		listNotes: func(_ context.Context, input note.ListInput) ([]note.Note, error) {
+			if input.CategorySlug != "" {
+				t.Fatalf("category slug = %q, want empty", input.CategorySlug)
+			}
+			return []note.Note{}, nil
+		},
+	}, fakeCatalog{
+		findActiveCategory: func(context.Context, note.CategorySlug) (note.Category, error) {
+			t.Fatal("FindActiveCategory should not be called")
+			return note.Category{}, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/notes?category_slug=+%09+", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+}
+
+func TestListNotesRejectsUnknownCategoryFilter(t *testing.T) {
+	router := newTestRouter(fakeNoteStore{
+		listNotes: func(context.Context, note.ListInput) ([]note.Note, error) {
+			t.Fatal("ListRecentNotes should not be called")
+			return nil, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/notes?category_slug=comida", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeInvalidNote {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidNote)
+	}
+	requireValidationProblems(t, body.Fields, []openapi.ValidationProblem{
+		{Field: openapi.ValidationFieldCategorySlug, Code: openapi.ValidationProblemCodeUnknown},
+	})
+}
+
+func TestListNotesRejectsDuplicateCategoryFilter(t *testing.T) {
+	router := newTestRouter(fakeNoteStore{
+		listNotes: func(context.Context, note.ListInput) ([]note.Note, error) {
+			t.Fatal("ListRecentNotes should not be called")
+			return nil, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/notes?category_slug=food&category_slug=travel", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeInvalidNote {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidNote)
+	}
+	if body.Fields != nil {
+		t.Fatalf("fields = %#v, want nil", *body.Fields)
+	}
+}
+
 func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	router := newTestRouter(fakeNoteStore{
@@ -94,6 +207,9 @@ func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 			}
 			if input.Limit != searchNotesLimit {
 				t.Fatalf("limit = %d, want %d", input.Limit, searchNotesLimit)
+			}
+			if input.CategorySlug != "" {
+				t.Fatalf("category slug = %q, want empty", input.CategorySlug)
 			}
 			return []note.Note{{
 				ID:           exampleNoteID,
@@ -133,6 +249,89 @@ func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 	if diff := cmp.Diff(want, body); diff != "" {
 		t.Fatalf("response body mismatch (-want +got):\n%s", diff)
 	}
+}
+
+func TestSearchNotesFiltersByCategory(t *testing.T) {
+	router := newTestRouter(fakeNoteStore{
+		searchNotes: func(_ context.Context, input note.SearchInput) ([]note.Note, error) {
+			if input.Query != "café" {
+				t.Fatalf("query = %q, want café", input.Query)
+			}
+			if input.CategorySlug != note.CategorySlugFood {
+				t.Fatalf("category slug = %q, want %q", input.CategorySlug, note.CategorySlugFood)
+			}
+			if input.Limit != searchNotesLimit {
+				t.Fatalf("limit = %d, want %d", input.Limit, searchNotesLimit)
+			}
+			return []note.Note{}, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=caf%C3%A9&category_slug=+food+", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+}
+
+func TestSearchNotesTreatsBlankCategoryFilterAsUnfiltered(t *testing.T) {
+	router := NewRouter(fakeNoteStore{
+		searchNotes: func(_ context.Context, input note.SearchInput) ([]note.Note, error) {
+			if input.CategorySlug != "" {
+				t.Fatalf("category slug = %q, want empty", input.CategorySlug)
+			}
+			return []note.Note{}, nil
+		},
+	}, fakeCatalog{
+		findActiveCategory: func(context.Context, note.CategorySlug) (note.Category, error) {
+			t.Fatal("FindActiveCategory should not be called")
+			return note.Category{}, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=cafe&category_slug=+%09+", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+}
+
+func TestSearchNotesRejectsUnknownCategoryFilter(t *testing.T) {
+	router := newTestRouter(fakeNoteStore{
+		searchNotes: func(context.Context, note.SearchInput) ([]note.Note, error) {
+			t.Fatal("SearchNotes should not be called")
+			return nil, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=cafe&category_slug=comida", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeInvalidSearch {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidSearch)
+	}
+	requireValidationProblems(t, body.Fields, []openapi.ValidationProblem{
+		{Field: openapi.ValidationFieldCategorySlug, Code: openapi.ValidationProblemCodeUnknown},
+	})
 }
 
 func TestSearchNotesRejectsEmptyQuery(t *testing.T) {
@@ -235,6 +434,36 @@ func TestSearchNotesRejectsDuplicateQuery(t *testing.T) {
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=cafe&q=pao", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeInvalidSearch {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidSearch)
+	}
+	if body.Fields != nil {
+		t.Fatalf("fields = %#v, want nil", *body.Fields)
+	}
+}
+
+func TestSearchNotesRejectsDuplicateCategoryFilter(t *testing.T) {
+	router := newTestRouter(fakeNoteStore{
+		searchNotes: func(context.Context, note.SearchInput) ([]note.Note, error) {
+			t.Fatal("SearchNotes should not be called")
+			return nil, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=cafe&category_slug=food&category_slug=travel", nil)
 
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)
@@ -802,7 +1031,7 @@ func TestCreateNoteRejectsOversizedRequestBody(t *testing.T) {
 
 func TestListNotesRejectsRequestBody(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
-		listNotes: func(context.Context, int) ([]note.Note, error) {
+		listNotes: func(context.Context, note.ListInput) ([]note.Note, error) {
 			t.Fatal("ListRecentNotes should not be called")
 			return nil, nil
 		},

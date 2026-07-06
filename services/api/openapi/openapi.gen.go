@@ -178,10 +178,19 @@ type ValidationProblem struct {
 // ValidationProblemCode defines model for ValidationProblem.Code.
 type ValidationProblemCode string
 
+// ListNotesParams defines parameters for ListNotes.
+type ListNotesParams struct {
+	// CategorySlug Optional active category slug used to narrow recent notes.
+	CategorySlug *CategorySlug `form:"category_slug,omitempty" json:"category_slug,omitempty"`
+}
+
 // SearchNotesParams defines parameters for SearchNotes.
 type SearchNotesParams struct {
 	// Q Raw user search text. Missing, blank, or overlong values return invalid_search.
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// CategorySlug Optional active category slug used to narrow search results.
+	CategorySlug *CategorySlug `form:"category_slug,omitempty" json:"category_slug,omitempty"`
 }
 
 // CreateNoteJSONRequestBody defines body for CreateNote for application/json ContentType.
@@ -270,7 +279,7 @@ type ClientInterface interface {
 	ListCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListNotes request
-	ListNotes(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListNotes(ctx context.Context, params *ListNotesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateNoteWithBody request with any body
 	CreateNoteWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -323,8 +332,8 @@ func (c *Client) ListCategories(ctx context.Context, reqEditors ...RequestEditor
 	return c.Client.Do(req)
 }
 
-func (c *Client) ListNotes(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListNotesRequest(c.Server)
+func (c *Client) ListNotes(ctx context.Context, params *ListNotesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListNotesRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -477,7 +486,7 @@ func NewListCategoriesRequest(server string) (*http.Request, error) {
 }
 
 // NewListNotesRequest generates requests for ListNotes
-func NewListNotesRequest(server string) (*http.Request, error) {
+func NewListNotesRequest(server string, params *ListNotesParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -493,6 +502,33 @@ func NewListNotesRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.CategorySlug != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "category_slug", *params.CategorySlug, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -644,6 +680,18 @@ func NewSearchNotesRequest(server string, params *SearchNotesParams) (*http.Requ
 
 		}
 
+		if params.CategorySlug != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "category_slug", *params.CategorySlug, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
@@ -711,7 +759,7 @@ type ClientWithResponsesInterface interface {
 	ListCategoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCategoriesHTTPResponse, error)
 
 	// ListNotesWithResponse request
-	ListNotesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListNotesHTTPResponse, error)
+	ListNotesWithResponse(ctx context.Context, params *ListNotesParams, reqEditors ...RequestEditorFn) (*ListNotesHTTPResponse, error)
 
 	// CreateNoteWithBodyWithResponse request with any body
 	CreateNoteWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateNoteHTTPResponse, error)
@@ -1010,8 +1058,8 @@ func (c *ClientWithResponses) ListCategoriesWithResponse(ctx context.Context, re
 }
 
 // ListNotesWithResponse request returning *ListNotesHTTPResponse
-func (c *ClientWithResponses) ListNotesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListNotesHTTPResponse, error) {
-	rsp, err := c.ListNotes(ctx, reqEditors...)
+func (c *ClientWithResponses) ListNotesWithResponse(ctx context.Context, params *ListNotesParams, reqEditors ...RequestEditorFn) (*ListNotesHTTPResponse, error) {
+	rsp, err := c.ListNotes(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

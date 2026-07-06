@@ -38,6 +38,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List category catalog */
+        get: operations["listCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/places": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List place catalog */
+        get: operations["listPlaces"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/notes": {
         parameters: {
             query?: never;
@@ -96,6 +130,21 @@ export interface components {
     schemas: {
         CategorySlug: string;
         CitySlug: string;
+        PlaceSlug: string;
+        CatalogCategory: {
+            slug: components["schemas"]["CategorySlug"];
+            label: string;
+            active: boolean;
+            /** Format: int32 */
+            display_order: number;
+        };
+        CatalogPlace: {
+            slug: components["schemas"]["PlaceSlug"];
+            label: string;
+            active: boolean;
+            /** Format: int32 */
+            display_order: number;
+        };
         CreateNoteRequest: {
             title: string;
             body: string;
@@ -110,6 +159,12 @@ export interface components {
         };
         ListNotesResponse: {
             notes: components["schemas"]["Note"][];
+        };
+        ListCategoriesResponse: {
+            categories: components["schemas"]["CatalogCategory"][];
+        };
+        ListPlacesResponse: {
+            places: components["schemas"]["CatalogPlace"][];
         };
         Note: {
             id: string;
@@ -189,6 +244,82 @@ export interface operations {
             };
             /** @description The request does not match the API contract. */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Category catalog rows. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCategoriesResponse"];
+                };
+            };
+            /** @description The request does not match the API contract. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not list categories. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listPlaces: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Place catalog rows. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListPlacesResponse"];
+                };
+            };
+            /** @description The request does not match the API contract. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not list places. */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

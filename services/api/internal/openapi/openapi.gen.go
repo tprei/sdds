@@ -102,6 +102,22 @@ func (e ValidationProblemCode) Valid() bool {
 	}
 }
 
+// CatalogCategory defines model for CatalogCategory.
+type CatalogCategory struct {
+	Active       bool         `json:"active"`
+	DisplayOrder int32        `json:"display_order"`
+	Label        string       `json:"label"`
+	Slug         CategorySlug `json:"slug"`
+}
+
+// CatalogPlace defines model for CatalogPlace.
+type CatalogPlace struct {
+	Active       bool      `json:"active"`
+	DisplayOrder int32     `json:"display_order"`
+	Label        string    `json:"label"`
+	Slug         PlaceSlug `json:"slug"`
+}
+
 // CategorySlug defines model for CategorySlug.
 type CategorySlug = string
 
@@ -125,9 +141,19 @@ type ErrorResponse struct {
 	Fields *[]ValidationProblem `json:"fields,omitempty"`
 }
 
+// ListCategoriesResponse defines model for ListCategoriesResponse.
+type ListCategoriesResponse struct {
+	Categories []CatalogCategory `json:"categories"`
+}
+
 // ListNotesResponse defines model for ListNotesResponse.
 type ListNotesResponse struct {
 	Notes []Note `json:"notes"`
+}
+
+// ListPlacesResponse defines model for ListPlacesResponse.
+type ListPlacesResponse struct {
+	Places []CatalogPlace `json:"places"`
 }
 
 // Note defines model for Note.
@@ -144,6 +170,9 @@ type Note struct {
 	// UpdatedAt Unix timestamp in milliseconds.
 	UpdatedAt int64 `json:"updated_at"`
 }
+
+// PlaceSlug defines model for PlaceSlug.
+type PlaceSlug = string
 
 // ValidationField defines model for ValidationField.
 type ValidationField string
@@ -174,6 +203,9 @@ type ServerInterface interface {
 	// Check API readiness
 	// (GET /readyz)
 	GetReadiness(w http.ResponseWriter, r *http.Request)
+	// List category catalog
+	// (GET /v1/categories)
+	ListCategories(w http.ResponseWriter, r *http.Request)
 	// List recent notes
 	// (GET /v1/notes)
 	ListNotes(w http.ResponseWriter, r *http.Request)
@@ -183,6 +215,9 @@ type ServerInterface interface {
 	// Get a note
 	// (GET /v1/notes/{note_id})
 	GetNote(w http.ResponseWriter, r *http.Request, noteId string)
+	// List place catalog
+	// (GET /v1/places)
+	ListPlaces(w http.ResponseWriter, r *http.Request)
 	// Search notes
 	// (GET /v1/search/notes)
 	SearchNotes(w http.ResponseWriter, r *http.Request, params SearchNotesParams)
@@ -204,6 +239,12 @@ func (_ Unimplemented) GetReadiness(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// List category catalog
+// (GET /v1/categories)
+func (_ Unimplemented) ListCategories(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // List recent notes
 // (GET /v1/notes)
 func (_ Unimplemented) ListNotes(w http.ResponseWriter, r *http.Request) {
@@ -219,6 +260,12 @@ func (_ Unimplemented) CreateNote(w http.ResponseWriter, r *http.Request) {
 // Get a note
 // (GET /v1/notes/{note_id})
 func (_ Unimplemented) GetNote(w http.ResponseWriter, r *http.Request, noteId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List place catalog
+// (GET /v1/places)
+func (_ Unimplemented) ListPlaces(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -256,6 +303,20 @@ func (siw *ServerInterfaceWrapper) GetReadiness(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetReadiness(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCategories operation middleware
+func (siw *ServerInterfaceWrapper) ListCategories(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCategories(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -310,6 +371,20 @@ func (siw *ServerInterfaceWrapper) GetNote(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetNote(w, r, noteId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListPlaces operation middleware
+func (siw *ServerInterfaceWrapper) ListPlaces(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPlaces(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -472,6 +547,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/readyz", wrapper.GetReadiness)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/categories", wrapper.ListCategories)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/notes", wrapper.ListNotes)
 	})
 	r.Group(func(r chi.Router) {
@@ -479,6 +557,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/notes/{note_id}", wrapper.GetNote)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/places", wrapper.ListPlaces)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/search/notes", wrapper.SearchNotes)
@@ -541,6 +622,55 @@ func (response GetReadiness400JSONResponse) VisitGetReadinessResponse(w http.Res
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCategoriesRequestObject struct {
+}
+
+type ListCategoriesResponseObject interface {
+	VisitListCategoriesResponse(w http.ResponseWriter) error
+}
+
+type ListCategories200JSONResponse ListCategoriesResponse
+
+func (response ListCategories200JSONResponse) VisitListCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCategories400JSONResponse ErrorResponse
+
+func (response ListCategories400JSONResponse) VisitListCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCategories500JSONResponse ErrorResponse
+
+func (response ListCategories500JSONResponse) VisitListCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -722,6 +852,55 @@ func (response GetNote500JSONResponse) VisitGetNoteResponse(w http.ResponseWrite
 	return err
 }
 
+type ListPlacesRequestObject struct {
+}
+
+type ListPlacesResponseObject interface {
+	VisitListPlacesResponse(w http.ResponseWriter) error
+}
+
+type ListPlaces200JSONResponse ListPlacesResponse
+
+func (response ListPlaces200JSONResponse) VisitListPlacesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPlaces400JSONResponse ErrorResponse
+
+func (response ListPlaces400JSONResponse) VisitListPlacesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPlaces500JSONResponse ErrorResponse
+
+func (response ListPlaces500JSONResponse) VisitListPlacesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SearchNotesRequestObject struct {
 	Params SearchNotesParams
 }
@@ -780,6 +959,9 @@ type StrictServerInterface interface {
 	// Check API readiness
 	// (GET /readyz)
 	GetReadiness(ctx context.Context, request GetReadinessRequestObject) (GetReadinessResponseObject, error)
+	// List category catalog
+	// (GET /v1/categories)
+	ListCategories(ctx context.Context, request ListCategoriesRequestObject) (ListCategoriesResponseObject, error)
 	// List recent notes
 	// (GET /v1/notes)
 	ListNotes(ctx context.Context, request ListNotesRequestObject) (ListNotesResponseObject, error)
@@ -789,6 +971,9 @@ type StrictServerInterface interface {
 	// Get a note
 	// (GET /v1/notes/{note_id})
 	GetNote(ctx context.Context, request GetNoteRequestObject) (GetNoteResponseObject, error)
+	// List place catalog
+	// (GET /v1/places)
+	ListPlaces(ctx context.Context, request ListPlacesRequestObject) (ListPlacesResponseObject, error)
 	// Search notes
 	// (GET /v1/search/notes)
 	SearchNotes(ctx context.Context, request SearchNotesRequestObject) (SearchNotesResponseObject, error)
@@ -864,6 +1049,30 @@ func (sh *strictHandler) GetReadiness(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetReadinessResponseObject); ok {
 		if err := validResponse.VisitGetReadinessResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCategories operation middleware
+func (sh *strictHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
+	var request ListCategoriesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCategories(ctx, request.(ListCategoriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCategories")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCategoriesResponseObject); ok {
+		if err := validResponse.VisitListCategoriesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -952,6 +1161,30 @@ func (sh *strictHandler) GetNote(w http.ResponseWriter, r *http.Request, noteId 
 	}
 }
 
+// ListPlaces operation middleware
+func (sh *strictHandler) ListPlaces(w http.ResponseWriter, r *http.Request) {
+	var request ListPlacesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPlaces(ctx, request.(ListPlacesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPlaces")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPlacesResponseObject); ok {
+		if err := validResponse.VisitListPlacesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // SearchNotes operation middleware
 func (sh *strictHandler) SearchNotes(w http.ResponseWriter, r *http.Request, params SearchNotesParams) {
 	var request SearchNotesRequestObject
@@ -983,29 +1216,32 @@ func (sh *strictHandler) SearchNotes(w http.ResponseWriter, r *http.Request, par
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"1FhNc9s2EP0rGLRHRpITtwfeEjcf7jiOazu9ZDwamFyRSEiABpaKVY/+e2cBkKJI2pYzqe2eJOJr3z68",
-	"XSxwwxNdVlqBQsvjG26THErh/h4IhEyb1VlRZ/SNqwp4zC0aqTK+jviBxDs6DQiEY41wClc1WKRRIk0l",
-	"Sq1EcWJ0BQYlWB4vRGEh4lWn6YZf6nRFv6W4PgKVYc7j/dlsFvFSqqZhLxraTQLquQ3IfjWw4DH/Zbpx",
-	"dBq8nG65SJMl7jixcX0dcZRYQA/q3sv7kK4jbuCqlgZSHn8Ji0Te7b4XXWAX7Ur68iskSAjeGqPNgU4d",
-	"ClB1SStKhWCUKOZAvTziUi1FIdP5V6tV51NphM6nBWGSnEdcaZwvdK1S7pGCxTlqPS+EyaADIzgU8esX",
-	"ZPrFUhglStrELxtghwEMj7ptzuKfZ5+OR5qPPax+81kDr+041vguwGzbguTOtT7yaBuSTsFWWll4oBiT",
-	"wO1dkthswjriCwlF6qZKhNLeN/dvck0QmBOjLwsona48v8IYsRroxSEa08KRtEjc2R90leSwO3C3S/dh",
-	"9UuOgXXTfywvPIPAT1yKS+fC5bYUbGJkRW7wmH9W8pqhLMGiKCsmFStlUUgLiVapnfCIL7QpaSYF6u/7",
-	"3KULWVLszlqmKIYzMGRMpqNet8ln0FNX6WOh6+23pFjcOaFt8bgFe0wxm0h5RyHWTXgPsHi1Y/7qWTsP",
-	"FnrNb7zBXuuWxIa9jY4GPX+5bDXMCD+WsRpy2v2JOCVxm2uD4X+hnfu1+qb0d/VgZgK+Ju0GI6P951qf",
-	"BcO39R95MKPdnxuETYLdPa16sfSF6heJbkumNFyqhR7Gz4fz8xNGBxdLtEIjEmQLbRjmwGyaWvb65JCC",
-	"qJAJhAxMxFHgHR8dHrw9Pnv7BzFuCh7zHLGy8XRqq/R6ok02DbPsdDN4kmNZdMKdN1Z4xJdgrEc1m8wm",
-	"MxqlK1CikjzmryazySse8Upg7nQxzUEUmP9D/zNwqYFk40g6THnM3wN+cEPcse+PEDfz5Wx/SMR5DgSD",
-	"VUYnYC2TlplaKamyCQHZn828GBWC8hVgVRUyceamrhBpa86dztf2UHObM8QSChWWarBMaWSlwCR3G0Mw",
-	"m92aOCnYuiyFWfGYH+SQfGudyBv/UWRO7J8ahiy/oIlTAyJd3cnhKYhUKrD2QTQmQjELZgkMjVgsZPI/",
-	"ZJFGmI73t5K43Ju2xcYojW0pM+Tw5xEyrJdGSDmFBBQyB/e5b0nEf3tscB5BXaQOWSHthqotgRDXzHS4",
-	"7MjDbzSl9krbETFs7pOb+8ibUAv+FE+HF9b19nmBpob1QIl7Pw2Ar6XHGSa22HdhWaiVnlaE7uTTxqMK",
-	"5in1hzukB7f36mnAUflHYFBr5u6qzyEm/La5cCXSBpnTdwsWLuP9oOimy+kN/cxlur7r/AmBUgkjSkAw",
-	"tNwNl4SOagG63/uKJCzG+0qPOmT0ny4u/sN8fF8UPP/0u+9P+McD1yYHAuaebJ6D5DPAW/X+HvBesfuH",
-	"qHtKBP8c1BQJPbX3znDxndUWDPMLM4RrnLCP0lqpsohdFkJ9iyir6SUYuhOxpShqsMwA1kax7QeyiXsy",
-	"4zG/qsGsNuF0xZ8qcHYqZD6SbKXKnrKUCfw74vqnxhNrNkAbLV7OOn1jqqXBVLqPiu91gnLprWkjM6na",
-	"69+UkyrCagPN1gplCeFGwkCllZYK3QtNEFynrF5Hg3sFXOOLhTS+7NJlCcrfhxsX22W8G+uL9b8BAAD/",
-	"/w==",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

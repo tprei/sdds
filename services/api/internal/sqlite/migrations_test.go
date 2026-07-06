@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -86,6 +87,35 @@ func TestApplyMigrationsSeedsControlledMetadata(t *testing.T) {
 	}
 }
 
+func TestCatalogMigrationRequiresPlacesToReferenceCities(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close database: %v", err)
+		}
+	})
+	applyMigrationFiles(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs")
+
+	_, err = db.ExecContext(
+		ctx,
+		`
+			INSERT INTO places (slug, label, active, display_order)
+			VALUES (?, ?, ?, ?)
+		`,
+		"curitiba",
+		"Curitiba",
+		true,
+		40,
+	)
+	if err == nil {
+		t.Fatal("insert place error = nil, want foreign key error")
+	}
+}
+
 func TestApplyMigrationsIndexesExistingNotes(t *testing.T) {
 	ctx := context.Background()
 	db, err := Open(":memory:")
@@ -97,20 +127,8 @@ func TestApplyMigrationsIndexesExistingNotes(t *testing.T) {
 			t.Fatalf("close database: %v", err)
 		}
 	})
+	applyMigrationFiles(t, ctx, db, "000001_initial_notes")
 
-	if _, err := db.ExecContext(ctx, createSchemaMigrationsSQL); err != nil {
-		t.Fatalf("create schema_migrations: %v", err)
-	}
-	initialMigration, err := migrations.ReadFile("migrations/000001_initial_notes.sql")
-	if err != nil {
-		t.Fatalf("read initial migration: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, string(initialMigration)); err != nil {
-		t.Fatalf("apply initial migration: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, recordMigrationSQL, "000001_initial_notes"); err != nil {
-		t.Fatalf("record initial migration: %v", err)
-	}
 	if _, err := db.ExecContext(
 		ctx,
 		`
@@ -146,5 +164,26 @@ func TestApplyMigrationsIndexesExistingNotes(t *testing.T) {
 	wantIDs := []string{"existing-note"}
 	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
 		t.Fatalf("search note ids mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func applyMigrationFiles(t *testing.T, ctx context.Context, db *sql.DB, versions ...string) {
+	t.Helper()
+
+	if _, err := db.ExecContext(ctx, createSchemaMigrationsSQL); err != nil {
+		t.Fatalf("create schema_migrations: %v", err)
+	}
+
+	for _, version := range versions {
+		contents, err := migrations.ReadFile("migrations/" + version + ".sql")
+		if err != nil {
+			t.Fatalf("read migration %s: %v", version, err)
+		}
+		if _, err := db.ExecContext(ctx, string(contents)); err != nil {
+			t.Fatalf("apply migration %s: %v", version, err)
+		}
+		if _, err := db.ExecContext(ctx, recordMigrationSQL, version); err != nil {
+			t.Fatalf("record migration %s: %v", version, err)
+		}
 	}
 }

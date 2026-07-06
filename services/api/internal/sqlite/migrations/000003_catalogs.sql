@@ -11,7 +11,7 @@ SET display_order = CASE slug
 END;
 
 CREATE TABLE places (
-	slug TEXT PRIMARY KEY,
+	slug TEXT PRIMARY KEY REFERENCES cities(slug),
 	label TEXT NOT NULL,
 	active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
 	display_order INTEGER NOT NULL DEFAULT 0

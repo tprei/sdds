@@ -27,14 +27,27 @@ func NewRouter(notes note.Store, catalog note.Catalog) http.Handler {
 	})
 }
 
-func writeGeneratedOpenAPIError(w http.ResponseWriter, _ *http.Request, err error) {
+func writeGeneratedOpenAPIError(w http.ResponseWriter, r *http.Request, err error) {
 	var invalidParamError *openapi.InvalidParamFormatError
-	if errors.As(err, &invalidParamError) && invalidParamError.ParamName == "q" {
-		writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidSearch})
-		return
+	if errors.As(err, &invalidParamError) {
+		if code, ok := generatedInvalidParamErrorCode(r.URL.Path, invalidParamError.ParamName); ok {
+			writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: code})
+			return
+		}
 	}
 
 	writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidJSON})
+}
+
+func generatedInvalidParamErrorCode(path string, paramName string) (openapi.ErrorCode, bool) {
+	switch {
+	case path == "/v1/search/notes" && (paramName == "q" || paramName == "category_slug"):
+		return openapi.ErrorCodeInvalidSearch, true
+	case path == "/v1/notes" && paramName == "category_slug":
+		return openapi.ErrorCodeInvalidNote, true
+	default:
+		return "", false
+	}
 }
 
 func noContent(w http.ResponseWriter, _ *http.Request) {

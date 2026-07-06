@@ -58,7 +58,7 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	requestWithoutPlace := openapi.CreateNoteJSONRequestBody{
 		Title:        "Dica sem lugar",
 		Body:         "Serve para qualquer lugar mundial.",
-		CategorySlug: "food",
+		CategorySlug: "travel",
 	}
 	createdWithoutPlace := createNote(t, client, requestWithoutPlace)
 	requireCreatedNote(t, createdWithoutPlace, requestWithoutPlace)
@@ -69,6 +69,18 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	}
 	requireListedNote(t, updatedNotes, created.Id, request)
 	requireListedNote(t, updatedNotes, createdWithoutPlace.Id, requestWithoutPlace)
+
+	foodNotes := listNotesByCategory(t, client, "food")
+	if len(foodNotes.Notes) != 1 {
+		t.Fatalf("food note count = %d, want 1", len(foodNotes.Notes))
+	}
+	requireListedNote(t, foodNotes, created.Id, request)
+
+	travelNotes := listNotesByCategory(t, client, "travel")
+	if len(travelNotes.Notes) != 1 {
+		t.Fatalf("travel note count = %d, want 1", len(travelNotes.Notes))
+	}
+	requireListedNote(t, travelNotes, createdWithoutPlace.Id, requestWithoutPlace)
 
 	fetched := getNote(t, client, created.Id)
 	requireCreatedNote(t, fetched, request)
@@ -109,10 +121,24 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		t.Fatalf("search note without place id = %q, want %q", searchResultsWithoutPlace.Notes[0].Id, createdWithoutPlace.Id)
 	}
 
+	filteredSearchResults := searchNotesByCategory(t, client, "mundial", "travel")
+	if len(filteredSearchResults.Notes) != 1 {
+		t.Fatalf("filtered search note count = %d, want 1", len(filteredSearchResults.Notes))
+	}
+	requireCreatedNote(t, filteredSearchResults.Notes[0], requestWithoutPlace)
+
+	emptyFilteredSearchResults := searchNotesByCategory(t, client, "mundial", "food")
+	if len(emptyFilteredSearchResults.Notes) != 0 {
+		t.Fatalf("empty filtered search note count = %d, want 0", len(emptyFilteredSearchResults.Notes))
+	}
+
 	emptySearchResults := searchNotes(t, client, "necessaire")
 	if len(emptySearchResults.Notes) != 0 {
 		t.Fatalf("empty search note count = %d, want 0", len(emptySearchResults.Notes))
 	}
+
+	requireListNotesCategoryFilterError(t, client, "comida")
+	requireSearchNotesCategoryFilterError(t, client, "comida")
 }
 
 func requireCatalogs(t *testing.T, client *openapi.ClientWithResponses) {
@@ -206,13 +232,28 @@ func waitForReadiness(t *testing.T, client *openapi.ClientWithResponses) {
 func listNotes(t *testing.T, client *openapi.ClientWithResponses) openapi.ListNotesResponse {
 	t.Helper()
 
-	response, err := client.ListNotesWithResponse(context.Background())
+	response, err := client.ListNotesWithResponse(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("GET /v1/notes: %v", err)
 	}
 	requireStatus(t, "GET /v1/notes", response.StatusCode(), http.StatusOK, response.Body)
 	if response.JSON200 == nil {
 		t.Fatal("GET /v1/notes returned 200 without JSON body")
+	}
+	return *response.JSON200
+}
+
+func listNotesByCategory(t *testing.T, client *openapi.ClientWithResponses, category string) openapi.ListNotesResponse {
+	t.Helper()
+
+	categorySlug := openapi.CategorySlug(category)
+	response, err := client.ListNotesWithResponse(context.Background(), &openapi.ListNotesParams{CategorySlug: &categorySlug})
+	if err != nil {
+		t.Fatalf("GET /v1/notes?category_slug=%s: %v", category, err)
+	}
+	requireStatus(t, "GET /v1/notes?category_slug", response.StatusCode(), http.StatusOK, response.Body)
+	if response.JSON200 == nil {
+		t.Fatal("GET /v1/notes?category_slug returned 200 without JSON body")
 	}
 	return *response.JSON200
 }
@@ -257,6 +298,76 @@ func searchNotes(t *testing.T, client *openapi.ClientWithResponses, query string
 		t.Fatal("GET /v1/search/notes returned 200 without JSON body")
 	}
 	return *response.JSON200
+}
+
+func searchNotesByCategory(t *testing.T, client *openapi.ClientWithResponses, query string, category string) openapi.ListNotesResponse {
+	t.Helper()
+
+	categorySlug := openapi.CategorySlug(category)
+	response, err := client.SearchNotesWithResponse(context.Background(), &openapi.SearchNotesParams{
+		CategorySlug: &categorySlug,
+		Q:            &query,
+	})
+	if err != nil {
+		t.Fatalf("GET /v1/search/notes?q=%s&category_slug=%s: %v", query, category, err)
+	}
+	requireStatus(t, "GET /v1/search/notes?category_slug", response.StatusCode(), http.StatusOK, response.Body)
+	if response.JSON200 == nil {
+		t.Fatal("GET /v1/search/notes?category_slug returned 200 without JSON body")
+	}
+	return *response.JSON200
+}
+
+func requireListNotesCategoryFilterError(t *testing.T, client *openapi.ClientWithResponses, category string) {
+	t.Helper()
+
+	categorySlug := openapi.CategorySlug(category)
+	response, err := client.ListNotesWithResponse(context.Background(), &openapi.ListNotesParams{CategorySlug: &categorySlug})
+	if err != nil {
+		t.Fatalf("GET /v1/notes?category_slug=%s: %v", category, err)
+	}
+	requireStatus(t, "GET /v1/notes?category_slug", response.StatusCode(), http.StatusBadRequest, response.Body)
+	if response.JSON400 == nil {
+		t.Fatal("GET /v1/notes?category_slug returned 400 without JSON body")
+	}
+	requireCategorySlugUnknownError(t, *response.JSON400, openapi.ErrorCodeInvalidNote)
+}
+
+func requireSearchNotesCategoryFilterError(t *testing.T, client *openapi.ClientWithResponses, category string) {
+	t.Helper()
+
+	categorySlug := openapi.CategorySlug(category)
+	query := "balcao"
+	response, err := client.SearchNotesWithResponse(context.Background(), &openapi.SearchNotesParams{
+		CategorySlug: &categorySlug,
+		Q:            &query,
+	})
+	if err != nil {
+		t.Fatalf("GET /v1/search/notes?category_slug=%s: %v", category, err)
+	}
+	requireStatus(t, "GET /v1/search/notes?category_slug", response.StatusCode(), http.StatusBadRequest, response.Body)
+	if response.JSON400 == nil {
+		t.Fatal("GET /v1/search/notes?category_slug returned 400 without JSON body")
+	}
+	requireCategorySlugUnknownError(t, *response.JSON400, openapi.ErrorCodeInvalidSearch)
+}
+
+func requireCategorySlugUnknownError(t *testing.T, got openapi.ErrorResponse, wantCode openapi.ErrorCode) {
+	t.Helper()
+
+	if got.Code != wantCode {
+		t.Fatalf("code = %s, want %s", got.Code, wantCode)
+	}
+	if got.Fields == nil {
+		t.Fatal("fields = nil, want category_slug unknown")
+	}
+	wantFields := []openapi.ValidationProblem{{
+		Field: openapi.ValidationFieldCategorySlug,
+		Code:  openapi.ValidationProblemCodeUnknown,
+	}}
+	if diff := cmp.Diff(wantFields, *got.Fields); diff != "" {
+		t.Fatalf("validation fields mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func requireStatus(t *testing.T, operation string, got int, want int, body []byte) {

@@ -47,7 +47,7 @@ func TestNoteStoreCreatesAndListsRecentNotes(t *testing.T) {
 		t.Fatalf("create second note: %v", err)
 	}
 
-	found, err := store.ListRecentNotes(ctx, 10)
+	found, err := store.ListRecentNotes(ctx, note.ListInput{Limit: 10})
 	if err != nil {
 		t.Fatalf("list notes: %v", err)
 	}
@@ -62,6 +62,66 @@ func TestNoteStoreCreatesAndListsRecentNotes(t *testing.T) {
 	}
 	if found[0].CreatedAt != times[1] {
 		t.Fatalf("created_at = %s, want %s", found[0].CreatedAt, times[1])
+	}
+}
+
+func TestNoteStoreListsRecentNotesByCategory(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+
+	times := []time.Time{
+		time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
+		time.Date(2026, 7, 2, 12, 1, 0, 0, time.UTC),
+		time.Date(2026, 7, 2, 12, 2, 0, 0, time.UTC),
+	}
+	index := 0
+	store := newNoteStore(db, func() time.Time {
+		current := times[index]
+		index++
+		return current
+	})
+
+	olderFood, err := store.CreateNote(ctx, note.CreateInput{
+		Title:        "Café com pão de queijo",
+		Body:         "Bom para trabalhar de manhã.",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
+	})
+	if err != nil {
+		t.Fatalf("create food note: %v", err)
+	}
+
+	if _, err := store.CreateNote(ctx, note.CreateInput{
+		Title:        "Necessaire de viagem",
+		Body:         "Cabe tudo e não vaza.",
+		CategorySlug: "travel",
+		PlaceSlug:    "rio-de-janeiro",
+	}); err != nil {
+		t.Fatalf("create travel note: %v", err)
+	}
+
+	newerFood, err := store.CreateNote(ctx, note.CreateInput{
+		Title:        "Padaria boa",
+		Body:         "Tem bolo simples.",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
+	})
+	if err != nil {
+		t.Fatalf("create newer food note: %v", err)
+	}
+
+	found, err := store.ListRecentNotes(ctx, note.ListInput{
+		CategorySlug: "food",
+		Limit:        10,
+	})
+	if err != nil {
+		t.Fatalf("list food notes: %v", err)
+	}
+
+	gotIDs := noteIDs(found)
+	wantIDs := []string{newerFood.ID, olderFood.ID}
+	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
+		t.Fatalf("recent note ids mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -160,6 +220,67 @@ func TestNoteStoreSearchesNoteBodies(t *testing.T) {
 
 	gotIDs := noteIDs(found)
 	wantIDs := []string{created.ID}
+	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
+		t.Fatalf("search note ids mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestNoteStoreSearchesNotesByCategory(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+
+	times := []time.Time{
+		time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
+		time.Date(2026, 7, 2, 12, 1, 0, 0, time.UTC),
+		time.Date(2026, 7, 2, 12, 2, 0, 0, time.UTC),
+	}
+	index := 0
+	store := newNoteStore(db, func() time.Time {
+		current := times[index]
+		index++
+		return current
+	})
+
+	olderFood, err := store.CreateNote(ctx, note.CreateInput{
+		Title:        "Café bom",
+		Body:         "Balcao simpatico.",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
+	})
+	if err != nil {
+		t.Fatalf("create food note: %v", err)
+	}
+
+	if _, err := store.CreateNote(ctx, note.CreateInput{
+		Title:        "Café bom",
+		Body:         "Balcao simpatico.",
+		CategorySlug: "travel",
+		PlaceSlug:    "rio-de-janeiro",
+	}); err != nil {
+		t.Fatalf("create travel note: %v", err)
+	}
+
+	newerFood, err := store.CreateNote(ctx, note.CreateInput{
+		Title:        "Café bom",
+		Body:         "Balcao simpatico.",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
+	})
+	if err != nil {
+		t.Fatalf("create newer food note: %v", err)
+	}
+
+	found, err := store.SearchNotes(ctx, note.SearchInput{
+		CategorySlug: "food",
+		Query:        "balcao",
+		Limit:        10,
+	})
+	if err != nil {
+		t.Fatalf("search food notes: %v", err)
+	}
+
+	gotIDs := noteIDs(found)
+	wantIDs := []string{newerFood.ID, olderFood.ID}
 	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
 		t.Fatalf("search note ids mismatch (-want +got):\n%s", diff)
 	}
@@ -320,7 +441,7 @@ func TestNoteStoreRespectsRecentLimit(t *testing.T) {
 		}
 	}
 
-	found, err := store.ListRecentNotes(ctx, 1)
+	found, err := store.ListRecentNotes(ctx, note.ListInput{Limit: 1})
 	if err != nil {
 		t.Fatalf("list notes: %v", err)
 	}
@@ -364,7 +485,7 @@ func TestNoteStoreListsFractionalSecondNotesInRecentOrder(t *testing.T) {
 		t.Fatalf("create newer note: %v", err)
 	}
 
-	found, err := store.ListRecentNotes(ctx, 10)
+	found, err := store.ListRecentNotes(ctx, note.ListInput{Limit: 10})
 	if err != nil {
 		t.Fatalf("list notes: %v", err)
 	}

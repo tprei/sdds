@@ -9,13 +9,15 @@ import (
 
 func TestNormalizeSearchInputTrimsQuery(t *testing.T) {
 	normalized := NormalizeSearchInput(SearchInput{
-		Query: "  café bom  ",
-		Limit: 12,
+		CategorySlug: " food ",
+		Query:        "  café bom  ",
+		Limit:        12,
 	})
 
 	want := SearchInput{
-		Query: "café bom",
-		Limit: 12,
+		CategorySlug: "food",
+		Query:        "café bom",
+		Limit:        12,
 	}
 	if diff := cmp.Diff(want, normalized); diff != "" {
 		t.Fatalf("normalized input mismatch (-want +got):\n%s", diff)

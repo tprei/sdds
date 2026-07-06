@@ -140,6 +140,38 @@ describe('notes API client', () => {
     ]);
   });
 
+  it('omits category filters from list note requests by default', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return jsonResponse(apiListNotesResponse());
+    });
+
+    await listNotes();
+
+    const request = onlyFetchCall(calls);
+    const url = new URL(request.url);
+    expect(url.pathname).toBe('/v1/notes');
+    expect(url.searchParams.has('category_slug')).toBe(false);
+    expect(request.method).toBe('GET');
+  });
+
+  it('sends category filters on list note requests', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return jsonResponse(apiListNotesResponse());
+    });
+
+    await listNotes({ categorySlug: 'food' });
+
+    const request = onlyFetchCall(calls);
+    const url = new URL(request.url);
+    expect(url.pathname).toBe('/v1/notes');
+    expect(url.searchParams.get('category_slug')).toBe('food');
+    expect(request.method).toBe('GET');
+  });
+
   it('sends get note requests with the note id in the path', async () => {
     const calls: FetchCall[] = [];
     stubFetch(async (request) => {
@@ -212,6 +244,24 @@ describe('notes API client', () => {
     expect(url.searchParams.get('q')).toBe(
       'restaurante brasileiro Dublin 12 barato',
     );
+    expect(url.searchParams.has('category_slug')).toBe(false);
+    expect(request.method).toBe('GET');
+  });
+
+  it('sends category filters on search note requests', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return jsonResponse(apiListNotesResponse());
+    });
+
+    await searchNotes({ categorySlug: 'food', query: 'cafe' });
+
+    const request = onlyFetchCall(calls);
+    const url = new URL(request.url);
+    expect(url.pathname).toBe('/v1/search/notes');
+    expect(url.searchParams.get('q')).toBe('cafe');
+    expect(url.searchParams.get('category_slug')).toBe('food');
     expect(request.method).toBe('GET');
   });
 

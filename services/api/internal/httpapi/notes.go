@@ -9,12 +9,25 @@ import (
 	"github.com/tprei/sdds/services/api/internal/openapi"
 )
 
-const recentNotesLimit = 50
+const recentNotesLimit = note.ListDefaultLimit
 const searchNotesLimit = note.SearchDefaultLimit
 const maxCreateNoteRequestBytes int64 = 32 * 1024
 
-func (handler server) ListNotes(w http.ResponseWriter, r *http.Request) {
-	notes, err := handler.notes.ListRecentNotes(r.Context(), recentNotesLimit)
+func (handler server) ListNotes(w http.ResponseWriter, r *http.Request, params openapi.ListNotesParams) {
+	input := listNotesInput(params)
+	if problems := note.ValidateListInput(input); len(problems) > 0 {
+		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, problems))
+		return
+	}
+	if problems, err := handler.validateCategoryFilter(r.Context(), input.CategorySlug); err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	} else if len(problems) > 0 {
+		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, problems))
+		return
+	}
+
+	notes, err := handler.notes.ListRecentNotes(r.Context(), input)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
@@ -71,6 +84,13 @@ func (handler server) SearchNotes(w http.ResponseWriter, r *http.Request, params
 		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidSearch, problems))
 		return
 	}
+	if problems, err := handler.validateCategoryFilter(r.Context(), input.CategorySlug); err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	} else if len(problems) > 0 {
+		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidSearch, problems))
+		return
+	}
 
 	notes, err := handler.notes.SearchNotes(r.Context(), input)
 	if err != nil {
@@ -90,6 +110,17 @@ func validationErrorResponse(code openapi.ErrorCode, problems []note.ValidationP
 		})
 	}
 	return openapi.ErrorResponse{Code: code, Fields: &fields}
+}
+
+func listNotesInput(params openapi.ListNotesParams) note.ListInput {
+	categorySlug := note.CategorySlug("")
+	if params.CategorySlug != nil {
+		categorySlug = note.CategorySlug(*params.CategorySlug)
+	}
+	return note.NormalizeListInput(note.ListInput{
+		CategorySlug: categorySlug,
+		Limit:        recentNotesLimit,
+	})
 }
 
 func createNoteInput(request openapi.CreateNoteRequest) note.CreateInput {
@@ -127,14 +158,33 @@ func (handler server) validateCreateNoteCatalogs(ctx context.Context, input note
 	return problems, nil
 }
 
+func (handler server) validateCategoryFilter(ctx context.Context, slug note.CategorySlug) ([]note.ValidationProblem, error) {
+	if slug == "" {
+		return nil, nil
+	}
+
+	if _, err := handler.catalog.FindActiveCategory(ctx, slug); errors.Is(err, note.ErrCategoryNotFound) {
+		return []note.ValidationProblem{{Field: "category_slug", Message: "unknown"}}, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
+}
+
 func searchNoteInput(params openapi.SearchNotesParams) note.SearchInput {
 	query := ""
 	if params.Q != nil {
 		query = *params.Q
 	}
+	categorySlug := note.CategorySlug("")
+	if params.CategorySlug != nil {
+		categorySlug = note.CategorySlug(*params.CategorySlug)
+	}
 	return note.NormalizeSearchInput(note.SearchInput{
-		Query: query,
-		Limit: searchNotesLimit,
+		CategorySlug: categorySlug,
+		Query:        query,
+		Limit:        searchNotesLimit,
 	})
 }
 

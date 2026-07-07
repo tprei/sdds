@@ -20,7 +20,12 @@ export type CreateNoteInput = {
   title: string;
 };
 
+export type ListNotesInput = {
+  categorySlug?: string;
+};
+
 export type SearchNotesInput = {
+  categorySlug?: string;
   query: string;
 };
 
@@ -59,8 +64,13 @@ export class APIResponseError extends Error {
   }
 }
 
-export async function listNotes(): Promise<Note[]> {
-  const { data, response } = await apiClient().GET('/v1/notes');
+export async function listNotes(input: ListNotesInput = {}): Promise<Note[]> {
+  const query = noteListQuery(input);
+  const { data, response } = await apiClient().GET('/v1/notes', {
+    params: {
+      query,
+    },
+  });
   if (!response.ok) {
     throw new APIRequestError(response.status);
   }
@@ -84,11 +94,10 @@ export async function getNote(id: string): Promise<Note> {
 }
 
 export async function searchNotes(input: SearchNotesInput): Promise<Note[]> {
+  const query = noteSearchQuery(input);
   const { data, response } = await apiClient().GET('/v1/search/notes', {
     params: {
-      query: {
-        q: input.query,
-      },
+      query,
     },
   });
   if (!response.ok) {
@@ -96,6 +105,25 @@ export async function searchNotes(input: SearchNotesInput): Promise<Note[]> {
   }
 
   return parseListNotesResponse(data);
+}
+
+function noteListQuery(input: ListNotesInput): {
+  category_slug?: string;
+} {
+  if (input.categorySlug === undefined) {
+    return {};
+  }
+  return { category_slug: input.categorySlug };
+}
+
+function noteSearchQuery(input: SearchNotesInput): {
+  category_slug?: string;
+  q: string;
+} {
+  if (input.categorySlug === undefined) {
+    return { q: input.query };
+  }
+  return { category_slug: input.categorySlug, q: input.query };
 }
 
 export async function createNote(input: CreateNoteInput): Promise<Note> {

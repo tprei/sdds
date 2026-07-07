@@ -330,7 +330,10 @@ export interface operations {
     };
     listNotes: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Optional active category slug used to narrow recent notes. */
+                category_slug?: components["schemas"]["CategorySlug"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -471,6 +474,8 @@ export interface operations {
             query?: {
                 /** @description Raw user search text. Missing, blank, or overlong values return invalid_search. */
                 q?: string;
+                /** @description Optional active category slug used to narrow search results. */
+                category_slug?: components["schemas"]["CategorySlug"];
             };
             header?: never;
             path?: never;

@@ -57,7 +57,7 @@ func TestHealthRoutesRejectUnsupportedMethods(t *testing.T) {
 
 func TestRouterAllowsLocalBrowserOrigin(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
-		listNotes: func(_ context.Context, _ int) ([]note.Note, error) {
+		listNotes: func(_ context.Context, _ note.ListInput) ([]note.Note, error) {
 			return []note.Note{}, nil
 		},
 	})
@@ -87,7 +87,7 @@ func TestRouterAllowsLocalBrowserOrigin(t *testing.T) {
 
 func TestRouterRejectsNonLocalBrowserOrigin(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
-		listNotes: func(_ context.Context, _ int) ([]note.Note, error) {
+		listNotes: func(_ context.Context, _ note.ListInput) ([]note.Note, error) {
 			return []note.Note{}, nil
 		},
 	})
@@ -137,7 +137,7 @@ func TestRouterRejectsPlainOptionsRequest(t *testing.T) {
 type fakeNoteStore struct {
 	createNote  func(ctx context.Context, input note.CreateInput) (note.Note, error)
 	findNote    func(ctx context.Context, id string) (note.Note, error)
-	listNotes   func(ctx context.Context, limit int) ([]note.Note, error)
+	listNotes   func(ctx context.Context, input note.ListInput) ([]note.Note, error)
 	searchNotes func(ctx context.Context, input note.SearchInput) ([]note.Note, error)
 }
 
@@ -155,11 +155,11 @@ func (store fakeNoteStore) FindNote(ctx context.Context, id string) (note.Note, 
 	return store.findNote(ctx, id)
 }
 
-func (store fakeNoteStore) ListRecentNotes(ctx context.Context, limit int) ([]note.Note, error) {
+func (store fakeNoteStore) ListRecentNotes(ctx context.Context, input note.ListInput) ([]note.Note, error) {
 	if store.listNotes == nil {
 		return nil, fmt.Errorf("list notes not implemented")
 	}
-	return store.listNotes(ctx, limit)
+	return store.listNotes(ctx, input)
 }
 
 func (store fakeNoteStore) SearchNotes(ctx context.Context, input note.SearchInput) ([]note.Note, error) {

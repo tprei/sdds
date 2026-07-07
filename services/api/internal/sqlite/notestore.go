@@ -27,6 +27,13 @@ const (
 		ORDER BY created_at DESC, id DESC
 		LIMIT ?
 	`
+	listRecentNotesByCategorySQL = `
+		SELECT id, title, body, category_slug, place_slug, created_at, updated_at
+		FROM notes
+		WHERE category_slug = ?
+		ORDER BY created_at DESC, id DESC
+		LIMIT ?
+	`
 	findNoteSQL = `
 		SELECT id, title, body, category_slug, place_slug, created_at, updated_at
 		FROM notes
@@ -37,6 +44,15 @@ const (
 		FROM note_search
 		JOIN notes ON notes.id = note_search.note_id
 		WHERE note_search MATCH ?
+		ORDER BY bm25(note_search), notes.created_at DESC, notes.id DESC
+		LIMIT ?
+	`
+	searchNotesByCategorySQL = `
+		SELECT notes.id, notes.title, notes.body, notes.category_slug, notes.place_slug, notes.created_at, notes.updated_at
+		FROM note_search
+		JOIN notes ON notes.id = note_search.note_id
+		WHERE note_search MATCH ?
+			AND notes.category_slug = ?
 		ORDER BY bm25(note_search), notes.created_at DESC, notes.id DESC
 		LIMIT ?
 	`
@@ -126,16 +142,20 @@ func (store *NoteStore) FindNote(ctx context.Context, id string) (note.Note, err
 	return note.Note{}, fmt.Errorf("find note: %w", err)
 }
 
-func (store *NoteStore) ListRecentNotes(ctx context.Context, limit int) (notes []note.Note, err error) {
-	if limit < 1 {
-		return nil, fmt.Errorf("list recent notes: limit must be positive")
+func (store *NoteStore) ListRecentNotes(ctx context.Context, input note.ListInput) (notes []note.Note, err error) {
+	normalized := note.NormalizeListInput(input)
+	if problems := note.ValidateListInput(normalized); len(problems) > 0 {
+		return nil, fmt.Errorf("list recent notes: invalid input")
 	}
 
-	rows, err := store.db.QueryContext(
-		ctx,
-		listRecentNotesSQL,
-		limit,
-	)
+	query := listRecentNotesSQL
+	args := []any{normalized.Limit}
+	if normalized.CategorySlug != "" {
+		query = listRecentNotesByCategorySQL
+		args = []any{string(normalized.CategorySlug), normalized.Limit}
+	}
+
+	rows, err := store.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query recent notes: %w", err)
 	}
@@ -171,12 +191,14 @@ func (store *NoteStore) SearchNotes(ctx context.Context, input note.SearchInput)
 		return []note.Note{}, nil
 	}
 
-	rows, err := store.db.QueryContext(
-		ctx,
-		searchNotesSQL,
-		matchExpression,
-		normalized.Limit,
-	)
+	query := searchNotesSQL
+	args := []any{matchExpression, normalized.Limit}
+	if normalized.CategorySlug != "" {
+		query = searchNotesByCategorySQL
+		args = []any{matchExpression, string(normalized.CategorySlug), normalized.Limit}
+	}
+
+	rows, err := store.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query note search: %w", err)
 	}

@@ -104,6 +104,13 @@ paths:
       summary: List recent notes
       tags:
         - Notes
+      parameters:
+        - name: category_slug
+          in: query
+          required: false
+          description: Optional active category slug used to narrow recent notes.
+          schema:
+            $ref: "#/components/schemas/CategorySlug"
       responses:
         "200":
           description: Recent notes.
@@ -209,6 +216,12 @@ paths:
           description: Raw user search text. Missing, blank, or overlong values return invalid_search.
           schema:
             type: string
+        - name: category_slug
+          in: query
+          required: false
+          description: Optional active category slug used to narrow search results.
+          schema:
+            $ref: "#/components/schemas/CategorySlug"
       responses:
         "200":
           description: Matching notes.

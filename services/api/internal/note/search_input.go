@@ -11,8 +11,9 @@ const (
 )
 
 type SearchInput struct {
-	Query string
-	Limit int
+	CategorySlug CategorySlug
+	Query        string
+	Limit        int
 }
 
 func NormalizeSearchInput(input SearchInput) SearchInput {
@@ -22,8 +23,9 @@ func NormalizeSearchInput(input SearchInput) SearchInput {
 	}
 
 	return SearchInput{
-		Query: strings.TrimSpace(input.Query),
-		Limit: limit,
+		CategorySlug: NormalizeCategorySlug(input.CategorySlug),
+		Query:        strings.TrimSpace(input.Query),
+		Limit:        limit,
 	}
 }
 
@@ -31,7 +33,7 @@ func ValidateSearchInput(input SearchInput) []ValidationProblem {
 	normalized := NormalizeSearchInput(input)
 	problems := make([]ValidationProblem, 0, 2)
 	problems = appendSearchQueryValidationProblems(problems, normalized.Query)
-	problems = appendSearchLimitValidationProblems(problems, normalized.Limit)
+	problems = appendLimitValidationProblems(problems, normalized.Limit)
 	return problems
 }
 
@@ -42,13 +44,6 @@ func appendSearchQueryValidationProblems(problems []ValidationProblem, query str
 	}
 	if queryLength > SearchQueryMaxLength {
 		return append(problems, ValidationProblem{Field: "q", Message: "too_long"})
-	}
-	return problems
-}
-
-func appendSearchLimitValidationProblems(problems []ValidationProblem, limit int) []ValidationProblem {
-	if limit < 1 {
-		return append(problems, ValidationProblem{Field: "limit", Message: "required"})
 	}
 	return problems
 }

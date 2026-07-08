@@ -39,12 +39,15 @@ const (
 		FROM notes
 		WHERE id = ?
 	`
+	searchNotesOrderSQL = `
+		ORDER BY bm25(note_search, 0.0, 6.0, 1.0), notes.created_at DESC, notes.id DESC
+	`
 	searchNotesSQL = `
 		SELECT notes.id, notes.title, notes.body, notes.category_slug, notes.place_slug, notes.created_at, notes.updated_at
 		FROM note_search
 		JOIN notes ON notes.id = note_search.note_id
 		WHERE note_search MATCH ?
-		ORDER BY bm25(note_search), notes.created_at DESC, notes.id DESC
+	` + searchNotesOrderSQL + `
 		LIMIT ?
 	`
 	searchNotesByCategorySQL = `
@@ -53,7 +56,7 @@ const (
 		JOIN notes ON notes.id = note_search.note_id
 		WHERE note_search MATCH ?
 			AND notes.category_slug = ?
-		ORDER BY bm25(note_search), notes.created_at DESC, notes.id DESC
+	` + searchNotesOrderSQL + `
 		LIMIT ?
 	`
 )

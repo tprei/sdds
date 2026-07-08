@@ -44,7 +44,11 @@ test('creates a note and reads it from the API-backed home feed', async ({
 
   await page.goto('/');
   await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Início$/ }),
+    page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Escopo atual: Mundo todo')).toBeVisible();
+  await expect(
+    page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
 
   await page.getByText('Escrever', { exact: true }).click();
@@ -56,6 +60,14 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await page.getByRole('button', { name: 'Comida' }).click();
   await page.getByRole('button', { name: 'São Paulo' }).click();
   await page.getByRole('button', { name: 'Publicar' }).click();
+
+  await expect(
+    page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Escopo atual: Mundo todo')).toBeVisible();
+  await expect(
+    page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
+  ).toBeVisible();
 
   const publishedNote = page.getByRole('button', {
     name: `Abrir nota: ${title}`,

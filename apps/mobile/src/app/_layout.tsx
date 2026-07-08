@@ -34,7 +34,10 @@ export default function RootLayout() {
           },
         }}
       >
-        <Tabs.Screen name="index" options={{ title: 'Início' }} />
+        <Tabs.Screen
+          name="index"
+          options={{ tabBarLabel: 'Início', title: 'Explorar' }}
+        />
         <Tabs.Screen name="search" options={{ title: 'Buscar' }} />
         <Tabs.Screen name="compose" options={{ title: 'Escrever' }} />
         <Tabs.Screen name="saved" options={{ title: 'Salvos' }} />

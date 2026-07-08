@@ -156,6 +156,47 @@ test('narrows the mobile explore feed by category', async ({
   await expect(travelNote).toBeVisible();
 });
 
+test('orders search results by weighted title matches and handles punctuation-only queries', async ({
+  page,
+  request,
+}) => {
+  const timestamp = Date.now();
+  const marker = `syntheticrank${timestamp}`;
+  const titleMatchTitle = `${marker} roteiro enorme com muitas palavras extras para alongar o titulo e reduzir relevancia sem peso`;
+  const bodyMatchTitle = `Busca curta ${timestamp}`;
+
+  await createNote(request, {
+    body: `Nota antiga para ranking ${timestamp}.`,
+    category_slug: 'food',
+    place_slug: 'sao-paulo',
+    title: titleMatchTitle,
+  });
+  await createNote(request, {
+    body: `${marker}.`,
+    category_slug: 'food',
+    place_slug: 'sao-paulo',
+    title: bodyMatchTitle,
+  });
+
+  await page.goto('/');
+  await page.getByText('Buscar', { exact: true }).click();
+  await expect(page.getByText('Procure uma nota')).toBeVisible();
+
+  await page.getByLabel('Buscar').fill(marker);
+  await page.getByRole('button', { name: 'Buscar' }).click();
+
+  const searchResults = page.getByRole('button', { name: /Abrir nota:/ });
+  await expect(searchResults).toHaveCount(2);
+  await expect(searchResults.nth(0)).toContainText(titleMatchTitle);
+  await expect(searchResults.nth(1)).toContainText(bodyMatchTitle);
+
+  await page.getByLabel('Buscar').fill('!!! *** ()');
+  await page.getByRole('button', { name: 'Buscar' }).click();
+
+  await expect(page.getByText('Nada por aqui ainda')).toBeVisible();
+  await expect(page.getByText('Não deu pra buscar')).toHaveCount(0);
+});
+
 test('filters note discovery by category through the public API', async ({
   request,
 }) => {

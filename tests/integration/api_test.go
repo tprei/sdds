@@ -137,6 +137,94 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		t.Fatalf("empty search note count = %d, want 0", len(emptySearchResults.Notes))
 	}
 
+	accentRequest := openapi.CreateNoteJSONRequestBody{
+		Title:        "Pão ftsaccent48",
+		Body:         "Massa boa.",
+		CategorySlug: "food",
+	}
+	accentNote := createNote(t, client, accentRequest)
+	accentResults := searchNotes(t, client, "pao ftsaccent48")
+	requireOnlySearchNoteIDs(t, accentResults, []string{accentNote.Id})
+
+	strictBothRequest := openapi.CreateNoteJSONRequestBody{
+		Title:        "strictcafe48 strictpao48",
+		Body:         "Encontro certo.",
+		CategorySlug: "food",
+	}
+	strictBothNote := createNote(t, client, strictBothRequest)
+	createNote(t, client, openapi.CreateNoteJSONRequestBody{
+		Title:        "strictcafe48",
+		Body:         "Falta o segundo termo.",
+		CategorySlug: "food",
+	})
+	createNote(t, client, openapi.CreateNoteJSONRequestBody{
+		Title:        "strictpao48",
+		Body:         "Falta o primeiro termo.",
+		CategorySlug: "food",
+	})
+	strictResults := searchNotes(t, client, "strictcafe48 strictpao48")
+	requireOnlySearchNoteIDs(t, strictResults, []string{strictBothNote.Id})
+
+	titleRankRequest := openapi.CreateNoteJSONRequestBody{
+		Title:        "rankbolo48 roteiro enorme com muitas palavras extras para alongar o titulo e reduzir relevancia sem peso",
+		Body:         "Nota mais antiga.",
+		CategorySlug: "food",
+	}
+	titleRankNote := createNote(t, client, titleRankRequest)
+	bodyRankRequest := openapi.CreateNoteJSONRequestBody{
+		Title:        "Bolo curto",
+		Body:         "rankbolo48.",
+		CategorySlug: "food",
+	}
+	bodyRankNote := createNote(t, client, bodyRankRequest)
+	rankedResults := searchNotes(t, client, "rankbolo48")
+	requireOnlySearchNoteIDs(t, rankedResults, []string{titleRankNote.Id, bodyRankNote.Id})
+
+	categoryFoodRequest := openapi.CreateNoteJSONRequestBody{
+		Title:        "catbusca48 comida",
+		Body:         "Filtro de categoria.",
+		CategorySlug: "food",
+	}
+	categoryFoodNote := createNote(t, client, categoryFoodRequest)
+	createNote(t, client, openapi.CreateNoteJSONRequestBody{
+		Title:        "catbusca48 viagem",
+		Body:         "Mesmo termo fora da categoria.",
+		CategorySlug: "travel",
+	})
+	categoryResults := searchNotesByCategory(t, client, "catbusca48", "food")
+	requireOnlySearchNoteIDs(t, categoryResults, []string{categoryFoodNote.Id})
+
+	globalPlace := "sao-paulo"
+	globalWithPlaceRequest := openapi.CreateNoteJSONRequestBody{
+		Title:        "globalbusca48 com lugar",
+		Body:         "Aparece na busca global.",
+		CategorySlug: "travel",
+		PlaceSlug:    &globalPlace,
+	}
+	globalWithPlaceNote := createNote(t, client, globalWithPlaceRequest)
+	globalWithoutPlaceRequest := openapi.CreateNoteJSONRequestBody{
+		Title:        "globalbusca48 sem lugar",
+		Body:         "Tambem aparece na busca global.",
+		CategorySlug: "travel",
+	}
+	globalWithoutPlaceNote := createNote(t, client, globalWithoutPlaceRequest)
+	globalResults := searchNotes(t, client, "globalbusca48")
+	requireSearchNoteIDs(t, globalResults, []string{globalWithPlaceNote.Id, globalWithoutPlaceNote.Id})
+
+	punctuationRequest := openapi.CreateNoteJSONRequestBody{
+		Title:        "pontoseguro48",
+		Body:         "Pontuacao nao muda a busca.",
+		CategorySlug: "food",
+	}
+	punctuationNote := createNote(t, client, punctuationRequest)
+	punctuationResults := searchNotes(t, client, "pontoseguro48 ***")
+	requireOnlySearchNoteIDs(t, punctuationResults, []string{punctuationNote.Id})
+
+	punctuationOnlyResults := searchNotes(t, client, "!!! *** ()")
+	if len(punctuationOnlyResults.Notes) != 0 {
+		t.Fatalf("punctuation-only search note count = %d, want 0", len(punctuationOnlyResults.Notes))
+	}
+
 	requireListNotesCategoryFilterError(t, client, "comida")
 	requireSearchNotesCategoryFilterError(t, client, "comida")
 }
@@ -409,6 +497,36 @@ func requireListedNote(t *testing.T, notes openapi.ListNotesResponse, id string,
 	}
 
 	t.Fatalf("listed note id %q missing", id)
+}
+
+func requireOnlySearchNoteIDs(t *testing.T, notes openapi.ListNotesResponse, wantIDs []string) {
+	t.Helper()
+
+	gotIDs := make([]string, 0, len(notes.Notes))
+	for _, found := range notes.Notes {
+		gotIDs = append(gotIDs, found.Id)
+	}
+	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
+		t.Fatalf("search note ids mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func requireSearchNoteIDs(t *testing.T, notes openapi.ListNotesResponse, wantIDs []string) {
+	t.Helper()
+
+	if len(notes.Notes) != len(wantIDs) {
+		t.Fatalf("search note count = %d, want %d", len(notes.Notes), len(wantIDs))
+	}
+
+	gotIDs := make(map[string]bool, len(notes.Notes))
+	for _, found := range notes.Notes {
+		gotIDs[found.Id] = true
+	}
+	for _, wantID := range wantIDs {
+		if !gotIDs[wantID] {
+			t.Fatalf("search note id %q missing", wantID)
+		}
+	}
 }
 
 func noteFieldsFromResponse(note openapi.Note) noteFields {

@@ -251,6 +251,41 @@ func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 	}
 }
 
+func TestSearchNotesReturnsEmptyNotesForPunctuationOnlyQuery(t *testing.T) {
+	router := newTestRouter(fakeNoteStore{
+		searchNotes: func(_ context.Context, input note.SearchInput) ([]note.Note, error) {
+			if input.Query != "!!! *** ()" {
+				t.Fatalf("query = %q, want punctuation-only query", input.Query)
+			}
+			if input.Limit != searchNotesLimit {
+				t.Fatalf("limit = %d, want %d", input.Limit, searchNotesLimit)
+			}
+			if input.CategorySlug != "" {
+				t.Fatalf("category slug = %q, want empty", input.CategorySlug)
+			}
+			return []note.Note{}, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=!!!+***+()", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	var body openapi.ListNotesResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Notes) != 0 {
+		t.Fatalf("note count = %d, want 0", len(body.Notes))
+	}
+}
+
 func TestSearchNotesFiltersByCategory(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
 		searchNotes: func(_ context.Context, input note.SearchInput) ([]note.Note, error) {

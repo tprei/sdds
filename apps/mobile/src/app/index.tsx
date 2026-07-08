@@ -1,23 +1,20 @@
 import { useCallback, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import {
   EmptyStateCard,
   FoundationScreen,
 } from '@/components/foundation-screen';
+import {
+  CategoryFilterControls,
+} from '@/features/notes/category-filter-controls';
+import { resolveCategoryFilterSlug } from '@/features/notes/category-filter';
 import { NoteCard } from '@/components/note-card';
 import { buildNoteCatalog, labelNotes } from '@/features/notes/catalog';
 import type { LabelledNote, NoteCatalog } from '@/features/notes/catalog';
-import {
-  categoryChipAccessibility,
-  resolveExploreCategorySlug,
-} from '@/features/notes/explore-screen';
 import { listCatalogs } from '@/lib/api/catalogs';
 import { listNotes } from '@/lib/api/notes';
 import type { ListNotesInput, Note } from '@/lib/api/notes';
-
-import { styles } from '@/features/notes/explore-screen.styles';
 
 type CatalogState =
   | { status: 'loading' }
@@ -88,7 +85,7 @@ export default function HomeScreen() {
         }
         const catalog = buildNoteCatalog(catalogs);
         catalogRef.current = catalog;
-        const categorySlug = resolveExploreCategorySlug(
+        const categorySlug = resolveCategoryFilterSlug(
           catalog,
           selectedCategorySlugRef.current,
         );
@@ -162,10 +159,10 @@ export default function HomeScreen() {
       title="Explorar"
       description="Um feed global de notas úteis pra descobrir dicas, lugares e achados."
     >
-      <CatalogControls
+      <CategoryFilterControls
+        catalog={catalogState.status === 'ready' ? catalogState.catalog : null}
         onSelectCategorySlug={selectCategorySlug}
         selectedCategorySlug={selectedCategorySlug}
-        state={catalogState}
       />
       {catalogState.status === 'error' ? (
         <CatalogError />
@@ -183,96 +180,6 @@ export default function HomeScreen() {
         />
       )}
     </FoundationScreen>
-  );
-}
-
-function CatalogControls({
-  onSelectCategorySlug,
-  selectedCategorySlug,
-  state,
-}: {
-  onSelectCategorySlug: (categorySlug: string | null) => void;
-  selectedCategorySlug: string | null;
-  state: CatalogState;
-}) {
-  if (state.status !== 'ready') {
-    return (
-      <View style={styles.controls}>
-        <View
-          accessible
-          accessibilityLabel="Escopo atual: Mundo todo"
-          style={styles.scopeBadge}
-        >
-          <Text style={styles.scopeLabel}>Mundo todo</Text>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.controls}>
-      <View
-        accessible
-        accessibilityLabel="Escopo atual: Mundo todo"
-        style={styles.scopeBadge}
-      >
-        <Text style={styles.scopeLabel}>Mundo todo</Text>
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryRow}
-      >
-        <CategoryChip
-          label="Tudo"
-          onPress={() => onSelectCategorySlug(null)}
-          selected={selectedCategorySlug === null}
-        />
-        {state.catalog.activeCategories.map((category) => (
-          <CategoryChip
-            key={category.slug}
-            label={category.label}
-            onPress={() => onSelectCategorySlug(category.slug)}
-            selected={selectedCategorySlug === category.slug}
-          />
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
-
-function CategoryChip({
-  label,
-  onPress,
-  selected,
-}: {
-  label: string;
-  onPress: () => void;
-  selected: boolean;
-}) {
-  const accessibility = categoryChipAccessibility(label, selected);
-
-  return (
-    <Pressable
-      accessibilityLabel={accessibility.accessibilityLabel}
-      accessibilityRole="button"
-      accessibilityState={accessibility.accessibilityState}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.categoryChip,
-        selected ? styles.categoryChipSelected : null,
-        pressed ? styles.categoryChipPressed : null,
-      ]}
-    >
-      <Text
-        style={[
-          styles.categoryChipText,
-          selected ? styles.categoryChipTextSelected : null,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 

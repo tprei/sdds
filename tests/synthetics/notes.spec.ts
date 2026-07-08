@@ -101,6 +101,61 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(page.getByLabel('Lugar da nota: São Paulo')).toBeVisible();
 });
 
+test('narrows the mobile explore feed by category', async ({
+  page,
+  request,
+}) => {
+  const timestamp = Date.now();
+  const foodTitle = `Explore comida ${timestamp}`;
+  const travelTitle = `Explore viagem ${timestamp}`;
+
+  await createNote(request, {
+    body: `Nota de comida criada para testar Explorar ${timestamp}.`,
+    category_slug: 'food',
+    place_slug: 'sao-paulo',
+    title: foodTitle,
+  });
+  await createNote(request, {
+    body: `Nota de viagem criada para testar Explorar ${timestamp}.`,
+    category_slug: 'travel',
+    place_slug: 'rio-de-janeiro',
+    title: travelTitle,
+  });
+
+  await page.goto('/');
+  await expect(
+    page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Escopo atual: Mundo todo')).toBeVisible();
+  await expect(
+    page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
+  ).toBeVisible();
+
+  const foodNote = page.getByRole('button', {
+    name: `Abrir nota: ${foodTitle}`,
+  });
+  const travelNote = page.getByRole('button', {
+    name: `Abrir nota: ${travelTitle}`,
+  });
+  await expect(foodNote).toBeVisible();
+  await expect(travelNote).toBeVisible();
+
+  await page.getByRole('button', { exact: true, name: 'Comida' }).click();
+  await expect(
+    page.getByRole('button', { exact: true, name: 'Comida, selecionado' }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Escopo atual: Mundo todo')).toBeVisible();
+  await expect(foodNote).toBeVisible();
+  await expect(travelNote).toHaveCount(0);
+
+  await page.getByRole('button', { exact: true, name: 'Tudo' }).click();
+  await expect(
+    page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
+  ).toBeVisible();
+  await expect(foodNote).toBeVisible();
+  await expect(travelNote).toBeVisible();
+});
+
 test('filters note discovery by category through the public API', async ({
   request,
 }) => {

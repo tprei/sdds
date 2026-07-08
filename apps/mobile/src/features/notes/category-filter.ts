@@ -1,6 +1,6 @@
 import type { NoteCatalog } from './catalog';
 
-export function categoryChipAccessibility(
+export function categoryFilterChipAccessibility(
   label: string,
   selected: boolean,
 ) {
@@ -10,7 +10,7 @@ export function categoryChipAccessibility(
   };
 }
 
-export function resolveExploreCategorySlug(
+export function resolveCategoryFilterSlug(
   catalog: NoteCatalog,
   currentSlug: string | null,
 ): string | null {

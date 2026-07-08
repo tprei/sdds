@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import type { APIRequestContext } from '@playwright/test';
+import type { APIRequestContext, Page } from '@playwright/test';
 
 const apiBaseURL =
   process.env.SDDS_SYNTHETICS_API_BASE_URL ?? 'http://127.0.0.1:18080';
@@ -46,7 +46,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
   ).toBeVisible();
-  await expect(page.getByLabel('Escopo atual: Mundo todo')).toBeVisible();
+  await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
@@ -64,7 +64,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
   ).toBeVisible();
-  await expect(page.getByLabel('Escopo atual: Mundo todo')).toBeVisible();
+  await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
@@ -77,7 +77,9 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(publishedNote).toContainText('São Paulo');
 
   await page.getByText('Buscar', { exact: true }).click();
-  await expect(page.getByText('Procure uma nota')).toBeVisible();
+  await expect(
+    page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
+  ).toBeVisible();
 
   await page.getByLabel('Buscar').fill(title);
   await page.getByRole('button', { name: 'Buscar' }).click();
@@ -126,7 +128,7 @@ test('narrows the mobile explore feed by category', async ({
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
   ).toBeVisible();
-  await expect(page.getByLabel('Escopo atual: Mundo todo')).toBeVisible();
+  await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
@@ -144,7 +146,7 @@ test('narrows the mobile explore feed by category', async ({
   await expect(
     page.getByRole('button', { exact: true, name: 'Comida, selecionado' }),
   ).toBeVisible();
-  await expect(page.getByLabel('Escopo atual: Mundo todo')).toBeVisible();
+  await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toHaveCount(0);
 
@@ -152,6 +154,92 @@ test('narrows the mobile explore feed by category', async ({
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
+  await expect(foodNote).toBeVisible();
+  await expect(travelNote).toBeVisible();
+});
+
+test('narrows the mobile search results by category and clears stale cards', async ({
+  page,
+  request,
+}) => {
+  const timestamp = Date.now();
+  const marker = `searchscope${timestamp}`;
+  const foodTitle = `Busca comida ${timestamp}`;
+  const travelTitle = `Busca viagem ${timestamp}`;
+
+  await createNote(request, {
+    body: `Marcador ${marker} para resultado de comida.`,
+    category_slug: 'food',
+    place_slug: 'sao-paulo',
+    title: foodTitle,
+  });
+  await createNote(request, {
+    body: `Marcador ${marker} para resultado de viagem.`,
+    category_slug: 'travel',
+    place_slug: 'rio-de-janeiro',
+    title: travelTitle,
+  });
+
+  await page.goto('/');
+  await page.getByText('Buscar', { exact: true }).click();
+  await expect(
+    page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
+  ).toBeVisible();
+  await expect(visibleGlobalScope(page)).toBeVisible();
+  await expect(
+    page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
+  ).toBeVisible();
+  await expect(page.getByText('Pesquisas desta sessão')).toHaveCount(0);
+
+  await page.getByLabel('Buscar').fill(marker);
+  await page.getByRole('button', { name: 'Buscar' }).click();
+
+  const foodNote = page.getByRole('button', {
+    name: `Abrir nota: ${foodTitle}`,
+  });
+  const travelNote = page.getByRole('button', {
+    name: `Abrir nota: ${travelTitle}`,
+  });
+  await expect(foodNote).toBeVisible();
+  await expect(travelNote).toBeVisible();
+  await expect(page.getByText(`2 notas para ${marker}`)).toBeVisible();
+  await expect(
+    page.getByLabel(
+      `Resultado da busca: 2 notas para ${marker}. Mundo todo.`,
+    ),
+  ).toBeVisible();
+
+  await page.getByRole('button', { exact: true, name: 'Comida' }).click();
+  await expect(
+    page.getByRole('button', { exact: true, name: 'Comida, selecionado' }),
+  ).toBeVisible();
+  await expect(visibleGlobalScope(page)).toBeVisible();
+  await expect(page.getByText(`1 nota para ${marker}`)).toBeVisible();
+  await expect(
+    page.getByLabel(
+      `Resultado da busca: 1 nota para ${marker}. Categoria Comida, Mundo todo.`,
+    ),
+  ).toBeVisible();
+  await expect(page.getByText('Categoria Comida · Mundo todo')).toBeVisible();
+  await expect(foodNote).toBeVisible();
+  await expect(travelNote).toHaveCount(0);
+
+  await page.getByRole('button', { exact: true, name: 'Tudo' }).click();
+  await expect(
+    page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
+  ).toBeVisible();
+  await expect(page.getByText(`2 notas para ${marker}`)).toBeVisible();
+  await expect(foodNote).toBeVisible();
+  await expect(travelNote).toBeVisible();
+
+  await page.getByRole('button', { name: 'Limpar' }).click();
+  await expect(page.getByLabel('Buscar')).toHaveValue('');
+  await expect(foodNote).toHaveCount(0);
+  await expect(travelNote).toHaveCount(0);
+  await expect(page.getByText('Pesquisas desta sessão')).toBeVisible();
+
+  await page.getByRole('button', { exact: true, name: marker }).click();
+  await expect(page.getByLabel('Buscar')).toHaveValue(marker);
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toBeVisible();
 });
@@ -180,7 +268,9 @@ test('orders search results by weighted title matches and handles punctuation-on
 
   await page.goto('/');
   await page.getByText('Buscar', { exact: true }).click();
-  await expect(page.getByText('Procure uma nota')).toBeVisible();
+  await expect(
+    page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
+  ).toBeVisible();
 
   await page.getByLabel('Buscar').fill(marker);
   await page.getByRole('button', { name: 'Buscar' }).click();
@@ -299,6 +389,10 @@ async function expectCategoryFilterError(
 
 function apiURL(path: string): string {
   return new URL(path, apiBaseURL).toString();
+}
+
+function visibleGlobalScope(page: Page) {
+  return page.locator('[aria-label="Escopo atual: Mundo todo"]:visible').last();
 }
 
 function noteTitles(response: ListNotesResponse): string[] {

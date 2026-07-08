@@ -312,6 +312,130 @@ func TestNoteStoreSearchReturnsEmptyResults(t *testing.T) {
 	}
 }
 
+func TestNoteStoreSearchRanksTitleMatchesAheadOfBodyMatches(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+
+	times := []time.Time{
+		time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
+		time.Date(2026, 7, 2, 12, 1, 0, 0, time.UTC),
+	}
+	index := 0
+	store := newNoteStore(db, func() time.Time {
+		current := times[index]
+		index++
+		return current
+	})
+
+	titleMatch, err := store.CreateNote(ctx, note.CreateInput{
+		Title:        "Brigadeiro roteiro enorme com muitas palavras extras para alongar o titulo e reduzir relevancia sem peso",
+		Body:         "Docinho antigo.",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
+	})
+	if err != nil {
+		t.Fatalf("create title match: %v", err)
+	}
+
+	bodyMatch, err := store.CreateNote(ctx, note.CreateInput{
+		Title:        "Mesa curta",
+		Body:         "Brigadeiro.",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
+	})
+	if err != nil {
+		t.Fatalf("create body match: %v", err)
+	}
+
+	found, err := store.SearchNotes(ctx, note.SearchInput{
+		Query: "brigadeiro",
+		Limit: 10,
+	})
+	if err != nil {
+		t.Fatalf("search notes: %v", err)
+	}
+
+	gotIDs := noteIDs(found)
+	wantIDs := []string{titleMatch.ID, bodyMatch.ID}
+	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
+		t.Fatalf("search note ids mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestNoteStoreSearchRequiresEveryToken(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+
+	store := NewNoteStore(db)
+	bothTokenMatch, err := store.CreateNote(ctx, note.CreateInput{
+		Title:        "Cafe com pao",
+		Body:         "Padaria boa.",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
+	})
+	if err != nil {
+		t.Fatalf("create both-token note: %v", err)
+	}
+
+	if _, err := store.CreateNote(ctx, note.CreateInput{
+		Title:        "Cafe honesto",
+		Body:         "Abre cedo.",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
+	}); err != nil {
+		t.Fatalf("create cafe-only note: %v", err)
+	}
+
+	if _, err := store.CreateNote(ctx, note.CreateInput{
+		Title:        "Pao bom",
+		Body:         "Sai quente.",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
+	}); err != nil {
+		t.Fatalf("create pao-only note: %v", err)
+	}
+
+	found, err := store.SearchNotes(ctx, note.SearchInput{
+		Query: "cafe pao",
+		Limit: 10,
+	})
+	if err != nil {
+		t.Fatalf("search notes: %v", err)
+	}
+
+	gotIDs := noteIDs(found)
+	wantIDs := []string{bothTokenMatch.ID}
+	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
+		t.Fatalf("search note ids mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestNoteStoreSearchReturnsEmptyForPunctuationOnlyQuery(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+
+	store := NewNoteStore(db)
+	if _, err := store.CreateNote(ctx, note.CreateInput{
+		Title:        "Café com pão de queijo",
+		Body:         "Bom para trabalhar de manhã.",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
+	}); err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	found, err := store.SearchNotes(ctx, note.SearchInput{
+		Query: "!!! *** ()",
+		Limit: 10,
+	})
+	if err != nil {
+		t.Fatalf("search notes: %v", err)
+	}
+	if len(found) != 0 {
+		t.Fatalf("search note count = %d, want 0", len(found))
+	}
+}
+
 func TestNoteStoreSearchOrdersTiesByRecency(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
@@ -419,6 +543,17 @@ func TestNoteStoreSearchIgnoresFTSOperatorsFromUserInput(t *testing.T) {
 	wantIDs := []string{created.ID}
 	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
 		t.Fatalf("search note ids mismatch (-want +got):\n%s", diff)
+	}
+
+	foundWithOR, err := store.SearchNotes(ctx, note.SearchInput{
+		Query: "restaurante OR barato",
+		Limit: 10,
+	})
+	if err != nil {
+		t.Fatalf("search notes with OR: %v", err)
+	}
+	if len(foundWithOR) != 0 {
+		t.Fatalf("search note count with OR = %d, want 0", len(foundWithOR))
 	}
 }
 

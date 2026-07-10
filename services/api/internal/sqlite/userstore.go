@@ -302,8 +302,7 @@ func newPasswordUserRecords(input user.CreatePasswordUserInput, now time.Time) (
 	return createdUser, author, loginIdentityID, session, nil
 }
 
-func scanPasswordLogin(scan rowScanner) (user.PasswordLogin, error) {
-	var login user.PasswordLogin
+func scanPasswordLogin(scan *sql.Row) (user.PasswordLogin, error) {
 	var userID string
 	var authorID string
 	var userCreatedAt int64
@@ -311,6 +310,8 @@ func scanPasswordLogin(scan rowScanner) (user.PasswordLogin, error) {
 	var authorCreatedAt int64
 	var authorUpdatedAt int64
 	var state string
+	var displayName string
+	var username string
 	var secretHash sql.NullString
 	if err := scan.Scan(
 		&userID,
@@ -318,10 +319,10 @@ func scanPasswordLogin(scan rowScanner) (user.PasswordLogin, error) {
 		&userCreatedAt,
 		&userUpdatedAt,
 		&authorID,
-		&login.Author.DisplayName,
+		&displayName,
 		&authorCreatedAt,
 		&authorUpdatedAt,
-		&login.Username,
+		&username,
 		&secretHash,
 	); err != nil {
 		return user.PasswordLogin{}, err
@@ -330,24 +331,30 @@ func scanPasswordLogin(scan rowScanner) (user.PasswordLogin, error) {
 		return user.PasswordLogin{}, user.ErrInvalidCredentials
 	}
 
-	login.User = user.User{
-		ID:        user.UserID(userID),
-		State:     user.UserState(state),
-		CreatedAt: timeFromUnixMillis(userCreatedAt),
-		UpdatedAt: timeFromUnixMillis(userUpdatedAt),
-	}
-	login.Author.ID = user.AuthorID(authorID)
-	login.Author.UserID = login.User.ID
-	login.Author.CreatedAt = timeFromUnixMillis(authorCreatedAt)
-	login.Author.UpdatedAt = timeFromUnixMillis(authorUpdatedAt)
-	login.SecretHash = secretHash.String
-	return login, nil
+	currentUserID := user.UserID(userID)
+	return user.PasswordLogin{
+		User: user.User{
+			ID:        currentUserID,
+			State:     user.UserState(state),
+			CreatedAt: timeFromUnixMillis(userCreatedAt),
+			UpdatedAt: timeFromUnixMillis(userUpdatedAt),
+		},
+		Author: user.Author{
+			ID:          user.AuthorID(authorID),
+			UserID:      currentUserID,
+			DisplayName: displayName,
+			CreatedAt:   timeFromUnixMillis(authorCreatedAt),
+			UpdatedAt:   timeFromUnixMillis(authorUpdatedAt),
+		},
+		Username:   username,
+		SecretHash: secretHash.String,
+	}, nil
 }
 
-func scanCurrentSession(scan rowScanner) (user.CurrentSession, error) {
-	var current user.CurrentSession
+func scanCurrentSession(scan *sql.Row) (user.CurrentSession, error) {
 	var sessionID string
 	var sessionUserID string
+	var tokenHash string
 	var sessionCreatedAt int64
 	var sessionExpiresAt int64
 	var sessionRevokedAt sql.NullInt64
@@ -355,6 +362,7 @@ func scanCurrentSession(scan rowScanner) (user.CurrentSession, error) {
 	var userCreatedAt int64
 	var userUpdatedAt int64
 	var authorID string
+	var displayName string
 	var authorCreatedAt int64
 	var authorUpdatedAt int64
 	var username sql.NullString
@@ -362,7 +370,7 @@ func scanCurrentSession(scan rowScanner) (user.CurrentSession, error) {
 	if err := scan.Scan(
 		&sessionID,
 		&sessionUserID,
-		&current.Session.TokenHash,
+		&tokenHash,
 		&sessionCreatedAt,
 		&sessionExpiresAt,
 		&sessionRevokedAt,
@@ -370,7 +378,7 @@ func scanCurrentSession(scan rowScanner) (user.CurrentSession, error) {
 		&userCreatedAt,
 		&userUpdatedAt,
 		&authorID,
-		&current.Author.DisplayName,
+		&displayName,
 		&authorCreatedAt,
 		&authorUpdatedAt,
 		&username,
@@ -378,24 +386,34 @@ func scanCurrentSession(scan rowScanner) (user.CurrentSession, error) {
 		return user.CurrentSession{}, err
 	}
 
-	current.Session.ID = user.SessionID(sessionID)
-	current.Session.UserID = user.UserID(sessionUserID)
-	current.Session.CreatedAt = timeFromUnixMillis(sessionCreatedAt)
-	current.Session.ExpiresAt = timeFromUnixMillis(sessionExpiresAt)
+	currentUserID := user.UserID(sessionUserID)
+	session := user.Session{
+		ID:        user.SessionID(sessionID),
+		UserID:    currentUserID,
+		TokenHash: tokenHash,
+		CreatedAt: timeFromUnixMillis(sessionCreatedAt),
+		ExpiresAt: timeFromUnixMillis(sessionExpiresAt),
+	}
 	if sessionRevokedAt.Valid {
 		revokedAt := timeFromUnixMillis(sessionRevokedAt.Int64)
-		current.Session.RevokedAt = &revokedAt
+		session.RevokedAt = &revokedAt
 	}
-	current.User = user.User{
-		ID:        user.UserID(sessionUserID),
-		State:     user.UserState(state),
-		CreatedAt: timeFromUnixMillis(userCreatedAt),
-		UpdatedAt: timeFromUnixMillis(userUpdatedAt),
+	current := user.CurrentSession{
+		Session: session,
+		User: user.User{
+			ID:        currentUserID,
+			State:     user.UserState(state),
+			CreatedAt: timeFromUnixMillis(userCreatedAt),
+			UpdatedAt: timeFromUnixMillis(userUpdatedAt),
+		},
+		Author: user.Author{
+			ID:          user.AuthorID(authorID),
+			UserID:      currentUserID,
+			DisplayName: displayName,
+			CreatedAt:   timeFromUnixMillis(authorCreatedAt),
+			UpdatedAt:   timeFromUnixMillis(authorUpdatedAt),
+		},
 	}
-	current.Author.ID = user.AuthorID(authorID)
-	current.Author.UserID = current.User.ID
-	current.Author.CreatedAt = timeFromUnixMillis(authorCreatedAt)
-	current.Author.UpdatedAt = timeFromUnixMillis(authorUpdatedAt)
 	if username.Valid {
 		current.Username = username.String
 	}
@@ -413,10 +431,6 @@ func rejectInactiveCurrentSession(current user.CurrentSession, now time.Time) (u
 		return user.CurrentSession{}, user.ErrSessionExpired
 	}
 	return current, nil
-}
-
-type rowScanner interface {
-	Scan(dest ...any) error
 }
 
 func isUniqueConstraintError(err error) bool {

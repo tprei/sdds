@@ -62,17 +62,17 @@ func newRouter(
 	router.Use(localBrowserCORS)
 	router.Use(openAPIRequestValidator())
 
+	authRateLimiters := newAuthRateLimiters(authLimits, clock)
 	handler := server{
 		notes:                 notes,
 		catalog:               catalog,
 		users:                 users,
 		passwordHasher:        passwordHasher,
 		invalidCredentialHash: invalidCredentialHash,
+		authRateLimiters:      authRateLimiters,
 		newSessionToken:       newSessionToken,
 		clock:                 clock,
 	}
-	authRateLimiters := newAuthRateLimiters(authLimits, clock)
-	handler.authRateLimiters = authRateLimiters
 	wrapper := openapi.ServerInterfaceWrapper{
 		Handler:          handler,
 		ErrorHandlerFunc: writeGeneratedOpenAPIError,

@@ -244,6 +244,70 @@ func TestCreateAuthSessionGlobalRateLimitReturnsTooManyRequests(t *testing.T) {
 	}
 }
 
+func TestAuthRateLimitersDoNotCreateAccountBucketsAfterGlobalRejection(t *testing.T) {
+	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
+	limiters := newAuthRateLimiters(AuthLimits{
+		SignupRequestsPerMinute:       1000,
+		LoginRequestsPerMinute:        1000,
+		SignupGlobalRequestsPerMinute: 1,
+		LoginGlobalRequestsPerMinute:  1,
+	}, func() time.Time { return now })
+	request := authRateLimitRequest(http.MethodPost, "/v1/auth/users", "{}", "203.0.113.10:1000")
+
+	if !limiters.allowSignup(request, "first") {
+		t.Fatal("first signup was rejected")
+	}
+	if limiters.allowSignup(request, "second") {
+		t.Fatal("second signup was accepted")
+	}
+	if got := len(limiters.signupAccountLimiters.entries); got != 1 {
+		t.Fatalf("signup account bucket count = %d, want 1", got)
+	}
+
+	loginRequest := authRateLimitRequest(http.MethodPost, "/v1/auth/sessions", "{}", "203.0.113.10:1000")
+	if !limiters.allowLogin(loginRequest, "first") {
+		t.Fatal("first login was rejected")
+	}
+	if limiters.allowLogin(loginRequest, "second") {
+		t.Fatal("second login was accepted")
+	}
+	if got := len(limiters.loginAccountLimiters.entries); got != 1 {
+		t.Fatalf("login account bucket count = %d, want 1", got)
+	}
+}
+
+func TestAuthRateLimitersDoNotCreateAccountBucketsAfterSourceRejection(t *testing.T) {
+	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
+	limiters := newAuthRateLimiters(AuthLimits{
+		SignupRequestsPerMinute:       1,
+		LoginRequestsPerMinute:        1,
+		SignupGlobalRequestsPerMinute: 1000,
+		LoginGlobalRequestsPerMinute:  1000,
+	}, func() time.Time { return now })
+	request := authRateLimitRequest(http.MethodPost, "/v1/auth/users", "{}", "203.0.113.10:1000")
+
+	if !limiters.allowSignup(request, "first") {
+		t.Fatal("first signup was rejected")
+	}
+	if limiters.allowSignup(request, "second") {
+		t.Fatal("second signup was accepted")
+	}
+	if got := len(limiters.signupAccountLimiters.entries); got != 1 {
+		t.Fatalf("signup account bucket count = %d, want 1", got)
+	}
+
+	loginRequest := authRateLimitRequest(http.MethodPost, "/v1/auth/sessions", "{}", "203.0.113.10:1000")
+	if !limiters.allowLogin(loginRequest, "first") {
+		t.Fatal("first login was rejected")
+	}
+	if limiters.allowLogin(loginRequest, "second") {
+		t.Fatal("second login was accepted")
+	}
+	if got := len(limiters.loginAccountLimiters.entries); got != 1 {
+		t.Fatalf("login account bucket count = %d, want 1", got)
+	}
+}
+
 func TestAuthRateLimitersAreIndependentAndRefill(t *testing.T) {
 	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
 	createCalls := 0

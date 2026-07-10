@@ -50,21 +50,29 @@ func newKeyedRequestsPerMinuteLimiters(requestsPerMinute int, maxKeys int) *keye
 
 func (limiters authRateLimiters) allowSignup(r *http.Request, username string) bool {
 	now := limiters.clock()
-	return takeRateLimitToken(
+	return takeRateLimitTokenLazy(
 		now,
-		limiters.signupSourceLimiters.limiterFor(requestSourceKey(r), now),
-		limiters.signupAccountLimiters.limiterFor(username, now),
-		limiters.signupGlobalLimiter,
+		func() *rate.Limiter { return limiters.signupGlobalLimiter },
+		func() *rate.Limiter {
+			return limiters.signupSourceLimiters.limiterFor(requestSourceKey(r), now)
+		},
+		func() *rate.Limiter {
+			return limiters.signupAccountLimiters.limiterFor(username, now)
+		},
 	)
 }
 
 func (limiters authRateLimiters) allowLogin(r *http.Request, username string) bool {
 	now := limiters.clock()
-	return takeRateLimitToken(
+	return takeRateLimitTokenLazy(
 		now,
-		limiters.loginSourceLimiters.limiterFor(requestSourceKey(r), now),
-		limiters.loginAccountLimiters.limiterFor(username, now),
-		limiters.loginGlobalLimiter,
+		func() *rate.Limiter { return limiters.loginGlobalLimiter },
+		func() *rate.Limiter {
+			return limiters.loginSourceLimiters.limiterFor(requestSourceKey(r), now)
+		},
+		func() *rate.Limiter {
+			return limiters.loginAccountLimiters.limiterFor(username, now)
+		},
 	)
 }
 
@@ -127,9 +135,18 @@ func requestSourceKey(r *http.Request) string {
 }
 
 func takeRateLimitToken(now time.Time, limiters ...*rate.Limiter) bool {
-	reservations := make([]*rate.Reservation, 0, len(limiters))
+	suppliers := make([]func() *rate.Limiter, 0, len(limiters))
 	for _, limiter := range limiters {
-		reservation := limiter.ReserveN(now, 1)
+		limiter := limiter
+		suppliers = append(suppliers, func() *rate.Limiter { return limiter })
+	}
+	return takeRateLimitTokenLazy(now, suppliers...)
+}
+
+func takeRateLimitTokenLazy(now time.Time, suppliers ...func() *rate.Limiter) bool {
+	reservations := make([]*rate.Reservation, 0, len(suppliers))
+	for _, supplier := range suppliers {
+		reservation := supplier().ReserveN(now, 1)
 		if !reservation.OK() || reservation.DelayFrom(now) > 0 {
 			reservation.CancelAt(now)
 			for _, previous := range reservations {

@@ -70,7 +70,7 @@ func appendUsernameValidationProblems(problems []ValidationProblem, username str
 	if usernameLength > UsernameMaxLength {
 		return append(problems, ValidationProblem{Field: "username", Code: "too_long"})
 	}
-	if !isUsernameIdentifier(username) {
+	if !hasValidUsernameCharacters(username) {
 		return append(problems, ValidationProblem{Field: "username", Code: "invalid"})
 	}
 	return problems
@@ -101,7 +101,7 @@ func appendPasswordValidationProblems(problems []ValidationProblem, password str
 	return problems
 }
 
-func isUsernameIdentifier(value string) bool {
+func hasValidUsernameCharacters(value string) bool {
 	for _, current := range value {
 		if current >= 'a' && current <= 'z' {
 			continue

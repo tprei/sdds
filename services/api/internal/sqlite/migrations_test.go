@@ -13,7 +13,17 @@ func TestApplyMigrationsCreatesInitialSchema(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	tables := []string{"schema_migrations", "categories", "places", "notes", "note_search"}
+	tables := []string{
+		"schema_migrations",
+		"categories",
+		"places",
+		"notes",
+		"note_search",
+		"users",
+		"authors",
+		"user_login_identities",
+		"sessions",
+	}
 	for _, table := range tables {
 		t.Run(table, func(t *testing.T) {
 			var count int
@@ -31,7 +41,15 @@ func TestApplyMigrationsCreatesCatalogIndexes(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	indexes := []string{"notes_recent_idx", "notes_category_idx", "notes_place_idx"}
+	indexes := []string{
+		"notes_recent_idx",
+		"notes_category_idx",
+		"notes_place_idx",
+		"user_login_identities_user_idx",
+		"user_login_identities_one_password_provider_per_user_idx",
+		"sessions_user_idx",
+		"sessions_active_expiry_idx",
+	}
 	for _, index := range indexes {
 		t.Run(index, func(t *testing.T) {
 			var count int
@@ -88,6 +106,119 @@ func TestApplyMigrationsSeedsCatalogs(t *testing.T) {
 	}
 	if diff := cmp.Diff(wantPlaces, gotPlaces); diff != "" {
 		t.Fatalf("places mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestLoginIdentityMigrationEnforcesSecretHashInvariants(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+
+	if _, err := db.ExecContext(
+		ctx,
+		`INSERT INTO users (id, state, created_at, updated_at) VALUES (?, ?, ?, ?)`,
+		"user-id",
+		"active",
+		int64(1782993600000),
+		int64(1782993600000),
+	); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+
+	_, err := db.ExecContext(
+		ctx,
+		`
+			INSERT INTO user_login_identities (id, user_id, kind, provider, normalized_identifier, secret_hash, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`,
+		"password-without-secret",
+		"user-id",
+		"password",
+		"local",
+		"thiago",
+		nil,
+		int64(1782993600000),
+		int64(1782993600000),
+	)
+	if err == nil {
+		t.Fatal("insert password identity without secret_hash error = nil, want constraint error")
+	}
+
+	if _, err := db.ExecContext(
+		ctx,
+		`
+			INSERT INTO user_login_identities (id, user_id, kind, provider, normalized_identifier, secret_hash, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`,
+		"oidc-without-secret",
+		"user-id",
+		"oidc",
+		"google",
+		"google-subject-id",
+		nil,
+		int64(1782993600000),
+		int64(1782993600000),
+	); err != nil {
+		t.Fatalf("insert oidc identity without secret_hash: %v", err)
+	}
+
+	_, err = db.ExecContext(
+		ctx,
+		`
+			INSERT INTO user_login_identities (id, user_id, kind, provider, normalized_identifier, secret_hash, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`,
+		"oidc-with-secret",
+		"user-id",
+		"oidc",
+		"apple",
+		"apple-subject-id",
+		"fake-secret",
+		int64(1782993600000),
+		int64(1782993600000),
+	)
+	if err == nil {
+		t.Fatal("insert oidc identity with secret_hash error = nil, want constraint error")
+	}
+}
+
+func TestLoginIdentityMigrationAllowsOnlyOnePasswordProviderPerUser(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+
+	if _, err := db.ExecContext(
+		ctx,
+		`INSERT INTO users (id, state, created_at, updated_at) VALUES (?, ?, ?, ?)`,
+		"user-id",
+		"active",
+		int64(1782993600000),
+		int64(1782993600000),
+	); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	insertPasswordIdentity := func(id string, normalizedIdentifier string) error {
+		_, err := db.ExecContext(
+			ctx,
+			`
+				INSERT INTO user_login_identities (id, user_id, kind, provider, normalized_identifier, secret_hash, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			`,
+			id,
+			"user-id",
+			"password",
+			"local",
+			normalizedIdentifier,
+			"secret-hash",
+			int64(1782993600000),
+			int64(1782993600000),
+		)
+		return err
+	}
+
+	if err := insertPasswordIdentity("first-password", "thiago"); err != nil {
+		t.Fatalf("insert first password identity: %v", err)
+	}
+	if err := insertPasswordIdentity("second-password", "thiago-alt"); err == nil {
+		t.Fatal("insert second password identity error = nil, want constraint error")
 	}
 }
 

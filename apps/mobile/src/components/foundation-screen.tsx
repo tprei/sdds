@@ -26,10 +26,11 @@ type EmptyStateCardProps = {
 type FoundationTextInputProps = TextInputProps;
 
 type FoundationButtonProps = {
-  disabled?: boolean;
-  label: string;
-  onPress?: () => void;
-  style?: StyleProp<ViewStyle>;
+	disabled?: boolean;
+	label: string;
+	onPress?: () => void;
+	style?: StyleProp<ViewStyle>;
+	testID?: string;
 };
 
 export function FoundationScreen({
@@ -85,8 +86,9 @@ export function FoundationTextInput({
 export function FoundationButton({
   disabled,
   label,
-  onPress,
-  style,
+	onPress,
+	style,
+	testID,
 }: FoundationButtonProps) {
   return (
     <Pressable
@@ -94,6 +96,7 @@ export function FoundationButton({
       accessibilityState={{ disabled: Boolean(disabled) }}
       disabled={disabled}
       onPress={onPress}
+      testID={testID}
       style={({ pressed }) => [
         styles.button,
         pressed && !disabled ? styles.buttonPressed : null,

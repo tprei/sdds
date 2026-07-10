@@ -25,6 +25,10 @@ func (handler server) CreateAuthUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, authValidationErrorResponse(openapi.ErrorCodeInvalidAuth, problems))
 		return
 	}
+	if !handler.authRateLimiters.allowSignup(input.Username) {
+		writeRateLimited(w)
+		return
+	}
 
 	secretHash, err := handler.passwordHasher.Hash(input.Password)
 	if err != nil {
@@ -69,6 +73,10 @@ func (handler server) CreateAuthSession(w http.ResponseWriter, r *http.Request) 
 	})
 	if problems := user.ValidateLoginInput(input); len(problems) > 0 {
 		writeError(w, http.StatusBadRequest, authValidationErrorResponse(openapi.ErrorCodeInvalidAuth, problems))
+		return
+	}
+	if !handler.authRateLimiters.allowLogin(input.Username) {
+		writeRateLimited(w)
 		return
 	}
 

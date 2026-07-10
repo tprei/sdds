@@ -80,10 +80,12 @@ The current API exposes operational endpoints:
 
 It opens SQLite at `SDDS_DATABASE_PATH`, defaulting to `sdds.db`, and applies migrations at startup.
 
-Auth has process-local operational limits to protect the small VM from expensive password work:
+Auth has process-local operational limits to protect the small VM from expensive password work. The signup and login request limits apply independently per remote source and per normalized username; the global limits are higher shared ceilings:
 
 - `SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE`, default `5`.
 - `SDDS_AUTH_LOGIN_REQUESTS_PER_MINUTE`, default `10`.
+- `SDDS_AUTH_GLOBAL_SIGNUP_REQUESTS_PER_MINUTE`, default `60`.
+- `SDDS_AUTH_GLOBAL_LOGIN_REQUESTS_PER_MINUTE`, default `120`.
 - `SDDS_AUTH_HASH_CONCURRENCY`, default `2`.
 
 The first product endpoints are:

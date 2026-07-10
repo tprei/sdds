@@ -48,7 +48,7 @@ describe('notes API client', () => {
       categorySlug: 'food',
       placeSlug: 'sao-paulo',
       title: 'Cafe bom',
-    });
+    }, 'test-token');
 
     const request = onlyFetchCall(calls);
     expect(request.url).toBe('http://localhost:8080/v1/notes');
@@ -73,7 +73,7 @@ describe('notes API client', () => {
       body: 'Tem pao de queijo decente.',
       categorySlug: 'food',
       title: 'Cafe bom',
-    });
+    }, 'test-token');
 
     await expect(requestJSON(onlyFetchCall(calls))).resolves.toMatchObject({
       place_slug: null,
@@ -88,9 +88,10 @@ describe('notes API client', () => {
       categorySlug: 'food',
       placeSlug: 'sao-paulo',
       title: 'Cafe bom',
-    });
+    }, 'test-token');
 
     expect(note).toEqual({
+      author: { displayName: 'Thiago', id: 'author-1' },
       body: 'Tem pao de queijo decente.',
       categorySlug: 'food',
       createdAt: 1782993600000,
@@ -118,7 +119,7 @@ describe('notes API client', () => {
         categorySlug: 'food',
         placeSlug: 'sao-paulo',
         title: 'Cafe bom',
-      }),
+      }, 'test-token'),
     ).rejects.toMatchObject(new APIRequestError(httpStatusBadRequest));
   });
 
@@ -129,6 +130,7 @@ describe('notes API client', () => {
 
     expect(notes).toEqual([
       {
+        author: { displayName: 'Thiago', id: 'author-1' },
         body: 'Tem pao de queijo decente.',
         categorySlug: 'food',
         createdAt: 1782993600000,
@@ -192,6 +194,7 @@ describe('notes API client', () => {
     const note = await getNote(exampleNoteID);
 
     expect(note).toEqual({
+      author: { displayName: 'Thiago', id: 'author-1' },
       body: 'Tem pao de queijo decente.',
       categorySlug: 'food',
       createdAt: 1782993600000,
@@ -286,6 +289,7 @@ describe('notes API client', () => {
 
     expect(notes).toEqual([
       {
+        author: { displayName: 'Thiago', id: 'author-1' },
         body: 'Tem pao de queijo decente.',
         categorySlug: 'food',
         createdAt: 1782993600000,
@@ -403,6 +407,7 @@ function apiListNotesResponse(): ListNotesResponse {
 
 function apiNote(overrides: Partial<NoteResponse> = {}): NoteResponse {
   return {
+    author: { display_name: 'Thiago', id: 'author-1' },
     body: 'Tem pao de queijo decente.',
     category_slug: 'food',
     created_at: 1782993600000,

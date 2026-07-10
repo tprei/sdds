@@ -7,6 +7,7 @@ import (
 
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
+	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 const recentNotesLimit = note.ListDefaultLimit
@@ -51,12 +52,18 @@ func (handler server) GetNote(w http.ResponseWriter, r *http.Request, noteID str
 }
 
 func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {
+	current, ok := currentSessionFromContext(r.Context())
+	if !ok {
+		writeUnauthenticated(w)
+		return
+	}
+
 	var request openapi.CreateNoteRequest
 	if !decodeJSONRequest(w, r, maxCreateNoteRequestBytes, &request) {
 		return
 	}
 
-	input := createNoteInput(request)
+	input := createNoteInput(request, current.User.ID)
 	if problems := note.ValidateCreateInput(input); len(problems) > 0 {
 		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, problems))
 		return
@@ -123,12 +130,13 @@ func listNotesInput(params openapi.ListNotesParams) note.ListInput {
 	})
 }
 
-func createNoteInput(request openapi.CreateNoteRequest) note.CreateInput {
+func createNoteInput(request openapi.CreateNoteRequest, userID user.UserID) note.CreateInput {
 	placeSlug := note.PlaceSlug("")
 	if request.PlaceSlug != nil {
 		placeSlug = note.PlaceSlug(*request.PlaceSlug)
 	}
 	return note.NormalizeCreateInput(note.CreateInput{
+		UserID:       userID,
 		Title:        request.Title,
 		Body:         request.Body,
 		CategorySlug: note.CategorySlug(request.CategorySlug),
@@ -208,7 +216,11 @@ func newNoteResponse(found note.Note) openapi.Note {
 		Body:         found.Body,
 		CategorySlug: openapi.CategorySlug(found.CategorySlug),
 		PlaceSlug:    placeSlugPointer,
-		CreatedAt:    found.CreatedAt.UTC().UnixMilli(),
-		UpdatedAt:    found.UpdatedAt.UTC().UnixMilli(),
+		Author: openapi.AuthorSummary{
+			Id:          string(found.Author.ID),
+			DisplayName: found.Author.DisplayName,
+		},
+		CreatedAt: found.CreatedAt.UTC().UnixMilli(),
+		UpdatedAt: found.UpdatedAt.UTC().UnixMilli(),
 	}
 }

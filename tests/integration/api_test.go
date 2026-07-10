@@ -70,6 +70,7 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	if len(initialNotes.Notes) != 0 {
 		t.Fatalf("initial note count = %d, want 0", len(initialNotes.Notes))
 	}
+	requireUnauthenticatedCreateNote(t, client)
 
 	selectedPlace := "sao-paulo"
 	request := openapi.CreateNoteJSONRequestBody{
@@ -78,38 +79,38 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		CategorySlug: "food",
 		PlaceSlug:    &selectedPlace,
 	}
-	created := createNote(t, client, request)
-	requireCreatedNote(t, created, request)
+	created := createNote(t, client, loggedInSession.Token, request)
+	requireCreatedNote(t, created, request, loggedInSession.User.Author)
 
 	requestWithoutPlace := openapi.CreateNoteJSONRequestBody{
 		Title:        "Dica sem lugar",
 		Body:         "Serve para qualquer lugar mundial.",
 		CategorySlug: "travel",
 	}
-	createdWithoutPlace := createNote(t, client, requestWithoutPlace)
-	requireCreatedNote(t, createdWithoutPlace, requestWithoutPlace)
+	createdWithoutPlace := createNote(t, client, loggedInSession.Token, requestWithoutPlace)
+	requireCreatedNote(t, createdWithoutPlace, requestWithoutPlace, loggedInSession.User.Author)
 
 	updatedNotes := listNotes(t, client)
 	if len(updatedNotes.Notes) != 2 {
 		t.Fatalf("updated note count = %d, want 2", len(updatedNotes.Notes))
 	}
-	requireListedNote(t, updatedNotes, created.Id, request)
-	requireListedNote(t, updatedNotes, createdWithoutPlace.Id, requestWithoutPlace)
+	requireListedNote(t, updatedNotes, created.Id, request, loggedInSession.User.Author)
+	requireListedNote(t, updatedNotes, createdWithoutPlace.Id, requestWithoutPlace, loggedInSession.User.Author)
 
 	foodNotes := listNotesByCategory(t, client, "food")
 	if len(foodNotes.Notes) != 1 {
 		t.Fatalf("food note count = %d, want 1", len(foodNotes.Notes))
 	}
-	requireListedNote(t, foodNotes, created.Id, request)
+	requireListedNote(t, foodNotes, created.Id, request, loggedInSession.User.Author)
 
 	travelNotes := listNotesByCategory(t, client, "travel")
 	if len(travelNotes.Notes) != 1 {
 		t.Fatalf("travel note count = %d, want 1", len(travelNotes.Notes))
 	}
-	requireListedNote(t, travelNotes, createdWithoutPlace.Id, requestWithoutPlace)
+	requireListedNote(t, travelNotes, createdWithoutPlace.Id, requestWithoutPlace, loggedInSession.User.Author)
 
 	fetched := getNote(t, client, created.Id)
-	requireCreatedNote(t, fetched, request)
+	requireCreatedNote(t, fetched, request, loggedInSession.User.Author)
 	if fetched.Id != created.Id {
 		t.Fatalf("fetched note id = %q, want %q", fetched.Id, created.Id)
 	}
@@ -121,7 +122,7 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	}
 
 	fetchedWithoutPlace := getNote(t, client, createdWithoutPlace.Id)
-	requireCreatedNote(t, fetchedWithoutPlace, requestWithoutPlace)
+	requireCreatedNote(t, fetchedWithoutPlace, requestWithoutPlace, loggedInSession.User.Author)
 	if fetchedWithoutPlace.Id != createdWithoutPlace.Id {
 		t.Fatalf("fetched note without place id = %q, want %q", fetchedWithoutPlace.Id, createdWithoutPlace.Id)
 	}
@@ -133,7 +134,7 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	if len(searchResults.Notes) != 1 {
 		t.Fatalf("search note count = %d, want 1", len(searchResults.Notes))
 	}
-	requireCreatedNote(t, searchResults.Notes[0], request)
+	requireCreatedNote(t, searchResults.Notes[0], request, loggedInSession.User.Author)
 	if searchResults.Notes[0].Id != created.Id {
 		t.Fatalf("search note id = %q, want %q", searchResults.Notes[0].Id, created.Id)
 	}
@@ -142,7 +143,7 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	if len(searchResultsWithoutPlace.Notes) != 1 {
 		t.Fatalf("search note without place count = %d, want 1", len(searchResultsWithoutPlace.Notes))
 	}
-	requireCreatedNote(t, searchResultsWithoutPlace.Notes[0], requestWithoutPlace)
+	requireCreatedNote(t, searchResultsWithoutPlace.Notes[0], requestWithoutPlace, loggedInSession.User.Author)
 	if searchResultsWithoutPlace.Notes[0].Id != createdWithoutPlace.Id {
 		t.Fatalf("search note without place id = %q, want %q", searchResultsWithoutPlace.Notes[0].Id, createdWithoutPlace.Id)
 	}
@@ -151,7 +152,7 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	if len(filteredSearchResults.Notes) != 1 {
 		t.Fatalf("filtered search note count = %d, want 1", len(filteredSearchResults.Notes))
 	}
-	requireCreatedNote(t, filteredSearchResults.Notes[0], requestWithoutPlace)
+	requireCreatedNote(t, filteredSearchResults.Notes[0], requestWithoutPlace, loggedInSession.User.Author)
 
 	emptyFilteredSearchResults := searchNotesByCategory(t, client, "mundial", "food")
 	if len(emptyFilteredSearchResults.Notes) != 0 {
@@ -168,7 +169,7 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		Body:         "Massa boa.",
 		CategorySlug: "food",
 	}
-	accentNote := createNote(t, client, accentRequest)
+	accentNote := createNote(t, client, loggedInSession.Token, accentRequest)
 	accentResults := searchNotes(t, client, "pao ftsaccent48")
 	requireOnlySearchNoteIDs(t, accentResults, []string{accentNote.Id})
 
@@ -177,13 +178,13 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		Body:         "Encontro certo.",
 		CategorySlug: "food",
 	}
-	strictBothNote := createNote(t, client, strictBothRequest)
-	createNote(t, client, openapi.CreateNoteJSONRequestBody{
+	strictBothNote := createNote(t, client, loggedInSession.Token, strictBothRequest)
+	createNote(t, client, loggedInSession.Token, openapi.CreateNoteJSONRequestBody{
 		Title:        "strictcafe48",
 		Body:         "Falta o segundo termo.",
 		CategorySlug: "food",
 	})
-	createNote(t, client, openapi.CreateNoteJSONRequestBody{
+	createNote(t, client, loggedInSession.Token, openapi.CreateNoteJSONRequestBody{
 		Title:        "strictpao48",
 		Body:         "Falta o primeiro termo.",
 		CategorySlug: "food",
@@ -196,13 +197,13 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		Body:         "Nota mais antiga.",
 		CategorySlug: "food",
 	}
-	titleRankNote := createNote(t, client, titleRankRequest)
+	titleRankNote := createNote(t, client, loggedInSession.Token, titleRankRequest)
 	bodyRankRequest := openapi.CreateNoteJSONRequestBody{
 		Title:        "Bolo curto",
 		Body:         "rankbolo48.",
 		CategorySlug: "food",
 	}
-	bodyRankNote := createNote(t, client, bodyRankRequest)
+	bodyRankNote := createNote(t, client, loggedInSession.Token, bodyRankRequest)
 	rankedResults := searchNotes(t, client, "rankbolo48")
 	requireOnlySearchNoteIDs(t, rankedResults, []string{titleRankNote.Id, bodyRankNote.Id})
 
@@ -211,8 +212,8 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		Body:         "Filtro de categoria.",
 		CategorySlug: "food",
 	}
-	categoryFoodNote := createNote(t, client, categoryFoodRequest)
-	createNote(t, client, openapi.CreateNoteJSONRequestBody{
+	categoryFoodNote := createNote(t, client, loggedInSession.Token, categoryFoodRequest)
+	createNote(t, client, loggedInSession.Token, openapi.CreateNoteJSONRequestBody{
 		Title:        "catbusca48 viagem",
 		Body:         "Mesmo termo fora da categoria.",
 		CategorySlug: "travel",
@@ -227,13 +228,13 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		CategorySlug: "travel",
 		PlaceSlug:    &globalPlace,
 	}
-	globalWithPlaceNote := createNote(t, client, globalWithPlaceRequest)
+	globalWithPlaceNote := createNote(t, client, loggedInSession.Token, globalWithPlaceRequest)
 	globalWithoutPlaceRequest := openapi.CreateNoteJSONRequestBody{
 		Title:        "globalbusca48 sem lugar",
 		Body:         "Tambem aparece na busca global.",
 		CategorySlug: "travel",
 	}
-	globalWithoutPlaceNote := createNote(t, client, globalWithoutPlaceRequest)
+	globalWithoutPlaceNote := createNote(t, client, loggedInSession.Token, globalWithoutPlaceRequest)
 	globalResults := searchNotes(t, client, "globalbusca48")
 	requireSearchNoteIDs(t, globalResults, []string{globalWithPlaceNote.Id, globalWithoutPlaceNote.Id})
 
@@ -242,13 +243,34 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		Body:         "Pontuacao nao muda a busca.",
 		CategorySlug: "food",
 	}
-	punctuationNote := createNote(t, client, punctuationRequest)
+	punctuationNote := createNote(t, client, loggedInSession.Token, punctuationRequest)
 	punctuationResults := searchNotes(t, client, "pontoseguro48 ***")
 	requireOnlySearchNoteIDs(t, punctuationResults, []string{punctuationNote.Id})
 
 	punctuationOnlyResults := searchNotes(t, client, "!!! *** ()")
 	if len(punctuationOnlyResults.Notes) != 0 {
 		t.Fatalf("punctuation-only search note count = %d, want 0", len(punctuationOnlyResults.Notes))
+	}
+
+	secondUsername := fmt.Sprintf("luiza-%d", time.Now().UnixNano())
+	secondDisplayName := "Luiza Integração"
+	secondSession := createAuthUser(t, client, openapi.CreateAuthUserJSONRequestBody{
+		Username:    secondUsername,
+		Password:    password,
+		DisplayName: secondDisplayName,
+	})
+	requireAuthSession(t, secondSession, secondUsername, secondDisplayName)
+	secondUserRequest := openapi.CreateNoteJSONRequestBody{
+		Title:        "Segunda autora",
+		Body:         "Nota de outra pessoa.",
+		CategorySlug: "finds",
+	}
+	secondUserNote := createNote(t, client, secondSession.Token, secondUserRequest)
+	requireCreatedNote(t, secondUserNote, secondUserRequest, secondSession.User.Author)
+	requireCreatedNote(t, getNote(t, client, created.Id), request, loggedInSession.User.Author)
+	requireCreatedNote(t, getNote(t, client, secondUserNote.Id), secondUserRequest, secondSession.User.Author)
+	if secondSession.User.Author.Id == loggedInSession.User.Author.Id {
+		t.Fatal("second user author id matches first user author id")
 	}
 
 	requireListNotesCategoryFilterError(t, client, "comida")
@@ -372,10 +394,10 @@ func listNotesByCategory(t *testing.T, client *openapi.ClientWithResponses, cate
 	return *response.JSON200
 }
 
-func createNote(t *testing.T, client *openapi.ClientWithResponses, request openapi.CreateNoteJSONRequestBody) openapi.Note {
+func createNote(t *testing.T, client *openapi.ClientWithResponses, token string, request openapi.CreateNoteJSONRequestBody) openapi.Note {
 	t.Helper()
 
-	response, err := client.CreateNoteWithResponse(context.Background(), request)
+	response, err := client.CreateNoteWithResponse(context.Background(), request, bearerTokenEditor(token))
 	if err != nil {
 		t.Fatalf("POST /v1/notes: %v", err)
 	}
@@ -384,6 +406,26 @@ func createNote(t *testing.T, client *openapi.ClientWithResponses, request opena
 		t.Fatal("POST /v1/notes returned 201 without JSON body")
 	}
 	return *response.JSON201
+}
+
+func requireUnauthenticatedCreateNote(t *testing.T, client *openapi.ClientWithResponses) {
+	t.Helper()
+
+	response, err := client.CreateNoteWithResponse(context.Background(), openapi.CreateNoteJSONRequestBody{
+		Title:        "Nota sem sessão",
+		Body:         "Não deveria publicar.",
+		CategorySlug: "food",
+	})
+	if err != nil {
+		t.Fatalf("POST /v1/notes unauthenticated: %v", err)
+	}
+	requireStatus(t, "POST /v1/notes unauthenticated", response.StatusCode(), http.StatusUnauthorized, response.Body)
+	if response.JSON401 == nil {
+		t.Fatal("POST /v1/notes unauthenticated returned 401 without JSON body")
+	}
+	if response.JSON401.Code != openapi.ErrorCodeUnauthenticated {
+		t.Fatalf("unauthenticated code = %s, want %s", response.JSON401.Code, openapi.ErrorCodeUnauthenticated)
+	}
 }
 
 func createAuthUser(t *testing.T, client *openapi.ClientWithResponses, request openapi.CreateAuthUserJSONRequestBody) openapi.AuthSessionResponse {
@@ -639,7 +681,7 @@ func requireCurrentSession(t *testing.T, got openapi.CurrentSessionResponse, wan
 	}
 }
 
-func requireCreatedNote(t *testing.T, got openapi.Note, want openapi.CreateNoteRequest) {
+func requireCreatedNote(t *testing.T, got openapi.Note, want openapi.CreateNoteRequest, wantAuthor openapi.AuthorSummary) {
 	t.Helper()
 
 	if got.Id == "" {
@@ -657,14 +699,17 @@ func requireCreatedNote(t *testing.T, got openapi.Note, want openapi.CreateNoteR
 	if got.UpdatedAt <= 0 {
 		t.Fatalf("updated_at = %d, want positive timestamp", got.UpdatedAt)
 	}
+	if diff := cmp.Diff(wantAuthor, got.Author); diff != "" {
+		t.Fatalf("note author mismatch (-want +got):\n%s", diff)
+	}
 }
 
-func requireListedNote(t *testing.T, notes openapi.ListNotesResponse, id string, want openapi.CreateNoteRequest) {
+func requireListedNote(t *testing.T, notes openapi.ListNotesResponse, id string, want openapi.CreateNoteRequest, wantAuthor openapi.AuthorSummary) {
 	t.Helper()
 
 	for _, listedNote := range notes.Notes {
 		if listedNote.Id == id {
-			requireCreatedNote(t, listedNote, want)
+			requireCreatedNote(t, listedNote, want, wantAuthor)
 			return
 		}
 	}

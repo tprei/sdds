@@ -97,7 +97,7 @@ The first product endpoints are:
 - `GET /v1/auth/session` returns the current bearer session.
 - `DELETE /v1/auth/session` revokes the current bearer session.
 - `GET /v1/notes` returns recent notes.
-- `POST /v1/notes` creates a note with `title`, `body`, `category_slug`, and optional `place_slug`.
+- `POST /v1/notes` creates a note with `title`, `body`, `category_slug`, and optional `place_slug`; it requires a bearer session.
 
 ### Data
 

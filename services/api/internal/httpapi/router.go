@@ -64,7 +64,8 @@ func newRouter(
 ) http.Handler {
 	router := chi.NewRouter()
 	router.Use(localBrowserCORS)
-	router.Use(openAPIRequestValidator())
+	validateOpenAPIRequest := openAPIRequestValidator()
+	requireCurrentSession := requireAuth(users, clock)
 
 	authRateLimiters := newAuthRateLimiters(authLimits, clock)
 	handler := server{
@@ -82,19 +83,26 @@ func newRouter(
 		ErrorHandlerFunc: writeGeneratedOpenAPIError,
 	}
 
-	router.Get("/healthz", wrapper.GetHealth)
-	router.Get("/readyz", wrapper.GetReadiness)
+	router.With(validateOpenAPIRequest).Get("/healthz", wrapper.GetHealth)
+	router.With(validateOpenAPIRequest).Get("/readyz", wrapper.GetReadiness)
 	router.Route("/v1", func(router chi.Router) {
-		router.Get("/categories", wrapper.ListCategories)
-		router.Get("/places", wrapper.ListPlaces)
-		router.Get("/notes", wrapper.ListNotes)
-		router.Post("/notes", wrapper.CreateNote)
-		router.Get("/notes/{note_id}", wrapper.GetNote)
-		router.Get("/search/notes", wrapper.SearchNotes)
-		router.Post("/auth/users", wrapper.CreateAuthUser)
-		router.Post("/auth/sessions", wrapper.CreateAuthSession)
-		router.With(requireAuth(users, clock)).Get("/auth/session", wrapper.GetAuthSession)
-		router.With(requireAuth(users, clock)).Delete("/auth/session", wrapper.DeleteAuthSession)
+		router.Group(func(router chi.Router) {
+			router.Use(validateOpenAPIRequest)
+			router.Get("/categories", wrapper.ListCategories)
+			router.Get("/places", wrapper.ListPlaces)
+			router.Get("/notes", wrapper.ListNotes)
+			router.Get("/notes/{note_id}", wrapper.GetNote)
+			router.Get("/search/notes", wrapper.SearchNotes)
+			router.Post("/auth/users", wrapper.CreateAuthUser)
+			router.Post("/auth/sessions", wrapper.CreateAuthSession)
+		})
+		router.Group(func(router chi.Router) {
+			router.Use(requireCurrentSession)
+			router.Use(validateOpenAPIRequest)
+			router.Post("/notes", wrapper.CreateNote)
+			router.Get("/auth/session", wrapper.GetAuthSession)
+			router.Delete("/auth/session", wrapper.DeleteAuthSession)
+		})
 	})
 
 	return router

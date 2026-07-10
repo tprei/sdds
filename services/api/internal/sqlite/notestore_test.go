@@ -10,11 +10,22 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tprei/sdds/services/api/internal/note"
+	"github.com/tprei/sdds/services/api/internal/user"
+)
+
+const (
+	systemNoteOwnerUserID   user.UserID   = "00000000-0000-7000-8000-000000000001"
+	systemNoteOwnerAuthorID user.AuthorID = "00000000-0000-7000-8000-000000000002"
+	testNoteAuthorUserID    user.UserID   = "00000000-0000-7000-8000-000000000101"
+	testNoteAuthorID        user.AuthorID = "00000000-0000-7000-8000-000000000201"
+	otherNoteAuthorUserID   user.UserID   = "00000000-0000-7000-8000-000000000102"
+	otherNoteAuthorID       user.AuthorID = "00000000-0000-7000-8000-000000000202"
 )
 
 func TestNoteStoreCreatesAndListsRecentNotes(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	times := []time.Time{
 		time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
@@ -28,6 +39,7 @@ func TestNoteStoreCreatesAndListsRecentNotes(t *testing.T) {
 	})
 
 	first, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Café com pão de queijo",
 		Body:         "Bom para trabalhar de manhã.",
 		CategorySlug: "food",
@@ -38,6 +50,7 @@ func TestNoteStoreCreatesAndListsRecentNotes(t *testing.T) {
 	}
 
 	second, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Necessaire de viagem",
 		Body:         "Cabe tudo e não vaza.",
 		CategorySlug: "travel",
@@ -63,11 +76,125 @@ func TestNoteStoreCreatesAndListsRecentNotes(t *testing.T) {
 	if found[0].CreatedAt != times[1] {
 		t.Fatalf("created_at = %s, want %s", found[0].CreatedAt, times[1])
 	}
+	if found[0].UserID != author.UserID {
+		t.Fatalf("user id = %q, want %q", found[0].UserID, author.UserID)
+	}
+	if diff := cmp.Diff(author.Summary, found[0].Author); diff != "" {
+		t.Fatalf("author mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestNoteStoreCreatesNoteWithOwnerAndAuthor(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
+
+	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
+	store := newNoteStore(db, func() time.Time {
+		return now
+	})
+
+	created, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
+		Title:        "Café com pão de queijo",
+		Body:         "Bom para trabalhar de manhã.",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
+	})
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	if created.UserID != author.UserID {
+		t.Fatalf("created user id = %q, want %q", created.UserID, author.UserID)
+	}
+	if diff := cmp.Diff(author.Summary, created.Author); diff != "" {
+		t.Fatalf("created author mismatch (-want +got):\n%s", diff)
+	}
+
+	var storedUserID string
+	if err := db.QueryRowContext(ctx, `SELECT user_id FROM notes WHERE id = ?`, created.ID).Scan(&storedUserID); err != nil {
+		t.Fatalf("query stored user id: %v", err)
+	}
+	if storedUserID != string(author.UserID) {
+		t.Fatalf("stored user id = %q, want %q", storedUserID, author.UserID)
+	}
+}
+
+func TestNoteStoreKeepsDistinctUsersAndAuthors(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	firstAuthor := seedDefaultNoteAuthor(t, ctx, db)
+	secondAuthor := seedNoteAuthor(t, ctx, db, otherNoteAuthorUserID, otherNoteAuthorID, "Luiza")
+
+	times := []time.Time{
+		time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
+		time.Date(2026, 7, 2, 12, 1, 0, 0, time.UTC),
+	}
+	index := 0
+	store := newNoteStore(db, func() time.Time {
+		current := times[index]
+		index++
+		return current
+	})
+
+	first, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       firstAuthor.UserID,
+		Title:        "Café bom",
+		Body:         "Tem pão de queijo decente.",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
+	})
+	if err != nil {
+		t.Fatalf("create first note: %v", err)
+	}
+
+	second, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       secondAuthor.UserID,
+		Title:        "Restaurante honesto",
+		Body:         "Barato e perto do metrô.",
+		CategorySlug: "food",
+		PlaceSlug:    "sao-paulo",
+	})
+	if err != nil {
+		t.Fatalf("create second note: %v", err)
+	}
+
+	found, err := store.ListRecentNotes(ctx, note.ListInput{Limit: 10})
+	if err != nil {
+		t.Fatalf("list notes: %v", err)
+	}
+
+	type ownerAndAuthor struct {
+		UserID user.UserID
+		Author note.AuthorSummary
+	}
+	got := make(map[string]ownerAndAuthor, len(found))
+	for _, foundNote := range found {
+		got[foundNote.ID] = ownerAndAuthor{
+			UserID: foundNote.UserID,
+			Author: foundNote.Author,
+		}
+	}
+	want := map[string]ownerAndAuthor{
+		first.ID: {
+			UserID: firstAuthor.UserID,
+			Author: firstAuthor.Summary,
+		},
+		second.ID: {
+			UserID: secondAuthor.UserID,
+			Author: secondAuthor.Summary,
+		},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("note owners mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func TestNoteStoreListsRecentNotesByCategory(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	times := []time.Time{
 		time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
@@ -82,6 +209,7 @@ func TestNoteStoreListsRecentNotesByCategory(t *testing.T) {
 	})
 
 	olderFood, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Café com pão de queijo",
 		Body:         "Bom para trabalhar de manhã.",
 		CategorySlug: "food",
@@ -92,6 +220,7 @@ func TestNoteStoreListsRecentNotesByCategory(t *testing.T) {
 	}
 
 	if _, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Necessaire de viagem",
 		Body:         "Cabe tudo e não vaza.",
 		CategorySlug: "travel",
@@ -101,6 +230,7 @@ func TestNoteStoreListsRecentNotesByCategory(t *testing.T) {
 	}
 
 	newerFood, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Padaria boa",
 		Body:         "Tem bolo simples.",
 		CategorySlug: "food",
@@ -128,6 +258,7 @@ func TestNoteStoreListsRecentNotesByCategory(t *testing.T) {
 func TestNoteStoreFindsNoteByID(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	store := newNoteStore(db, func() time.Time {
@@ -135,6 +266,7 @@ func TestNoteStoreFindsNoteByID(t *testing.T) {
 	})
 
 	created, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Café com pão de queijo",
 		Body:         "Bom para trabalhar de manhã.",
 		CategorySlug: "food",
@@ -168,9 +300,11 @@ func TestNoteStoreFindsUnknownNoteAsNotFound(t *testing.T) {
 func TestNoteStoreSearchesNoteTitles(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	store := NewNoteStore(db)
 	created, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Café com pão de queijo",
 		Body:         "Bom para trabalhar de manhã.",
 		CategorySlug: "food",
@@ -193,14 +327,20 @@ func TestNoteStoreSearchesNoteTitles(t *testing.T) {
 	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
 		t.Fatalf("search note ids mismatch (-want +got):\n%s", diff)
 	}
+	wantAuthor := author.Summary
+	if diff := cmp.Diff(wantAuthor, found[0].Author); diff != "" {
+		t.Fatalf("search author mismatch (-want +got):\n%s", diff)
+	}
 }
 
 func TestNoteStoreSearchesNoteBodies(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	store := NewNoteStore(db)
 	created, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Lugar bom",
 		Body:         "Tem brigadeiro decente.",
 		CategorySlug: "food",
@@ -228,6 +368,7 @@ func TestNoteStoreSearchesNoteBodies(t *testing.T) {
 func TestNoteStoreSearchesNotesByCategory(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	times := []time.Time{
 		time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
@@ -242,6 +383,7 @@ func TestNoteStoreSearchesNotesByCategory(t *testing.T) {
 	})
 
 	olderFood, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Café bom",
 		Body:         "Balcao simpatico.",
 		CategorySlug: "food",
@@ -252,6 +394,7 @@ func TestNoteStoreSearchesNotesByCategory(t *testing.T) {
 	}
 
 	if _, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Café bom",
 		Body:         "Balcao simpatico.",
 		CategorySlug: "travel",
@@ -261,6 +404,7 @@ func TestNoteStoreSearchesNotesByCategory(t *testing.T) {
 	}
 
 	newerFood, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Café bom",
 		Body:         "Balcao simpatico.",
 		CategorySlug: "food",
@@ -289,9 +433,11 @@ func TestNoteStoreSearchesNotesByCategory(t *testing.T) {
 func TestNoteStoreSearchReturnsEmptyResults(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	store := NewNoteStore(db)
 	if _, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Café com pão de queijo",
 		Body:         "Bom para trabalhar de manhã.",
 		CategorySlug: "food",
@@ -315,6 +461,7 @@ func TestNoteStoreSearchReturnsEmptyResults(t *testing.T) {
 func TestNoteStoreSearchRanksTitleMatchesAheadOfBodyMatches(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	times := []time.Time{
 		time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
@@ -328,6 +475,7 @@ func TestNoteStoreSearchRanksTitleMatchesAheadOfBodyMatches(t *testing.T) {
 	})
 
 	titleMatch, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Brigadeiro roteiro enorme com muitas palavras extras para alongar o titulo e reduzir relevancia sem peso",
 		Body:         "Docinho antigo.",
 		CategorySlug: "food",
@@ -338,6 +486,7 @@ func TestNoteStoreSearchRanksTitleMatchesAheadOfBodyMatches(t *testing.T) {
 	}
 
 	bodyMatch, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Mesa curta",
 		Body:         "Brigadeiro.",
 		CategorySlug: "food",
@@ -365,9 +514,11 @@ func TestNoteStoreSearchRanksTitleMatchesAheadOfBodyMatches(t *testing.T) {
 func TestNoteStoreSearchRequiresEveryToken(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	store := NewNoteStore(db)
 	bothTokenMatch, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Cafe com pao",
 		Body:         "Padaria boa.",
 		CategorySlug: "food",
@@ -378,6 +529,7 @@ func TestNoteStoreSearchRequiresEveryToken(t *testing.T) {
 	}
 
 	if _, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Cafe honesto",
 		Body:         "Abre cedo.",
 		CategorySlug: "food",
@@ -387,6 +539,7 @@ func TestNoteStoreSearchRequiresEveryToken(t *testing.T) {
 	}
 
 	if _, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Pao bom",
 		Body:         "Sai quente.",
 		CategorySlug: "food",
@@ -413,9 +566,11 @@ func TestNoteStoreSearchRequiresEveryToken(t *testing.T) {
 func TestNoteStoreSearchReturnsEmptyForPunctuationOnlyQuery(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	store := NewNoteStore(db)
 	if _, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Café com pão de queijo",
 		Body:         "Bom para trabalhar de manhã.",
 		CategorySlug: "food",
@@ -439,6 +594,7 @@ func TestNoteStoreSearchReturnsEmptyForPunctuationOnlyQuery(t *testing.T) {
 func TestNoteStoreSearchOrdersTiesByRecency(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	times := []time.Time{
 		time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
@@ -452,6 +608,7 @@ func TestNoteStoreSearchOrdersTiesByRecency(t *testing.T) {
 	})
 
 	older, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Café bom",
 		Body:         "Um achado de bairro.",
 		CategorySlug: "food",
@@ -462,6 +619,7 @@ func TestNoteStoreSearchOrdersTiesByRecency(t *testing.T) {
 	}
 
 	newer, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Café bom",
 		Body:         "Um achado de bairro.",
 		CategorySlug: "food",
@@ -489,9 +647,11 @@ func TestNoteStoreSearchOrdersTiesByRecency(t *testing.T) {
 func TestNoteStoreSearchMatchesAccentedText(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	store := NewNoteStore(db)
 	created, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Café bom",
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: "food",
@@ -519,9 +679,11 @@ func TestNoteStoreSearchMatchesAccentedText(t *testing.T) {
 func TestNoteStoreSearchIgnoresFTSOperatorsFromUserInput(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	store := NewNoteStore(db)
 	created, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Restaurante brasileiro",
 		Body:         "Barato em Dublin 12.",
 		CategorySlug: "food",
@@ -560,6 +722,7 @@ func TestNoteStoreSearchIgnoresFTSOperatorsFromUserInput(t *testing.T) {
 func TestNoteStoreRespectsRecentLimit(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	store := newNoteStore(db, func() time.Time {
 		return time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
@@ -567,6 +730,7 @@ func TestNoteStoreRespectsRecentLimit(t *testing.T) {
 
 	for _, title := range []string{"Primeira nota", "Segunda nota"} {
 		if _, err := store.CreateNote(ctx, note.CreateInput{
+			UserID:       author.UserID,
 			Title:        title,
 			Body:         "Um corpo de nota.",
 			CategorySlug: "finds",
@@ -588,6 +752,7 @@ func TestNoteStoreRespectsRecentLimit(t *testing.T) {
 func TestNoteStoreListsFractionalSecondNotesInRecentOrder(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	times := []time.Time{
 		time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
@@ -601,6 +766,7 @@ func TestNoteStoreListsFractionalSecondNotesInRecentOrder(t *testing.T) {
 	})
 
 	older, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Nota exata",
 		Body:         "Criada no segundo exato.",
 		CategorySlug: "food",
@@ -611,6 +777,7 @@ func TestNoteStoreListsFractionalSecondNotesInRecentOrder(t *testing.T) {
 	}
 
 	newer, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Nota fracionada",
 		Body:         "Criada um pouco depois.",
 		CategorySlug: "food",
@@ -638,6 +805,7 @@ func TestNoteStoreListsFractionalSecondNotesInRecentOrder(t *testing.T) {
 func TestNoteStoreStoresUnixMillisecondTimestamps(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	now := time.Date(2026, 7, 2, 12, 0, 0, 123_456_789, time.UTC)
 	store := newNoteStore(db, func() time.Time {
@@ -645,6 +813,7 @@ func TestNoteStoreStoresUnixMillisecondTimestamps(t *testing.T) {
 	})
 
 	created, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Café bom",
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: note.CategorySlugFood,
@@ -672,9 +841,11 @@ func TestNoteStoreStoresUnixMillisecondTimestamps(t *testing.T) {
 func TestNoteStoreRejectsUnknownCategory(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	store := NewNoteStore(db)
 	_, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Produto bom",
 		Body:         "Funcionou bem.",
 		CategorySlug: "qualquer-coisa",
@@ -691,9 +862,11 @@ func TestNoteStoreRejectsUnknownCategory(t *testing.T) {
 func TestNoteStoreRejectsUnknownPlace(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
+	author := seedDefaultNoteAuthor(t, ctx, db)
 
 	store := NewNoteStore(db)
 	_, err := store.CreateNote(ctx, note.CreateInput{
+		UserID:       author.UserID,
 		Title:        "Produto bom",
 		Body:         "Funcionou bem.",
 		CategorySlug: "finds",
@@ -713,6 +886,52 @@ func noteIDs(notes []note.Note) []string {
 		ids = append(ids, found.ID)
 	}
 	return ids
+}
+
+type testNoteAuthor struct {
+	UserID  user.UserID
+	Summary note.AuthorSummary
+}
+
+func seedDefaultNoteAuthor(t *testing.T, ctx context.Context, db *sql.DB) testNoteAuthor {
+	t.Helper()
+
+	return seedNoteAuthor(t, ctx, db, testNoteAuthorUserID, testNoteAuthorID, "Thiago")
+}
+
+func seedNoteAuthor(t *testing.T, ctx context.Context, db *sql.DB, userID user.UserID, authorID user.AuthorID, displayName string) testNoteAuthor {
+	t.Helper()
+
+	const createdAt int64 = 1782993600000
+	if _, err := db.ExecContext(
+		ctx,
+		`INSERT INTO users (id, state, created_at, updated_at) VALUES (?, ?, ?, ?)`,
+		userID,
+		user.UserStateActive,
+		createdAt,
+		createdAt,
+	); err != nil {
+		t.Fatalf("insert test user: %v", err)
+	}
+	if _, err := db.ExecContext(
+		ctx,
+		`INSERT INTO authors (id, user_id, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		authorID,
+		userID,
+		displayName,
+		createdAt,
+		createdAt,
+	); err != nil {
+		t.Fatalf("insert test author: %v", err)
+	}
+
+	return testNoteAuthor{
+		UserID: userID,
+		Summary: note.AuthorSummary{
+			ID:          authorID,
+			DisplayName: displayName,
+		},
+	}
 }
 
 func openMigratedDatabase(t *testing.T, ctx context.Context) *sql.DB {

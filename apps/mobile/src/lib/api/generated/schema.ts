@@ -258,6 +258,7 @@ export interface components {
             body: string;
             category_slug: components["schemas"]["CategorySlug"];
             place_slug: (string & components["schemas"]["PlaceSlug"]) | null;
+            author: components["schemas"]["AuthorSummary"];
             /**
              * Format: int64
              * @description Unix timestamp in milliseconds.
@@ -710,6 +711,15 @@ export interface operations {
             };
             /** @description The request JSON or note content is invalid. */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is missing a valid authenticated session. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

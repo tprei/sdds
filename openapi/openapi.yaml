@@ -296,6 +296,8 @@ paths:
       summary: Create a note
       tags:
         - Notes
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -311,6 +313,12 @@ paths:
                 $ref: "#/components/schemas/Note"
         "400":
           description: The request JSON or note content is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is missing a valid authenticated session.
           content:
             application/json:
               schema:
@@ -627,6 +635,7 @@ components:
         - body
         - category_slug
         - place_slug
+        - author
         - created_at
         - updated_at
       properties:
@@ -643,6 +652,8 @@ components:
           nullable: true
           allOf:
             - $ref: "#/components/schemas/PlaceSlug"
+        author:
+          $ref: "#/components/schemas/AuthorSummary"
         created_at:
           type: integer
           format: int64

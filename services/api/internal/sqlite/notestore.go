@@ -10,50 +10,106 @@ import (
 	"unicode"
 
 	"github.com/tprei/sdds/services/api/internal/note"
+	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 const (
 	insertNoteSQL = `
-		INSERT INTO notes (id, title, body, category_slug, place_slug, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	insertNoteSearchSQL = `
 		INSERT INTO note_search (note_id, title, body)
 		VALUES (?, ?, ?)
 	`
 	listRecentNotesSQL = `
-		SELECT id, title, body, category_slug, place_slug, created_at, updated_at
+		SELECT
+			notes.id,
+			notes.user_id,
+			notes.title,
+			notes.body,
+			notes.category_slug,
+			notes.place_slug,
+			authors.id,
+			authors.display_name,
+			notes.created_at,
+			notes.updated_at
 		FROM notes
-		ORDER BY created_at DESC, id DESC
+		JOIN authors ON authors.user_id = notes.user_id
+		ORDER BY notes.created_at DESC, notes.id DESC
 		LIMIT ?
 	`
 	listRecentNotesByCategorySQL = `
-		SELECT id, title, body, category_slug, place_slug, created_at, updated_at
+		SELECT
+			notes.id,
+			notes.user_id,
+			notes.title,
+			notes.body,
+			notes.category_slug,
+			notes.place_slug,
+			authors.id,
+			authors.display_name,
+			notes.created_at,
+			notes.updated_at
 		FROM notes
-		WHERE category_slug = ?
-		ORDER BY created_at DESC, id DESC
+		JOIN authors ON authors.user_id = notes.user_id
+		WHERE notes.category_slug = ?
+		ORDER BY notes.created_at DESC, notes.id DESC
 		LIMIT ?
 	`
 	findNoteSQL = `
-		SELECT id, title, body, category_slug, place_slug, created_at, updated_at
+		SELECT
+			notes.id,
+			notes.user_id,
+			notes.title,
+			notes.body,
+			notes.category_slug,
+			notes.place_slug,
+			authors.id,
+			authors.display_name,
+			notes.created_at,
+			notes.updated_at
 		FROM notes
-		WHERE id = ?
+		JOIN authors ON authors.user_id = notes.user_id
+		WHERE notes.id = ?
 	`
 	searchNotesOrderSQL = `
 		ORDER BY bm25(note_search, 0.0, 6.0, 1.0), notes.created_at DESC, notes.id DESC
 	`
 	searchNotesSQL = `
-		SELECT notes.id, notes.title, notes.body, notes.category_slug, notes.place_slug, notes.created_at, notes.updated_at
+		SELECT
+			notes.id,
+			notes.user_id,
+			notes.title,
+			notes.body,
+			notes.category_slug,
+			notes.place_slug,
+			authors.id,
+			authors.display_name,
+			notes.created_at,
+			notes.updated_at
 		FROM note_search
 		JOIN notes ON notes.id = note_search.note_id
+		JOIN authors ON authors.user_id = notes.user_id
 		WHERE note_search MATCH ?
 	` + searchNotesOrderSQL + `
 		LIMIT ?
 	`
 	searchNotesByCategorySQL = `
-		SELECT notes.id, notes.title, notes.body, notes.category_slug, notes.place_slug, notes.created_at, notes.updated_at
+		SELECT
+			notes.id,
+			notes.user_id,
+			notes.title,
+			notes.body,
+			notes.category_slug,
+			notes.place_slug,
+			authors.id,
+			authors.display_name,
+			notes.created_at,
+			notes.updated_at
 		FROM note_search
 		JOIN notes ON notes.id = note_search.note_id
+		JOIN authors ON authors.user_id = notes.user_id
 		WHERE note_search MATCH ?
 			AND notes.category_slug = ?
 	` + searchNotesOrderSQL + `
@@ -85,6 +141,7 @@ func (store *NoteStore) CreateNote(ctx context.Context, input note.CreateInput) 
 
 	created = note.Note{
 		ID:           id,
+		UserID:       input.UserID,
 		Title:        input.Title,
 		Body:         input.Body,
 		CategorySlug: input.CategorySlug,
@@ -107,6 +164,7 @@ func (store *NoteStore) CreateNote(ctx context.Context, input note.CreateInput) 
 		ctx,
 		insertNoteSQL,
 		created.ID,
+		created.UserID,
 		created.Title,
 		created.Body,
 		string(created.CategorySlug),
@@ -125,6 +183,11 @@ func (store *NoteStore) CreateNote(ctx context.Context, input note.CreateInput) 
 		created.Body,
 	); err != nil {
 		return note.Note{}, fmt.Errorf("insert note search: %w", err)
+	}
+
+	created, err = scanNoteRow(tx.QueryRowContext(ctx, findNoteSQL, created.ID))
+	if err != nil {
+		return note.Note{}, fmt.Errorf("load created note: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -268,27 +331,34 @@ func scanNoteRow(row *sql.Row) (note.Note, error) {
 
 func scanNoteValues(scan func(dest ...any) error) (note.Note, error) {
 	var found note.Note
+	var userID string
 	var categorySlug string
 	var placeSlug sql.NullString
+	var authorID string
 	var createdAt int64
 	var updatedAt int64
 
 	if err := scan(
 		&found.ID,
+		&userID,
 		&found.Title,
 		&found.Body,
 		&categorySlug,
 		&placeSlug,
+		&authorID,
+		&found.Author.DisplayName,
 		&createdAt,
 		&updatedAt,
 	); err != nil {
 		return note.Note{}, fmt.Errorf("scan note: %w", err)
 	}
 
+	found.UserID = user.UserID(userID)
 	found.CategorySlug = note.CategorySlug(categorySlug)
 	if placeSlug.Valid {
 		found.PlaceSlug = note.PlaceSlug(placeSlug.String)
 	}
+	found.Author.ID = user.AuthorID(authorID)
 	found.CreatedAt = timeFromUnixMillis(createdAt)
 	found.UpdatedAt = timeFromUnixMillis(updatedAt)
 	return found, nil

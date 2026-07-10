@@ -504,10 +504,13 @@ func TestAuthRequestsRejectOversizedBodies(t *testing.T) {
 }
 
 func TestAuthSessionRoutesRejectRequestBodies(t *testing.T) {
+	tokenHash := user.HashSessionToken("current-token")
 	router := newAuthTestRouter(t, fakeUserStore{
-		findCurrentSession: func(context.Context, string, time.Time) (user.CurrentSession, error) {
-			t.Fatal("FindCurrentSession should not be called")
-			return user.CurrentSession{}, nil
+		findCurrentSession: func(_ context.Context, gotTokenHash string, now time.Time) (user.CurrentSession, error) {
+			if gotTokenHash != tokenHash {
+				t.Fatalf("token hash = %q, want %q", gotTokenHash, tokenHash)
+			}
+			return authCurrentSession("thiago", "Thiago", tokenHash, now.Add(user.SessionLifetime)), nil
 		},
 	})
 

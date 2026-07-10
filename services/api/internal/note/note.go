@@ -4,21 +4,31 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 var ErrNoteNotFound = errors.New("note not found")
 
 type Note struct {
 	ID           string
+	UserID       user.UserID
 	Title        string
 	Body         string
 	CategorySlug CategorySlug
 	PlaceSlug    PlaceSlug
+	Author       AuthorSummary
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
 
+type AuthorSummary struct {
+	ID          user.AuthorID
+	DisplayName string
+}
+
 type CreateInput struct {
+	UserID       user.UserID
 	Title        string
 	Body         string
 	CategorySlug CategorySlug

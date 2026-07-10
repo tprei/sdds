@@ -14,7 +14,22 @@ import (
 )
 
 func newTestRouter(notes fakeNoteStore) http.Handler {
-	return NewRouter(notes, fakeCatalog{}, fakeUserStore{}, DefaultAuthLimits())
+	handler := NewRouter(notes, fakeCatalog{}, fakeUserStore{
+		findCurrentSession: func(_ context.Context, tokenHash string, _ time.Time) (user.CurrentSession, error) {
+			if tokenHash != user.HashSessionToken("current-token") {
+				return user.CurrentSession{}, user.ErrSessionNotFound
+			}
+			return user.CurrentSession{
+				Session: user.Session{UserID: "user-id-thiago", TokenHash: tokenHash},
+				User:    user.User{ID: "user-id-thiago", State: user.UserStateActive},
+				Author:  user.Author{ID: "author-id-thiago", UserID: "user-id-thiago", DisplayName: "Thiago"},
+			}, nil
+		},
+	}, DefaultAuthLimits())
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Header.Set("Authorization", "Bearer current-token")
+		handler.ServeHTTP(w, r)
+	})
 }
 
 func TestHealthRoutesReturnNoContent(t *testing.T) {

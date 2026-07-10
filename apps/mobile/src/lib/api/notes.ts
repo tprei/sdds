@@ -4,6 +4,7 @@ import { apiBaseURL } from './config';
 import type { components, paths } from './generated/schema';
 
 export type Note = {
+  author: NoteAuthor;
   body: string;
   categorySlug: string;
   createdAt: number;
@@ -11,6 +12,11 @@ export type Note = {
   placeSlug: string | null;
   title: string;
   updatedAt: number;
+};
+
+export type NoteAuthor = {
+  displayName: string;
+  id: string;
 };
 
 export type CreateNoteInput = {
@@ -30,6 +36,7 @@ export type SearchNotesInput = {
 };
 
 type GeneratedSchemas = components['schemas'];
+type AuthorSummaryResponse = GeneratedSchemas['AuthorSummary'];
 type CreateNoteRequest = GeneratedSchemas['CreateNoteRequest'];
 type ListNotesResponse = GeneratedSchemas['ListNotesResponse'];
 type NoteResponse = GeneratedSchemas['Note'];
@@ -39,7 +46,12 @@ type ExhaustiveSchemaKeyList<T, K extends SchemaKeyList<T>> =
   Exclude<SchemaKey<T>, K[number]> extends never ? K : never;
 
 const listNotesResponseKeys = schemaKeyList<ListNotesResponse>()(['notes']);
+const authorSummaryResponseKeys = schemaKeyList<AuthorSummaryResponse>()([
+  'display_name',
+  'id',
+]);
 const noteResponseKeys = schemaKeyList<NoteResponse>()([
+  'author',
   'body',
   'category_slug',
   'created_at',
@@ -126,7 +138,10 @@ function noteSearchQuery(input: SearchNotesInput): {
   return { category_slug: input.categorySlug, q: input.query };
 }
 
-export async function createNote(input: CreateNoteInput): Promise<Note> {
+export async function createNote(
+  input: CreateNoteInput,
+  token: string,
+): Promise<Note> {
   const request: CreateNoteRequest = {
     body: input.body,
     category_slug: input.categorySlug,
@@ -134,7 +149,7 @@ export async function createNote(input: CreateNoteInput): Promise<Note> {
     title: input.title,
   };
 
-  const { data, response } = await apiClient().POST('/v1/notes', {
+  const { data, response } = await apiClient(token).POST('/v1/notes', {
     body: request,
   });
   if (!response.ok) {
@@ -144,15 +159,15 @@ export async function createNote(input: CreateNoteInput): Promise<Note> {
   return parseNoteResponse(data);
 }
 
-function apiClient() {
+function apiClient(token?: string) {
   return createClient<paths>({
     baseUrl: apiBaseURL(),
-    fetch: apiFetch,
+    fetch: (request) => apiFetch(request, token),
   });
 }
 
-async function apiFetch(request: Request): Promise<Response> {
-  const response = await fetch(request);
+async function apiFetch(request: Request, token?: string): Promise<Response> {
+  const response = await fetch(authenticatedRequest(request, token));
   if (response.ok) {
     return response;
   }
@@ -165,6 +180,16 @@ async function apiFetch(request: Request): Promise<Response> {
     status: response.status,
     statusText: response.statusText,
   });
+}
+
+function authenticatedRequest(request: Request, token?: string): Request {
+  if (token === undefined) {
+    return request;
+  }
+
+  const headers = new Headers(request.headers);
+  headers.set('Authorization', `Bearer ${token}`);
+  return new Request(request, { headers });
 }
 
 function parseListNotesResponse(value: unknown): Note[] {
@@ -181,6 +206,7 @@ function parseNoteResponse(value: unknown): Note {
   }
 
   return {
+    author: parseAuthorSummary(value.author),
     body: value.body,
     categorySlug: value.category_slug,
     createdAt: value.created_at,
@@ -188,6 +214,13 @@ function parseNoteResponse(value: unknown): Note {
     placeSlug: value.place_slug,
     title: value.title,
     updatedAt: value.updated_at,
+  };
+}
+
+function parseAuthorSummary(value: AuthorSummaryResponse): NoteAuthor {
+  return {
+    displayName: value.display_name,
+    id: value.id,
   };
 }
 
@@ -200,8 +233,20 @@ function isNoteResponse(value: unknown): value is NoteResponse {
     typeof value.body === 'string' &&
     typeof value.category_slug === 'string' &&
     (typeof value.place_slug === 'string' || value.place_slug === null) &&
+    isAuthorSummaryResponse(value.author) &&
     isUnixMillisecondTimestamp(value.created_at) &&
     isUnixMillisecondTimestamp(value.updated_at)
+  );
+}
+
+function isAuthorSummaryResponse(
+  value: unknown,
+): value is AuthorSummaryResponse {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, authorSummaryResponseKeys) &&
+    typeof value.id === 'string' &&
+    typeof value.display_name === 'string'
   );
 }
 

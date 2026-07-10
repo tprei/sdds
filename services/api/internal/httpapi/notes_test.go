@@ -17,6 +17,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
+	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 const exampleNoteID = "018ff5b8-0000-7000-8000-000000000000"
@@ -648,6 +649,9 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	router := newTestRouter(fakeNoteStore{
 		createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
+			if input.UserID != user.UserID("user-id-thiago") {
+				t.Fatalf("user id = %q, want user-id-thiago", input.UserID)
+			}
 			if input.Title != "Café bom" {
 				t.Fatalf("title = %q, want Café bom", input.Title)
 			}
@@ -698,6 +702,29 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 	wireBody := decodeResponseObject(t, response.Body.Bytes())
 	requireJSONNumber(t, wireBody, "created_at", now.UnixMilli())
 	requireJSONNumber(t, wireBody, "updated_at", now.UnixMilli())
+}
+
+func TestCreateNoteRejectsMissingSessionBeforeValidation(t *testing.T) {
+	createCalled := false
+	router := NewRouter(fakeNoteStore{
+		createNote: func(_ context.Context, _ note.CreateInput) (note.Note, error) {
+			createCalled = true
+			return note.Note{}, nil
+		},
+	}, fakeCatalog{}, fakeUserStore{}, DefaultAuthLimits())
+	request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(`{`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
+	}
+	requireErrorCode(t, response, openapi.ErrorCodeUnauthenticated)
+	if createCalled {
+		t.Fatal("note store was called")
+	}
 }
 
 func TestCreateNoteAcceptsOmittedPlace(t *testing.T) {

@@ -18,6 +18,7 @@ type ValidationProblem struct {
 
 func NormalizeCreateInput(input CreateInput) CreateInput {
 	return CreateInput{
+		UserID:       input.UserID,
 		Title:        strings.TrimSpace(input.Title),
 		Body:         strings.TrimSpace(input.Body),
 		CategorySlug: NormalizeCategorySlug(input.CategorySlug),

@@ -21,7 +21,7 @@ func TestNoteStoreCreatesAndListsRecentNotes(t *testing.T) {
 		time.Date(2026, 7, 2, 12, 1, 0, 0, time.UTC),
 	}
 	index := 0
-	store := newNoteStore(db, func() time.Time {
+	store := newTestNoteStore(db, func() time.Time {
 		current := times[index]
 		index++
 		return current
@@ -75,7 +75,7 @@ func TestNoteStoreListsRecentNotesByCategory(t *testing.T) {
 		time.Date(2026, 7, 2, 12, 2, 0, 0, time.UTC),
 	}
 	index := 0
-	store := newNoteStore(db, func() time.Time {
+	store := newTestNoteStore(db, func() time.Time {
 		current := times[index]
 		index++
 		return current
@@ -130,7 +130,7 @@ func TestNoteStoreFindsNoteByID(t *testing.T) {
 	db := openMigratedDatabase(t, ctx)
 
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
-	store := newNoteStore(db, func() time.Time {
+	store := newTestNoteStore(db, func() time.Time {
 		return now
 	})
 
@@ -158,7 +158,7 @@ func TestNoteStoreFindsUnknownNoteAsNotFound(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	store := NewNoteStore(db)
+	store := newTestNoteStore(db, time.Now)
 	_, err := store.FindNote(ctx, "missing-note")
 	if !errors.Is(err, note.ErrNoteNotFound) {
 		t.Fatalf("find note error = %v, want ErrNoteNotFound", err)
@@ -169,7 +169,7 @@ func TestNoteStoreSearchesNoteTitles(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	store := NewNoteStore(db)
+	store := newTestNoteStore(db, time.Now)
 	created, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Café com pão de queijo",
 		Body:         "Bom para trabalhar de manhã.",
@@ -199,7 +199,7 @@ func TestNoteStoreSearchesNoteBodies(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	store := NewNoteStore(db)
+	store := newTestNoteStore(db, time.Now)
 	created, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Lugar bom",
 		Body:         "Tem brigadeiro decente.",
@@ -235,7 +235,7 @@ func TestNoteStoreSearchesNotesByCategory(t *testing.T) {
 		time.Date(2026, 7, 2, 12, 2, 0, 0, time.UTC),
 	}
 	index := 0
-	store := newNoteStore(db, func() time.Time {
+	store := newTestNoteStore(db, func() time.Time {
 		current := times[index]
 		index++
 		return current
@@ -290,7 +290,7 @@ func TestNoteStoreSearchReturnsEmptyResults(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	store := NewNoteStore(db)
+	store := newTestNoteStore(db, time.Now)
 	if _, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Café com pão de queijo",
 		Body:         "Bom para trabalhar de manhã.",
@@ -321,7 +321,7 @@ func TestNoteStoreSearchRanksTitleMatchesAheadOfBodyMatches(t *testing.T) {
 		time.Date(2026, 7, 2, 12, 1, 0, 0, time.UTC),
 	}
 	index := 0
-	store := newNoteStore(db, func() time.Time {
+	store := newTestNoteStore(db, func() time.Time {
 		current := times[index]
 		index++
 		return current
@@ -366,7 +366,7 @@ func TestNoteStoreSearchRequiresEveryToken(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	store := NewNoteStore(db)
+	store := newTestNoteStore(db, time.Now)
 	bothTokenMatch, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Cafe com pao",
 		Body:         "Padaria boa.",
@@ -414,7 +414,7 @@ func TestNoteStoreSearchReturnsEmptyForPunctuationOnlyQuery(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	store := NewNoteStore(db)
+	store := newTestNoteStore(db, time.Now)
 	if _, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Café com pão de queijo",
 		Body:         "Bom para trabalhar de manhã.",
@@ -445,7 +445,7 @@ func TestNoteStoreSearchOrdersTiesByRecency(t *testing.T) {
 		time.Date(2026, 7, 2, 12, 1, 0, 0, time.UTC),
 	}
 	index := 0
-	store := newNoteStore(db, func() time.Time {
+	store := newTestNoteStore(db, func() time.Time {
 		current := times[index]
 		index++
 		return current
@@ -490,7 +490,7 @@ func TestNoteStoreSearchMatchesAccentedText(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	store := NewNoteStore(db)
+	store := newTestNoteStore(db, time.Now)
 	created, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Café bom",
 		Body:         "Tem pão de queijo decente.",
@@ -520,7 +520,7 @@ func TestNoteStoreSearchIgnoresFTSOperatorsFromUserInput(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	store := NewNoteStore(db)
+	store := newTestNoteStore(db, time.Now)
 	created, err := store.CreateNote(ctx, note.CreateInput{
 		Title:        "Restaurante brasileiro",
 		Body:         "Barato em Dublin 12.",
@@ -561,7 +561,7 @@ func TestNoteStoreRespectsRecentLimit(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	store := newNoteStore(db, func() time.Time {
+	store := newTestNoteStore(db, func() time.Time {
 		return time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	})
 
@@ -594,7 +594,7 @@ func TestNoteStoreListsFractionalSecondNotesInRecentOrder(t *testing.T) {
 		time.Date(2026, 7, 2, 12, 0, 0, 100_000_000, time.UTC),
 	}
 	index := 0
-	store := newNoteStore(db, func() time.Time {
+	store := newTestNoteStore(db, func() time.Time {
 		current := times[index]
 		index++
 		return current
@@ -640,7 +640,7 @@ func TestNoteStoreStoresUnixMillisecondTimestamps(t *testing.T) {
 	db := openMigratedDatabase(t, ctx)
 
 	now := time.Date(2026, 7, 2, 12, 0, 0, 123_456_789, time.UTC)
-	store := newNoteStore(db, func() time.Time {
+	store := newTestNoteStore(db, func() time.Time {
 		return now
 	})
 
@@ -713,6 +713,31 @@ func noteIDs(notes []note.Note) []string {
 		ids = append(ids, found.ID)
 	}
 	return ids
+}
+
+type testNoteStore struct {
+	*NoteStore
+}
+
+func newTestNoteStore(db *sql.DB, clock func() time.Time) *testNoteStore {
+	if _, err := db.Exec(`
+		INSERT INTO users (id, state, created_at, updated_at)
+		VALUES (?, 'active', 0, 0)
+		ON CONFLICT (id) DO NOTHING`, systemNoteOwnerUserID); err != nil {
+		panic(err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO authors (id, user_id, display_name, created_at, updated_at)
+		VALUES (?, ?, 'sdds', 0, 0)
+		ON CONFLICT (id) DO NOTHING`, systemNoteOwnerAuthorID, systemNoteOwnerUserID); err != nil {
+		panic(err)
+	}
+	return &testNoteStore{NoteStore: newNoteStore(db, clock)}
+}
+
+func (store *testNoteStore) CreateNote(ctx context.Context, input note.CreateInput) (note.Note, error) {
+	input.UserID = systemNoteOwnerUserID
+	return store.NoteStore.CreateNote(ctx, input)
 }
 
 func openMigratedDatabase(t *testing.T, ctx context.Context) *sql.DB {

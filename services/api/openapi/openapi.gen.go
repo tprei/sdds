@@ -222,8 +222,9 @@ type ListPlacesResponse struct {
 
 // Note defines model for Note.
 type Note struct {
-	Body         string       `json:"body"`
-	CategorySlug CategorySlug `json:"category_slug"`
+	Author       AuthorSummary `json:"author"`
+	Body         string        `json:"body"`
+	CategorySlug CategorySlug  `json:"category_slug"`
 
 	// CreatedAt Unix timestamp in milliseconds.
 	CreatedAt int64      `json:"created_at"`
@@ -1359,6 +1360,7 @@ type CreateNoteHTTPResponse struct {
 	HTTPResponse *http.Response
 	JSON201      *Note
 	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
 	JSON413      *ErrorResponse
 	JSON500      *ErrorResponse
 }
@@ -1984,6 +1986,13 @@ func ParseCreateNoteHTTPResponse(rsp *http.Response) (*CreateNoteHTTPResponse, e
 			return nil, err
 		}
 		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
 		var dest ErrorResponse

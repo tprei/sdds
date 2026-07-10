@@ -65,6 +65,7 @@ export default function ProfileScreen() {
                 params: { next: '/profile' },
               });
             }}
+			testID="profile-retry-login-button"
           />
         </>
       ) : null}
@@ -82,6 +83,7 @@ export default function ProfileScreen() {
                 params: { next: '/profile' },
               });
             }}
+			testID="profile-signup-button"
           />
           <FoundationButton
             label="Entrar"
@@ -91,6 +93,7 @@ export default function ProfileScreen() {
                 params: { next: '/profile' },
               });
             }}
+			testID="profile-login-button"
           />
         </>
       ) : null}
@@ -112,6 +115,7 @@ export default function ProfileScreen() {
             disabled={logoutState.status === 'submitting'}
             label={logoutState.status === 'submitting' ? 'Saindo...' : 'Sair'}
             onPress={handleLogout}
+			testID="profile-logout-button"
           />
         </>
       ) : null}

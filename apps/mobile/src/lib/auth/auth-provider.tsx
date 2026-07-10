@@ -28,6 +28,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: AuthProviderProps) {
   const controller = useMemo(() => createAuthController(), []);
   const [state, setState] = useState<AuthState>({ status: 'loading' });
+  const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
   const operationVersionRef = useRef(0);
   const stateRef = useRef<AuthState>(state);
 
@@ -41,13 +42,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return operationVersionRef.current;
   }, []);
 
-  const setAuthStateIfCurrent = useCallback(
-    (version: number, nextState: AuthState) => {
-      if (version === operationVersionRef.current) {
-        setAuthState(nextState);
-      }
+  const enqueueAuthMutation = useCallback(
+    async (operation: () => Promise<AuthState>) => {
+      beginAuthMutation();
+      const mutation = mutationQueueRef.current.then(operation, operation);
+      const update = mutation.then(setAuthState);
+      mutationQueueRef.current = update.then(
+        () => undefined,
+        () => undefined,
+      );
+      return update;
     },
-    [setAuthState],
+    [beginAuthMutation, setAuthState],
+  );
+
+  const enqueueLogoutMutation = useCallback(
+    async (operation: () => Promise<AuthState>) => {
+      return enqueueAuthMutation(async () => {
+        try {
+          return await operation();
+        } catch (error: unknown) {
+          setAuthState({ status: 'anonymous' });
+          throw error;
+        }
+      });
+    },
+    [enqueueAuthMutation, setAuthState],
   );
 
   useEffect(() => {
@@ -67,32 +87,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = useCallback(
     async (input: LoginInput) => {
-      const mutationVersion = beginAuthMutation();
-      const nextState = await controller.login(input);
-      setAuthStateIfCurrent(mutationVersion, nextState);
+      await enqueueAuthMutation(() => controller.login(input));
     },
-    [beginAuthMutation, controller, setAuthStateIfCurrent],
+    [controller, enqueueAuthMutation],
   );
 
   const signup = useCallback(
     async (input: SignupInput) => {
-      const mutationVersion = beginAuthMutation();
-      const nextState = await controller.signup(input);
-      setAuthStateIfCurrent(mutationVersion, nextState);
+      await enqueueAuthMutation(() => controller.signup(input));
     },
-    [beginAuthMutation, controller, setAuthStateIfCurrent],
+    [controller, enqueueAuthMutation],
   );
 
   const logout = useCallback(async () => {
-    const mutationVersion = beginAuthMutation();
-    try {
-      const nextState = await controller.logout(stateRef.current);
-      setAuthStateIfCurrent(mutationVersion, nextState);
-    } catch (error: unknown) {
-      setAuthStateIfCurrent(mutationVersion, { status: 'anonymous' });
-      throw error;
-    }
-  }, [beginAuthMutation, controller, setAuthStateIfCurrent]);
+    await enqueueLogoutMutation(() => controller.logout(stateRef.current));
+  }, [controller, enqueueLogoutMutation]);
 
   const value = useMemo(
     () => ({ login, logout, signup, state }),

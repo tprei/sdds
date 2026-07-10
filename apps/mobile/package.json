@@ -7,6 +7,7 @@
     "expo": "~57.0.1",
     "expo-linking": "~57.0.1",
     "expo-router": "~57.0.2",
+    "expo-secure-store": "~57.0.0",
     "expo-splash-screen": "~57.0.1",
     "expo-status-bar": "~57.0.0",
     "expo-system-ui": "~57.0.0",

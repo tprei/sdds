@@ -65,6 +65,7 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	})
 	requireAuthSession(t, loggedInSession, username, displayName)
 	requireCurrentSession(t, getAuthSession(t, client, loggedInSession.Token), loggedInSession)
+	client = newAuthenticatedAPIClient(t, loggedInSession.Token)
 
 	initialNotes := listNotes(t, client)
 	if len(initialNotes.Notes) != 0 {
@@ -303,6 +304,20 @@ func newAPIClient(t *testing.T) *openapi.ClientWithResponses {
 	)
 	if err != nil {
 		t.Fatalf("create API client: %v", err)
+	}
+	return client
+}
+
+func newAuthenticatedAPIClient(t *testing.T, token string) *openapi.ClientWithResponses {
+	t.Helper()
+
+	client, err := openapi.NewClientWithResponses(
+		apiBaseURL(),
+		openapi.WithHTTPClient(&http.Client{Timeout: httpClientTimeout}),
+		openapi.WithRequestEditorFn(bearerTokenEditor(token)),
+	)
+	if err != nil {
+		t.Fatalf("create authenticated API client: %v", err)
 	}
 	return client
 }

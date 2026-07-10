@@ -8,6 +8,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/oapi-codegen/runtime v1.4.2
+	golang.org/x/crypto v0.50.0
 	modernc.org/sqlite v1.53.0
 )
 

@@ -155,6 +155,82 @@ describe('auth API client', () => {
     );
   });
 
+  it('preserves structured auth validation error bodies', async () => {
+    stubFetch(async () =>
+      jsonResponse(
+        {
+          code: 'invalid_auth',
+          fields: [
+            { code: 'too_short', field: 'password' },
+            { code: 'required', field: 'display_name' },
+          ],
+        },
+        httpStatusBadRequest,
+      ),
+    );
+
+    await expect(
+      createAuthUser({
+        displayName: '',
+        password: 'short',
+        username: 'thiago',
+      }),
+    ).rejects.toMatchObject(
+      new AuthAPIRequestError(httpStatusBadRequest, {
+        code: 'invalid_auth',
+        fields: [
+          { code: 'too_short', field: 'password' },
+          { code: 'required', field: 'display_name' },
+        ],
+      }),
+    );
+  });
+
+  it('preserves username-taken error bodies', async () => {
+    stubFetch(async () =>
+      jsonResponse(
+        {
+          code: 'username_taken',
+          fields: [{ code: 'taken', field: 'username' }],
+        },
+        httpStatusConflict,
+      ),
+    );
+
+    await expect(
+      createAuthUser({
+        displayName: 'Thiago',
+        password: 'secret-password',
+        username: 'thiago',
+      }),
+    ).rejects.toMatchObject(
+      new AuthAPIRequestError(httpStatusConflict, {
+        code: 'username_taken',
+        fields: [{ code: 'taken', field: 'username' }],
+      }),
+    );
+  });
+
+  it('keeps malformed error responses as status-only request errors', async () => {
+    stubFetch(async () =>
+      jsonResponse(
+        {
+          code: 'invalid_auth',
+          fields: [{ field: 'password' }],
+        },
+        httpStatusBadRequest,
+      ),
+    );
+
+    await expect(
+      createAuthUser({
+        displayName: 'Thiago',
+        password: 'short',
+        username: 'thiago',
+      }),
+    ).rejects.toMatchObject(new AuthAPIRequestError(httpStatusBadRequest));
+  });
+
   it('rejects malformed auth session responses', async () => {
     stubFetch(async () =>
       jsonResponse(
@@ -209,6 +285,8 @@ describe('auth API client', () => {
 });
 
 const httpStatusCreated = 201;
+const httpStatusBadRequest = 400;
+const httpStatusConflict = 409;
 const httpStatusNoContent = 204;
 const httpStatusUnauthorized = 401;
 

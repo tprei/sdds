@@ -86,6 +86,7 @@ const errorCodes = schemaValueList<ErrorCode>()([
   'invalid_note',
   'invalid_search',
   'not_found',
+  'rate_limited',
   'request_too_large',
   'unauthenticated',
   'username_taken',

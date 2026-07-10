@@ -211,6 +211,23 @@ describe('auth API client', () => {
     );
   });
 
+  it('preserves rate-limit error bodies', async () => {
+    stubFetch(async () =>
+      jsonResponse({ code: 'rate_limited' }, httpStatusTooManyRequests),
+    );
+
+    await expect(
+      createAuthSession({
+        password: 'secret-password',
+        username: 'thiago',
+      }),
+    ).rejects.toMatchObject(
+      new AuthAPIRequestError(httpStatusTooManyRequests, {
+        code: 'rate_limited',
+      }),
+    );
+  });
+
   it('keeps malformed error responses as status-only request errors', async () => {
     stubFetch(async () =>
       jsonResponse(
@@ -288,6 +305,7 @@ const httpStatusCreated = 201;
 const httpStatusBadRequest = 400;
 const httpStatusConflict = 409;
 const httpStatusNoContent = 204;
+const httpStatusTooManyRequests = 429;
 const httpStatusUnauthorized = 401;
 
 function apiAuthSession(

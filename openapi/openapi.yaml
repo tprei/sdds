@@ -137,6 +137,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too many signup requests are in flight or recently attempted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: The API could not create the user.
           content:
@@ -176,6 +182,12 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "413":
           description: The request body is too large.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too many login requests are in flight or recently attempted.
           content:
             application/json:
               schema:
@@ -549,6 +561,7 @@ components:
         - ErrorCodeInvalidNote
         - ErrorCodeInvalidSearch
         - ErrorCodeNotFound
+        - ErrorCodeRateLimited
         - ErrorCodeRequestTooLarge
         - ErrorCodeUnauthenticated
         - ErrorCodeUsernameTaken
@@ -559,6 +572,7 @@ components:
         - invalid_note
         - invalid_search
         - not_found
+        - rate_limited
         - request_too_large
         - unauthenticated
         - username_taken

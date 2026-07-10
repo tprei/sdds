@@ -80,10 +80,20 @@ The current API exposes operational endpoints:
 
 It opens SQLite at `SDDS_DATABASE_PATH`, defaulting to `sdds.db`, and applies migrations at startup.
 
+Auth has process-local operational limits to protect the small VM from expensive password work:
+
+- `SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE`, default `5`.
+- `SDDS_AUTH_LOGIN_REQUESTS_PER_MINUTE`, default `10`.
+- `SDDS_AUTH_HASH_CONCURRENCY`, default `2`.
+
 The first product endpoints are:
 
 - `GET /v1/categories` returns the category catalog.
 - `GET /v1/places` returns the place catalog.
+- `POST /v1/auth/users` creates a username/password account and returns a bearer session.
+- `POST /v1/auth/sessions` exchanges username/password credentials for a bearer session.
+- `GET /v1/auth/session` returns the current bearer session.
+- `DELETE /v1/auth/session` revokes the current bearer session.
 - `GET /v1/notes` returns recent notes.
 - `POST /v1/notes` creates a note with `title`, `body`, `category_slug`, and optional `place_slug`.
 

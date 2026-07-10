@@ -28,7 +28,11 @@ func main() {
 }
 
 func run() error {
-	return runWithArgs(context.Background(), loadConfig(), os.Args[1:])
+	config, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	return runWithArgs(context.Background(), config, os.Args[1:])
 }
 
 func runWithArgs(ctx context.Context, config config, args []string) error {
@@ -70,7 +74,7 @@ func runServer(ctx context.Context, config config) (err error) {
 	noteStore := sqlite.NewNoteStore(db)
 	catalogStore := sqlite.NewCatalogStore(db)
 	userStore := sqlite.NewUserStore(db)
-	server := newServer(config, httpapi.NewRouter(noteStore, catalogStore, userStore))
+	server := newServer(config, httpapi.NewRouter(noteStore, catalogStore, userStore, config.authLimits))
 
 	slog.Info("api listening", "addr", config.httpAddr)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

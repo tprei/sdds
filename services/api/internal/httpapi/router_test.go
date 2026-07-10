@@ -14,7 +14,7 @@ import (
 )
 
 func newTestRouter(notes fakeNoteStore) http.Handler {
-	return NewRouter(notes, fakeCatalog{}, fakeUserStore{})
+	return NewRouter(notes, fakeCatalog{}, fakeUserStore{}, DefaultAuthLimits())
 }
 
 func TestHealthRoutesReturnNoContent(t *testing.T) {

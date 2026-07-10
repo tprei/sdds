@@ -28,6 +28,7 @@ const (
 	ErrorCodeInvalidNote     ErrorCode = "invalid_note"
 	ErrorCodeInvalidSearch   ErrorCode = "invalid_search"
 	ErrorCodeNotFound        ErrorCode = "not_found"
+	ErrorCodeRateLimited     ErrorCode = "rate_limited"
 	ErrorCodeRequestTooLarge ErrorCode = "request_too_large"
 	ErrorCodeUnauthenticated ErrorCode = "unauthenticated"
 	ErrorCodeUsernameTaken   ErrorCode = "username_taken"
@@ -47,6 +48,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeInvalidSearch:
 		return true
 	case ErrorCodeNotFound:
+		return true
+	case ErrorCodeRateLimited:
 		return true
 	case ErrorCodeRequestTooLarge:
 		return true
@@ -1224,6 +1227,7 @@ type CreateAuthSessionHTTPResponse struct {
 	JSON400      *ErrorResponse
 	JSON401      *ErrorResponse
 	JSON413      *ErrorResponse
+	JSON429      *ErrorResponse
 	JSON500      *ErrorResponse
 }
 
@@ -1258,6 +1262,7 @@ type CreateAuthUserHTTPResponse struct {
 	JSON400      *ErrorResponse
 	JSON409      *ErrorResponse
 	JSON413      *ErrorResponse
+	JSON429      *ErrorResponse
 	JSON500      *ErrorResponse
 }
 
@@ -1792,6 +1797,13 @@ func ParseCreateAuthSessionHTTPResponse(rsp *http.Response) (*CreateAuthSessionH
 		}
 		response.JSON413 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -1845,6 +1857,13 @@ func ParseCreateAuthUserHTTPResponse(rsp *http.Response) (*CreateAuthUserHTTPRes
 			return nil, err
 		}
 		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse

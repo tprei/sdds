@@ -17,6 +17,7 @@ type server struct {
 	users                 user.Store
 	passwordHasher        passwordHasher
 	invalidCredentialHash string
+	authRateLimiters      authRateLimiters
 	newSessionToken       func() (string, error)
 	clock                 func() time.Time
 }
@@ -28,9 +29,23 @@ type passwordHasher interface {
 	Verify(password string, encoded string) (bool, error)
 }
 
-func NewRouter(notes note.Store, catalog note.Catalog, users user.Store) http.Handler {
-	hasher := user.NewPasswordHasher()
-	return newRouter(notes, catalog, users, hasher, mustInvalidCredentialHash(hasher), user.NewSessionToken, time.Now)
+type AuthLimits struct {
+	SignupRequestsPerMinute int
+	LoginRequestsPerMinute  int
+	PasswordHashConcurrency int
+}
+
+func DefaultAuthLimits() AuthLimits {
+	return AuthLimits{
+		SignupRequestsPerMinute: 5,
+		LoginRequestsPerMinute:  10,
+		PasswordHashConcurrency: 2,
+	}
+}
+
+func NewRouter(notes note.Store, catalog note.Catalog, users user.Store, authLimits AuthLimits) http.Handler {
+	hasher := newBoundedPasswordHasher(user.NewPasswordHasher(), authLimits.PasswordHashConcurrency)
+	return newRouter(notes, catalog, users, hasher, mustInvalidCredentialHash(hasher), user.NewSessionToken, time.Now, authLimits)
 }
 
 func newRouter(
@@ -41,17 +56,20 @@ func newRouter(
 	invalidCredentialHash string,
 	newSessionToken func() (string, error),
 	clock func() time.Time,
+	authLimits AuthLimits,
 ) http.Handler {
 	router := chi.NewRouter()
 	router.Use(localBrowserCORS)
 	router.Use(openAPIRequestValidator())
 
+	authRateLimiters := newAuthRateLimiters(authLimits, clock)
 	handler := server{
 		notes:                 notes,
 		catalog:               catalog,
 		users:                 users,
 		passwordHasher:        passwordHasher,
 		invalidCredentialHash: invalidCredentialHash,
+		authRateLimiters:      authRateLimiters,
 		newSessionToken:       newSessionToken,
 		clock:                 clock,
 	}
@@ -69,8 +87,8 @@ func newRouter(
 		router.Post("/notes", wrapper.CreateNote)
 		router.Get("/notes/{note_id}", wrapper.GetNote)
 		router.Get("/search/notes", wrapper.SearchNotes)
-		router.Post("/auth/users", wrapper.CreateAuthUser)
-		router.Post("/auth/sessions", wrapper.CreateAuthSession)
+		router.With(authRateLimiters.signup).Post("/auth/users", wrapper.CreateAuthUser)
+		router.With(authRateLimiters.login).Post("/auth/sessions", wrapper.CreateAuthSession)
 		router.With(requireAuth(users, clock)).Get("/auth/session", wrapper.GetAuthSession)
 		router.With(requireAuth(users, clock)).Delete("/auth/session", wrapper.DeleteAuthSession)
 	})

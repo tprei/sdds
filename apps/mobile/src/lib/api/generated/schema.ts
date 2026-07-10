@@ -238,7 +238,7 @@ export interface components {
             author: components["schemas"]["AuthorSummary"];
         };
         /** @enum {string} */
-        ErrorCode: "internal_error" | "invalid_auth" | "invalid_json" | "invalid_note" | "invalid_search" | "not_found" | "request_too_large" | "unauthenticated" | "username_taken";
+        ErrorCode: "internal_error" | "invalid_auth" | "invalid_json" | "invalid_note" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken";
         ErrorResponse: {
             code: components["schemas"]["ErrorCode"];
             fields?: components["schemas"]["ValidationProblem"][];
@@ -464,6 +464,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Too many signup requests are in flight or recently attempted. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description The API could not create the user. */
             500: {
                 headers: {
@@ -517,6 +526,15 @@ export interface operations {
             };
             /** @description The request body is too large. */
             413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many login requests are in flight or recently attempted. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

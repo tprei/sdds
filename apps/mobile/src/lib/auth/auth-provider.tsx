@@ -37,23 +37,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setState(nextState);
   }, []);
 
-  const beginAuthMutation = useCallback(() => {
-    operationVersionRef.current += 1;
-    return operationVersionRef.current;
-  }, []);
-
   const enqueueAuthMutation = useCallback(
     async (operation: () => Promise<AuthState>) => {
-      beginAuthMutation();
       const mutation = mutationQueueRef.current.then(operation, operation);
-      const update = mutation.then(setAuthState);
+      const update = mutation.then((nextState) => {
+        operationVersionRef.current += 1;
+        setAuthState(nextState);
+        return nextState;
+      });
       mutationQueueRef.current = update.then(
         () => undefined,
         () => undefined,
       );
       return update;
     },
-    [beginAuthMutation, setAuthState],
+    [setAuthState],
   );
 
   useEffect(() => {

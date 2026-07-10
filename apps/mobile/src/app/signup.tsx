@@ -10,15 +10,18 @@ import {
 import { AuthAPIRequestError } from '@/lib/api/auth';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { styles } from '@/features/auth/auth-screen.styles';
+import {
+  genericSignupErrorMessage,
+  signupValidationMessage,
+  returnPathFromParam,
+  usernameTakenErrorMessage,
+} from '@/features/auth/auth-messages';
+import { conflictStatus } from '@/lib/api/status';
 
 type SubmitState =
   | { status: 'idle' }
   | { status: 'submitting' }
   | { message: string; status: 'error' };
-
-type ReturnPath = '/' | '/compose' | '/profile';
-
-const usernameTakenStatus = 409;
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -51,6 +54,7 @@ export default function SignupScreen() {
     setSubmitState({ status: 'submitting' });
     try {
       await signup({ displayName, password, username });
+      setSubmitState({ status: 'idle' });
       router.replace(returnPath);
     } catch (error) {
       setSubmitState({
@@ -67,17 +71,19 @@ export default function SignupScreen() {
       title="Criar conta"
     >
       <FoundationTextInput
-        accessibilityLabel="Nome público"
+        accessibilityLabel="Seu nome"
         onChangeText={setDisplayName}
-        placeholder="Nome público"
+        placeholder="Seu nome"
+        testID="signup-display-name-input"
         value={displayName}
       />
       <FoundationTextInput
-        accessibilityLabel="Nome de login"
+        accessibilityLabel="Nome de usuário"
         autoCapitalize="none"
         autoCorrect={false}
         onChangeText={setUsername}
-        placeholder="Nome de login"
+        placeholder="Nome de usuário"
+        testID="signup-username-input"
         value={username}
       />
       <FoundationTextInput
@@ -85,6 +91,7 @@ export default function SignupScreen() {
         onChangeText={setPassword}
         placeholder="Senha"
         secureTextEntry
+        testID="signup-password-input"
         value={password}
       />
       {submitState.status === 'error' ? (
@@ -96,6 +103,7 @@ export default function SignupScreen() {
         disabled={!canSubmit || isSubmitting}
         label={isSubmitting ? 'Criando...' : 'Criar conta'}
         onPress={handleSubmit}
+        testID="signup-submit-button"
       />
       <FoundationButton
         label="Já tenho conta"
@@ -105,24 +113,25 @@ export default function SignupScreen() {
             params: { next: returnPath },
           });
         }}
+        testID="signup-login-button"
       />
     </FoundationScreen>
   );
 }
 
-function returnPathFromParam(value: string | string[] | undefined): ReturnPath {
-  if (value === '/compose' || value === '/profile') {
-    return value;
-  }
-  return '/';
-}
-
 function signupErrorMessage(error: unknown): string {
-  if (
-    error instanceof AuthAPIRequestError &&
-    error.status === usernameTakenStatus
-  ) {
-    return 'Esse nome de login já tá em uso.';
+  if (!(error instanceof AuthAPIRequestError)) {
+    return genericSignupErrorMessage;
   }
-  return 'Não deu pra criar a conta agora. Tenta de novo em instantes.';
+
+  if (error.status === conflictStatus || error.code === 'username_taken') {
+    return usernameTakenErrorMessage;
+  }
+
+  const validationMessage = signupValidationMessage(error.fields ?? []);
+  if (validationMessage !== null) {
+    return validationMessage;
+  }
+
+  return genericSignupErrorMessage;
 }

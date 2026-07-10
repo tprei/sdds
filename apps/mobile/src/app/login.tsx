@@ -10,15 +10,17 @@ import {
 import { AuthAPIRequestError } from '@/lib/api/auth';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { styles } from '@/features/auth/auth-screen.styles';
+import {
+  genericLoginErrorMessage,
+  loginValidationMessage,
+  returnPathFromParam,
+} from '@/features/auth/auth-messages';
+import { unauthorizedStatus } from '@/lib/api/status';
 
 type SubmitState =
   | { status: 'idle' }
   | { status: 'submitting' }
   | { message: string; status: 'error' };
-
-type ReturnPath = '/' | '/compose' | '/profile';
-
-const unauthorizedStatus = 401;
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -47,6 +49,7 @@ export default function LoginScreen() {
     setSubmitState({ status: 'submitting' });
     try {
       await login({ password, username });
+      setSubmitState({ status: 'idle' });
       router.replace(returnPath);
     } catch (error) {
       setSubmitState({
@@ -58,16 +61,17 @@ export default function LoginScreen() {
 
   return (
     <FoundationScreen
-      description="Entre com seu nome de login e senha pra publicar notas."
+      description="Entre com seu nome de usuário e senha pra publicar notas."
       eyebrow="Entrar"
       title="Entrar"
     >
       <FoundationTextInput
-        accessibilityLabel="Nome de login"
+        accessibilityLabel="Nome de usuário"
         autoCapitalize="none"
         autoCorrect={false}
         onChangeText={setUsername}
-        placeholder="Nome de login"
+        placeholder="Nome de usuário"
+        testID="login-username-input"
         value={username}
       />
       <FoundationTextInput
@@ -75,6 +79,7 @@ export default function LoginScreen() {
         onChangeText={setPassword}
         placeholder="Senha"
         secureTextEntry
+        testID="login-password-input"
         value={password}
       />
       {submitState.status === 'error' ? (
@@ -86,6 +91,7 @@ export default function LoginScreen() {
         disabled={!canSubmit || isSubmitting}
         label={isSubmitting ? 'Entrando...' : 'Entrar'}
         onPress={handleSubmit}
+        testID="login-submit-button"
       />
       <FoundationButton
         label="Criar conta"
@@ -95,24 +101,25 @@ export default function LoginScreen() {
             params: { next: returnPath },
           });
         }}
+        testID="login-signup-button"
       />
     </FoundationScreen>
   );
 }
 
-function returnPathFromParam(value: string | string[] | undefined): ReturnPath {
-  if (value === '/compose' || value === '/profile') {
-    return value;
-  }
-  return '/';
-}
-
 function loginErrorMessage(error: unknown): string {
-  if (
-    error instanceof AuthAPIRequestError &&
-    error.status === unauthorizedStatus
-  ) {
-    return 'Nome de login ou senha não bate.';
+  if (!(error instanceof AuthAPIRequestError)) {
+    return genericLoginErrorMessage;
   }
-  return 'Não deu pra entrar agora. Tenta de novo em instantes.';
+
+  if (error.status === unauthorizedStatus) {
+    return 'Nome de usuário ou senha inválidos.';
+  }
+
+  const validationMessage = loginValidationMessage(error.fields ?? []);
+  if (validationMessage !== null) {
+    return validationMessage;
+  }
+
+  return genericLoginErrorMessage;
 }

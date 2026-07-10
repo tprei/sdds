@@ -55,7 +55,7 @@ export default function ProfileScreen() {
         <>
           <EmptyStateCard
             title="Não deu pra confirmar sua sessão"
-            body="Confere sua conexão e tenta abrir o app de novo."
+            body="Verifique sua conexão e tente abrir o app de novo."
           />
           <FoundationButton
             label="Entrar de novo"
@@ -71,8 +71,8 @@ export default function ProfileScreen() {
       {state.status === 'anonymous' ? (
         <>
           <EmptyStateCard
-            title="Entre pra publicar"
-            body="Você pode continuar lendo sem conta. Pra escrever uma nota, entra ou cria uma conta rapidinho."
+            title="Entre para publicar"
+            body="Você pode continuar lendo sem conta. Para escrever uma nota, entre ou crie uma conta."
           />
           <FoundationButton
             label="Criar conta"
@@ -98,7 +98,7 @@ export default function ProfileScreen() {
         <>
           <EmptyStateCard
             title={state.user.author.displayName}
-            body={`Nome de login: ${state.user.username}`}
+            body={`Nome de usuário: ${state.user.username}`}
           />
           <Text style={styles.metaText}>
             Suas próximas notas vão sair com esse nome público.
@@ -121,7 +121,7 @@ export default function ProfileScreen() {
 
 function logoutErrorMessage(error: unknown): string {
   if (error instanceof Error) {
-    return 'Sessão local encerrada. O servidor não confirmou a saída agora.';
+    return 'Não foi possível limpar a sessão deste aparelho. Tente novamente.';
   }
-  return 'Sessão local encerrada. Tenta abrir o app de novo depois.';
+  return 'Não foi possível sair agora. Tente novamente mais tarde.';
 }

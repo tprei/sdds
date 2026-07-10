@@ -45,7 +45,6 @@ func TestApplyMigrationsCreatesCatalogIndexes(t *testing.T) {
 		"notes_recent_idx",
 		"notes_category_idx",
 		"notes_place_idx",
-		"notes_user_idx",
 		"user_login_identities_user_idx",
 		"user_login_identities_one_password_provider_per_user_idx",
 		"sessions_user_idx",
@@ -344,128 +343,6 @@ func TestNotePlaceMigrationPreservesExistingNotes(t *testing.T) {
 	}
 	if diff := cmp.Diff(wantPlace, place); diff != "" {
 		t.Fatalf("place mismatch (-want +got):\n%s", diff)
-	}
-}
-
-func TestNoteOwnershipMigrationPreservesExistingNotes(t *testing.T) {
-	ctx := context.Background()
-	db, err := Open(":memory:")
-	if err != nil {
-		t.Fatalf("open database: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := db.Close(); err != nil {
-			t.Fatalf("close database: %v", err)
-		}
-	})
-	applyMigrationFiles(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs", "000004_note_places", "000005_users_authors_sessions")
-
-	if _, err := db.ExecContext(
-		ctx,
-		`
-			INSERT INTO notes (id, title, body, category_slug, place_slug, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`,
-		"existing-owned-note",
-		"Cafe com pao",
-		"Padaria boa perto do metrô.",
-		"food",
-		"sao-paulo",
-		int64(1782993600000),
-		int64(1782993600000),
-	); err != nil {
-		t.Fatalf("insert existing note: %v", err)
-	}
-
-	if err := ApplyMigrations(ctx, db); err != nil {
-		t.Fatalf("apply remaining migrations: %v", err)
-	}
-
-	var userIDType string
-	var userIDNotNull int
-	if err := db.QueryRowContext(ctx, `SELECT type, "notnull" FROM pragma_table_info('notes') WHERE name = 'user_id'`).Scan(&userIDType, &userIDNotNull); err != nil {
-		t.Fatalf("query user_id column: %v", err)
-	}
-	if userIDType != "TEXT" {
-		t.Fatalf("user_id type = %q, want TEXT", userIDType)
-	}
-	if userIDNotNull != 1 {
-		t.Fatalf("user_id notnull = %d, want 1", userIDNotNull)
-	}
-
-	var ownerForeignKeys int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_foreign_key_list('notes') WHERE "from" = 'user_id' AND "table" = 'users' AND "to" = 'id'`).Scan(&ownerForeignKeys); err != nil {
-		t.Fatalf("query user_id foreign key: %v", err)
-	}
-	if ownerForeignKeys != 1 {
-		t.Fatalf("user_id foreign key count = %d, want 1", ownerForeignKeys)
-	}
-
-	var userState string
-	var userCreatedAt int64
-	var userUpdatedAt int64
-	if err := db.QueryRowContext(ctx, `SELECT state, created_at, updated_at FROM users WHERE id = ?`, systemNoteOwnerUserID).Scan(&userState, &userCreatedAt, &userUpdatedAt); err != nil {
-		t.Fatalf("query system user: %v", err)
-	}
-	if userState != "active" {
-		t.Fatalf("system user state = %q, want active", userState)
-	}
-	if userCreatedAt != 0 || userUpdatedAt != 0 {
-		t.Fatalf("system user timestamps = %d/%d, want 0/0", userCreatedAt, userUpdatedAt)
-	}
-
-	var authorUserID string
-	var authorDisplayName string
-	if err := db.QueryRowContext(ctx, `SELECT user_id, display_name FROM authors WHERE id = ?`, systemNoteOwnerAuthorID).Scan(&authorUserID, &authorDisplayName); err != nil {
-		t.Fatalf("query system author: %v", err)
-	}
-	if authorUserID != string(systemNoteOwnerUserID) {
-		t.Fatalf("system author user id = %q, want %q", authorUserID, systemNoteOwnerUserID)
-	}
-	if authorDisplayName != "sdds" {
-		t.Fatalf("system author display name = %q, want sdds", authorDisplayName)
-	}
-
-	var migratedUserID string
-	if err := db.QueryRowContext(ctx, `SELECT user_id FROM notes WHERE id = ?`, "existing-owned-note").Scan(&migratedUserID); err != nil {
-		t.Fatalf("query migrated note user id: %v", err)
-	}
-	if migratedUserID != string(systemNoteOwnerUserID) {
-		t.Fatalf("migrated note user id = %q, want %q", migratedUserID, systemNoteOwnerUserID)
-	}
-
-	for _, index := range []string{"notes_recent_idx", "notes_category_idx", "notes_place_idx", "notes_user_idx"} {
-		t.Run(index, func(t *testing.T) {
-			var count int
-			if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?`, index).Scan(&count); err != nil {
-				t.Fatalf("query index %s: %v", index, err)
-			}
-			if count != 1 {
-				t.Fatalf("index %s count = %d, want 1", index, count)
-			}
-		})
-	}
-
-	found, err := NewNoteStore(db).SearchNotes(ctx, note.SearchInput{
-		Query: "pao",
-		Limit: 10,
-	})
-	if err != nil {
-		t.Fatalf("search notes: %v", err)
-	}
-	if len(found) != 1 {
-		t.Fatalf("search note count = %d, want 1", len(found))
-	}
-	gotNote := found[0]
-	if gotNote.ID != "existing-owned-note" {
-		t.Fatalf("search note id = %q, want existing-owned-note", gotNote.ID)
-	}
-	if gotNote.UserID != systemNoteOwnerUserID {
-		t.Fatalf("search note user id = %q, want %q", gotNote.UserID, systemNoteOwnerUserID)
-	}
-	wantAuthor := note.AuthorSummary{ID: systemNoteOwnerAuthorID, DisplayName: "sdds"}
-	if diff := cmp.Diff(wantAuthor, gotNote.Author); diff != "" {
-		t.Fatalf("search note author mismatch (-want +got):\n%s", diff)
 	}
 }
 

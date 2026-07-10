@@ -3,6 +3,9 @@ import type { APIRequestContext, Page } from '@playwright/test';
 
 const apiBaseURL =
   process.env.SDDS_SYNTHETICS_API_BASE_URL ?? 'http://127.0.0.1:18080';
+const syntheticPassword = 'secret-password';
+
+let authTokenPromise: Promise<string> | undefined;
 
 type CreateNoteRequest = {
   body: string;
@@ -39,6 +42,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   page,
 }) => {
   const timestamp = Date.now();
+  const username = `ui-${timestamp}`;
   const title = `Café certeiro ${timestamp}`;
   const body = `Coado gostoso, balcão simpático e pão na chapa no ponto ${timestamp}.`;
 
@@ -52,6 +56,12 @@ test('creates a note and reads it from the API-backed home feed', async ({
   ).toBeVisible();
 
   await page.getByText('Escrever', { exact: true }).click();
+  await expect(page.getByText('Entre para escrever')).toBeVisible();
+  await page.getByRole('button', { name: 'Criar conta' }).click();
+  await page.getByLabel('Seu nome').fill('Autor UI');
+  await page.getByLabel('Nome de usuário').fill(username);
+  await page.getByLabel('Senha').fill(syntheticPassword);
+  await page.getByRole('button', { name: 'Criar conta' }).click();
   await expect(page.getByText('Conta uma dica')).toBeVisible();
 
   await page.getByLabel('Título da nota').fill(title);
@@ -340,11 +350,32 @@ async function createNote(
   request: APIRequestContext,
   input: CreateNoteRequest,
 ): Promise<NoteResponse> {
+  const token = await authToken(request);
   const response = await request.post(apiURL('/v1/notes'), {
     data: input,
+    headers: { Authorization: `Bearer ${token}` },
   });
   expect(response.status()).toBe(201);
   return parseNoteResponse(await response.json());
+}
+
+async function authToken(request: APIRequestContext): Promise<string> {
+  authTokenPromise ??= createAuthUser(request);
+  return authTokenPromise;
+}
+
+async function createAuthUser(request: APIRequestContext): Promise<string> {
+  const timestamp = Date.now();
+  const response = await request.post(apiURL('/v1/auth/users'), {
+    data: {
+      display_name: 'Autor Sintético',
+      password: syntheticPassword,
+      username: `synthetic-${timestamp}`,
+    },
+  });
+  expect(response.status()).toBe(201);
+  const session = (await response.json()) as { token: string };
+  return session.token;
 }
 
 async function listNotes(

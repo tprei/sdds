@@ -17,7 +17,6 @@ type server struct {
 	users                 user.Store
 	passwordHasher        passwordHasher
 	invalidCredentialHash string
-	authRateLimiters      authRateLimiters
 	newSessionToken       func() (string, error)
 	clock                 func() time.Time
 }

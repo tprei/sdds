@@ -137,6 +137,12 @@ function ReadyNoteDetail({ note }: { note: LabelledNote }) {
         {note.title}
       </Text>
       <Text
+        accessibilityLabel={`Autor da nota: ${note.author.displayName}`}
+        style={styles.author}
+      >
+        {note.author.displayName}
+      </Text>
+      <Text
         accessibilityLabel={`Texto da nota: ${note.body}`}
         style={styles.body}
       >

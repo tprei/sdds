@@ -3,6 +3,11 @@ import { StyleSheet } from 'react-native';
 import { radius, semanticColors, spacing, typography } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
+  author: {
+    color: semanticColors.textMuted,
+    fontSize: typography.sizeBody,
+    fontWeight: typography.weightSemibold,
+  },
   body: {
     color: semanticColors.textBody,
     fontSize: typography.sizeBodyLarge,

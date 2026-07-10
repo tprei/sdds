@@ -231,7 +231,7 @@ Run the browser-level synthetic against the Dockerized API:
 
 ```sh
 docker compose -p sdds-synthetics -f infra/compose/compose.yaml down -v
-SDDS_HTTP_PORT=18080 docker compose -p sdds-synthetics -f infra/compose/compose.yaml up --build -d api
+SDDS_HTTP_PORT=18080 SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE=60 SDDS_AUTH_LOGIN_REQUESTS_PER_MINUTE=60 docker compose -p sdds-synthetics -f infra/compose/compose.yaml up --build -d api
 pnpm test:synthetics
 docker compose -p sdds-synthetics -f infra/compose/compose.yaml down -v
 ```

@@ -28,6 +28,12 @@ export function NoteCard({
         )}
       </View>
       <Text style={styles.title}>{note.title}</Text>
+      <Text
+        accessibilityLabel={`Autor da nota: ${note.author.displayName}`}
+        style={styles.author}
+      >
+        {note.author.displayName}
+      </Text>
       <Text style={styles.body}>{note.body}</Text>
     </View>
   );

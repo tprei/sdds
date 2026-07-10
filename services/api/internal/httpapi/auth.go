@@ -25,7 +25,7 @@ func (handler server) CreateAuthUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, authValidationErrorResponse(openapi.ErrorCodeInvalidAuth, problems))
 		return
 	}
-	if !handler.authRateLimiters.allowSignup(input.Username) {
+	if !handler.authRateLimiters.allowSignup(r, input.Username) {
 		writeRateLimited(w)
 		return
 	}
@@ -75,7 +75,7 @@ func (handler server) CreateAuthSession(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, authValidationErrorResponse(openapi.ErrorCodeInvalidAuth, problems))
 		return
 	}
-	if !handler.authRateLimiters.allowLogin(input.Username) {
+	if !handler.authRateLimiters.allowLogin(r, input.Username) {
 		writeRateLimited(w)
 		return
 	}

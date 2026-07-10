@@ -83,7 +83,7 @@ func TestCreateAuthUserAllowsDifferentSources(t *testing.T) {
 	}
 }
 
-func TestMalformedSignupDoesNotConsumeGlobalAuthLimit(t *testing.T) {
+func TestMalformedSignupDoesNotConsumeAuthLimit(t *testing.T) {
 	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
 	createCalls := 0
 	router := newAuthRateLimitTestRouter(t, fakeUserStore{
@@ -107,7 +107,41 @@ func TestMalformedSignupDoesNotConsumeGlobalAuthLimit(t *testing.T) {
 	}
 
 	validResponse := httptest.NewRecorder()
-	validRequest := authRateLimitRequest(http.MethodPost, "/v1/auth/users", `{"username":"thiago","password":"secret-password","display_name":"Thiago"}`, "203.0.113.20:1000")
+	validRequest := authRateLimitRequest(http.MethodPost, "/v1/auth/users", `{"username":"thiago","password":"secret-password","display_name":"Thiago"}`, "203.0.113.10:1000")
+	router.ServeHTTP(validResponse, validRequest)
+	if validResponse.Code != http.StatusCreated {
+		t.Fatalf("valid status = %d, want %d", validResponse.Code, http.StatusCreated)
+	}
+	if createCalls != 1 {
+		t.Fatalf("create calls = %d, want 1", createCalls)
+	}
+}
+
+func TestInvalidSignupDoesNotConsumeAuthLimit(t *testing.T) {
+	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
+	createCalls := 0
+	router := newAuthRateLimitTestRouter(t, fakeUserStore{
+		createPasswordUser: func(_ context.Context, input user.CreatePasswordUserInput) (user.CurrentSession, error) {
+			createCalls++
+			return authCurrentSession(input.Username, input.DisplayName, input.TokenHash, input.ExpiresAt), nil
+		},
+	}, AuthLimits{
+		SignupRequestsPerMinute:       1,
+		LoginRequestsPerMinute:        1000,
+		SignupGlobalRequestsPerMinute: 1,
+		LoginGlobalRequestsPerMinute:  1000,
+		PasswordHashConcurrency:       4,
+	}, func() time.Time { return now })
+
+	invalidResponse := httptest.NewRecorder()
+	invalidRequest := authRateLimitRequest(http.MethodPost, "/v1/auth/users", `{"username":"x","password":"short","display_name":""}`, "203.0.113.10:1000")
+	router.ServeHTTP(invalidResponse, invalidRequest)
+	if invalidResponse.Code != http.StatusBadRequest {
+		t.Fatalf("invalid status = %d, want %d", invalidResponse.Code, http.StatusBadRequest)
+	}
+
+	validResponse := httptest.NewRecorder()
+	validRequest := authRateLimitRequest(http.MethodPost, "/v1/auth/users", `{"username":"thiago","password":"secret-password","display_name":"Thiago"}`, "203.0.113.10:1000")
 	router.ServeHTTP(validResponse, validRequest)
 	if validResponse.Code != http.StatusCreated {
 		t.Fatalf("valid status = %d, want %d", validResponse.Code, http.StatusCreated)

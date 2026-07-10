@@ -48,43 +48,24 @@ func newKeyedRequestsPerMinuteLimiters(requestsPerMinute int, maxKeys int) *keye
 	}
 }
 
-func (limiters authRateLimiters) signupSource(next http.Handler) http.Handler {
-	return limiters.limitSource(next, limiters.signupSourceLimiters)
-}
-
-func (limiters authRateLimiters) loginSource(next http.Handler) http.Handler {
-	return limiters.limitSource(next, limiters.loginSourceLimiters)
-}
-
-func (limiters authRateLimiters) allowSignup(username string) bool {
+func (limiters authRateLimiters) allowSignup(r *http.Request, username string) bool {
 	now := limiters.clock()
 	return takeRateLimitToken(
 		now,
+		limiters.signupSourceLimiters.limiterFor(requestSourceKey(r), now),
 		limiters.signupAccountLimiters.limiterFor(username, now),
 		limiters.signupGlobalLimiter,
 	)
 }
 
-func (limiters authRateLimiters) allowLogin(username string) bool {
+func (limiters authRateLimiters) allowLogin(r *http.Request, username string) bool {
 	now := limiters.clock()
 	return takeRateLimitToken(
 		now,
+		limiters.loginSourceLimiters.limiterFor(requestSourceKey(r), now),
 		limiters.loginAccountLimiters.limiterFor(username, now),
 		limiters.loginGlobalLimiter,
 	)
-}
-
-func (limiters authRateLimiters) limitSource(next http.Handler, keyedLimiters *keyedRateLimiters) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		now := limiters.clock()
-		sourceLimiter := keyedLimiters.limiterFor(requestSourceKey(r), now)
-		if !takeRateLimitToken(now, sourceLimiter) {
-			writeRateLimited(w)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
 }
 
 type keyedRateLimiters struct {

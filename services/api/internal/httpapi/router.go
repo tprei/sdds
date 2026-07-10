@@ -30,16 +30,20 @@ type passwordHasher interface {
 }
 
 type AuthLimits struct {
-	SignupRequestsPerMinute int
-	LoginRequestsPerMinute  int
-	PasswordHashConcurrency int
+	SignupRequestsPerMinute       int
+	LoginRequestsPerMinute        int
+	SignupGlobalRequestsPerMinute int
+	LoginGlobalRequestsPerMinute  int
+	PasswordHashConcurrency       int
 }
 
 func DefaultAuthLimits() AuthLimits {
 	return AuthLimits{
-		SignupRequestsPerMinute: 5,
-		LoginRequestsPerMinute:  10,
-		PasswordHashConcurrency: 2,
+		SignupRequestsPerMinute:       5,
+		LoginRequestsPerMinute:        10,
+		SignupGlobalRequestsPerMinute: 60,
+		LoginGlobalRequestsPerMinute:  120,
+		PasswordHashConcurrency:       2,
 	}
 }
 
@@ -87,8 +91,8 @@ func newRouter(
 		router.Post("/notes", wrapper.CreateNote)
 		router.Get("/notes/{note_id}", wrapper.GetNote)
 		router.Get("/search/notes", wrapper.SearchNotes)
-		router.With(authRateLimiters.signup).Post("/auth/users", wrapper.CreateAuthUser)
-		router.With(authRateLimiters.login).Post("/auth/sessions", wrapper.CreateAuthSession)
+		router.Post("/auth/users", wrapper.CreateAuthUser)
+		router.Post("/auth/sessions", wrapper.CreateAuthSession)
 		router.With(requireAuth(users, clock)).Get("/auth/session", wrapper.GetAuthSession)
 		router.With(requireAuth(users, clock)).Delete("/auth/session", wrapper.DeleteAuthSession)
 	})

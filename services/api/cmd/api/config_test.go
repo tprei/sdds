@@ -31,6 +31,8 @@ func TestLoadConfigUsesEnvironmentOverrides(t *testing.T) {
 	t.Setenv("SDDS_HTTP_ADDR", "127.0.0.1:18080")
 	t.Setenv("SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE", "7")
 	t.Setenv("SDDS_AUTH_LOGIN_REQUESTS_PER_MINUTE", "11")
+	t.Setenv("SDDS_AUTH_GLOBAL_SIGNUP_REQUESTS_PER_MINUTE", "70")
+	t.Setenv("SDDS_AUTH_GLOBAL_LOGIN_REQUESTS_PER_MINUTE", "110")
 	t.Setenv("SDDS_AUTH_HASH_CONCURRENCY", "3")
 
 	got, err := loadConfig()
@@ -40,9 +42,11 @@ func TestLoadConfigUsesEnvironmentOverrides(t *testing.T) {
 
 	want := config{
 		authLimits: httpapi.AuthLimits{
-			SignupRequestsPerMinute: 7,
-			LoginRequestsPerMinute:  11,
-			PasswordHashConcurrency: 3,
+			SignupRequestsPerMinute:       7,
+			LoginRequestsPerMinute:        11,
+			SignupGlobalRequestsPerMinute: 70,
+			LoginGlobalRequestsPerMinute:  110,
+			PasswordHashConcurrency:       3,
 		},
 		databasePath: "/tmp/sdds-test.db",
 		httpAddr:     "127.0.0.1:18080",
@@ -61,6 +65,8 @@ func TestLoadConfigRejectsInvalidAuthLimits(t *testing.T) {
 		{name: "signup malformed", envName: "SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE", value: "often"},
 		{name: "signup zero", envName: "SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE", value: "0"},
 		{name: "login negative", envName: "SDDS_AUTH_LOGIN_REQUESTS_PER_MINUTE", value: "-1"},
+		{name: "global signup zero", envName: "SDDS_AUTH_GLOBAL_SIGNUP_REQUESTS_PER_MINUTE", value: "0"},
+		{name: "global login negative", envName: "SDDS_AUTH_GLOBAL_LOGIN_REQUESTS_PER_MINUTE", value: "-1"},
 		{name: "hash concurrency malformed", envName: "SDDS_AUTH_HASH_CONCURRENCY", value: "many"},
 	}
 
@@ -87,5 +93,7 @@ func clearConfigEnv(t *testing.T) {
 	t.Setenv("SDDS_HTTP_ADDR", "")
 	t.Setenv("SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE", "")
 	t.Setenv("SDDS_AUTH_LOGIN_REQUESTS_PER_MINUTE", "")
+	t.Setenv("SDDS_AUTH_GLOBAL_SIGNUP_REQUESTS_PER_MINUTE", "")
+	t.Setenv("SDDS_AUTH_GLOBAL_LOGIN_REQUESTS_PER_MINUTE", "")
 	t.Setenv("SDDS_AUTH_HASH_CONCURRENCY", "")
 }

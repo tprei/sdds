@@ -102,6 +102,37 @@ describe('auth session controller', () => {
     expect(clearSessionToken).toHaveBeenCalledOnce();
   });
 
+  it('boots the replacement token when storage changes during boot', async () => {
+    vi.mocked(readSessionToken)
+      .mockResolvedValueOnce('expired-token')
+      .mockResolvedValueOnce('fresh-token');
+    vi.mocked(getAuthSession)
+      .mockRejectedValueOnce(new AuthAPIRequestError(401))
+      .mockResolvedValueOnce(apiCurrentSession());
+
+    await expect(createAuthController().bootstrap()).resolves.toEqual({
+      status: 'authenticated',
+      token: 'fresh-token',
+      user: apiUser(),
+    });
+    expect(clearSessionToken).not.toHaveBeenCalled();
+    expect(getAuthSession).toHaveBeenNthCalledWith(1, 'expired-token');
+    expect(getAuthSession).toHaveBeenNthCalledWith(2, 'fresh-token');
+  });
+
+  it('does not clear storage when the token is removed during boot', async () => {
+    vi.mocked(readSessionToken)
+      .mockResolvedValueOnce('expired-token')
+      .mockResolvedValueOnce(null);
+    vi.mocked(getAuthSession).mockRejectedValue(new AuthAPIRequestError(401));
+
+    await expect(createAuthController().bootstrap()).resolves.toEqual({
+      status: 'anonymous',
+    });
+    expect(clearSessionToken).not.toHaveBeenCalled();
+    expect(getAuthSession).toHaveBeenCalledOnce();
+  });
+
   it('keeps storage intact when boot fails without an auth rejection', async () => {
     vi.mocked(readSessionToken).mockResolvedValue('stored-token');
     vi.mocked(getAuthSession).mockRejectedValue(new AuthAPIRequestError(500));

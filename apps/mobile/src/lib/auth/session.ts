@@ -40,37 +40,12 @@ export type AuthController = {
 export function createAuthController(): AuthController {
   return {
     async bootstrap() {
-      let token: string | null;
-
-      try {
-        token = await readSessionToken();
-      } catch {
+      const token = await readStoredSessionToken();
+      if (token === undefined) {
         return { status: 'error' };
       }
 
-      if (token === null) {
-        return { status: 'anonymous' };
-      }
-
-      try {
-        const session = await getAuthSession(token);
-        return {
-          status: 'authenticated',
-          token,
-          user: session.user,
-        };
-      } catch (error: unknown) {
-        if (!isUnauthenticatedRequest(error)) {
-          return { status: 'error' };
-        }
-
-        try {
-          await clearSessionToken();
-          return { status: 'anonymous' };
-        } catch {
-          return { status: 'error' };
-        }
-      }
+      return bootstrapToken(token);
     },
     async login(input) {
       const session = await createAuthSession(input);
@@ -98,6 +73,48 @@ export function createAuthController(): AuthController {
 }
 
 const unauthenticatedStatus = 401;
+
+async function bootstrapToken(token: string | null): Promise<AuthState> {
+  if (token === null) {
+    return { status: 'anonymous' };
+  }
+
+  try {
+    const session = await getAuthSession(token);
+    return {
+      status: 'authenticated',
+      token,
+      user: session.user,
+    };
+  } catch (error: unknown) {
+    if (!isUnauthenticatedRequest(error)) {
+      return { status: 'error' };
+    }
+
+    const currentToken = await readStoredSessionToken();
+    if (currentToken === undefined) {
+      return { status: 'error' };
+    }
+    if (currentToken !== token) {
+      return bootstrapToken(currentToken);
+    }
+
+    try {
+      await clearSessionToken();
+      return { status: 'anonymous' };
+    } catch {
+      return { status: 'error' };
+    }
+  }
+}
+
+async function readStoredSessionToken(): Promise<string | null | undefined> {
+  try {
+    return await readSessionToken();
+  } catch {
+    return undefined;
+  }
+}
 
 function isUnauthenticatedRequest(error: unknown): boolean {
   return (

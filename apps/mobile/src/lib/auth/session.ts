@@ -40,7 +40,14 @@ export type AuthController = {
 export function createAuthController(): AuthController {
   return {
     async bootstrap() {
-      const token = await readSessionToken();
+      let token: string | null;
+
+      try {
+        token = await readSessionToken();
+      } catch {
+        return { status: 'error' };
+      }
+
       if (token === null) {
         return { status: 'anonymous' };
       }
@@ -56,8 +63,13 @@ export function createAuthController(): AuthController {
         if (!isUnauthenticatedRequest(error)) {
           return { status: 'error' };
         }
-        await clearSessionToken();
-        return { status: 'anonymous' };
+
+        try {
+          await clearSessionToken();
+          return { status: 'anonymous' };
+        } catch {
+          return { status: 'error' };
+        }
       }
     },
     async login(input) {

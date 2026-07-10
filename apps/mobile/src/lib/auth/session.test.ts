@@ -81,6 +81,27 @@ describe('auth session controller', () => {
     expect(clearSessionToken).toHaveBeenCalledOnce();
   });
 
+  it('boots error when the stored token cannot be read', async () => {
+    vi.mocked(readSessionToken).mockRejectedValue(new Error('storage failed'));
+
+    await expect(createAuthController().bootstrap()).resolves.toEqual({
+      status: 'error',
+    });
+    expect(getAuthSession).not.toHaveBeenCalled();
+    expect(clearSessionToken).not.toHaveBeenCalled();
+  });
+
+  it('boots error when an invalid stored token cannot be cleared', async () => {
+    vi.mocked(readSessionToken).mockResolvedValue('expired-token');
+    vi.mocked(getAuthSession).mockRejectedValue(new AuthAPIRequestError(401));
+    vi.mocked(clearSessionToken).mockRejectedValue(new Error('storage failed'));
+
+    await expect(createAuthController().bootstrap()).resolves.toEqual({
+      status: 'error',
+    });
+    expect(clearSessionToken).toHaveBeenCalledOnce();
+  });
+
   it('keeps storage intact when boot fails without an auth rejection', async () => {
     vi.mocked(readSessionToken).mockResolvedValue('stored-token');
     vi.mocked(getAuthSession).mockRejectedValue(new AuthAPIRequestError(500));

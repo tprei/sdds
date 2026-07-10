@@ -74,7 +74,7 @@ export function createAuthController(): AuthController {
           } catch (error: unknown) {
             if (!isUnauthenticatedRequest(error)) {
               await clearSessionToken();
-              throw error;
+              return { status: 'anonymous' };
             }
           }
         }

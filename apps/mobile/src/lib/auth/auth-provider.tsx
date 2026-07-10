@@ -56,20 +56,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [beginAuthMutation, setAuthState],
   );
 
-  const enqueueLogoutMutation = useCallback(
-    async (operation: () => Promise<AuthState>) => {
-      return enqueueAuthMutation(async () => {
-        try {
-          return await operation();
-        } catch (error: unknown) {
-          setAuthState({ status: 'anonymous' });
-          throw error;
-        }
-      });
-    },
-    [enqueueAuthMutation, setAuthState],
-  );
-
   useEffect(() => {
     let isActive = true;
     const bootstrapVersion = operationVersionRef.current;
@@ -100,8 +86,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const logout = useCallback(async () => {
-    await enqueueLogoutMutation(() => controller.logout(stateRef.current));
-  }, [controller, enqueueLogoutMutation]);
+    await enqueueAuthMutation(() => controller.logout(stateRef.current));
+  }, [controller, enqueueAuthMutation]);
 
   const value = useMemo(
     () => ({ login, logout, signup, state }),

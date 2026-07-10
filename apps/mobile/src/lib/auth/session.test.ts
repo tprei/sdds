@@ -262,6 +262,53 @@ describe('auth session controller', () => {
     ).resolves.toEqual({ status: 'anonymous' });
     expect(clearSessionToken).toHaveBeenCalledOnce();
   });
+
+  it('logs out locally when server revocation fails after clearing the token', async () => {
+    vi.mocked(deleteAuthSession).mockRejectedValue(new AuthAPIRequestError(500));
+    vi.mocked(clearSessionToken).mockResolvedValue(undefined);
+
+    await expect(
+      createAuthController().logout({
+        status: 'authenticated',
+        token: 'session-token',
+        user: apiUser(),
+      }),
+    ).resolves.toEqual({ status: 'anonymous' });
+    expect(deleteAuthSession).toHaveBeenCalledWith('session-token');
+    expect(clearSessionToken).toHaveBeenCalledOnce();
+  });
+
+  it('keeps logout rejected when a failed revocation cannot clear the token', async () => {
+    const clearError = new Error('storage failed');
+    vi.mocked(deleteAuthSession).mockRejectedValue(new AuthAPIRequestError(500));
+    vi.mocked(clearSessionToken).mockRejectedValue(clearError);
+
+    await expect(
+      createAuthController().logout({
+        status: 'authenticated',
+        token: 'session-token',
+        user: apiUser(),
+      }),
+    ).rejects.toBe(clearError);
+    expect(deleteAuthSession).toHaveBeenCalledWith('session-token');
+    expect(clearSessionToken).toHaveBeenCalledOnce();
+  });
+
+  it('keeps logout rejected when a revoked token cannot be cleared', async () => {
+    const clearError = new Error('storage failed');
+    vi.mocked(deleteAuthSession).mockResolvedValue(undefined);
+    vi.mocked(clearSessionToken).mockRejectedValue(clearError);
+
+    await expect(
+      createAuthController().logout({
+        status: 'authenticated',
+        token: 'session-token',
+        user: apiUser(),
+      }),
+    ).rejects.toBe(clearError);
+    expect(deleteAuthSession).toHaveBeenCalledWith('session-token');
+    expect(clearSessionToken).toHaveBeenCalledOnce();
+  });
 });
 
 type Deferred<T> = {

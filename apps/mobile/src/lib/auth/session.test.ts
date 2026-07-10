@@ -143,6 +143,42 @@ describe('auth session controller', () => {
     expect(clearSessionToken).not.toHaveBeenCalled();
   });
 
+  it('serializes login storage writes after bootstrap clears an expired token', async () => {
+    const bootSession = deferred<CurrentAuthSession>();
+    vi.mocked(readSessionToken)
+      .mockResolvedValueOnce('expired-token')
+      .mockResolvedValueOnce('expired-token');
+    vi.mocked(getAuthSession).mockReturnValueOnce(bootSession.promise);
+    vi.mocked(clearSessionToken).mockResolvedValue(undefined);
+    vi.mocked(createAuthSession).mockResolvedValue(
+      apiAuthSession({ token: 'fresh-token' }),
+    );
+    vi.mocked(saveSessionToken).mockResolvedValue(undefined);
+
+    const controller = createAuthController();
+    const bootstrap = controller.bootstrap();
+    const login = controller.login({
+      password: 'senha-secreta',
+      username: 'thiago',
+    });
+
+    await flushQueuedMutation();
+    expect(createAuthSession).not.toHaveBeenCalled();
+
+    bootSession.reject(new AuthAPIRequestError(401));
+
+    await expect(bootstrap).resolves.toEqual({ status: 'anonymous' });
+    await expect(login).resolves.toEqual({
+      status: 'authenticated',
+      token: 'fresh-token',
+      user: apiUser(),
+    });
+    expect(clearSessionToken).toHaveBeenCalledBefore(
+      vi.mocked(saveSessionToken),
+    );
+    expect(saveSessionToken).toHaveBeenCalledWith('fresh-token');
+  });
+
   it('logs in and persists the returned token', async () => {
     vi.mocked(createAuthSession).mockResolvedValue(apiAuthSession());
     vi.mocked(saveSessionToken).mockResolvedValue(undefined);

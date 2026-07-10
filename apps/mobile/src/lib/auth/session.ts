@@ -53,12 +53,14 @@ export function createAuthController(): AuthController {
 
   return {
     async bootstrap() {
-      const token = await readStoredSessionToken();
-      if (token === undefined) {
-        return { status: 'error' };
-      }
+      return runAuthMutation(async () => {
+        const token = await readStoredSessionToken();
+        if (token === undefined) {
+          return { status: 'error' };
+        }
 
-      return bootstrapToken(token);
+        return bootstrapToken(token);
+      });
     },
     async login(input) {
       return runAuthMutation(async () => {

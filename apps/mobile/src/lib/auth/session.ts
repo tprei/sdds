@@ -38,6 +38,19 @@ export type AuthController = {
 };
 
 export function createAuthController(): AuthController {
+  let mutationQueue: Promise<void> = Promise.resolve();
+
+  async function runAuthMutation(
+    operation: () => Promise<AuthState>,
+  ): Promise<AuthState> {
+    const result = mutationQueue.then(operation, operation);
+    mutationQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
   return {
     async bootstrap() {
       const token = await readStoredSessionToken();
@@ -48,26 +61,32 @@ export function createAuthController(): AuthController {
       return bootstrapToken(token);
     },
     async login(input) {
-      const session = await createAuthSession(input);
-      return persistSession(session);
+      return runAuthMutation(async () => {
+        const session = await createAuthSession(input);
+        return persistSession(session);
+      });
     },
     async logout(state) {
-      if (state.status === 'authenticated') {
-        try {
-          await deleteAuthSession(state.token);
-        } catch (error: unknown) {
-          if (!isUnauthenticatedRequest(error)) {
-            await clearSessionToken();
-            throw error;
+      return runAuthMutation(async () => {
+        if (state.status === 'authenticated') {
+          try {
+            await deleteAuthSession(state.token);
+          } catch (error: unknown) {
+            if (!isUnauthenticatedRequest(error)) {
+              await clearSessionToken();
+              throw error;
+            }
           }
         }
-      }
-      await clearSessionToken();
-      return { status: 'anonymous' };
+        await clearSessionToken();
+        return { status: 'anonymous' };
+      });
     },
     async signup(input) {
-      const session = await createAuthUser(input);
-      return persistSession(session);
+      return runAuthMutation(async () => {
+        const session = await createAuthUser(input);
+        return persistSession(session);
+      });
     },
   };
 }

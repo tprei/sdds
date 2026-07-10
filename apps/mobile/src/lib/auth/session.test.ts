@@ -164,6 +164,53 @@ describe('auth session controller', () => {
     expect(saveSessionToken).toHaveBeenCalledWith('session-token');
   });
 
+  it('serializes overlapping logins before persisting tokens', async () => {
+    const firstSession = deferred<AuthSession>();
+    const secondSession = deferred<AuthSession>();
+    vi.mocked(createAuthSession)
+      .mockReturnValueOnce(firstSession.promise)
+      .mockReturnValueOnce(secondSession.promise);
+    vi.mocked(saveSessionToken).mockResolvedValue(undefined);
+
+    const controller = createAuthController();
+    const firstLogin = controller.login({
+      password: 'senha-secreta',
+      username: 'ana',
+    });
+    const secondLogin = controller.login({
+      password: 'senha-secreta',
+      username: 'bia',
+    });
+
+    await flushQueuedMutation();
+
+    expect(createAuthSession).toHaveBeenCalledOnce();
+    firstSession.resolve(apiAuthSession({ token: 'ana-token' }));
+
+    await expect(firstLogin).resolves.toEqual({
+      status: 'authenticated',
+      token: 'ana-token',
+      user: apiUser(),
+    });
+    await flushQueuedMutation();
+
+    expect(createAuthSession).toHaveBeenCalledTimes(2);
+    expect(createAuthSession).toHaveBeenNthCalledWith(2, {
+      password: 'senha-secreta',
+      username: 'bia',
+    });
+    expect(saveSessionToken).toHaveBeenNthCalledWith(1, 'ana-token');
+
+    secondSession.resolve(apiAuthSession({ token: 'bia-token' }));
+
+    await expect(secondLogin).resolves.toEqual({
+      status: 'authenticated',
+      token: 'bia-token',
+      user: apiUser(),
+    });
+    expect(saveSessionToken).toHaveBeenNthCalledWith(2, 'bia-token');
+  });
+
   it('signs up and persists the returned token', async () => {
     vi.mocked(createAuthUser).mockResolvedValue(apiAuthSession());
     vi.mocked(saveSessionToken).mockResolvedValue(undefined);
@@ -217,10 +264,35 @@ describe('auth session controller', () => {
   });
 });
 
-function apiAuthSession(): AuthSession {
+type Deferred<T> = {
+  promise: Promise<T>;
+  reject(error: unknown): void;
+  resolve(value: T): void;
+};
+
+function deferred<T>(): Deferred<T> {
+  let rejectDeferred: (error: unknown) => void = () => undefined;
+  let resolveDeferred: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((resolve, reject) => {
+    rejectDeferred = reject;
+    resolveDeferred = resolve;
+  });
+  return {
+    promise,
+    reject: rejectDeferred,
+    resolve: resolveDeferred,
+  };
+}
+
+async function flushQueuedMutation(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+function apiAuthSession(options: { token?: string } = {}): AuthSession {
   return {
     expiresAt: 1782993600000,
-    token: 'session-token',
+    token: options.token ?? 'session-token',
     user: apiUser(),
   };
 }

@@ -15,6 +15,8 @@ tags:
     description: Runtime health endpoints.
   - name: Catalog
     description: Backend-owned category and place catalogs.
+  - name: Auth
+    description: User account and session endpoints.
   - name: Notes
     description: Text-first recommendation notes.
 paths:
@@ -94,6 +96,153 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: The API could not list places.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/auth/users:
+    post:
+      operationId: createAuthUser
+      summary: Create a user account
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: The user was created and signed in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSessionResponse"
+        "400":
+          description: The request JSON or auth fields are invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The username is already taken.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: The request body is too large.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not create the user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/auth/sessions:
+    post:
+      operationId: createAuthSession
+      summary: Create an authenticated session
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "201":
+          description: The credentials were exchanged for a session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSessionResponse"
+        "400":
+          description: The request JSON or auth fields are invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The credentials are invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: The request body is too large.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not create the session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/auth/session:
+    get:
+      operationId: getAuthSession
+      summary: Get the current authenticated session
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The current session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentSessionResponse"
+        "400":
+          description: The request does not match the API contract.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not get the current session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteAuthSession
+      summary: Delete the current authenticated session
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: The session was revoked.
+        "400":
+          description: The request does not match the API contract.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not revoke the session.
           content:
             application/json:
               schema:
@@ -242,7 +391,39 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
   schemas:
+    AuthSessionResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+        - expires_at
+        - user
+      properties:
+        token:
+          type: string
+        expires_at:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Unix timestamp in milliseconds.
+        user:
+          $ref: "#/components/schemas/CurrentUser"
+    AuthorSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - display_name
+      properties:
+        id:
+          type: string
+        display_name:
+          type: string
     CategorySlug:
       type: string
     PlaceSlug:
@@ -306,22 +487,81 @@ components:
           nullable: true
           allOf:
             - $ref: "#/components/schemas/PlaceSlug"
+    CreateSessionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    CreateUserRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - username
+        - password
+        - display_name
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        display_name:
+          type: string
+    CurrentSessionResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - expires_at
+        - user
+      properties:
+        expires_at:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Unix timestamp in milliseconds.
+        user:
+          $ref: "#/components/schemas/CurrentUser"
+    CurrentUser:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - username
+        - author
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        author:
+          $ref: "#/components/schemas/AuthorSummary"
     ErrorCode:
       type: string
       x-enum-varnames:
         - ErrorCodeInternal
+        - ErrorCodeInvalidAuth
         - ErrorCodeInvalidJSON
         - ErrorCodeInvalidNote
         - ErrorCodeInvalidSearch
         - ErrorCodeNotFound
         - ErrorCodeRequestTooLarge
+        - ErrorCodeUnauthenticated
+        - ErrorCodeUsernameTaken
       enum:
         - internal_error
+        - invalid_auth
         - invalid_json
         - invalid_note
         - invalid_search
         - not_found
         - request_too_large
+        - unauthenticated
+        - username_taken
     ErrorResponse:
       type: object
       additionalProperties: false
@@ -407,12 +647,18 @@ components:
         - ValidationFieldCategorySlug
         - ValidationFieldPlaceSlug
         - ValidationFieldQ
+        - ValidationFieldUsername
+        - ValidationFieldPassword
+        - ValidationFieldDisplayName
       enum:
         - title
         - body
         - category_slug
         - place_slug
         - q
+        - username
+        - password
+        - display_name
     ValidationProblem:
       type: object
       additionalProperties: false
@@ -429,8 +675,12 @@ components:
             - ValidationProblemCodeTooShort
             - ValidationProblemCodeTooLong
             - ValidationProblemCodeUnknown
+            - ValidationProblemCodeInvalid
+            - ValidationProblemCodeTaken
           enum:
             - required
             - too_short
             - too_long
             - unknown
+            - invalid
+            - taken

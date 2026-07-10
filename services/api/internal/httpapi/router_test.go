@@ -6,13 +6,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tprei/sdds/services/api/internal/note"
+	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 func newTestRouter(notes fakeNoteStore) http.Handler {
-	return NewRouter(notes, fakeCatalog{})
+	return NewRouter(notes, fakeCatalog{}, fakeUserStore{})
 }
 
 func TestHealthRoutesReturnNoContent(t *testing.T) {
@@ -212,4 +214,55 @@ func (catalog fakeCatalog) FindActivePlace(ctx context.Context, slug note.PlaceS
 		}
 	}
 	return note.Place{}, note.ErrPlaceNotFound
+}
+
+type fakeUserStore struct {
+	createPasswordUser func(ctx context.Context, input user.CreatePasswordUserInput) (user.CurrentSession, error)
+	findPasswordLogin  func(ctx context.Context, normalizedUsername string) (user.PasswordLogin, error)
+	createSession      func(ctx context.Context, input user.CreateSessionInput) (user.CurrentSession, error)
+	findCurrentSession func(ctx context.Context, tokenHash string, now time.Time) (user.CurrentSession, error)
+	revokeSession      func(ctx context.Context, sessionID user.SessionID, revokedAt time.Time) error
+	findAuthorByUserID func(ctx context.Context, userID user.UserID) (user.Author, error)
+}
+
+func (store fakeUserStore) CreatePasswordUser(ctx context.Context, input user.CreatePasswordUserInput) (user.CurrentSession, error) {
+	if store.createPasswordUser == nil {
+		return user.CurrentSession{}, fmt.Errorf("create password user not implemented")
+	}
+	return store.createPasswordUser(ctx, input)
+}
+
+func (store fakeUserStore) FindPasswordLogin(ctx context.Context, normalizedUsername string) (user.PasswordLogin, error) {
+	if store.findPasswordLogin == nil {
+		return user.PasswordLogin{}, fmt.Errorf("find password login not implemented")
+	}
+	return store.findPasswordLogin(ctx, normalizedUsername)
+}
+
+func (store fakeUserStore) CreateSession(ctx context.Context, input user.CreateSessionInput) (user.CurrentSession, error) {
+	if store.createSession == nil {
+		return user.CurrentSession{}, fmt.Errorf("create session not implemented")
+	}
+	return store.createSession(ctx, input)
+}
+
+func (store fakeUserStore) FindCurrentSession(ctx context.Context, tokenHash string, now time.Time) (user.CurrentSession, error) {
+	if store.findCurrentSession == nil {
+		return user.CurrentSession{}, fmt.Errorf("find current session not implemented")
+	}
+	return store.findCurrentSession(ctx, tokenHash, now)
+}
+
+func (store fakeUserStore) RevokeSession(ctx context.Context, sessionID user.SessionID, revokedAt time.Time) error {
+	if store.revokeSession == nil {
+		return fmt.Errorf("revoke session not implemented")
+	}
+	return store.revokeSession(ctx, sessionID, revokedAt)
+}
+
+func (store fakeUserStore) FindAuthorByUserID(ctx context.Context, userID user.UserID) (user.Author, error) {
+	if store.findAuthorByUserID == nil {
+		return user.Author{}, fmt.Errorf("find author by user id not implemented")
+	}
+	return store.findAuthorByUserID(ctx, userID)
 }

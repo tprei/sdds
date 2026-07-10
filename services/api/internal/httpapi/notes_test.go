@@ -125,7 +125,7 @@ func TestListNotesTreatsBlankCategoryFilterAsUnfiltered(t *testing.T) {
 			t.Fatal("FindActiveCategory should not be called")
 			return note.Category{}, nil
 		},
-	})
+	}, fakeUserStore{})
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/notes?category_slug=+%09+", nil)
@@ -326,7 +326,7 @@ func TestSearchNotesTreatsBlankCategoryFilterAsUnfiltered(t *testing.T) {
 			t.Fatal("FindActiveCategory should not be called")
 			return note.Category{}, nil
 		},
-	})
+	}, fakeUserStore{})
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=cafe&category_slug=+%09+", nil)

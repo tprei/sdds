@@ -72,6 +72,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a user account */
+        post: operations["createAuthUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create an authenticated session */
+        post: operations["createAuthSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the current authenticated session */
+        get: operations["getAuthSession"];
+        put?: never;
+        post?: never;
+        /** Delete the current authenticated session */
+        delete: operations["deleteAuthSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/notes": {
         parameters: {
             query?: never;
@@ -128,6 +180,19 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AuthSessionResponse: {
+            token: string;
+            /**
+             * Format: int64
+             * @description Unix timestamp in milliseconds.
+             */
+            expires_at: number;
+            user: components["schemas"]["CurrentUser"];
+        };
+        AuthorSummary: {
+            id: string;
+            display_name: string;
+        };
         CategorySlug: string;
         PlaceSlug: string;
         CatalogCategory: {
@@ -150,8 +215,30 @@ export interface components {
             category_slug: components["schemas"]["CategorySlug"];
             place_slug?: (string & components["schemas"]["PlaceSlug"]) | null;
         };
+        CreateSessionRequest: {
+            username: string;
+            password: string;
+        };
+        CreateUserRequest: {
+            username: string;
+            password: string;
+            display_name: string;
+        };
+        CurrentSessionResponse: {
+            /**
+             * Format: int64
+             * @description Unix timestamp in milliseconds.
+             */
+            expires_at: number;
+            user: components["schemas"]["CurrentUser"];
+        };
+        CurrentUser: {
+            id: string;
+            username: string;
+            author: components["schemas"]["AuthorSummary"];
+        };
         /** @enum {string} */
-        ErrorCode: "internal_error" | "invalid_json" | "invalid_note" | "invalid_search" | "not_found" | "request_too_large";
+        ErrorCode: "internal_error" | "invalid_auth" | "invalid_json" | "invalid_note" | "invalid_search" | "not_found" | "request_too_large" | "unauthenticated" | "username_taken";
         ErrorResponse: {
             code: components["schemas"]["ErrorCode"];
             fields?: components["schemas"]["ValidationProblem"][];
@@ -183,11 +270,11 @@ export interface components {
             updated_at: number;
         };
         /** @enum {string} */
-        ValidationField: "title" | "body" | "category_slug" | "place_slug" | "q";
+        ValidationField: "title" | "body" | "category_slug" | "place_slug" | "q" | "username" | "password" | "display_name";
         ValidationProblem: {
             field: components["schemas"]["ValidationField"];
             /** @enum {string} */
-            code: "required" | "too_short" | "too_long" | "unknown";
+            code: "required" | "too_short" | "too_long" | "unknown" | "invalid" | "taken";
         };
     };
     responses: never;
@@ -318,6 +405,218 @@ export interface operations {
                 };
             };
             /** @description The API could not list places. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createAuthUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description The user was created and signed in. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSessionResponse"];
+                };
+            };
+            /** @description The request JSON or auth fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The username is already taken. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request body is too large. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not create the user. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createAuthSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description The credentials were exchanged for a session. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSessionResponse"];
+                };
+            };
+            /** @description The request JSON or auth fields are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The credentials are invalid. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request body is too large. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not create the session. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getAuthSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The current session. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentSessionResponse"];
+                };
+            };
+            /** @description The request does not match the API contract. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not get the current session. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deleteAuthSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session was revoked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The request does not match the API contract. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not revoke the session. */
             500: {
                 headers: {
                     [name: string]: unknown;

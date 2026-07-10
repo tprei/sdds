@@ -40,6 +40,32 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 
 	requireCatalogs(t, client)
 
+	username := fmt.Sprintf("thiago-%d", time.Now().UnixNano())
+	displayName := "Thiago Integração"
+	password := "secret-password"
+	createdSession := createAuthUser(t, client, openapi.CreateAuthUserJSONRequestBody{
+		Username:    username,
+		Password:    password,
+		DisplayName: displayName,
+	})
+	requireAuthSession(t, createdSession, username, displayName)
+	requireDuplicateAuthUser(t, client, openapi.CreateAuthUserJSONRequestBody{
+		Username:    username,
+		Password:    password,
+		DisplayName: displayName,
+	})
+	currentSession := getAuthSession(t, client, createdSession.Token)
+	requireCurrentSession(t, currentSession, createdSession)
+	deleteAuthSession(t, client, createdSession.Token)
+	requireUnauthenticatedAuthSession(t, client, createdSession.Token)
+	requireInvalidAuthSession(t, client, username, "wrong-password")
+	loggedInSession := createAuthSession(t, client, openapi.CreateAuthSessionJSONRequestBody{
+		Username: username,
+		Password: password,
+	})
+	requireAuthSession(t, loggedInSession, username, displayName)
+	requireCurrentSession(t, getAuthSession(t, client, loggedInSession.Token), loggedInSession)
+
 	initialNotes := listNotes(t, client)
 	if len(initialNotes.Notes) != 0 {
 		t.Fatalf("initial note count = %d, want 0", len(initialNotes.Notes))
@@ -360,6 +386,116 @@ func createNote(t *testing.T, client *openapi.ClientWithResponses, request opena
 	return *response.JSON201
 }
 
+func createAuthUser(t *testing.T, client *openapi.ClientWithResponses, request openapi.CreateAuthUserJSONRequestBody) openapi.AuthSessionResponse {
+	t.Helper()
+
+	response, err := client.CreateAuthUserWithResponse(context.Background(), request)
+	if err != nil {
+		t.Fatalf("POST /v1/auth/users: %v", err)
+	}
+	requireStatus(t, "POST /v1/auth/users", response.StatusCode(), http.StatusCreated, response.Body)
+	if response.JSON201 == nil {
+		t.Fatal("POST /v1/auth/users returned 201 without JSON body")
+	}
+	return *response.JSON201
+}
+
+func requireDuplicateAuthUser(t *testing.T, client *openapi.ClientWithResponses, request openapi.CreateAuthUserJSONRequestBody) {
+	t.Helper()
+
+	response, err := client.CreateAuthUserWithResponse(context.Background(), request)
+	if err != nil {
+		t.Fatalf("POST /v1/auth/users duplicate: %v", err)
+	}
+	requireStatus(t, "POST /v1/auth/users duplicate", response.StatusCode(), http.StatusConflict, response.Body)
+	if response.JSON409 == nil {
+		t.Fatal("POST /v1/auth/users duplicate returned 409 without JSON body")
+	}
+	if response.JSON409.Code != openapi.ErrorCodeUsernameTaken {
+		t.Fatalf("duplicate code = %s, want %s", response.JSON409.Code, openapi.ErrorCodeUsernameTaken)
+	}
+}
+
+func createAuthSession(t *testing.T, client *openapi.ClientWithResponses, request openapi.CreateAuthSessionJSONRequestBody) openapi.AuthSessionResponse {
+	t.Helper()
+
+	response, err := client.CreateAuthSessionWithResponse(context.Background(), request)
+	if err != nil {
+		t.Fatalf("POST /v1/auth/sessions: %v", err)
+	}
+	requireStatus(t, "POST /v1/auth/sessions", response.StatusCode(), http.StatusCreated, response.Body)
+	if response.JSON201 == nil {
+		t.Fatal("POST /v1/auth/sessions returned 201 without JSON body")
+	}
+	return *response.JSON201
+}
+
+func requireInvalidAuthSession(t *testing.T, client *openapi.ClientWithResponses, username string, password string) {
+	t.Helper()
+
+	response, err := client.CreateAuthSessionWithResponse(context.Background(), openapi.CreateAuthSessionJSONRequestBody{
+		Username: username,
+		Password: password,
+	})
+	if err != nil {
+		t.Fatalf("POST /v1/auth/sessions invalid: %v", err)
+	}
+	requireStatus(t, "POST /v1/auth/sessions invalid", response.StatusCode(), http.StatusUnauthorized, response.Body)
+	if response.JSON401 == nil {
+		t.Fatal("POST /v1/auth/sessions invalid returned 401 without JSON body")
+	}
+	if response.JSON401.Code != openapi.ErrorCodeInvalidAuth {
+		t.Fatalf("invalid auth code = %s, want %s", response.JSON401.Code, openapi.ErrorCodeInvalidAuth)
+	}
+}
+
+func getAuthSession(t *testing.T, client *openapi.ClientWithResponses, token string) openapi.CurrentSessionResponse {
+	t.Helper()
+
+	response, err := client.GetAuthSessionWithResponse(context.Background(), bearerTokenEditor(token))
+	if err != nil {
+		t.Fatalf("GET /v1/auth/session: %v", err)
+	}
+	requireStatus(t, "GET /v1/auth/session", response.StatusCode(), http.StatusOK, response.Body)
+	if response.JSON200 == nil {
+		t.Fatal("GET /v1/auth/session returned 200 without JSON body")
+	}
+	return *response.JSON200
+}
+
+func requireUnauthenticatedAuthSession(t *testing.T, client *openapi.ClientWithResponses, token string) {
+	t.Helper()
+
+	response, err := client.GetAuthSessionWithResponse(context.Background(), bearerTokenEditor(token))
+	if err != nil {
+		t.Fatalf("GET /v1/auth/session unauthenticated: %v", err)
+	}
+	requireStatus(t, "GET /v1/auth/session unauthenticated", response.StatusCode(), http.StatusUnauthorized, response.Body)
+	if response.JSON401 == nil {
+		t.Fatal("GET /v1/auth/session unauthenticated returned 401 without JSON body")
+	}
+	if response.JSON401.Code != openapi.ErrorCodeUnauthenticated {
+		t.Fatalf("unauthenticated code = %s, want %s", response.JSON401.Code, openapi.ErrorCodeUnauthenticated)
+	}
+}
+
+func deleteAuthSession(t *testing.T, client *openapi.ClientWithResponses, token string) {
+	t.Helper()
+
+	response, err := client.DeleteAuthSessionWithResponse(context.Background(), bearerTokenEditor(token))
+	if err != nil {
+		t.Fatalf("DELETE /v1/auth/session: %v", err)
+	}
+	requireStatus(t, "DELETE /v1/auth/session", response.StatusCode(), http.StatusNoContent, response.Body)
+}
+
+func bearerTokenEditor(token string) openapi.RequestEditorFn {
+	return func(_ context.Context, request *http.Request) error {
+		request.Header.Set("Authorization", "Bearer "+token)
+		return nil
+	}
+}
+
 func getNote(t *testing.T, client *openapi.ClientWithResponses, id string) openapi.Note {
 	t.Helper()
 
@@ -463,6 +599,43 @@ func requireStatus(t *testing.T, operation string, got int, want int, body []byt
 
 	if got != want {
 		t.Fatalf("%s status = %d, want %d; body: %s", operation, got, want, string(body))
+	}
+}
+
+func requireAuthSession(t *testing.T, got openapi.AuthSessionResponse, username string, displayName string) {
+	t.Helper()
+
+	if got.Token == "" {
+		t.Fatal("auth token is empty")
+	}
+	if got.ExpiresAt <= time.Now().UnixMilli() {
+		t.Fatalf("expires_at = %d, want future timestamp", got.ExpiresAt)
+	}
+	if got.User.Id == "" {
+		t.Fatal("current user id is empty")
+	}
+	if got.User.Id == got.User.Author.Id {
+		t.Fatal("current private user id matches public author id")
+	}
+	if got.User.Username != username {
+		t.Fatalf("username = %q, want %q", got.User.Username, username)
+	}
+	if got.User.Author.Id == "" {
+		t.Fatal("author id is empty")
+	}
+	if got.User.Author.DisplayName != displayName {
+		t.Fatalf("author display_name = %q, want %q", got.User.Author.DisplayName, displayName)
+	}
+}
+
+func requireCurrentSession(t *testing.T, got openapi.CurrentSessionResponse, want openapi.AuthSessionResponse) {
+	t.Helper()
+
+	if got.ExpiresAt != want.ExpiresAt {
+		t.Fatalf("current expires_at = %d, want %d", got.ExpiresAt, want.ExpiresAt)
+	}
+	if diff := cmp.Diff(want.User, got.User); diff != "" {
+		t.Fatalf("current user mismatch (-want +got):\n%s", diff)
 	}
 }
 

@@ -3,28 +3,87 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
+	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 type server struct {
-	notes   note.Store
-	catalog note.Catalog
+	notes                 note.Store
+	catalog               note.Catalog
+	users                 user.Store
+	passwordHasher        passwordHasher
+	invalidCredentialHash string
+	newSessionToken       func() (string, error)
+	clock                 func() time.Time
 }
 
 var _ openapi.ServerInterface = server{}
 
-func NewRouter(notes note.Store, catalog note.Catalog) http.Handler {
+type passwordHasher interface {
+	Hash(password string) (string, error)
+	Verify(password string, encoded string) (bool, error)
+}
+
+func NewRouter(notes note.Store, catalog note.Catalog, users user.Store) http.Handler {
+	hasher := user.NewPasswordHasher()
+	return newRouter(notes, catalog, users, hasher, mustInvalidCredentialHash(hasher), user.NewSessionToken, time.Now)
+}
+
+func newRouter(
+	notes note.Store,
+	catalog note.Catalog,
+	users user.Store,
+	passwordHasher passwordHasher,
+	invalidCredentialHash string,
+	newSessionToken func() (string, error),
+	clock func() time.Time,
+) http.Handler {
 	router := chi.NewRouter()
 	router.Use(localBrowserCORS)
 	router.Use(openAPIRequestValidator())
 
-	return openapi.HandlerWithOptions(server{notes: notes, catalog: catalog}, openapi.ChiServerOptions{
-		BaseRouter:       router,
+	handler := server{
+		notes:                 notes,
+		catalog:               catalog,
+		users:                 users,
+		passwordHasher:        passwordHasher,
+		invalidCredentialHash: invalidCredentialHash,
+		newSessionToken:       newSessionToken,
+		clock:                 clock,
+	}
+	wrapper := openapi.ServerInterfaceWrapper{
+		Handler:          handler,
 		ErrorHandlerFunc: writeGeneratedOpenAPIError,
+	}
+
+	router.Get("/healthz", wrapper.GetHealth)
+	router.Get("/readyz", wrapper.GetReadiness)
+	router.Route("/v1", func(router chi.Router) {
+		router.Get("/categories", wrapper.ListCategories)
+		router.Get("/places", wrapper.ListPlaces)
+		router.Get("/notes", wrapper.ListNotes)
+		router.Post("/notes", wrapper.CreateNote)
+		router.Get("/notes/{note_id}", wrapper.GetNote)
+		router.Get("/search/notes", wrapper.SearchNotes)
+		router.Post("/auth/users", wrapper.CreateAuthUser)
+		router.Post("/auth/sessions", wrapper.CreateAuthSession)
+		router.With(requireAuth(users, clock)).Get("/auth/session", wrapper.GetAuthSession)
+		router.With(requireAuth(users, clock)).Delete("/auth/session", wrapper.DeleteAuthSession)
 	})
+
+	return router
+}
+
+func mustInvalidCredentialHash(hasher passwordHasher) string {
+	hash, err := hasher.Hash("invalid-credential-probe")
+	if err != nil {
+		panic(err)
+	}
+	return hash
 }
 
 func writeGeneratedOpenAPIError(w http.ResponseWriter, r *http.Request, err error) {

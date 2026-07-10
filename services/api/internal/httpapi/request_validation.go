@@ -9,7 +9,11 @@ import (
 	"github.com/tprei/sdds/services/api/internal/openapi"
 )
 
-const createNoteGeneratedOperationID = "CreateNote"
+const (
+	createAuthSessionGeneratedOperationID = "CreateAuthSession"
+	createAuthUserGeneratedOperationID    = "CreateAuthUser"
+	createNoteGeneratedOperationID        = "CreateNote"
+)
 
 func openAPIRequestValidator() func(http.Handler) http.Handler {
 	spec, err := openapi.GetSpec()
@@ -72,6 +76,8 @@ func writeOpenAPIRequestValidationError(w http.ResponseWriter, err error) {
 
 func requestBodyLimitForOperation(operationID string) (int64, bool) {
 	switch operationID {
+	case createAuthSessionGeneratedOperationID, createAuthUserGeneratedOperationID:
+		return maxAuthRequestBytes, true
 	case createNoteGeneratedOperationID:
 		return maxCreateNoteRequestBytes, true
 	default:

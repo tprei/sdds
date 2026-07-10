@@ -200,7 +200,7 @@ export default function ComposeScreen() {
             accessibilityLabel="Texto da nota"
             multiline
             onChangeText={setBody}
-            placeholder="O que você testou, gostou ou recomenda?"
+            placeholder="O que você quer compartilhar?"
             value={body}
           />
           {catalogState.status === 'loading' ? (

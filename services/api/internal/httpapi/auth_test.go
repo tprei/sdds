@@ -43,7 +43,7 @@ func TestCreateAuthUserReturnsSession(t *testing.T) {
 		},
 	}, hasher, authTestCredentialProbeHash(t), func() (string, error) {
 		return "created-token", nil
-	}, func() time.Time { return now })
+	}, func() time.Time { return now }, authTestLimits())
 
 	response := httptest.NewRecorder()
 	request := jsonRequest(http.MethodPost, "/v1/auth/users", `{"username":" Thiago ","password":"secret-password","display_name":" Thiago "}`)
@@ -163,7 +163,7 @@ func TestCreateAuthSessionReturnsSession(t *testing.T) {
 		},
 	}, hasher, authTestCredentialProbeHash(t), func() (string, error) {
 		return "login-token", nil
-	}, func() time.Time { return now })
+	}, func() time.Time { return now }, authTestLimits())
 	response := httptest.NewRecorder()
 	request := jsonRequest(http.MethodPost, "/v1/auth/sessions", `{"username":" Thiago ","password":"secret-password"}`)
 
@@ -317,7 +317,7 @@ func TestCreateAuthSessionVerifiesPasswordBeforeRejectingCredentials(t *testing.
 				return "unused-token", nil
 			}, func() time.Time {
 				return time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
-			})
+			}, authTestLimits())
 
 			response := httptest.NewRecorder()
 			request := jsonRequest(http.MethodPost, "/v1/auth/sessions", `{"username":"thiago","password":"secret-password"}`)
@@ -357,7 +357,7 @@ func TestGetAuthSessionReturnsCurrentSession(t *testing.T) {
 		},
 	}, authTestPasswordHasher(), authTestCredentialProbeHash(t), func() (string, error) {
 		return "unused-token", nil
-	}, func() time.Time { return now })
+	}, func() time.Time { return now }, authTestLimits())
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/auth/session", nil)
 	request.Header.Set("Authorization", "Bearer current-token")
@@ -465,7 +465,7 @@ func TestDeleteAuthSessionRevokesCurrentSession(t *testing.T) {
 		},
 	}, authTestPasswordHasher(), authTestCredentialProbeHash(t), func() (string, error) {
 		return "unused-token", nil
-	}, func() time.Time { return now })
+	}, func() time.Time { return now }, authTestLimits())
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodDelete, "/v1/auth/session", nil)
 	request.Header.Set("Authorization", "Bearer current-token")
@@ -560,7 +560,15 @@ func newAuthTestRouter(t *testing.T, users fakeUserStore) http.Handler {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	return newRouter(fakeNoteStore{}, fakeCatalog{}, users, authTestPasswordHasher(), authTestCredentialProbeHash(t), func() (string, error) {
 		return "test-token", nil
-	}, func() time.Time { return now })
+	}, func() time.Time { return now }, authTestLimits())
+}
+
+func authTestLimits() AuthLimits {
+	return AuthLimits{
+		SignupRequestsPerMinute: 1000,
+		LoginRequestsPerMinute:  1000,
+		PasswordHashConcurrency: 4,
+	}
 }
 
 func authTestCredentialProbeHash(t *testing.T) string {
@@ -586,7 +594,7 @@ func authTestPasswordHasher() user.PasswordHasher {
 			SaltLength:  16,
 			KeyLength:   32,
 		},
-		SaltReader: bytes.NewReader(bytes.Repeat([]byte{3}, 16)),
+		SaltReader: bytes.NewReader(bytes.Repeat([]byte{3}, 16*1024)),
 	}
 }
 

@@ -17,11 +17,9 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
-	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 const exampleNoteID = "018ff5b8-0000-7000-8000-000000000000"
-const exampleAuthorID = "author-id-thiago"
 
 func TestListNotesReturnsRecentNotes(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
@@ -39,7 +37,6 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 				Body:         "Tem pão de queijo decente.",
 				CategorySlug: "food",
 				PlaceSlug:    "sao-paulo",
-				Author:       exampleAuthor(),
 				CreatedAt:    now,
 				UpdatedAt:    now,
 			}}, nil
@@ -66,7 +63,6 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugFood),
 		PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
-		Author:       exampleOpenAPIAuthor(),
 		CreatedAt:    now.UnixMilli(),
 		UpdatedAt:    now.UnixMilli(),
 	}}}
@@ -87,7 +83,7 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 	if !ok {
 		t.Fatalf("note = %T, want map[string]any", notesValue[0])
 	}
-	requireJSONKeys(t, noteValue, "id", "title", "body", "category_slug", "place_slug", "author", "created_at", "updated_at")
+	requireJSONKeys(t, noteValue, "id", "title", "body", "category_slug", "place_slug", "created_at", "updated_at")
 	requireJSONNumber(t, noteValue, "created_at", now.UnixMilli())
 	requireJSONNumber(t, noteValue, "updated_at", now.UnixMilli())
 }
@@ -221,7 +217,6 @@ func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 				Body:         "Tem pão de queijo decente.",
 				CategorySlug: "food",
 				PlaceSlug:    "sao-paulo",
-				Author:       exampleAuthor(),
 				CreatedAt:    now,
 				UpdatedAt:    now,
 			}}, nil
@@ -248,7 +243,6 @@ func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugFood),
 		PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
-		Author:       exampleOpenAPIAuthor(),
 		CreatedAt:    now.UnixMilli(),
 		UpdatedAt:    now.UnixMilli(),
 	}}}
@@ -564,7 +558,6 @@ func TestGetNoteReturnsNote(t *testing.T) {
 				Body:         "Tem pão de queijo decente.",
 				CategorySlug: "food",
 				PlaceSlug:    "sao-paulo",
-				Author:       exampleAuthor(),
 				CreatedAt:    now,
 				UpdatedAt:    now,
 			}, nil
@@ -591,7 +584,6 @@ func TestGetNoteReturnsNote(t *testing.T) {
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugFood),
 		PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
-		Author:       exampleOpenAPIAuthor(),
 		CreatedAt:    now.UnixMilli(),
 		UpdatedAt:    now.UnixMilli(),
 	}
@@ -654,11 +646,8 @@ func TestGetNoteReturnsInternalError(t *testing.T) {
 
 func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
-	router := newAuthenticatedTestRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
-			if input.UserID != "user-id-thiago" {
-				t.Fatalf("user id = %q, want user-id-thiago", input.UserID)
-			}
 			if input.Title != "Café bom" {
 				t.Fatalf("title = %q, want Café bom", input.Title)
 			}
@@ -667,12 +656,10 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 			}
 			return note.Note{
 				ID:           exampleNoteID,
-				UserID:       input.UserID,
 				Title:        input.Title,
 				Body:         input.Body,
 				CategorySlug: input.CategorySlug,
 				PlaceSlug:    input.PlaceSlug,
-				Author:       exampleAuthor(),
 				CreatedAt:    now,
 				UpdatedAt:    now,
 			}, nil
@@ -683,7 +670,6 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
-	authorizeTestRequest(request)
 
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)
@@ -702,7 +688,6 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugFood),
 		PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
-		Author:       exampleOpenAPIAuthor(),
 		CreatedAt:    now.UnixMilli(),
 		UpdatedAt:    now.UnixMilli(),
 	}
@@ -716,18 +701,16 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 }
 
 func TestCreateNoteAcceptsOmittedPlace(t *testing.T) {
-	router := newAuthenticatedTestRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
 			if input.PlaceSlug != "" {
 				t.Fatalf("place slug = %q, want empty", input.PlaceSlug)
 			}
 			return note.Note{
 				ID:           exampleNoteID,
-				UserID:       input.UserID,
 				Title:        input.Title,
 				Body:         input.Body,
 				CategorySlug: input.CategorySlug,
-				Author:       exampleAuthor(),
 				CreatedAt:    time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
 				UpdatedAt:    time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
 			}, nil
@@ -737,7 +720,6 @@ func TestCreateNoteAcceptsOmittedPlace(t *testing.T) {
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(`{"title":"Café bom","body":"Funciona.","category_slug":"food"}`))
 	request.Header.Set("Content-Type", "application/json")
-	authorizeTestRequest(request)
 
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)
@@ -756,18 +738,16 @@ func TestCreateNoteAcceptsOmittedPlace(t *testing.T) {
 }
 
 func TestCreateNoteAcceptsNullPlace(t *testing.T) {
-	router := newAuthenticatedTestRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
 			if input.PlaceSlug != "" {
 				t.Fatalf("place slug = %q, want empty", input.PlaceSlug)
 			}
 			return note.Note{
 				ID:           exampleNoteID,
-				UserID:       input.UserID,
 				Title:        input.Title,
 				Body:         input.Body,
 				CategorySlug: input.CategorySlug,
-				Author:       exampleAuthor(),
 				CreatedAt:    time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
 				UpdatedAt:    time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
 			}, nil
@@ -777,7 +757,6 @@ func TestCreateNoteAcceptsNullPlace(t *testing.T) {
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(`{"title":"Café bom","body":"Funciona.","category_slug":"food","place_slug":null}`))
 	request.Header.Set("Content-Type", "application/json")
-	authorizeTestRequest(request)
 
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)
@@ -795,79 +774,12 @@ func TestCreateNoteAcceptsNullPlace(t *testing.T) {
 	}
 }
 
-func TestCreateNoteRejectsMissingSession(t *testing.T) {
-	router := newAuthenticatedTestRouter(fakeNoteStore{
-		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
-			t.Fatal("CreateNote should not be called")
-			return note.Note{}, nil
-		},
-	})
-	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(`{"title":"Café bom","body":"Funciona.","category_slug":"food"}`))
-	request.Header.Set("Content-Type", "application/json")
-
-	router.ServeHTTP(response, request)
-	requireOpenAPIResponse(t, request, response)
-
-	if response.Code != http.StatusUnauthorized {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
-	}
-	var body openapi.ErrorResponse
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if body.Code != openapi.ErrorCodeUnauthenticated {
-		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeUnauthenticated)
-	}
-}
-
-func TestCreateNoteRejectsMissingSessionBeforeRequestValidation(t *testing.T) {
-	router := newAuthenticatedTestRouter(fakeNoteStore{
-		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
-			t.Fatal("CreateNote should not be called")
-			return note.Note{}, nil
-		},
-	})
-
-	tests := []struct {
-		name string
-		body string
-	}{
-		{name: "malformed JSON", body: `{"title":`},
-		{name: "missing body", body: ""},
-		{name: "oversized body", body: strings.Repeat("{", int(maxCreateNoteRequestBytes)+1)},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			response := httptest.NewRecorder()
-			request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(tt.body))
-			request.Header.Set("Content-Type", "application/json")
-
-			router.ServeHTTP(response, request)
-			requireOpenAPIResponse(t, request, response)
-
-			if response.Code != http.StatusUnauthorized {
-				t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
-			}
-			var body openapi.ErrorResponse
-			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-				t.Fatalf("decode response: %v", err)
-			}
-			if body.Code != openapi.ErrorCodeUnauthenticated {
-				t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeUnauthenticated)
-			}
-		})
-	}
-}
-
 func TestCreateNoteRejectsValidationProblems(t *testing.T) {
-	router := newAuthenticatedTestRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 	requestBody := []byte(`{"title":"   ","body":"   ","category_slug":"food","place_slug":"sao-paulo"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
-	authorizeTestRequest(request)
 
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)
@@ -924,7 +836,7 @@ func TestCreateNoteRejectsOpenAPIRequestSchemaProblems(t *testing.T) {
 		},
 	}
 
-	router := newAuthenticatedTestRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
 			t.Fatal("CreateNote should not be called")
 			return note.Note{}, nil
@@ -936,7 +848,6 @@ func TestCreateNoteRejectsOpenAPIRequestSchemaProblems(t *testing.T) {
 			response := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(tt.body))
 			request.Header.Set("Content-Type", "application/json")
-			authorizeTestRequest(request)
 
 			router.ServeHTTP(response, request)
 			requireOpenAPIResponse(t, request, response)
@@ -960,12 +871,11 @@ func TestCreateNoteRejectsOpenAPIRequestSchemaProblems(t *testing.T) {
 }
 
 func TestCreateNoteRejectsUnknownSlugsThroughCatalogValidation(t *testing.T) {
-	router := newAuthenticatedTestRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"qualquer","place_slug":"qualquer"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
-	authorizeTestRequest(request)
 
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)
@@ -988,11 +898,10 @@ func TestCreateNoteRejectsUnknownSlugsThroughCatalogValidation(t *testing.T) {
 }
 
 func TestCreateNoteRejectsInvalidJSON(t *testing.T) {
-	router := newAuthenticatedTestRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader([]byte(`{"title":`)))
 	request.Header.Set("Content-Type", "application/json")
-	authorizeTestRequest(request)
 
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)
@@ -1019,7 +928,7 @@ func TestCreateNoteRejectsMissingOrUnsupportedContentType(t *testing.T) {
 		{name: "unsupported", contentType: "text/plain"},
 	}
 
-	router := newAuthenticatedTestRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
 			t.Fatal("CreateNote should not be called")
 			return note.Note{}, nil
@@ -1034,7 +943,6 @@ func TestCreateNoteRejectsMissingOrUnsupportedContentType(t *testing.T) {
 			if tt.contentType != "" {
 				request.Header.Set("Content-Type", tt.contentType)
 			}
-			authorizeTestRequest(request)
 
 			router.ServeHTTP(response, request)
 			requireOpenAPIResponse(t, request, response)
@@ -1055,7 +963,7 @@ func TestCreateNoteRejectsMissingOrUnsupportedContentType(t *testing.T) {
 }
 
 func TestCreateNoteRejectsOldCitySlugJSON(t *testing.T) {
-	router := newAuthenticatedTestRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
 			t.Fatal("CreateNote should not be called")
 			return note.Note{}, nil
@@ -1065,7 +973,6 @@ func TestCreateNoteRejectsOldCitySlugJSON(t *testing.T) {
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
-	authorizeTestRequest(request)
 
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)
@@ -1084,7 +991,7 @@ func TestCreateNoteRejectsOldCitySlugJSON(t *testing.T) {
 }
 
 func TestCreateNoteRejectsUnknownJSONFields(t *testing.T) {
-	router := newAuthenticatedTestRouter(fakeNoteStore{
+	router := newTestRouter(fakeNoteStore{
 		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
 			t.Fatal("CreateNote should not be called")
 			return note.Note{}, nil
@@ -1094,7 +1001,6 @@ func TestCreateNoteRejectsUnknownJSONFields(t *testing.T) {
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
-	authorizeTestRequest(request)
 
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)
@@ -1113,12 +1019,11 @@ func TestCreateNoteRejectsUnknownJSONFields(t *testing.T) {
 }
 
 func TestCreateNoteRejectsTrailingJSON(t *testing.T) {
-	router := newAuthenticatedTestRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"food","place_slug":"sao-paulo"} {}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
-	authorizeTestRequest(request)
 
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)
@@ -1137,12 +1042,11 @@ func TestCreateNoteRejectsTrailingJSON(t *testing.T) {
 }
 
 func TestCreateNoteRejectsOversizedRequestBody(t *testing.T) {
-	router := newAuthenticatedTestRouter(fakeNoteStore{})
+	router := newTestRouter(fakeNoteStore{})
 	requestBody := []byte(`{"title":"Café bom","body":"` + strings.Repeat("a", int(maxCreateNoteRequestBytes)) + `","category_slug":"food","place_slug":"sao-paulo"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
-	authorizeTestRequest(request)
 
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)
@@ -1196,52 +1100,6 @@ func TestNoteRoutesRejectUnsupportedMethods(t *testing.T) {
 
 	if response.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusMethodNotAllowed)
-	}
-}
-
-func newAuthenticatedTestRouter(notes fakeNoteStore) http.Handler {
-	return NewRouter(notes, fakeCatalog{}, fakeUserStore{
-		findCurrentSession: func(_ context.Context, tokenHash string, _ time.Time) (user.CurrentSession, error) {
-			if tokenHash != user.HashSessionToken("current-token") {
-				return user.CurrentSession{}, user.ErrSessionNotFound
-			}
-			return user.CurrentSession{
-				Session: user.Session{
-					ID:        "session-id-thiago",
-					UserID:    "user-id-thiago",
-					TokenHash: tokenHash,
-					ExpiresAt: time.Date(2026, 8, 2, 12, 0, 0, 0, time.UTC),
-				},
-				User: user.User{
-					ID:    "user-id-thiago",
-					State: user.UserStateActive,
-				},
-				Author: user.Author{
-					ID:          exampleAuthorID,
-					UserID:      "user-id-thiago",
-					DisplayName: "Thiago",
-				},
-				Username: "thiago",
-			}, nil
-		},
-	}, DefaultAuthLimits())
-}
-
-func authorizeTestRequest(request *http.Request) {
-	request.Header.Set("Authorization", "Bearer current-token")
-}
-
-func exampleAuthor() note.AuthorSummary {
-	return note.AuthorSummary{
-		ID:          exampleAuthorID,
-		DisplayName: "Thiago",
-	}
-}
-
-func exampleOpenAPIAuthor() openapi.AuthorSummary {
-	return openapi.AuthorSummary{
-		Id:          exampleAuthorID,
-		DisplayName: "Thiago",
 	}
 }
 

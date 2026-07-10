@@ -28,6 +28,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: AuthProviderProps) {
   const controller = useMemo(() => createAuthController(), []);
   const [state, setState] = useState<AuthState>({ status: 'loading' });
+  const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const operationVersionRef = useRef(0);
   const stateRef = useRef<AuthState>(state);
 
   const setAuthState = useCallback((nextState: AuthState) => {
@@ -35,11 +37,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setState(nextState);
   }, []);
 
+  const enqueueAuthMutation = useCallback(
+    async (operation: () => Promise<AuthState>) => {
+      const mutation = mutationQueueRef.current.then(operation, operation);
+      const update = mutation.then((nextState) => {
+        operationVersionRef.current += 1;
+        setAuthState(nextState);
+        return nextState;
+      });
+      mutationQueueRef.current = update.then(
+        () => undefined,
+        () => undefined,
+      );
+      return update;
+    },
+    [setAuthState],
+  );
+
   useEffect(() => {
     let isActive = true;
+    const bootstrapVersion = operationVersionRef.current;
 
     controller.bootstrap().then((nextState) => {
-      if (isActive) {
+      if (isActive && bootstrapVersion === operationVersionRef.current) {
         setAuthState(nextState);
       }
     });
@@ -51,29 +71,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = useCallback(
     async (input: LoginInput) => {
-      const nextState = await controller.login(input);
-      setAuthState(nextState);
+      await enqueueAuthMutation(() => controller.login(input));
     },
-    [controller, setAuthState],
+    [controller, enqueueAuthMutation],
   );
 
   const signup = useCallback(
     async (input: SignupInput) => {
-      const nextState = await controller.signup(input);
-      setAuthState(nextState);
+      await enqueueAuthMutation(() => controller.signup(input));
     },
-    [controller, setAuthState],
+    [controller, enqueueAuthMutation],
   );
 
   const logout = useCallback(async () => {
-    try {
-      const nextState = await controller.logout(stateRef.current);
-      setAuthState(nextState);
-    } catch (error: unknown) {
-      setAuthState({ status: 'anonymous' });
-      throw error;
-    }
-  }, [controller, setAuthState]);
+    await enqueueAuthMutation(() => controller.logout(stateRef.current));
+  }, [controller, enqueueAuthMutation]);
 
   const value = useMemo(
     () => ({ login, logout, signup, state }),

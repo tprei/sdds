@@ -38,54 +38,104 @@ export type AuthController = {
 };
 
 export function createAuthController(): AuthController {
+  let mutationQueue: Promise<void> = Promise.resolve();
+
+  async function runAuthMutation(
+    operation: () => Promise<AuthState>,
+  ): Promise<AuthState> {
+    const result = mutationQueue.then(operation, operation);
+    mutationQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
   return {
     async bootstrap() {
-      const token = await readSessionToken();
-      if (token === null) {
-        return { status: 'anonymous' };
-      }
-
-      try {
-        const session = await getAuthSession(token);
-        return {
-          status: 'authenticated',
-          token,
-          user: session.user,
-        };
-      } catch (error: unknown) {
-        if (!isUnauthenticatedRequest(error)) {
+      return runAuthMutation(async () => {
+        const token = await readStoredSessionToken();
+        if (token === undefined) {
           return { status: 'error' };
+        }
+
+        return bootstrapToken(token);
+      });
+    },
+    async login(input) {
+      return runAuthMutation(async () => {
+        const session = await createAuthSession(input);
+        return persistSession(session);
+      });
+    },
+    async logout(state) {
+      return runAuthMutation(async () => {
+        if (state.status === 'authenticated') {
+          try {
+            await deleteAuthSession(state.token);
+          } catch (error: unknown) {
+            if (!isUnauthenticatedRequest(error)) {
+              await clearSessionToken();
+              return { status: 'anonymous' };
+            }
+          }
         }
         await clearSessionToken();
         return { status: 'anonymous' };
-      }
-    },
-    async login(input) {
-      const session = await createAuthSession(input);
-      return persistSession(session);
-    },
-    async logout(state) {
-      if (state.status === 'authenticated') {
-        try {
-          await deleteAuthSession(state.token);
-        } catch (error: unknown) {
-          if (!isUnauthenticatedRequest(error)) {
-            await clearSessionToken();
-            throw error;
-          }
-        }
-      }
-      await clearSessionToken();
-      return { status: 'anonymous' };
+      });
     },
     async signup(input) {
-      const session = await createAuthUser(input);
-      return persistSession(session);
+      return runAuthMutation(async () => {
+        const session = await createAuthUser(input);
+        return persistSession(session);
+      });
     },
   };
 }
 
 const unauthenticatedStatus = 401;
+
+async function bootstrapToken(token: string | null): Promise<AuthState> {
+  if (token === null) {
+    return { status: 'anonymous' };
+  }
+
+  try {
+    const session = await getAuthSession(token);
+    return {
+      status: 'authenticated',
+      token,
+      user: session.user,
+    };
+  } catch (error: unknown) {
+    if (!isUnauthenticatedRequest(error)) {
+      return { status: 'error' };
+    }
+
+    const currentToken = await readStoredSessionToken();
+    if (currentToken === undefined) {
+      return { status: 'error' };
+    }
+    if (currentToken !== token) {
+      return bootstrapToken(currentToken);
+    }
+
+    try {
+      await clearSessionToken();
+      return { status: 'anonymous' };
+    } catch {
+      return { status: 'error' };
+    }
+  }
+}
+
+async function readStoredSessionToken(): Promise<string | null | undefined> {
+  try {
+    return await readSessionToken();
+  } catch {
+    return undefined;
+  }
+}
 
 function isUnauthenticatedRequest(error: unknown): boolean {
   return (

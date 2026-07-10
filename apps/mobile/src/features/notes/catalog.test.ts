@@ -77,7 +77,10 @@ function catalogs(): Catalogs {
 
 function apiNote(): Note {
   return {
-    author: { displayName: 'Thiago', id: 'author-1' },
+    author: {
+      displayName: 'Thiago',
+      id: 'author-id',
+    },
     body: 'Tem pão de queijo decente.',
     categorySlug: 'food',
     createdAt: 1782993600000,

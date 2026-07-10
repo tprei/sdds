@@ -18,6 +18,7 @@ vi.mock('react-native', () => ({
 
 const configuredAPIBaseURLEnvName = 'EXPO_PUBLIC_SDDS_API_BASE_URL';
 const exampleNoteID = '018ff5b8-0000-7000-8000-000000000000';
+const exampleToken = 'session-token';
 
 type FetchCall = {
   request: Request;
@@ -43,16 +44,20 @@ describe('notes API client', () => {
       return jsonResponse(apiNote(), httpStatusCreated);
     });
 
-    await createNote({
-      body: 'Tem pao de queijo decente.',
-      categorySlug: 'food',
-      placeSlug: 'sao-paulo',
-      title: 'Cafe bom',
-    }, 'test-token');
+    await createNote(
+      {
+        body: 'Tem pao de queijo decente.',
+        categorySlug: 'food',
+        placeSlug: 'sao-paulo',
+        title: 'Cafe bom',
+      },
+      exampleToken,
+    );
 
     const request = onlyFetchCall(calls);
     expect(request.url).toBe('http://localhost:8080/v1/notes');
     expect(request.method).toBe('POST');
+    expect(request.headers.get('authorization')).toBe(`Bearer ${exampleToken}`);
     expect(request.headers.get('content-type')).toBe('application/json');
     await expect(requestJSON(request)).resolves.toEqual({
       body: 'Tem pao de queijo decente.',
@@ -69,11 +74,14 @@ describe('notes API client', () => {
       return jsonResponse(apiNote({ place_slug: null }), httpStatusCreated);
     });
 
-    await createNote({
-      body: 'Tem pao de queijo decente.',
-      categorySlug: 'food',
-      title: 'Cafe bom',
-    }, 'test-token');
+    await createNote(
+      {
+        body: 'Tem pao de queijo decente.',
+        categorySlug: 'food',
+        title: 'Cafe bom',
+      },
+      exampleToken,
+    );
 
     await expect(requestJSON(onlyFetchCall(calls))).resolves.toMatchObject({
       place_slug: null,
@@ -83,15 +91,21 @@ describe('notes API client', () => {
   it('parses created notes from the API wire shape', async () => {
     stubFetch(async () => jsonResponse(apiNote(), httpStatusCreated));
 
-    const note = await createNote({
-      body: 'Tem pao de queijo decente.',
-      categorySlug: 'food',
-      placeSlug: 'sao-paulo',
-      title: 'Cafe bom',
-    }, 'test-token');
+    const note = await createNote(
+      {
+        body: 'Tem pao de queijo decente.',
+        categorySlug: 'food',
+        placeSlug: 'sao-paulo',
+        title: 'Cafe bom',
+      },
+      exampleToken,
+    );
 
     expect(note).toEqual({
-      author: { displayName: 'Thiago', id: 'author-1' },
+      author: {
+        displayName: 'Thiago',
+        id: 'author-id',
+      },
       body: 'Tem pao de queijo decente.',
       categorySlug: 'food',
       createdAt: 1782993600000,
@@ -114,12 +128,15 @@ describe('notes API client', () => {
     stubFetch(async () => unreadableResponse(httpStatusBadRequest));
 
     await expect(
-      createNote({
-        body: 'Tem pao de queijo decente.',
-        categorySlug: 'food',
-        placeSlug: 'sao-paulo',
-        title: 'Cafe bom',
-      }, 'test-token'),
+      createNote(
+        {
+          body: 'Tem pao de queijo decente.',
+          categorySlug: 'food',
+          placeSlug: 'sao-paulo',
+          title: 'Cafe bom',
+        },
+        exampleToken,
+      ),
     ).rejects.toMatchObject(new APIRequestError(httpStatusBadRequest));
   });
 
@@ -128,18 +145,7 @@ describe('notes API client', () => {
 
     const notes = await listNotes();
 
-    expect(notes).toEqual([
-      {
-        author: { displayName: 'Thiago', id: 'author-1' },
-        body: 'Tem pao de queijo decente.',
-        categorySlug: 'food',
-        createdAt: 1782993600000,
-        id: exampleNoteID,
-        placeSlug: 'sao-paulo',
-        title: 'Cafe bom',
-        updatedAt: 1782993600000,
-      },
-    ]);
+    expect(notes).toEqual([expectedNote()]);
   });
 
   it('omits category filters from list note requests by default', async () => {
@@ -193,16 +199,7 @@ describe('notes API client', () => {
 
     const note = await getNote(exampleNoteID);
 
-    expect(note).toEqual({
-      author: { displayName: 'Thiago', id: 'author-1' },
-      body: 'Tem pao de queijo decente.',
-      categorySlug: 'food',
-      createdAt: 1782993600000,
-      id: exampleNoteID,
-      placeSlug: 'sao-paulo',
-      title: 'Cafe bom',
-      updatedAt: 1782993600000,
-    });
+    expect(note).toEqual(expectedNote());
   });
 
   it('raises request errors for missing fetched notes', async () => {
@@ -287,18 +284,7 @@ describe('notes API client', () => {
 
     const notes = await searchNotes({ query: 'cafe' });
 
-    expect(notes).toEqual([
-      {
-        author: { displayName: 'Thiago', id: 'author-1' },
-        body: 'Tem pao de queijo decente.',
-        categorySlug: 'food',
-        createdAt: 1782993600000,
-        id: exampleNoteID,
-        placeSlug: 'sao-paulo',
-        title: 'Cafe bom',
-        updatedAt: 1782993600000,
-      },
-    ]);
+    expect(notes).toEqual([expectedNote()]);
   });
 
   it('raises request errors from search status codes', async () => {
@@ -379,6 +365,24 @@ describe('notes API client', () => {
     await expect(listNotes()).rejects.toThrow(APIResponseError);
   });
 
+  it('rejects invalid author response shapes', async () => {
+    stubFetch(async () =>
+      jsonResponse({
+        notes: [
+          {
+            ...apiNote(),
+            author: {
+              display_name: 'Thiago',
+              user_id: 'private-user-id',
+            },
+          },
+        ],
+      }),
+    );
+
+    await expect(listNotes()).rejects.toThrow(APIResponseError);
+  });
+
   it('rejects legacy city slug response fields', async () => {
     stubFetch(async () =>
       jsonResponse({
@@ -407,7 +411,10 @@ function apiListNotesResponse(): ListNotesResponse {
 
 function apiNote(overrides: Partial<NoteResponse> = {}): NoteResponse {
   return {
-    author: { display_name: 'Thiago', id: 'author-1' },
+    author: {
+      display_name: 'Thiago',
+      id: 'author-id',
+    },
     body: 'Tem pao de queijo decente.',
     category_slug: 'food',
     created_at: 1782993600000,
@@ -416,6 +423,22 @@ function apiNote(overrides: Partial<NoteResponse> = {}): NoteResponse {
     title: 'Cafe bom',
     updated_at: 1782993600000,
     ...overrides,
+  };
+}
+
+function expectedNote() {
+  return {
+    author: {
+      displayName: 'Thiago',
+      id: 'author-id',
+    },
+    body: 'Tem pao de queijo decente.',
+    categorySlug: 'food',
+    createdAt: 1782993600000,
+    id: exampleNoteID,
+    placeSlug: 'sao-paulo',
+    title: 'Cafe bom',
+    updatedAt: 1782993600000,
   };
 }
 

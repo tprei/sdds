@@ -12,13 +12,13 @@ import (
 )
 
 type server struct {
-	notes           note.Store
-	catalog         note.Catalog
-	users           user.Store
-	passwordHasher  passwordHasher
-	credentialProbe string
-	newSessionToken func() (string, error)
-	clock           func() time.Time
+	notes                 note.Store
+	catalog               note.Catalog
+	users                 user.Store
+	passwordHasher        passwordHasher
+	invalidCredentialHash string
+	newSessionToken       func() (string, error)
+	clock                 func() time.Time
 }
 
 var _ openapi.ServerInterface = server{}
@@ -30,7 +30,7 @@ type passwordHasher interface {
 
 func NewRouter(notes note.Store, catalog note.Catalog, users user.Store) http.Handler {
 	hasher := user.NewPasswordHasher()
-	return newRouter(notes, catalog, users, hasher, mustCredentialProbeHash(hasher), user.NewSessionToken, time.Now)
+	return newRouter(notes, catalog, users, hasher, mustInvalidCredentialHash(hasher), user.NewSessionToken, time.Now)
 }
 
 func newRouter(
@@ -38,7 +38,7 @@ func newRouter(
 	catalog note.Catalog,
 	users user.Store,
 	passwordHasher passwordHasher,
-	credentialProbe string,
+	invalidCredentialHash string,
 	newSessionToken func() (string, error),
 	clock func() time.Time,
 ) http.Handler {
@@ -47,13 +47,13 @@ func newRouter(
 	router.Use(openAPIRequestValidator())
 
 	handler := server{
-		notes:           notes,
-		catalog:         catalog,
-		users:           users,
-		passwordHasher:  passwordHasher,
-		credentialProbe: credentialProbe,
-		newSessionToken: newSessionToken,
-		clock:           clock,
+		notes:                 notes,
+		catalog:               catalog,
+		users:                 users,
+		passwordHasher:        passwordHasher,
+		invalidCredentialHash: invalidCredentialHash,
+		newSessionToken:       newSessionToken,
+		clock:                 clock,
 	}
 	wrapper := openapi.ServerInterfaceWrapper{
 		Handler:          handler,
@@ -62,21 +62,23 @@ func newRouter(
 
 	router.Get("/healthz", wrapper.GetHealth)
 	router.Get("/readyz", wrapper.GetReadiness)
-	router.Get("/v1/categories", wrapper.ListCategories)
-	router.Get("/v1/places", wrapper.ListPlaces)
-	router.Get("/v1/notes", wrapper.ListNotes)
-	router.Post("/v1/notes", wrapper.CreateNote)
-	router.Get("/v1/notes/{note_id}", wrapper.GetNote)
-	router.Get("/v1/search/notes", wrapper.SearchNotes)
-	router.Post("/v1/auth/users", wrapper.CreateAuthUser)
-	router.Post("/v1/auth/sessions", wrapper.CreateAuthSession)
-	router.With(requireAuth(users, clock)).Get("/v1/auth/session", wrapper.GetAuthSession)
-	router.With(requireAuth(users, clock)).Delete("/v1/auth/session", wrapper.DeleteAuthSession)
+	router.Route("/v1", func(router chi.Router) {
+		router.Get("/categories", wrapper.ListCategories)
+		router.Get("/places", wrapper.ListPlaces)
+		router.Get("/notes", wrapper.ListNotes)
+		router.Post("/notes", wrapper.CreateNote)
+		router.Get("/notes/{note_id}", wrapper.GetNote)
+		router.Get("/search/notes", wrapper.SearchNotes)
+		router.Post("/auth/users", wrapper.CreateAuthUser)
+		router.Post("/auth/sessions", wrapper.CreateAuthSession)
+		router.With(requireAuth(users, clock)).Get("/auth/session", wrapper.GetAuthSession)
+		router.With(requireAuth(users, clock)).Delete("/auth/session", wrapper.DeleteAuthSession)
+	})
 
 	return router
 }
 
-func mustCredentialProbeHash(hasher passwordHasher) string {
+func mustInvalidCredentialHash(hasher passwordHasher) string {
 	hash, err := hasher.Hash("invalid-credential-probe")
 	if err != nil {
 		panic(err)

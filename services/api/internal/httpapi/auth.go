@@ -168,7 +168,7 @@ func writeInvalidCredentials(w http.ResponseWriter) {
 }
 
 func (handler server) writeInvalidCredentialsAfterVerification(w http.ResponseWriter, password string) {
-	if _, err := handler.passwordHasher.Verify(password, handler.credentialProbe); err != nil {
+	if _, err := handler.passwordHasher.Verify(password, handler.invalidCredentialHash); err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}

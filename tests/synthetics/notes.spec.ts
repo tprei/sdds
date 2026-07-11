@@ -165,7 +165,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   ).toBeVisible();
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(
-    page.getByLabel(`Autor da nota: ${displayName}`).last(),
+    page.getByLabel(`Abrir perfil do autor: ${displayName}`).last(),
   ).toBeVisible();
   await expect(page.getByLabel(`Texto da nota: ${body}`)).toBeVisible();
   await expect(page.getByLabel('Categoria da nota: Comida')).toBeVisible();
@@ -626,7 +626,7 @@ test('shows distinct authors when a second user signs in', async ({
   await firstCard.click();
   await expect(page.getByRole('heading', { name: firstTitle })).toBeVisible();
   await expect(
-    page.getByLabel(`Autor da nota: ${firstDisplayName}`).last(),
+    page.getByLabel(`Abrir perfil do autor: ${firstDisplayName}`).last(),
   ).toBeVisible();
 });
 

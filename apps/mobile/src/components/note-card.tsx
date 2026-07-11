@@ -8,6 +8,7 @@ type NoteCardProps = {
   categoryLabel: string;
   note: Note;
   onPress?: () => void;
+  onPressAuthor?: (authorID: string) => void;
   placeLabel: string | null;
 };
 
@@ -15,6 +16,7 @@ export function NoteCard({
   categoryLabel,
   note,
   onPress,
+  onPressAuthor,
   placeLabel,
 }: NoteCardProps) {
   const content = (
@@ -28,12 +30,25 @@ export function NoteCard({
         )}
       </View>
       <Text style={styles.title}>{note.title}</Text>
-      <Text
-        accessibilityLabel={`Autor da nota: ${note.author.displayName}`}
-        style={styles.author}
-      >
-        {note.author.displayName}
-      </Text>
+      {onPressAuthor === undefined ? (
+        <Text
+          accessibilityLabel={`Autor da nota: ${note.author.displayName}`}
+          style={styles.author}
+        >
+          {note.author.displayName}
+        </Text>
+      ) : (
+        <Pressable
+          accessibilityLabel={`Abrir perfil do autor: ${note.author.displayName}`}
+          accessibilityRole="button"
+          onPress={(event) => {
+            event.stopPropagation();
+            onPressAuthor(note.author.id);
+          }}
+        >
+          <Text style={styles.author}>{note.author.displayName}</Text>
+        </Pressable>
+      )}
       <Text style={styles.body}>{note.body}</Text>
     </View>
   );

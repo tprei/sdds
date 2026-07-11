@@ -169,6 +169,7 @@ export default function HomeScreen() {
       ) : (
         <FeedContent
           catalogState={catalogState}
+          onOpenAuthor={(authorID) => { router.push({ pathname: '/authors/[id]', params: { id: authorID } }); }}
           onOpenNote={(note) => {
             router.push({
               pathname: '/notes/[id]',
@@ -194,11 +195,13 @@ function CatalogError() {
 
 function FeedContent({
   catalogState,
+  onOpenAuthor,
   onOpenNote,
   selectedCategorySlug,
   state,
 }: {
   catalogState: CatalogState;
+  onOpenAuthor: (authorID: string) => void;
   onOpenNote: (note: Note) => void;
   selectedCategorySlug: string | null;
   state: FeedState;
@@ -236,6 +239,7 @@ function FeedContent({
       key={labelledNote.id}
       note={labelledNote}
       onPress={() => onOpenNote(labelledNote)}
+      onPressAuthor={onOpenAuthor}
       placeLabel={labelledNote.placeLabel}
     />
   ));

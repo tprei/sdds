@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
@@ -77,13 +77,13 @@ export default function NoteDetailScreen() {
       eyebrow="Nota"
       title="Nota"
     >
-      {renderNoteDetailState(state)}
+      {renderNoteDetailState(state, (authorID) => router.push({ pathname: '/authors/[id]', params: { id: authorID } }))}
       <FoundationButton label="Voltar" onPress={() => router.back()} />
     </FoundationScreen>
   );
 }
 
-function renderNoteDetailState(state: NoteDetailState) {
+function renderNoteDetailState(state: NoteDetailState, onPressAuthor: (authorID: string) => void) {
   if (state.status === 'loading') {
     return (
       <EmptyStateCard
@@ -111,10 +111,10 @@ function renderNoteDetailState(state: NoteDetailState) {
     );
   }
 
-  return <ReadyNoteDetail note={state.note} />;
+  return <ReadyNoteDetail note={state.note} onPressAuthor={onPressAuthor} />;
 }
 
-function ReadyNoteDetail({ note }: { note: LabelledNote }) {
+function ReadyNoteDetail({ note, onPressAuthor }: { note: LabelledNote; onPressAuthor: (authorID: string) => void }) {
   return (
     <>
       <View style={styles.metaRow}>
@@ -136,12 +136,13 @@ function ReadyNoteDetail({ note }: { note: LabelledNote }) {
       <Text accessibilityRole="header" style={styles.title}>
         {note.title}
       </Text>
-      <Text
-        accessibilityLabel={`Autor da nota: ${note.author.displayName}`}
-        style={styles.author}
+      <Pressable
+        accessibilityLabel={`Abrir perfil do autor: ${note.author.displayName}`}
+        accessibilityRole="button"
+        onPress={() => onPressAuthor(note.author.id)}
       >
-        {note.author.displayName}
-      </Text>
+        <Text style={styles.author}>{note.author.displayName}</Text>
+      </Pressable>
       <Text
         accessibilityLabel={`Texto da nota: ${note.body}`}
         style={styles.body}

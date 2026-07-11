@@ -152,10 +152,11 @@ func TestRouterRejectsPlainOptionsRequest(t *testing.T) {
 }
 
 type fakeNoteStore struct {
-	createNote  func(ctx context.Context, input note.CreateInput) (note.Note, error)
-	findNote    func(ctx context.Context, id string) (note.Note, error)
-	listNotes   func(ctx context.Context, input note.ListInput) ([]note.Note, error)
-	searchNotes func(ctx context.Context, input note.SearchInput) ([]note.Note, error)
+	createNote      func(ctx context.Context, input note.CreateInput) (note.Note, error)
+	findNote        func(ctx context.Context, id string) (note.Note, error)
+	listNotes       func(ctx context.Context, input note.ListInput) ([]note.Note, error)
+	searchNotes     func(ctx context.Context, input note.SearchInput) ([]note.Note, error)
+	listAuthorNotes func(ctx context.Context, input note.AuthorNotesInput) (note.AuthorNotesPage, error)
 }
 
 func (store fakeNoteStore) CreateNote(ctx context.Context, input note.CreateInput) (note.Note, error) {
@@ -184,6 +185,13 @@ func (store fakeNoteStore) SearchNotes(ctx context.Context, input note.SearchInp
 		return nil, fmt.Errorf("search notes not implemented")
 	}
 	return store.searchNotes(ctx, input)
+}
+
+func (store fakeNoteStore) ListAuthorNotes(ctx context.Context, input note.AuthorNotesInput) (note.AuthorNotesPage, error) {
+	if store.listAuthorNotes == nil {
+		return note.AuthorNotesPage{}, fmt.Errorf("list author notes not implemented")
+	}
+	return store.listAuthorNotes(ctx, input)
 }
 
 type fakeCatalog struct {
@@ -238,6 +246,7 @@ type fakeUserStore struct {
 	findCurrentSession func(ctx context.Context, tokenHash string, now time.Time) (user.CurrentSession, error)
 	revokeSession      func(ctx context.Context, sessionID user.SessionID, revokedAt time.Time) error
 	findAuthorByUserID func(ctx context.Context, userID user.UserID) (user.Author, error)
+	findPublicAuthor   func(ctx context.Context, authorID user.AuthorID) (user.PublicAuthor, error)
 }
 
 func (store fakeUserStore) CreatePasswordUser(ctx context.Context, input user.CreatePasswordUserInput) (user.CurrentSession, error) {
@@ -280,4 +289,11 @@ func (store fakeUserStore) FindAuthorByUserID(ctx context.Context, userID user.U
 		return user.Author{}, fmt.Errorf("find author by user id not implemented")
 	}
 	return store.findAuthorByUserID(ctx, userID)
+}
+
+func (store fakeUserStore) FindPublicAuthor(ctx context.Context, authorID user.AuthorID) (user.PublicAuthor, error) {
+	if store.findPublicAuthor == nil {
+		return user.PublicAuthor{}, fmt.Errorf("find public author not implemented")
+	}
+	return store.findPublicAuthor(ctx, authorID)
 }

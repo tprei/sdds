@@ -40,6 +40,14 @@ func openAPIRequestValidator() func(http.Handler) http.Handler {
 			}
 
 			if route.Operation.RequestBody == nil && requestHasBody(r) {
+				var requestError *openapi3filter.RequestError
+				if errors.As(err, &requestError) && requestError.Parameter != nil {
+					if response, ok := generatedInvalidAuthorNotesParamError(r.URL.Path, requestError.Parameter.Name); ok {
+						writeError(w, http.StatusBadRequest, response)
+						return
+					}
+				}
+
 				writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidJSON})
 				return
 			}
@@ -55,7 +63,7 @@ func openAPIRequestValidator() func(http.Handler) http.Handler {
 				Options:    &options,
 			})
 			if err != nil {
-				writeOpenAPIRequestValidationError(w, err)
+				writeOpenAPIRequestValidationError(w, r, err)
 				return
 			}
 
@@ -64,11 +72,19 @@ func openAPIRequestValidator() func(http.Handler) http.Handler {
 	}
 }
 
-func writeOpenAPIRequestValidationError(w http.ResponseWriter, err error) {
+func writeOpenAPIRequestValidationError(w http.ResponseWriter, r *http.Request, err error) {
 	var maxBytesError *http.MaxBytesError
 	if errors.As(err, &maxBytesError) {
 		writeError(w, http.StatusRequestEntityTooLarge, openapi.ErrorResponse{Code: openapi.ErrorCodeRequestTooLarge})
 		return
+	}
+
+	var requestError *openapi3filter.RequestError
+	if errors.As(err, &requestError) && requestError.Parameter != nil {
+		if response, ok := generatedInvalidAuthorNotesParamError(r.URL.Path, requestError.Parameter.Name); ok {
+			writeError(w, http.StatusBadRequest, response)
+			return
+		}
 	}
 
 	writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidJSON})

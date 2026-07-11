@@ -71,7 +71,9 @@ func (e ErrorCode) Valid() bool {
 const (
 	ValidationFieldBody         ValidationField = "body"
 	ValidationFieldCategorySlug ValidationField = "category_slug"
+	ValidationFieldCursor       ValidationField = "cursor"
 	ValidationFieldDisplayName  ValidationField = "display_name"
+	ValidationFieldLimit        ValidationField = "limit"
 	ValidationFieldPassword     ValidationField = "password"
 	ValidationFieldPlaceSlug    ValidationField = "place_slug"
 	ValidationFieldQ            ValidationField = "q"
@@ -86,7 +88,11 @@ func (e ValidationField) Valid() bool {
 		return true
 	case ValidationFieldCategorySlug:
 		return true
+	case ValidationFieldCursor:
+		return true
 	case ValidationFieldDisplayName:
+		return true
+	case ValidationFieldLimit:
 		return true
 	case ValidationFieldPassword:
 		return true
@@ -139,6 +145,12 @@ type AuthSessionResponse struct {
 	ExpiresAt int64       `json:"expires_at"`
 	Token     string      `json:"token"`
 	User      CurrentUser `json:"user"`
+}
+
+// AuthorNotesPage defines model for AuthorNotesPage.
+type AuthorNotesPage struct {
+	NextCursor *string `json:"next_cursor"`
+	Notes      []Note  `json:"notes"`
 }
 
 // AuthorSummary defines model for AuthorSummary.
@@ -244,6 +256,13 @@ type Note struct {
 // PlaceSlug defines model for PlaceSlug.
 type PlaceSlug = string
 
+// PublicAuthor defines model for PublicAuthor.
+type PublicAuthor struct {
+	DisplayName string `json:"display_name"`
+	Id          string `json:"id"`
+	NoteCount   int64  `json:"note_count"`
+}
+
 // ValidationField defines model for ValidationField.
 type ValidationField string
 
@@ -258,6 +277,15 @@ type ValidationProblemCode string
 
 // bearerAuthContextKey is the context key for bearerAuth security scheme
 type bearerAuthContextKey string
+
+// ListAuthorNotesParams defines parameters for ListAuthorNotes.
+type ListAuthorNotesParams struct {
+	// Limit Optional page size. Defaults to 20 and must be between 1 and 50.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque cursor returned by the preceding author-notes page.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
 
 // ListNotesParams defines parameters for ListNotes.
 type ListNotesParams struct {
@@ -303,6 +331,12 @@ type ServerInterface interface {
 	// Create a user account
 	// (POST /v1/auth/users)
 	CreateAuthUser(w http.ResponseWriter, r *http.Request)
+	// Get a public author profile
+	// (GET /v1/authors/{author_id})
+	GetAuthor(w http.ResponseWriter, r *http.Request, authorId string)
+	// List an author's notes
+	// (GET /v1/authors/{author_id}/notes)
+	ListAuthorNotes(w http.ResponseWriter, r *http.Request, authorId string, params ListAuthorNotesParams)
 	// List category catalog
 	// (GET /v1/categories)
 	ListCategories(w http.ResponseWriter, r *http.Request)
@@ -360,6 +394,18 @@ func (_ Unimplemented) CreateAuthSession(w http.ResponseWriter, r *http.Request)
 // Create a user account
 // (POST /v1/auth/users)
 func (_ Unimplemented) CreateAuthUser(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get a public author profile
+// (GET /v1/authors/{author_id})
+func (_ Unimplemented) GetAuthor(w http.ResponseWriter, r *http.Request, authorId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List an author's notes
+// (GET /v1/authors/{author_id}/notes)
+func (_ Unimplemented) ListAuthorNotes(w http.ResponseWriter, r *http.Request, authorId string, params ListAuthorNotesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -495,6 +541,87 @@ func (siw *ServerInterfaceWrapper) CreateAuthUser(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAuthUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAuthor operation middleware
+func (siw *ServerInterfaceWrapper) GetAuthor(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "author_id" -------------
+	var authorId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "author_id", chi.URLParam(r, "author_id"), &authorId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "author_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuthor(w, r, authorId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAuthorNotes operation middleware
+func (siw *ServerInterfaceWrapper) ListAuthorNotes(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "author_id" -------------
+	var authorId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "author_id", chi.URLParam(r, "author_id"), &authorId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "author_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAuthorNotesParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAuthorNotes(w, r, authorId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -787,6 +914,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/v1/auth/users", wrapper.CreateAuthUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/authors/{author_id}", wrapper.GetAuthor)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/authors/{author_id}/notes", wrapper.ListAuthorNotes)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/categories", wrapper.ListCategories)
@@ -1172,6 +1305,135 @@ func (response CreateAuthUser500JSONResponse) VisitCreateAuthUserResponse(w http
 	return err
 }
 
+type GetAuthorRequestObject struct {
+	AuthorId string `json:"author_id"`
+}
+
+type GetAuthorResponseObject interface {
+	VisitGetAuthorResponse(w http.ResponseWriter) error
+}
+
+type GetAuthor200JSONResponse PublicAuthor
+
+func (response GetAuthor200JSONResponse) VisitGetAuthorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthor400JSONResponse ErrorResponse
+
+func (response GetAuthor400JSONResponse) VisitGetAuthorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthor404JSONResponse ErrorResponse
+
+func (response GetAuthor404JSONResponse) VisitGetAuthorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthor500JSONResponse ErrorResponse
+
+func (response GetAuthor500JSONResponse) VisitGetAuthorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthorNotesRequestObject struct {
+	AuthorId string `json:"author_id"`
+	Params   ListAuthorNotesParams
+}
+
+type ListAuthorNotesResponseObject interface {
+	VisitListAuthorNotesResponse(w http.ResponseWriter) error
+}
+
+type ListAuthorNotes200JSONResponse AuthorNotesPage
+
+func (response ListAuthorNotes200JSONResponse) VisitListAuthorNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthorNotes400JSONResponse ErrorResponse
+
+func (response ListAuthorNotes400JSONResponse) VisitListAuthorNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthorNotes404JSONResponse ErrorResponse
+
+func (response ListAuthorNotes404JSONResponse) VisitListAuthorNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthorNotes500JSONResponse ErrorResponse
+
+func (response ListAuthorNotes500JSONResponse) VisitListAuthorNotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListCategoriesRequestObject struct {
 }
 
@@ -1532,6 +1794,12 @@ type StrictServerInterface interface {
 	// Create a user account
 	// (POST /v1/auth/users)
 	CreateAuthUser(ctx context.Context, request CreateAuthUserRequestObject) (CreateAuthUserResponseObject, error)
+	// Get a public author profile
+	// (GET /v1/authors/{author_id})
+	GetAuthor(ctx context.Context, request GetAuthorRequestObject) (GetAuthorResponseObject, error)
+	// List an author's notes
+	// (GET /v1/authors/{author_id}/notes)
+	ListAuthorNotes(ctx context.Context, request ListAuthorNotesRequestObject) (ListAuthorNotesResponseObject, error)
 	// List category catalog
 	// (GET /v1/categories)
 	ListCategories(ctx context.Context, request ListCategoriesRequestObject) (ListCategoriesResponseObject, error)
@@ -1739,6 +2007,59 @@ func (sh *strictHandler) CreateAuthUser(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// GetAuthor operation middleware
+func (sh *strictHandler) GetAuthor(w http.ResponseWriter, r *http.Request, authorId string) {
+	var request GetAuthorRequestObject
+
+	request.AuthorId = authorId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuthor(ctx, request.(GetAuthorRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuthor")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAuthorResponseObject); ok {
+		if err := validResponse.VisitGetAuthorResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAuthorNotes operation middleware
+func (sh *strictHandler) ListAuthorNotes(w http.ResponseWriter, r *http.Request, authorId string, params ListAuthorNotesParams) {
+	var request ListAuthorNotesRequestObject
+
+	request.AuthorId = authorId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAuthorNotes(ctx, request.(ListAuthorNotesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAuthorNotes")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAuthorNotesResponseObject); ok {
+		if err := validResponse.VisitListAuthorNotesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListCategories operation middleware
 func (sh *strictHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
 	var request ListCategoriesRequestObject
@@ -1901,44 +2222,48 @@ func (sh *strictHandler) SearchNotes(w http.ResponseWriter, r *http.Request, par
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"Bhyxy7vl/wIAAP//",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

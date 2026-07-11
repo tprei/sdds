@@ -46,6 +46,7 @@ func TestApplyMigrationsCreatesCatalogIndexes(t *testing.T) {
 		"notes_category_idx",
 		"notes_place_idx",
 		"notes_user_idx",
+		"notes_author_page_idx",
 		"user_login_identities_user_idx",
 		"user_login_identities_one_password_provider_per_user_idx",
 		"sessions_user_idx",
@@ -434,7 +435,7 @@ func TestNoteOwnershipMigrationPreservesExistingNotes(t *testing.T) {
 		t.Fatalf("migrated note user id = %q, want %q", migratedUserID, systemNoteOwnerUserID)
 	}
 
-	for _, index := range []string{"notes_recent_idx", "notes_category_idx", "notes_place_idx", "notes_user_idx"} {
+	for _, index := range []string{"notes_recent_idx", "notes_category_idx", "notes_place_idx", "notes_user_idx", "notes_author_page_idx"} {
 		t.Run(index, func(t *testing.T) {
 			var count int
 			if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?`, index).Scan(&count); err != nil {

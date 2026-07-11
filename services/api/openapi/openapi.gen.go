@@ -66,7 +66,9 @@ func (e ErrorCode) Valid() bool {
 const (
 	ValidationFieldBody         ValidationField = "body"
 	ValidationFieldCategorySlug ValidationField = "category_slug"
+	ValidationFieldCursor       ValidationField = "cursor"
 	ValidationFieldDisplayName  ValidationField = "display_name"
+	ValidationFieldLimit        ValidationField = "limit"
 	ValidationFieldPassword     ValidationField = "password"
 	ValidationFieldPlaceSlug    ValidationField = "place_slug"
 	ValidationFieldQ            ValidationField = "q"
@@ -81,7 +83,11 @@ func (e ValidationField) Valid() bool {
 		return true
 	case ValidationFieldCategorySlug:
 		return true
+	case ValidationFieldCursor:
+		return true
 	case ValidationFieldDisplayName:
+		return true
+	case ValidationFieldLimit:
 		return true
 	case ValidationFieldPassword:
 		return true
@@ -134,6 +140,12 @@ type AuthSessionResponse struct {
 	ExpiresAt int64       `json:"expires_at"`
 	Token     string      `json:"token"`
 	User      CurrentUser `json:"user"`
+}
+
+// AuthorNotesPage defines model for AuthorNotesPage.
+type AuthorNotesPage struct {
+	NextCursor *string `json:"next_cursor"`
+	Notes      []Note  `json:"notes"`
 }
 
 // AuthorSummary defines model for AuthorSummary.
@@ -239,6 +251,13 @@ type Note struct {
 // PlaceSlug defines model for PlaceSlug.
 type PlaceSlug = string
 
+// PublicAuthor defines model for PublicAuthor.
+type PublicAuthor struct {
+	DisplayName string `json:"display_name"`
+	Id          string `json:"id"`
+	NoteCount   int64  `json:"note_count"`
+}
+
 // ValidationField defines model for ValidationField.
 type ValidationField string
 
@@ -253,6 +272,15 @@ type ValidationProblemCode string
 
 // bearerAuthContextKey is the context key for bearerAuth security scheme
 type bearerAuthContextKey string
+
+// ListAuthorNotesParams defines parameters for ListAuthorNotes.
+type ListAuthorNotesParams struct {
+	// Limit Optional page size. Defaults to 20 and must be between 1 and 50.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor Opaque cursor returned by the preceding author-notes page.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
 
 // ListNotesParams defines parameters for ListNotes.
 type ListNotesParams struct {
@@ -373,6 +401,12 @@ type ClientInterface interface {
 
 	CreateAuthUser(ctx context.Context, body CreateAuthUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetAuthor request
+	GetAuthor(ctx context.Context, authorId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAuthorNotes request
+	ListAuthorNotes(ctx context.Context, authorId string, params *ListAuthorNotesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListCategories request
 	ListCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -480,6 +514,30 @@ func (c *Client) CreateAuthUserWithBody(ctx context.Context, contentType string,
 
 func (c *Client) CreateAuthUser(ctx context.Context, body CreateAuthUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateAuthUserRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetAuthor(ctx context.Context, authorId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuthorRequest(c.Server, authorId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListAuthorNotes(ctx context.Context, authorId string, params *ListAuthorNotesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAuthorNotesRequest(c.Server, authorId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -758,6 +816,113 @@ func NewCreateAuthUserRequestWithBody(server string, contentType string, body io
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetAuthorRequest generates requests for GetAuthor
+func NewGetAuthorRequest(server string, authorId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "author_id", authorId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/authors/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListAuthorNotesRequest generates requests for ListAuthorNotes
+func NewListAuthorNotesRequest(server string, authorId string, params *ListAuthorNotesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "author_id", authorId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/authors/%s/notes", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -1075,6 +1240,12 @@ type ClientWithResponsesInterface interface {
 
 	CreateAuthUserWithResponse(ctx context.Context, body CreateAuthUserJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAuthUserHTTPResponse, error)
 
+	// GetAuthorWithResponse request
+	GetAuthorWithResponse(ctx context.Context, authorId string, reqEditors ...RequestEditorFn) (*GetAuthorHTTPResponse, error)
+
+	// ListAuthorNotesWithResponse request
+	ListAuthorNotesWithResponse(ctx context.Context, authorId string, params *ListAuthorNotesParams, reqEditors ...RequestEditorFn) (*ListAuthorNotesHTTPResponse, error)
+
 	// ListCategoriesWithResponse request
 	ListCategoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCategoriesHTTPResponse, error)
 
@@ -1285,6 +1456,72 @@ func (r CreateAuthUserHTTPResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CreateAuthUserHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAuthorHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PublicAuthor
+	JSON400      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuthorHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuthorHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuthorHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListAuthorNotesHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AuthorNotesPage
+	JSON400      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAuthorNotesHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAuthorNotesHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAuthorNotesHTTPResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -1554,6 +1791,24 @@ func (c *ClientWithResponses) CreateAuthUserWithResponse(ctx context.Context, bo
 		return nil, err
 	}
 	return ParseCreateAuthUserHTTPResponse(rsp)
+}
+
+// GetAuthorWithResponse request returning *GetAuthorHTTPResponse
+func (c *ClientWithResponses) GetAuthorWithResponse(ctx context.Context, authorId string, reqEditors ...RequestEditorFn) (*GetAuthorHTTPResponse, error) {
+	rsp, err := c.GetAuthor(ctx, authorId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuthorHTTPResponse(rsp)
+}
+
+// ListAuthorNotesWithResponse request returning *ListAuthorNotesHTTPResponse
+func (c *ClientWithResponses) ListAuthorNotesWithResponse(ctx context.Context, authorId string, params *ListAuthorNotesParams, reqEditors ...RequestEditorFn) (*ListAuthorNotesHTTPResponse, error) {
+	rsp, err := c.ListAuthorNotes(ctx, authorId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAuthorNotesHTTPResponse(rsp)
 }
 
 // ListCategoriesWithResponse request returning *ListCategoriesHTTPResponse
@@ -1866,6 +2121,100 @@ func ParseCreateAuthUserHTTPResponse(rsp *http.Response) (*CreateAuthUserHTTPRes
 			return nil, err
 		}
 		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAuthorHTTPResponse parses an HTTP response from a GetAuthorWithResponse call
+func ParseGetAuthorHTTPResponse(rsp *http.Response) (*GetAuthorHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuthorHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PublicAuthor
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListAuthorNotesHTTPResponse parses an HTTP response from a ListAuthorNotesWithResponse call
+func ParseListAuthorNotesHTTPResponse(rsp *http.Response) (*ListAuthorNotesHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAuthorNotesHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthorNotesPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse

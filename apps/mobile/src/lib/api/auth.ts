@@ -100,6 +100,8 @@ const validationFields = schemaValueList<ValidationField>()([
   'username',
   'password',
   'display_name',
+  'limit',
+  'cursor',
 ]);
 const validationProblemCodes = schemaValueList<
   ValidationProblemResponse['code']

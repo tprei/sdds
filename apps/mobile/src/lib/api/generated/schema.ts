@@ -710,6 +710,15 @@ export interface operations {
                     "application/json": components["schemas"]["PublicAuthor"];
                 };
             };
+            /** @description The request does not match the API contract. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description The author was not found. */
             404: {
                 headers: {
@@ -733,7 +742,9 @@ export interface operations {
     listAuthorNotes: {
         parameters: {
             query?: {
+                /** @description Optional page size. Defaults to 20 and must be between 1 and 50. */
                 limit?: number;
+                /** @description Opaque cursor returned by the preceding author-notes page. */
                 cursor?: string;
             };
             header?: never;

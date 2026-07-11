@@ -3,6 +3,9 @@ import { StyleSheet } from 'react-native';
 import { radius, semanticColors, spacing, typography } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
+  authorHidden: {
+    display: 'none',
+  },
   author: {
     color: semanticColors.textMuted,
     fontSize: typography.sizeSmall,

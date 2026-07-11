@@ -52,6 +52,9 @@ export function NoteCard({
       {metadata}
       <Text style={styles.title}>{note.title}</Text>
       <Text style={styles.body}>{note.body}</Text>
+      {onPressAuthor === undefined ? null : (
+        <Text style={styles.authorHidden}>{note.author.displayName}</Text>
+      )}
     </>
   );
 

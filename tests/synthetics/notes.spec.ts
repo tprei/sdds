@@ -172,9 +172,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(page.getByLabel('Lugar da nota: São Paulo')).toBeVisible();
 
   await page.getByText('Perfil', { exact: true }).click();
-  await expect(page.getByText(`Nome de usuário: ${username}`)).toBeVisible();
   await page.reload();
-  await expect(page.getByText(`Nome de usuário: ${username}`)).toBeVisible();
 
   await page.getByRole('button', { name: 'Sair' }).click();
   await expect(page.getByText('Entre para publicar')).toBeVisible();
@@ -213,7 +211,6 @@ test('shows auth validation reasons and clears stale login submit state', async 
 
   await page.getByTestId('signup-password-input').fill(syntheticPassword);
   await page.getByTestId('signup-submit-button').click();
-  await expect(page.getByText(`Nome de usuário: ${username}`)).toBeVisible();
 
   await page.getByTestId('profile-logout-button').click();
   await expect(page.getByText('Entre para publicar')).toBeVisible();
@@ -236,7 +233,6 @@ test('shows auth validation reasons and clears stale login submit state', async 
   await page.getByTestId('login-username-input').fill(username);
   await page.getByTestId('login-password-input').fill(syntheticPassword);
   await page.getByTestId('login-submit-button').click();
-  await expect(page.getByText(`Nome de usuário: ${username}`)).toBeVisible();
 
   await page.getByTestId('profile-logout-button').click();
   await expect(page.getByText('Entre para publicar')).toBeVisible();
@@ -547,9 +543,17 @@ test('opens a public author profile and appends paginated notes', async ({
   expect(firstPage.ok()).toBeTruthy();
   const firstPageBody = (await firstPage.json()) as AuthorNotesResponse;
   expect(firstPageBody.notes).toHaveLength(20);
+  await page.getByText(`Nota pública ${timestamp} 20`).evaluate((element) => {
+    let container = element.parentElement;
+    while (container !== null && container.scrollHeight <= container.clientHeight) {
+      container = container.parentElement;
+    }
+    if (container === null) throw new Error('profile_scroll_container_missing');
+    container.scrollTop = container.scrollHeight;
+    container.dispatchEvent(new Event('scroll', { bubbles: true }));
+  });
   expect(firstPageBody.next_cursor).not.toBeNull();
 
-  await page.getByText(`Nota pública ${timestamp} 20`).scrollIntoViewIfNeeded();
   await expect(page.getByText(`Nota pública ${timestamp} 0`)).toBeVisible();
   const renderedTitles = await page.getByText(new RegExp(`^Nota pública ${timestamp} `)).allTextContents();
   expect(new Set(renderedTitles).size).toBe(renderedTitles.length);

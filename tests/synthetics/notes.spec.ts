@@ -249,8 +249,30 @@ test('shows auth validation reasons and clears stale login submit state', async 
   await page.getByTestId('signup-password-input').fill(syntheticPassword);
   await page.getByTestId('signup-submit-button').click();
 
-  await page.getByTestId('profile-logout-button').click();
-  await expect(page.getByText('Entre para publicar')).toBeVisible({ timeout: 10000 });
+  let failNextLogout = true;
+  await page.route('**/v1/auth/session', async (route) => {
+    if (route.request().method() !== 'DELETE' || !failNextLogout) {
+      await route.continue();
+      return;
+    }
+    failNextLogout = false;
+    await route.fulfill({
+      body: JSON.stringify({ code: 'internal_error' }),
+      contentType: 'application/json',
+      status: 500,
+    });
+  });
+  const logoutButton = page.getByTestId('profile-logout-button');
+  await logoutButton.click();
+  await expect(page.getByRole('alert')).toContainText(
+    'Não foi possível limpar a sessão deste aparelho.',
+  );
+  await expect(logoutButton).toBeEnabled();
+  await logoutButton.click();
+  await expect(page.getByText('Entre para publicar')).toBeVisible({
+    timeout: 10000,
+  });
+  await page.unroute('**/v1/auth/session');
 
   await page.getByTestId('profile-signup-button').click();
   await expect(visibleScreenTitle(page, 'Criar conta')).toBeVisible();

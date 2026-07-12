@@ -495,7 +495,7 @@ func TestNoteCursorMigrationEnforcesStoredCursorBounds(t *testing.T) {
 		t.Fatalf("insert author: %v", err)
 	}
 
-	insertNote := func(id string, createdAt any, updatedAt any) error {
+	insertNote := func(id any, createdAt any, updatedAt any) error {
 		_, err := db.ExecContext(
 			ctx,
 			`
@@ -528,6 +528,9 @@ func TestNoteCursorMigrationEnforcesStoredCursorBounds(t *testing.T) {
 	}
 	if err := insertNote(strings.Repeat("\x00", 240), 1782993600000, 1782993600000); err == nil {
 		t.Fatal("insert NUL note ID error = nil, want constraint error")
+	}
+	if err := insertNote([]byte("blob-note-id"), 1782993600000, 1782993600000); err == nil {
+		t.Fatal("insert BLOB note ID error = nil, want constraint error")
 	}
 	if err := insertNote("zero-created-at", 0, 1782993600000); err == nil {
 		t.Fatal("insert non-positive created_at error = nil, want constraint error")

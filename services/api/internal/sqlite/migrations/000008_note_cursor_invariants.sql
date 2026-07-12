@@ -9,7 +9,8 @@ ALTER TABLE notes RENAME TO notes_legacy;
 
 CREATE TABLE notes (
 	id TEXT PRIMARY KEY NOT NULL CHECK (
-		length(CAST(id AS BLOB)) BETWEEN 1 AND 240
+		typeof(id) = 'text'
+		AND length(CAST(id AS BLOB)) BETWEEN 1 AND 240
 		AND instr(id, char(0)) = 0
 		AND id NOT GLOB '*[^A-Za-z0-9._~-]*'
 	),

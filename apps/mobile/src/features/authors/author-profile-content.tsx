@@ -224,6 +224,7 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (
+        !loadingNext &&
         !nextError &&
         cursor !== null &&
         catalog !== null &&
@@ -232,7 +233,7 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
         void loadNext(cursor, catalog);
       }
     },
-    [catalog, cursor, loadNext, nextError],
+    [catalog, cursor, loadNext, loadingNext, nextError],
   );
 
   if (loading) return <InitialLoading />;

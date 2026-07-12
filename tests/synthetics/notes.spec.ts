@@ -250,8 +250,14 @@ test('shows auth validation reasons and clears stale login submit state', async 
   await page.getByTestId('signup-submit-button').click();
 
   let failNextLogout = true;
+  let logoutDeleteRequests = 0;
   await page.route('**/v1/auth/session', async (route) => {
-    if (route.request().method() !== 'DELETE' || !failNextLogout) {
+    if (route.request().method() !== 'DELETE') {
+      await route.continue();
+      return;
+    }
+    logoutDeleteRequests += 1;
+    if (!failNextLogout) {
       await route.continue();
       return;
     }
@@ -281,11 +287,13 @@ test('shows auth validation reasons and clears stale login submit state', async 
   await expect(page.getByRole('alert')).toContainText(
     'Não foi possível limpar a sessão deste aparelho.',
   );
+  expect(logoutDeleteRequests).toBe(1);
   await expect(logoutButton).toBeEnabled();
   await logoutButton.click();
   await expect(page.getByText('Entre para publicar')).toBeVisible({
     timeout: 10000,
   });
+  expect(logoutDeleteRequests).toBe(2);
   await page.unroute('**/v1/auth/session');
 
   await page.getByTestId('profile-signup-button').click();

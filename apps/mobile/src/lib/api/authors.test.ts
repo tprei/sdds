@@ -23,22 +23,6 @@ const malformedPageCases: [string, unknown][] = [
   ['missing cursor', { notes: [apiNote()] }],
   ['empty cursor', { next_cursor: '', notes: [] }],
   ['oversized cursor', { next_cursor: 'x'.repeat(513), notes: [] }],
-  [
-    'private page field',
-    { next_cursor: null, notes: [], user_id: 'private-user-id' },
-  ],
-  [
-    'private note author field',
-    {
-      next_cursor: null,
-      notes: [
-        {
-          ...apiNote(),
-          author: { display_name: 'Thiago', id: authorID, user_id: 'private' },
-        },
-      ],
-    },
-  ],
   ['invalid cursor type', { next_cursor: 42, notes: [] }],
 ];
 
@@ -107,6 +91,31 @@ describe('authors API client', () => {
     });
   });
 
+  it('ignores extra author note page fields', async () => {
+    stubFetch(async () =>
+      jsonResponse({
+        next_cursor: null,
+        notes: [
+          {
+            ...apiNote(),
+            author: { display_name: 'Thiago', id: authorID, user_id: 'private' },
+          },
+        ],
+        user_id: 'private-user-id',
+      }),
+    );
+
+    await expect(listAuthorNotes({ authorID })).resolves.toMatchObject({
+      nextCursor: null,
+      notes: [
+        expect.objectContaining({
+          author: { displayName: 'Thiago', id: authorID },
+          id: noteID,
+        }),
+      ],
+    });
+  });
+
   it.each(malformedPageCases)(
     'rejects malformed author note page: %s',
     async (_name, response) => {
@@ -118,7 +127,7 @@ describe('authors API client', () => {
     },
   );
 
-  it('rejects private fields in public author responses', async () => {
+  it('ignores extra public author response fields', async () => {
     stubFetch(async () =>
       jsonResponse({
         display_name: 'Thiago',
@@ -128,7 +137,11 @@ describe('authors API client', () => {
       }),
     );
 
-    await expect(getPublicAuthor(authorID)).rejects.toThrow(APIResponseError);
+    await expect(getPublicAuthor(authorID)).resolves.toEqual({
+      displayName: 'Thiago',
+      id: authorID,
+      noteCount: 3,
+    });
   });
 
   it('raises request errors for author status failures', async () => {

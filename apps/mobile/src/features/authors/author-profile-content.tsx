@@ -30,7 +30,7 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
   const pendingCursor = useRef<string | null | undefined>(undefined);
 
   const load = useCallback(async (next: string | undefined) => {
-    if (pendingCursor.current === next) return;
+    if (next !== undefined && pendingCursor.current === next) return;
     pendingCursor.current = next;
     if (next === undefined) {
       setLoading(true);

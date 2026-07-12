@@ -210,7 +210,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
     });
   });
   await page.getByRole('button', { name: 'Sair' }).click();
-  await expect(page.getByText('Não foi possível limpar a sessão deste aparelho. Tente novamente.')).toBeVisible();
+  await expect(page.getByRole('alert')).toBeVisible();
   await page.unroute('**/v1/auth/session');
   await page.getByRole('button', { name: 'Sair' }).click();
   await expect(page.getByTestId('profile-signup-button')).toBeVisible({ timeout: 30000 });

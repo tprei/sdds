@@ -11,7 +11,7 @@ import (
 const (
 	listAuthorNotesSQL = `
 		SELECT
-			notes.rowid,
+			notes.author_page_key,
 			notes.id,
 			notes.user_id,
 			notes.title,
@@ -25,12 +25,12 @@ const (
 		FROM notes
 		JOIN authors ON authors.user_id = notes.user_id
 		WHERE authors.id = ?
-		ORDER BY notes.created_at DESC, notes.rowid DESC
+		ORDER BY notes.created_at DESC, notes.author_page_key DESC
 		LIMIT ?
 	`
 	listAuthorNotesAfterSQL = `
 		SELECT
-			notes.rowid,
+			notes.author_page_key,
 			notes.id,
 			notes.user_id,
 			notes.title,
@@ -46,9 +46,9 @@ const (
 		WHERE authors.id = ?
 			AND (
 				notes.created_at < ?
-				OR (notes.created_at = ? AND notes.rowid < ?)
+				OR (notes.created_at = ? AND notes.author_page_key < ?)
 			)
-		ORDER BY notes.created_at DESC, notes.rowid DESC
+		ORDER BY notes.created_at DESC, notes.author_page_key DESC
 		LIMIT ?
 	`
 )
@@ -67,7 +67,7 @@ func (store *NoteStore) ListAuthorNotes(ctx context.Context, input note.AuthorNo
 	if input.After != nil {
 		createdAt := unixMillis(input.After.CreatedAt)
 		query = listAuthorNotesAfterSQL
-		args = []any{input.AuthorID, createdAt, createdAt, input.After.RowID, fetchLimit}
+		args = []any{input.AuthorID, createdAt, createdAt, input.After.PageKey, fetchLimit}
 	}
 
 	rows, err := store.db.QueryContext(ctx, query, args...)
@@ -101,9 +101,9 @@ func (store *NoteStore) ListAuthorNotes(ctx context.Context, input note.AuthorNo
 }
 
 func scanAuthorNote(rows *sql.Rows) (note.AuthorNote, error) {
-	var rowID int64
+	var pageKey int64
 	found, err := scanNoteValues(func(dest ...any) error {
-		destinations := append([]any{&rowID}, dest...)
+		destinations := append([]any{&pageKey}, dest...)
 		return rows.Scan(destinations...)
 	})
 	if err != nil {
@@ -113,7 +113,7 @@ func scanAuthorNote(rows *sql.Rows) (note.AuthorNote, error) {
 		Note: found,
 		Position: note.AuthorNotePosition{
 			CreatedAt: found.CreatedAt,
-			RowID:     rowID,
+			PageKey:   pageKey,
 		},
 	}, nil
 }

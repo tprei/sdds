@@ -15,9 +15,9 @@ import (
 const maxAuthorNotesCursorLength = pagination.MaxCursorLength
 
 type authorNotesCursorPayload struct {
-	Version   int   `json:"v"`
-	CreatedAt int64 `json:"created_at"`
-	RowID     int64 `json:"row_id"`
+	Version   int    `json:"v"`
+	CreatedAt *int64 `json:"created_at"`
+	PageKey   int64  `json:"page_key"`
 }
 
 func (handler server) GetAuthor(w http.ResponseWriter, r *http.Request, authorID string) {
@@ -93,10 +93,10 @@ func decodeAuthorNotesCursor(encoded *string) (*note.AuthorNotePosition, []note.
 	if err := pagination.Decode(*encoded, &payload); err != nil {
 		return nil, []note.ValidationProblem{{Field: "cursor", Message: "invalid"}}
 	}
-	if payload.Version != 1 || payload.CreatedAt <= 0 || payload.RowID <= 0 {
+	if payload.Version != 1 || payload.CreatedAt == nil || payload.PageKey <= 0 {
 		return nil, []note.ValidationProblem{{Field: "cursor", Message: "invalid"}}
 	}
-	return &note.AuthorNotePosition{CreatedAt: time.UnixMilli(payload.CreatedAt).UTC(), RowID: payload.RowID}, nil
+	return &note.AuthorNotePosition{CreatedAt: time.UnixMilli(*payload.CreatedAt).UTC(), PageKey: payload.PageKey}, nil
 }
 
 func newPublicAuthorResponse(profile author.PublicAuthor) openapi.PublicAuthor {
@@ -128,13 +128,10 @@ func newAuthorNotesPageResponse(page note.AuthorNotesPage) (openapi.AuthorNotesP
 
 func encodeAuthorNotesCursor(cursor note.AuthorNotePosition) (string, error) {
 	createdAt := cursor.CreatedAt.UTC().UnixMilli()
-	if createdAt <= 0 {
-		return "", fmt.Errorf("encode author notes cursor: non-positive created_at")
+	if cursor.PageKey <= 0 {
+		return "", fmt.Errorf("encode author notes cursor: non-positive page_key")
 	}
-	if cursor.RowID <= 0 {
-		return "", fmt.Errorf("encode author notes cursor: non-positive row_id")
-	}
-	payload := authorNotesCursorPayload{Version: 1, CreatedAt: createdAt, RowID: cursor.RowID}
+	payload := authorNotesCursorPayload{Version: 1, CreatedAt: &createdAt, PageKey: cursor.PageKey}
 	encoded, err := pagination.Encode(payload)
 	if err != nil {
 		return "", fmt.Errorf("encode author notes cursor: %w", err)

@@ -777,12 +777,10 @@ components:
         created_at:
           type: integer
           format: int64
-          minimum: 0
           description: Unix timestamp in milliseconds.
         updated_at:
           type: integer
           format: int64
-          minimum: 0
           description: Unix timestamp in milliseconds.
     ValidationField:
       type: string

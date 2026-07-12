@@ -471,7 +471,7 @@ func TestNoteOwnershipMigrationPreservesExistingNotes(t *testing.T) {
 	}
 }
 
-func TestNoteCursorMigrationPreservesLegacyTextNoteIDs(t *testing.T) {
+func TestNoteCursorMigrationPreservesLegacyNoteIDsAndTimestamps(t *testing.T) {
 	ctx := context.Background()
 	db, err := Open(":memory:")
 	if err != nil {
@@ -503,30 +503,39 @@ func TestNoteCursorMigrationPreservesLegacyTextNoteIDs(t *testing.T) {
 		t.Fatalf("insert legacy owner author: %v", err)
 	}
 
-	legacyIDs := []string{
-		"",
-		"legacy/id",
-		"emoji-😀",
-		strings.Repeat("x", 260),
-		"nul-\x00-id",
+	legacyNotes := []struct {
+		inputID   any
+		storedID  string
+		createdAt int64
+		updatedAt int64
+	}{
+		{inputID: "", storedID: "", createdAt: 0, updatedAt: 0},
+		{inputID: "legacy/id", storedID: "legacy/id", createdAt: -1, updatedAt: -2},
+		{inputID: "emoji-😀", storedID: "emoji-😀", createdAt: 1782993600000, updatedAt: 1782993600000},
+		{inputID: strings.Repeat("x", 260), storedID: strings.Repeat("x", 260), createdAt: 1782993600001, updatedAt: 1782993600001},
+		{inputID: "nul-\x00-id", storedID: "nul-\x00-id", createdAt: 1782993600002, updatedAt: 1782993600002},
+		{inputID: "same-id", storedID: "same-id", createdAt: 1782993600003, updatedAt: 1782993600003},
+		{inputID: []byte("same-id"), storedID: "legacy-blob-id-7-73616d652d6964", createdAt: 1782993600004, updatedAt: 1782993600004},
+		{inputID: "legacy-blob-id-9-626c6f622d6e6f74652d6964", storedID: "legacy-blob-id-9-626c6f622d6e6f74652d6964", createdAt: 1782993600005, updatedAt: 1782993600005},
+		{inputID: []byte("blob-note-id"), storedID: "legacy-blob-id-9-626c6f622d6e6f74652d6964-1", createdAt: 1782993600006, updatedAt: 1782993600006},
 	}
-	for index, id := range legacyIDs {
+	for _, legacy := range legacyNotes {
 		if _, err := db.ExecContext(
 			ctx,
 			`
 				INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 			`,
-			id,
+			legacy.inputID,
 			string(systemNoteOwnerUserID),
 			"Cafe legado",
 			"Nota legada com identificador antigo.",
 			"food",
 			"sao-paulo",
-			int64(1782993600000+index),
-			int64(1782993600000+index),
+			legacy.createdAt,
+			legacy.updatedAt,
 		); err != nil {
-			t.Fatalf("insert legacy note %q: %v", id, err)
+			t.Fatalf("insert legacy note %q: %v", legacy.storedID, err)
 		}
 	}
 
@@ -534,25 +543,33 @@ func TestNoteCursorMigrationPreservesLegacyTextNoteIDs(t *testing.T) {
 		t.Fatalf("apply remaining migrations: %v", err)
 	}
 
-	for _, id := range legacyIDs {
+	for _, legacy := range legacyNotes {
 		var storedID string
-		if err := db.QueryRowContext(ctx, `SELECT id FROM notes WHERE id = ?`, id).Scan(&storedID); err != nil {
-			t.Fatalf("query migrated note %q: %v", id, err)
+		var createdAt int64
+		var updatedAt int64
+		if err := db.QueryRowContext(ctx, `SELECT id, created_at, updated_at FROM notes WHERE id = ?`, legacy.storedID).Scan(&storedID, &createdAt, &updatedAt); err != nil {
+			t.Fatalf("query migrated note %q: %v", legacy.storedID, err)
 		}
-		if storedID != id {
-			t.Fatalf("migrated note id = %q, want %q", storedID, id)
+		if storedID != legacy.storedID {
+			t.Fatalf("migrated note id = %q, want %q", storedID, legacy.storedID)
+		}
+		if createdAt != legacy.createdAt {
+			t.Fatalf("migrated note created_at = %d, want %d", createdAt, legacy.createdAt)
+		}
+		if updatedAt != legacy.updatedAt {
+			t.Fatalf("migrated note updated_at = %d, want %d", updatedAt, legacy.updatedAt)
 		}
 		var searchRows int
-		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM note_search WHERE note_id = ?`, id).Scan(&searchRows); err != nil {
-			t.Fatalf("query search row %q: %v", id, err)
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM note_search WHERE note_id = ?`, legacy.storedID).Scan(&searchRows); err != nil {
+			t.Fatalf("query search row %q: %v", legacy.storedID, err)
 		}
 		if searchRows != 1 {
-			t.Fatalf("search rows for %q = %d, want 1", id, searchRows)
+			t.Fatalf("search rows for %q = %d, want 1", legacy.storedID, searchRows)
 		}
 	}
 }
 
-func TestNoteCursorMigrationEnforcesStoredTimestampTypes(t *testing.T) {
+func TestNoteCursorMigrationEnforcesStoredCursorTypes(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 	if _, err := db.ExecContext(
@@ -606,14 +623,20 @@ func TestNoteCursorMigrationEnforcesStoredTimestampTypes(t *testing.T) {
 			t.Fatalf("insert text note ID %q: %v", id, err)
 		}
 	}
+	if err := insertNote("zero-created-at", 0, 1782993600000); err != nil {
+		t.Fatalf("insert zero created_at: %v", err)
+	}
+	if err := insertNote("negative-created-at", -1, 1782993600000); err != nil {
+		t.Fatalf("insert negative created_at: %v", err)
+	}
+	if err := insertNote("zero-updated-at", 1782993600000, 0); err != nil {
+		t.Fatalf("insert zero updated_at: %v", err)
+	}
+	if err := insertNote("negative-updated-at", 1782993600000, -1); err != nil {
+		t.Fatalf("insert negative updated_at: %v", err)
+	}
 	if err := insertNote([]byte("blob-note-id"), 1782993600000, 1782993600000); err == nil {
 		t.Fatal("insert BLOB note ID error = nil, want constraint error")
-	}
-	if err := insertNote("zero-created-at", 0, 1782993600000); err == nil {
-		t.Fatal("insert non-positive created_at error = nil, want constraint error")
-	}
-	if err := insertNote("zero-updated-at", 1782993600000, 0); err == nil {
-		t.Fatal("insert non-positive updated_at error = nil, want constraint error")
 	}
 	if err := insertNote("text-created-at", "not-a-timestamp", int64(1782993600000)); err == nil {
 		t.Fatal("insert text created_at error = nil, want constraint error")

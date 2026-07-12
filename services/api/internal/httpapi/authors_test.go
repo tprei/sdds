@@ -20,7 +20,7 @@ import (
 const (
 	exampleAuthorID        = author.AuthorID("018ff5b8-0000-7000-8000-000000000010")
 	exampleAuthorNoteID    = "018ff5b8-0000-7000-8000-000000000011"
-	exampleCursorRowID     = int64(123)
+	exampleCursorPageKey   = int64(123)
 	exampleAuthorDisplay   = "Marina Alves"
 	exampleAuthorCreatedMS = int64(1782993600000)
 )
@@ -89,7 +89,7 @@ func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 			if input.After != nil {
 				t.Fatalf("cursor = %#v, want nil", input.After)
 			}
-			return note.AuthorNotesPage{Notes: []note.AuthorNote{authorHTTPAuthorNote(exampleAuthorNoteID, createdAt, exampleCursorRowID)}, HasMore: true}, nil
+			return note.AuthorNotesPage{Notes: []note.AuthorNote{authorHTTPAuthorNote(exampleAuthorNoteID, createdAt, exampleCursorPageKey)}, HasMore: true}, nil
 		},
 	}, fakeCatalog{}, fakeUserStore{
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
@@ -120,7 +120,7 @@ func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 	if len(problems) > 0 {
 		t.Fatalf("returned cursor did not decode: %#v", problems)
 	}
-	if cursor == nil || cursor.RowID != exampleCursorRowID || !cursor.CreatedAt.Equal(createdAt) {
+	if cursor == nil || cursor.PageKey != exampleCursorPageKey || !cursor.CreatedAt.Equal(createdAt) {
 		t.Fatalf("decoded cursor = %#v, want final returned note position", cursor)
 	}
 
@@ -149,7 +149,7 @@ func TestListAuthorNotesReturnsCursorForLongLegacyID(t *testing.T) {
 	router := NewRouter(fakeNoteStore{
 		listAuthorNotes: func(context.Context, note.AuthorNotesInput) (note.AuthorNotesPage, error) {
 			return note.AuthorNotesPage{
-				Notes:   []note.AuthorNote{authorHTTPAuthorNote(longID, createdAt, exampleCursorRowID)},
+				Notes:   []note.AuthorNote{authorHTTPAuthorNote(longID, createdAt, exampleCursorPageKey)},
 				HasMore: true,
 			}, nil
 		},
@@ -179,14 +179,14 @@ func TestListAuthorNotesReturnsCursorForLongLegacyID(t *testing.T) {
 	if len(problems) > 0 {
 		t.Fatalf("returned cursor did not decode: %#v", problems)
 	}
-	if cursor == nil || cursor.RowID != exampleCursorRowID {
-		t.Fatalf("decoded cursor = %#v, want row ID %d", cursor, exampleCursorRowID)
+	if cursor == nil || cursor.PageKey != exampleCursorPageKey {
+		t.Fatalf("decoded cursor = %#v, want page key %d", cursor, exampleCursorPageKey)
 	}
 }
 
 func TestListAuthorNotesPassesExplicitLimitAndCursor(t *testing.T) {
 	createdAt := time.UnixMilli(exampleAuthorCreatedMS).UTC()
-	encoded, err := encodeAuthorNotesCursor(note.AuthorNotePosition{CreatedAt: createdAt, RowID: exampleCursorRowID})
+	encoded, err := encodeAuthorNotesCursor(note.AuthorNotePosition{CreatedAt: createdAt, PageKey: exampleCursorPageKey})
 	if err != nil {
 		t.Fatalf("encode cursor: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestListAuthorNotesPassesExplicitLimitAndCursor(t *testing.T) {
 			if input.After == nil {
 				t.Fatal("cursor = nil, want decoded cursor")
 			}
-			if input.After.RowID != exampleCursorRowID || !input.After.CreatedAt.Equal(createdAt) {
+			if input.After.PageKey != exampleCursorPageKey || !input.After.CreatedAt.Equal(createdAt) {
 				t.Fatalf("cursor = %#v, want request cursor", input.After)
 			}
 			return note.AuthorNotesPage{Notes: []note.AuthorNote{}}, nil
@@ -228,23 +228,43 @@ func TestListAuthorNotesPassesExplicitLimitAndCursor(t *testing.T) {
 		t.Fatalf("next_cursor = %q, want nil", *body.NextCursor)
 	}
 }
-func TestAuthorNotesCursorRoundTripsRowID(t *testing.T) {
-	position := note.AuthorNotePosition{CreatedAt: time.UnixMilli(exampleAuthorCreatedMS).UTC(), RowID: exampleCursorRowID}
-	encoded, err := encodeAuthorNotesCursor(position)
-	if err != nil {
-		t.Fatalf("encode cursor: %v", err)
+func TestAuthorNotesCursorRoundTripsPageKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		position note.AuthorNotePosition
+	}{
+		{
+			name:     "positive created at",
+			position: note.AuthorNotePosition{CreatedAt: time.UnixMilli(exampleAuthorCreatedMS).UTC(), PageKey: exampleCursorPageKey},
+		},
+		{
+			name:     "zero created at",
+			position: note.AuthorNotePosition{CreatedAt: time.UnixMilli(0).UTC(), PageKey: exampleCursorPageKey},
+		},
+		{
+			name:     "negative created at",
+			position: note.AuthorNotePosition{CreatedAt: time.UnixMilli(-1).UTC(), PageKey: exampleCursorPageKey},
+		},
 	}
-	decoded, problems := decodeAuthorNotesCursor(&encoded)
-	if diff := cmp.Diff([]note.ValidationProblem(nil), problems); diff != "" {
-		t.Fatalf("problems mismatch (-want +got):\n%s", diff)
-	}
-	if diff := cmp.Diff(&position, decoded); diff != "" {
-		t.Fatalf("cursor mismatch (-want +got):\n%s", diff)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			encoded, err := encodeAuthorNotesCursor(tt.position)
+			if err != nil {
+				t.Fatalf("encode cursor: %v", err)
+			}
+			decoded, problems := decodeAuthorNotesCursor(&encoded)
+			if diff := cmp.Diff([]note.ValidationProblem(nil), problems); diff != "" {
+				t.Fatalf("problems mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(&tt.position, decoded); diff != "" {
+				t.Fatalf("cursor mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 
 func TestListAuthorNotesRejectsInvalidParametersBeforeAuthorLookup(t *testing.T) {
-	unsupportedVersion := rawAuthorCursor(`{"v":2,"created_at":1782993600000,"row_id":123}`)
+	unsupportedVersion := rawAuthorCursor(`{"v":2,"created_at":1782993600000,"page_key":123}`)
 	tests := []struct {
 		name      string
 		query     string
@@ -344,14 +364,13 @@ func TestAuthorNotesCursorRejectsMalformedPayloads(t *testing.T) {
 	}{
 		{name: "empty", cursor: ""},
 		{name: "invalid base64", cursor: "not-base64!"},
-		{name: "unsupported version", cursor: rawAuthorCursor(`{"v":2,"created_at":1782993600000,"row_id":123}`)},
-		{name: "missing version", cursor: rawAuthorCursor(`{"created_at":1782993600000,"row_id":123}`)},
-		{name: "missing created at", cursor: rawAuthorCursor(`{"v":1,"row_id":123}`)},
-		{name: "non-positive created at", cursor: rawAuthorCursor(`{"v":1,"created_at":0,"row_id":123}`)},
-		{name: "missing row id", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000}`)},
-		{name: "non-positive row id", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"row_id":0}`)},
-		{name: "unknown field", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"row_id":123,"extra":true}`)},
-		{name: "trailing json", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"row_id":123}{}`)},
+		{name: "unsupported version", cursor: rawAuthorCursor(`{"v":2,"created_at":1782993600000,"page_key":123}`)},
+		{name: "missing version", cursor: rawAuthorCursor(`{"created_at":1782993600000,"page_key":123}`)},
+		{name: "missing created at", cursor: rawAuthorCursor(`{"v":1,"page_key":123}`)},
+		{name: "missing page key", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000}`)},
+		{name: "non-positive page key", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"page_key":0}`)},
+		{name: "unknown field", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"page_key":123,"extra":true}`)},
+		{name: "trailing json", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"page_key":123}{}`)},
 		{name: "oversized", cursor: strings.Repeat("a", maxAuthorNotesCursorLength+1)},
 	}
 
@@ -383,13 +402,13 @@ func authorHTTPNote(id string, createdAt time.Time) note.Note {
 	}
 }
 
-func authorHTTPAuthorNote(id string, createdAt time.Time, rowID int64) note.AuthorNote {
+func authorHTTPAuthorNote(id string, createdAt time.Time, pageKey int64) note.AuthorNote {
 	found := authorHTTPNote(id, createdAt)
 	return note.AuthorNote{
 		Note: found,
 		Position: note.AuthorNotePosition{
 			CreatedAt: createdAt,
-			RowID:     rowID,
+			PageKey:   pageKey,
 		},
 	}
 }

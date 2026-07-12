@@ -14,7 +14,7 @@ const (
 
 type AuthorNotePosition struct {
 	CreatedAt time.Time
-	RowID     int64
+	PageKey   int64
 }
 
 type AuthorNote struct {

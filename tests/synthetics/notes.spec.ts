@@ -542,7 +542,7 @@ test('opens a public author profile and appends paginated notes', async ({
   });
 
   await page.goto(`/authors/${author.id}`);
-  await expect(page.getByText(displayName, { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(displayName, { exact: true }).last()).toBeVisible();
   await expect(page.getByText(`Nota pública ${timestamp} 20`)).toBeVisible();
   const firstPage = await request.get(`${apiBaseURL}/v1/authors/${author.id}/notes?limit=20`);
   expect(firstPage.ok()).toBeTruthy();
@@ -550,9 +550,15 @@ test('opens a public author profile and appends paginated notes', async ({
   expect(firstPageBody.notes).toHaveLength(20);
   expect(firstPageBody.next_cursor).not.toBeNull();
 
-  await page.mouse.wheel(0, 5000);
-  await page.mouse.wheel(0, 5000);
-  await page.mouse.wheel(0, 5000);
+  await page.mouse.move(400, 700);
+  await page.mouse.wheel(0, 1000);
+  await page.mouse.wheel(0, 1000);
+  await page.mouse.wheel(0, 1000);
+  await page.mouse.wheel(0, 1000);
+  await page.mouse.wheel(0, 1000);
+  await page.mouse.wheel(0, 1000);
+  await page.mouse.wheel(0, 1000);
+  await page.mouse.wheel(0, 1000);
   await expect(page.getByText(`Nota pública ${timestamp} 0`)).toBeVisible();
   const renderedTitles = await page.getByText(new RegExp(`^Nota pública ${timestamp} `)).allTextContents();
   expect(new Set(renderedTitles).size).toBe(renderedTitles.length);

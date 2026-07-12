@@ -1,31 +1,133 @@
 import createClient from 'openapi-fetch';
 
 import { apiBaseURL } from './config';
-import type { paths } from './generated/schema';
-import type { Note, NoteAuthor } from './notes';
-import { APIRequestError, APIResponseError } from './notes';
+import type { components, paths } from './generated/schema';
+import { APIRequestError, APIResponseError, parseNoteResponse } from './notes';
+import type { Note } from './notes';
 
-export type PublicAuthor = { id: string; displayName: string; noteCount: number };
-export type AuthorNotesPage = { notes: Note[]; nextCursor: string | null };
-export type ListAuthorNotesInput = { authorID: string; limit?: number; cursor?: string };
+export type PublicAuthor = {
+  id: string;
+  displayName: string;
+  noteCount: number;
+};
+
+export type AuthorNotesPage = {
+  notes: Note[];
+  nextCursor: string | null;
+};
+
+export type ListAuthorNotesInput = {
+  authorID: string;
+  limit?: number;
+  cursor?: string;
+};
+
+type GeneratedSchemas = components['schemas'];
+type PublicAuthorResponse = GeneratedSchemas['PublicAuthor'];
+type AuthorNotesPageResponse = GeneratedSchemas['AuthorNotesPage'];
+type SchemaKey<T> = Extract<keyof T, string>;
+type SchemaKeyList<T> = readonly SchemaKey<T>[];
+type ExhaustiveSchemaKeyList<T, K extends SchemaKeyList<T>> =
+  Exclude<SchemaKey<T>, K[number]> extends never ? K : never;
+
+const publicAuthorResponseKeys = schemaKeyList<PublicAuthorResponse>()([
+  'display_name',
+  'id',
+  'note_count',
+]);
+const authorNotesPageResponseKeys = schemaKeyList<AuthorNotesPageResponse>()([
+  'next_cursor',
+  'notes',
+]);
 
 const client = () => createClient<paths>({ baseUrl: apiBaseURL() });
 
 export async function getPublicAuthor(authorID: string): Promise<PublicAuthor> {
-  const { data, response } = await client().GET('/v1/authors/{author_id}', { params: { path: { author_id: authorID } } });
-  if (!response.ok) throw new APIRequestError(response.status);
-  if (!isRecord(data) || !hasKeys(data, ['id','display_name','note_count']) || typeof data.id !== 'string' || typeof data.display_name !== 'string' || !Number.isInteger(data.note_count) || data.note_count < 0) throw new APIResponseError();
-  return { id: data.id, displayName: data.display_name, noteCount: data.note_count };
+  const { data, response } = await client().GET('/v1/authors/{author_id}', {
+    params: { path: { author_id: authorID } },
+  });
+  if (!response.ok) {
+    throw new APIRequestError(response.status);
+  }
+  if (!isPublicAuthorResponse(data)) {
+    throw new APIResponseError();
+  }
+  return {
+    displayName: data.display_name,
+    id: data.id,
+    noteCount: data.note_count,
+  };
 }
 
-export async function listAuthorNotes(input: ListAuthorNotesInput): Promise<AuthorNotesPage> {
-  const { data, response } = await client().GET('/v1/authors/{author_id}/notes', { params: { path: { author_id: input.authorID }, query: { ...(input.limit === undefined ? {} : { limit: input.limit }), ...(input.cursor === undefined ? {} : { cursor: input.cursor }) } } });
-  if (!response.ok) throw new APIRequestError(response.status);
-  if (!isRecord(data) || !hasKeys(data, ['notes','next_cursor']) || !Array.isArray(data.notes) || (typeof data.next_cursor !== 'string' && data.next_cursor !== null)) throw new APIResponseError();
-  return { notes: data.notes.map(parseNote), nextCursor: data.next_cursor };
+export async function listAuthorNotes(
+  input: ListAuthorNotesInput,
+): Promise<AuthorNotesPage> {
+  const { data, response } = await client().GET(
+    '/v1/authors/{author_id}/notes',
+    {
+      params: {
+        path: { author_id: input.authorID },
+        query: {
+          ...(input.limit === undefined ? {} : { limit: input.limit }),
+          ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+        },
+      },
+    },
+  );
+  if (!response.ok) {
+    throw new APIRequestError(response.status);
+  }
+  if (!isAuthorNotesPageResponse(data)) {
+    throw new APIResponseError();
+  }
+  return {
+    nextCursor: data.next_cursor,
+    notes: data.notes.map(parseNoteResponse),
+  };
 }
 
-function parseNote(value: unknown): Note { if (!isRecord(value) || !hasKeys(value,['id','title','body','category_slug','place_slug','author','created_at','updated_at']) || typeof value.id!=='string' || typeof value.title!=='string' || typeof value.body!=='string' || typeof value.category_slug!=='string' || (typeof value.place_slug!=='string' && value.place_slug!==null) || !isRecord(value.author) || !hasKeys(value.author,['id','display_name']) || typeof value.author.id!=='string' || typeof value.author.display_name!=='string' || !isTime(value.created_at) || !isTime(value.updated_at)) throw new APIResponseError(); return { id:value.id,title:value.title,body:value.body,categorySlug:value.category_slug,placeSlug:value.place_slug,createdAt:value.created_at,updatedAt:value.updated_at,author:{id:value.author.id,displayName:value.author.display_name} as NoteAuthor }; }
-function isRecord(value: unknown): value is Record<string, any> { return typeof value === 'object' && value !== null && !Array.isArray(value); }
-function hasKeys(value: Record<string, unknown>, keys: string[]): boolean { const actual=Object.keys(value); return actual.length===keys.length && keys.every((key)=>Object.prototype.hasOwnProperty.call(value,key)); }
-function isTime(value: unknown): value is number { return typeof value === 'number' && Number.isInteger(value) && value >= 0; }
+function isPublicAuthorResponse(value: unknown): value is PublicAuthorResponse {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, publicAuthorResponseKeys) &&
+    typeof value.id === 'string' &&
+    typeof value.display_name === 'string' &&
+    typeof value.note_count === 'number' &&
+    Number.isInteger(value.note_count) &&
+    value.note_count >= 0
+  );
+}
+
+function isAuthorNotesPageResponse(
+  value: unknown,
+): value is AuthorNotesPageResponse {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, authorNotesPageResponseKeys) &&
+    Array.isArray(value.notes) &&
+    (typeof value.next_cursor === 'string' || value.next_cursor === null)
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasOnlyKeys(
+  value: Record<string, unknown>,
+  expectedKeys: readonly string[],
+): boolean {
+  const keys = Object.keys(value);
+  return (
+    keys.length === expectedKeys.length &&
+    expectedKeys.every((key) =>
+      Object.prototype.hasOwnProperty.call(value, key),
+    )
+  );
+}
+
+function schemaKeyList<T>() {
+  return <const K extends SchemaKeyList<T>>(
+    keys: ExhaustiveSchemaKeyList<T, K>,
+  ) => keys;
+}

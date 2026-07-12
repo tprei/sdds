@@ -140,10 +140,11 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(publishedNote).toContainText(body);
   await expect(publishedNote).toContainText(displayName);
   await expect(publishedNote).toContainText('São Paulo');
+  const exploreURL = page.url();
   await page.getByLabel(`Abrir perfil do autor: ${displayName}`).click();
   await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
   await expect(page.getByText(displayName, { exact: true }).last()).toBeVisible();
-  await page.goBack();
+  await page.goto(exploreURL);
   await expect(publishedNote).toBeVisible();
 
   await page.getByText('Buscar', { exact: true }).click();
@@ -168,10 +169,11 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Nota$/ }),
   ).toBeVisible();
+  const noteURL = page.url();
   await page.getByLabel(`Abrir perfil do autor: ${displayName}`).last().click();
   await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
   await expect(page.getByText(displayName, { exact: true }).last()).toBeVisible();
-  await page.goBack();
+  await page.goto(noteURL);
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(
     page.getByLabel(`Abrir perfil do autor: ${displayName}`).last(),
@@ -618,7 +620,7 @@ test('shows distinct authors when a second user signs in', async ({
   await page.getByLabel('Nome de usuário').fill(secondUsername);
   await page.getByLabel('Senha').fill(syntheticPassword);
   await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.getByText(secondDisplayName)).toBeVisible();
+  await expect(page.getByText(secondDisplayName).last()).toBeVisible();
 
   await page.goto('/');
   const firstCard = page.getByRole('button', {

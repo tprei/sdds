@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 
-import { FoundationButton } from '../../components/foundation-screen';
-import { buildNoteCatalog, labelNotes } from '../notes/catalog';
-import { listCatalogs } from '../../lib/api/catalogs';
 import { NoteCard } from '../../components/note-card';
+import { FoundationButton } from '../../components/foundation-screen';
+import { listCatalogs } from '../../lib/api/catalogs';
 import { APIRequestError } from '../../lib/api/notes';
 import { getPublicAuthor, listAuthorNotes } from '../../lib/api/authors';
 import type { PublicAuthor } from '../../lib/api/authors';
-import type { Note } from '../../lib/api/notes';
+import { buildNoteCatalog, labelNotes, type LabelledNote, type NoteCatalog } from '../notes/catalog';
 import { styles } from './author-profile-content.styles';
 
 type Props = { authorID: string; onPressNote: (noteID: string) => void };
+type ProfileError = 'not_found' | 'error' | null;
 
 function initials(name: string): string {
   return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('');
@@ -21,92 +21,147 @@ function noteCount(count: number): string {
   return `${count} ${count === 1 ? 'Nota' : 'Notas'}`;
 }
 
+function ProfileHeader({ author }: { author: PublicAuthor }) {
+  return (
+    <View style={styles.header}>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>{initials(author.displayName)}</Text>
+      </View>
+      <Text style={styles.name}>{author.displayName}</Text>
+      <Text style={styles.count}>{noteCount(author.noteCount)}</Text>
+    </View>
+  );
+}
+
+function InitialLoading() {
+  return <Text style={styles.message}>Carregando perfil…</Text>;
+}
+
+function InitialError({ notFound, onRetry }: { notFound: boolean; onRetry: () => void }) {
+  return (
+    <View>
+      <Text accessibilityRole={notFound ? undefined : 'alert'} style={styles.message}>
+        {notFound ? 'Perfil não encontrado.' : 'Não foi possível carregar este perfil.'}
+      </Text>
+      <FoundationButton label="Tentar de novo" onPress={onRetry} />
+    </View>
+  );
+}
+
+function ProfileNotes({ notes, onPressNote }: { notes: LabelledNote[]; onPressNote: (noteID: string) => void }) {
+  if (notes.length === 0) {
+    return <Text style={styles.message}>Nenhuma nota ainda.</Text>;
+  }
+
+  return (
+    <>
+      {notes.map((note) => (
+        <NoteCard
+          categoryLabel={note.categoryLabel}
+          key={note.id}
+          note={note}
+          onPress={() => onPressNote(note.id)}
+          placeLabel={note.placeLabel}
+        />
+      ))}
+    </>
+  );
+}
+
+function PaginationStatus({ loading, error, onRetry }: { loading: boolean; error: boolean; onRetry: () => void }) {
+  if (error) {
+    return (
+      <View>
+        <Text accessibilityRole="alert" style={styles.message}>Não foi possível carregar mais notas.</Text>
+        <FoundationButton label="Tentar de novo" onPress={onRetry} />
+      </View>
+    );
+  }
+  return loading ? <Text style={styles.message}>Carregando mais notas…</Text> : null;
+}
+
+function nearScrollEnd(event: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }): boolean {
+  const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+  return contentOffset.y + layoutMeasurement.height >= contentSize.height - 120;
+}
+
 export function AuthorProfileContent({ authorID, onPressNote }: Props) {
   const [author, setAuthor] = useState<PublicAuthor | null>(null);
-  const [catalog, setCatalog] = useState<ReturnType<typeof buildNoteCatalog> | null>(null);
-  const [notes, setNotes] = useState<Note[]>([]);
+  const [catalog, setCatalog] = useState<NoteCatalog | null>(null);
+  const [notes, setNotes] = useState<LabelledNote[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingNext, setLoadingNext] = useState(false);
-  const [error, setError] = useState<'not_found' | 'error' | null>(null);
+  const [error, setError] = useState<ProfileError>(null);
   const [nextError, setNextError] = useState(false);
   const pendingCursor = useRef<string | null | undefined>(undefined);
 
-  const load = useCallback(async (next: string | undefined) => {
-    if (next !== undefined && pendingCursor.current === next) return;
-    pendingCursor.current = next;
-    if (next === undefined) {
-      setLoading(true);
-      setError(null);
-    } else {
-      setLoadingNext(true);
-      setNextError(false);
-    }
+  const loadInitial = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      if (next === undefined) {
-        const [profile, page, catalogs] = await Promise.all([
-          getPublicAuthor(authorID),
-          listAuthorNotes({ authorID }),
-          listCatalogs(),
-        ]);
-        const nextCatalog = buildNoteCatalog(catalogs);
-        const labelledNotes = labelNotes(nextCatalog, page.notes);
-        if (labelledNotes === null) throw new Error('catalog_labels_missing');
-        setAuthor(profile);
-        setCatalog(nextCatalog);
-        setNotes(labelledNotes);
-        setCursor(page.nextCursor);
-      } else {
-        const page = await listAuthorNotes({ authorID, cursor: next });
-        if (catalog === null) throw new Error('catalog_missing');
-        const labelledNotes = labelNotes(catalog, page.notes);
-        if (labelledNotes === null) throw new Error('catalog_labels_missing');
-        setNotes((current) => {
-          const ids = new Set(current.map((note) => note.id));
-          return [...current, ...labelledNotes.filter((note) => !ids.has(note.id))];
-        });
-        setCursor(page.nextCursor);
-      }
+      const [profile, page, catalogs] = await Promise.all([
+        getPublicAuthor(authorID),
+        listAuthorNotes({ authorID }),
+        listCatalogs(),
+      ]);
+      const nextCatalog = buildNoteCatalog(catalogs);
+      const labelledNotes = labelNotes(nextCatalog, page.notes);
+      if (labelledNotes === null) throw new Error('catalog_labels_missing');
+      setAuthor(profile);
+      setCatalog(nextCatalog);
+      setNotes(labelledNotes);
+      setCursor(page.nextCursor);
     } catch (caught) {
-      if (caught instanceof APIRequestError && caught.status === 404 && next === undefined) {
-        setError('not_found');
-      } else if (next === undefined) {
-        setError('error');
-      } else {
-        setNextError(true);
-      }
+      setError(caught instanceof APIRequestError && caught.status === 404 ? 'not_found' : 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [authorID]);
+
+  const loadNext = useCallback(async (nextCursor: string, nextCatalog: NoteCatalog) => {
+    if (pendingCursor.current === nextCursor) return;
+    pendingCursor.current = nextCursor;
+    setLoadingNext(true);
+    setNextError(false);
+    try {
+      const page = await listAuthorNotes({ authorID, cursor: nextCursor });
+      const labelledNotes = labelNotes(nextCatalog, page.notes);
+      if (labelledNotes === null) throw new Error('catalog_labels_missing');
+      setNotes((current) => {
+        const ids = new Set(current.map((note) => note.id));
+        return [...current, ...labelledNotes.filter((note) => !ids.has(note.id))];
+      });
+      setCursor(page.nextCursor);
+    } catch {
+      setNextError(true);
     } finally {
       pendingCursor.current = undefined;
-      setLoading(false);
       setLoadingNext(false);
     }
-  }, [authorID, catalog]);
+  }, [authorID]);
 
   useEffect(() => {
-    queueMicrotask(() => void load(undefined));
-  }, [load]);
+    pendingCursor.current = null;
+    queueMicrotask(() => void loadInitial());
+  }, [loadInitial]);
 
-  if (loading) return <Text style={styles.message}>Carregando perfil…</Text>;
-  if (error === 'not_found') return <View><Text style={styles.message}>Perfil não encontrado.</Text><FoundationButton label="Tentar de novo" onPress={() => void load(undefined)} /></View>;
-  if (error === 'error' || author === null || catalog === null) return <View><Text accessibilityRole="alert" style={styles.message}>Não foi possível carregar este perfil.</Text><FoundationButton label="Tentar de novo" onPress={() => void load(undefined)} /></View>;
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (cursor !== null && catalog !== null && nearScrollEnd(event)) {
+      void loadNext(cursor, catalog);
+    }
+  }, [catalog, cursor, loadNext]);
+
+  if (loading) return <InitialLoading />;
+  if (error !== null || author === null || catalog === null) {
+    return <InitialError notFound={error === 'not_found'} onRetry={() => void loadInitial()} />;
+  }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      onScroll={(event) => {
-        const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-        if (cursor !== null && contentOffset.y + layoutMeasurement.height >= contentSize.height - 120) void load(cursor);
-      }}
-      scrollEventThrottle={100}
-    >
-      <View style={styles.header}>
-        <View style={styles.avatar}><Text style={styles.avatarText}>{initials(author.displayName)}</Text></View>
-        <Text style={styles.name}>{author.displayName}</Text>
-        <Text style={styles.count}>{noteCount(author.noteCount)}</Text>
-      </View>
-      {notes.length === 0 ? <Text style={styles.message}>Nenhuma nota ainda.</Text> : notes.map((note) => <NoteCard key={note.id} categoryLabel={catalog.categoryLabels.get(note.categorySlug) ?? ''} note={note} placeLabel={note.placeSlug === null ? null : catalog.placeLabels.get(note.placeSlug) ?? null} onPress={() => onPressNote(note.id)} />)}
-      {nextError ? <View><Text accessibilityRole="alert" style={styles.message}>Não foi possível carregar mais notas.</Text><FoundationButton label="Tentar de novo" onPress={() => cursor !== null && void load(cursor)} /></View> : null}
-      {loadingNext ? <Text style={styles.message}>Carregando mais notas…</Text> : null}
+    <ScrollView contentContainerStyle={styles.content} onScroll={handleScroll} scrollEventThrottle={100}>
+      <ProfileHeader author={author} />
+      <ProfileNotes notes={notes} onPressNote={onPressNote} />
+      <PaginationStatus error={nextError} loading={loadingNext} onRetry={() => cursor !== null && void loadNext(cursor, catalog)} />
     </ScrollView>
   );
 }

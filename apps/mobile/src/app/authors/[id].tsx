@@ -4,9 +4,28 @@ import { Text, View } from 'react-native';
 import { FoundationButton } from '../../components/foundation-screen';
 import { AuthorProfileContent } from '../../features/authors/author-profile-content';
 
+const rootStyle = { flex: 1 };
+
 export default function AuthorProfileScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
-  if (typeof id !== 'string' || id.length === 0) return <View><Text>Perfil não encontrado.</Text></View>;
-  return <View style={{ flex: 1 }}><FoundationButton label="Voltar" onPress={() => router.back()} /><AuthorProfileContent authorID={id} onPressNote={(noteID) => router.push({ pathname: '/notes/[id]', params: { id: noteID } })} /></View>;
+
+  if (typeof id !== 'string' || id.length === 0) {
+    return (
+      <View>
+        <Text>Perfil não encontrado.</Text>
+      </View>
+    );
+  }
+
+  function openNote(noteID: string) {
+    router.push({ pathname: '/notes/[id]', params: { id: noteID } });
+  }
+
+  return (
+    <View style={rootStyle}>
+      <FoundationButton label="Voltar" onPress={() => router.back()} />
+      <AuthorProfileContent authorID={id} onPressNote={openNote} />
+    </View>
+  );
 }

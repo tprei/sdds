@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   ScrollView,
   Text,
@@ -6,6 +6,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 
 import { NoteCard } from '../../components/note-card';
 import { FoundationButton } from '../../components/foundation-screen';
@@ -29,7 +30,7 @@ function initials(name: string): string {
     .trim()
     .split(/\s+/)
     .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
+    .map((part) => Array.from(part)[0]?.toLocaleUpperCase('pt-BR') ?? '')
     .join('');
 }
 
@@ -39,12 +40,20 @@ function noteCount(count: number): string {
 
 function ProfileHeader({ author }: { author: PublicAuthor }) {
   return (
-    <View style={styles.header}>
+    <View style={styles.header} testID="author-profile-header">
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{initials(author.displayName)}</Text>
       </View>
-      <Text style={styles.name}>{author.displayName}</Text>
-      <Text style={styles.count}>{noteCount(author.noteCount)}</Text>
+      <Text
+        accessibilityRole="header"
+        style={styles.name}
+        testID="author-profile-name"
+      >
+        {author.displayName}
+      </Text>
+      <Text style={styles.count} testID="author-profile-note-count">
+        {noteCount(author.noteCount)}
+      </Text>
     </View>
   );
 }
@@ -147,22 +156,48 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
   const [nextError, setNextError] = useState(false);
   const pendingCursor = useRef<string | null | undefined>(undefined);
   const requestVersion = useRef(0);
+  const [activeAuthorID, setActiveAuthorID] = useState<string | null>(null);
+  const currentAuthorID = useRef(authorID);
+
+  useLayoutEffect(() => {
+    currentAuthorID.current = authorID;
+    requestVersion.current += 1;
+    pendingCursor.current = undefined;
+  }, [authorID]);
+
+  const isCurrentRequest = useCallback(
+    (version: number, requestedAuthorID: string) =>
+      version === requestVersion.current &&
+      requestedAuthorID === currentAuthorID.current,
+    [],
+  );
+
+  const invalidateRequests = useCallback(() => {
+    requestVersion.current += 1;
+    pendingCursor.current = undefined;
+  }, []);
 
   const loadInitial = useCallback(async () => {
+    const requestedAuthorID = authorID;
     const version = requestVersion.current + 1;
     requestVersion.current = version;
     pendingCursor.current = undefined;
+    setActiveAuthorID(null);
+    setAuthor(null);
+    setCatalog(null);
+    setNotes([]);
+    setCursor(null);
     setLoadingNext(false);
     setNextError(false);
     setLoading(true);
     setError(null);
     try {
       const [profile, page, catalogs] = await Promise.all([
-        getPublicAuthor(authorID),
-        listAuthorNotes({ authorID }),
+        getPublicAuthor(requestedAuthorID),
+        listAuthorNotes({ authorID: requestedAuthorID }),
         listCatalogs(),
       ]);
-      if (version !== requestVersion.current) return;
+      if (!isCurrentRequest(version, requestedAuthorID)) return;
       const nextCatalog = buildNoteCatalog(catalogs);
       const labelledNotes = labelNotes(nextCatalog, page.notes);
       if (labelledNotes === null) throw new Error('catalog_labels_missing');
@@ -170,8 +205,10 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
       setCatalog(nextCatalog);
       setNotes(labelledNotes);
       setCursor(page.nextCursor);
+      setActiveAuthorID(requestedAuthorID);
     } catch (caught) {
-      if (version === requestVersion.current) {
+      if (isCurrentRequest(version, requestedAuthorID)) {
+        setActiveAuthorID(requestedAuthorID);
         setError(
           caught instanceof APIRequestError && caught.status === 404
             ? 'not_found'
@@ -179,21 +216,25 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
         );
       }
     } finally {
-      if (version === requestVersion.current) setLoading(false);
+      if (isCurrentRequest(version, requestedAuthorID)) setLoading(false);
     }
-  }, [authorID]);
+  }, [authorID, isCurrentRequest]);
 
   const loadNext = useCallback(
     async (nextCursor: string, nextCatalog: NoteCatalog) => {
       if (pendingCursor.current === nextCursor) return;
+      const requestedAuthorID = authorID;
       pendingCursor.current = nextCursor;
       const version = requestVersion.current + 1;
       requestVersion.current = version;
       setLoadingNext(true);
       setNextError(false);
       try {
-        const page = await listAuthorNotes({ authorID, cursor: nextCursor });
-        if (version !== requestVersion.current) return;
+        const page = await listAuthorNotes({
+          authorID: requestedAuthorID,
+          cursor: nextCursor,
+        });
+        if (!isCurrentRequest(version, requestedAuthorID)) return;
         const labelledNotes = labelNotes(nextCatalog, page.notes);
         if (labelledNotes === null) throw new Error('catalog_labels_missing');
         setNotes((current) => {
@@ -205,21 +246,23 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
         });
         setCursor(page.nextCursor);
       } catch {
-        if (version === requestVersion.current) setNextError(true);
+        if (isCurrentRequest(version, requestedAuthorID)) setNextError(true);
       } finally {
-        if (version === requestVersion.current) {
+        if (isCurrentRequest(version, requestedAuthorID)) {
           pendingCursor.current = undefined;
           setLoadingNext(false);
         }
       }
     },
-    [authorID],
+    [authorID, isCurrentRequest],
   );
 
-  useEffect(() => {
-    pendingCursor.current = null;
-    queueMicrotask(() => void loadInitial());
-  }, [loadInitial]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadInitial();
+      return invalidateRequests;
+    }, [invalidateRequests, loadInitial]),
+  );
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -236,7 +279,7 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
     [catalog, cursor, loadNext, loadingNext, nextError],
   );
 
-  if (loading) return <InitialLoading />;
+  if (activeAuthorID !== authorID || loading) return <InitialLoading />;
   if (error !== null || author === null || catalog === null) {
     return (
       <InitialError

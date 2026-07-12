@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react';
+import * as React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -6,6 +6,9 @@ import type { PublicAuthor, AuthorNotesPage } from '../../lib/api/authors';
 import type { Catalogs } from '../../lib/api/catalogs';
 import type { Note } from '../../lib/api/notes';
 import { AuthorProfileContent } from './author-profile-content';
+
+const { createElement } = React;
+type ReactNode = React.ReactNode;
 
 vi.mock('react-native', () => {
   type NativeProps = {
@@ -49,8 +52,20 @@ vi.mock('../../components/foundation-screen', () => ({
     ),
 }));
 
+type FocusEffect = () => void | (() => void);
+
+vi.mock('expo-router', async () => {
+  const react = (await vi.importActual('react')) as typeof React;
+  return {
+    useFocusEffect(effect: FocusEffect) {
+      react.useEffect(effect, [effect]);
+    },
+  };
+});
+
+
 const mocks = vi.hoisted(() => ({
-  getPublicAuthor: vi.fn<() => Promise<PublicAuthor>>(),
+  getPublicAuthor: vi.fn<(authorID: string) => Promise<PublicAuthor>>(),
   listAuthorNotes: vi.fn<(
     input: { authorID: string; cursor?: string },
   ) => Promise<AuthorNotesPage>>(),
@@ -79,7 +94,7 @@ const catalogs: Catalogs = {
   places: [],
 };
 
-describe('AuthorProfileContent pagination errors', () => {
+describe('AuthorProfileContent', () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
@@ -88,9 +103,15 @@ describe('AuthorProfileContent pagination errors', () => {
     mocks.getPublicAuthor.mockResolvedValue(author);
     mocks.listCatalogs.mockResolvedValue(catalogs);
     mocks.listAuthorNotes
-      .mockResolvedValueOnce({ notes: [note('first-note', 'Primeira nota')], nextCursor: 'cursor-1' })
+      .mockResolvedValueOnce({
+        notes: [note('first-note', 'Primeira nota')],
+        nextCursor: 'cursor-1',
+      })
       .mockRejectedValueOnce(new Error('page_failed'))
-      .mockResolvedValueOnce({ notes: [note('second-note', 'Segunda nota')], nextCursor: null });
+      .mockResolvedValueOnce({
+        notes: [note('second-note', 'Segunda nota')],
+        nextCursor: null,
+      });
 
     let renderer: ReactTestRenderer;
     await act(async () => {
@@ -100,7 +121,9 @@ describe('AuthorProfileContent pagination errors', () => {
       await flushPromises();
     });
 
-    const scrollView = renderer!.root.findByProps({ testID: 'author-profile-scroll' });
+    const scrollView = renderer!.root.findByProps({
+      testID: 'author-profile-scroll',
+    });
     await act(async () => {
       scrollView.props.onScroll(nearEndEvent());
       await flushPromises();
@@ -111,8 +134,10 @@ describe('AuthorProfileContent pagination errors', () => {
       authorID: 'author-id',
       cursor: 'cursor-1',
     });
-    expect(renderer!.root.findAllByProps({ accessibilityRole: 'alert' })).not.toHaveLength(0);
-    expect(renderer!.root.findAll((node) => node.props.children === 'Primeira nota')).not.toHaveLength(0);
+    expect(
+      renderer!.root.findAllByProps({ accessibilityRole: 'alert' }),
+    ).not.toHaveLength(0);
+    expect(textNodes(renderer!, 'Primeira nota')).not.toHaveLength(0);
 
     await act(async () => {
       scrollView.props.onScroll(nearEndEvent());
@@ -133,8 +158,125 @@ describe('AuthorProfileContent pagination errors', () => {
       authorID: 'author-id',
       cursor: 'cursor-1',
     });
-    expect(renderer!.root.findAllByProps({ accessibilityRole: 'alert' })).toHaveLength(0);
-    expect(renderer!.root.findAll((node) => node.props.children === 'Segunda nota')).not.toHaveLength(0);
+    expect(
+      renderer!.root.findAllByProps({ accessibilityRole: 'alert' }),
+    ).toHaveLength(0);
+    expect(textNodes(renderer!, 'Segunda nota')).not.toHaveLength(0);
+
+    renderer!.unmount();
+  });
+
+  it('hides loaded author data immediately when the author changes', async () => {
+    const nextAuthor: PublicAuthor = {
+      displayName: 'João Silva',
+      id: 'next-author',
+      noteCount: 1,
+    };
+    const nextProfile = deferred<PublicAuthor>();
+    const nextPage = deferred<AuthorNotesPage>();
+    mocks.getPublicAuthor
+      .mockResolvedValueOnce(author)
+      .mockReturnValueOnce(nextProfile.promise);
+    mocks.listCatalogs.mockResolvedValue(catalogs);
+    mocks.listAuthorNotes
+      .mockResolvedValueOnce({
+        notes: [note('first-note', 'Primeira nota')],
+        nextCursor: null,
+      })
+      .mockReturnValueOnce(nextPage.promise);
+
+    let renderer: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <AuthorProfileContent authorID="author-id" onPressNote={() => undefined} />,
+      );
+      await flushPromises();
+    });
+    expect(textNodes(renderer!, 'Marina Alves')).not.toHaveLength(0);
+    expect(textNodes(renderer!, 'Primeira nota')).not.toHaveLength(0);
+
+    await act(async () => {
+      renderer!.update(
+        <AuthorProfileContent authorID="next-author" onPressNote={() => undefined} />,
+      );
+      await flushPromises();
+    });
+
+    expect(textNodes(renderer!, 'Marina Alves')).toHaveLength(0);
+    expect(textNodes(renderer!, 'Primeira nota')).toHaveLength(0);
+    expect(textNodes(renderer!, 'Carregando perfil…')).not.toHaveLength(0);
+
+    await act(async () => {
+      nextProfile.resolve(nextAuthor);
+      nextPage.resolve({
+        notes: [note('next-note', 'Segunda nota')],
+        nextCursor: null,
+      });
+      await flushPromises();
+    });
+
+    expect(textNodes(renderer!, 'João Silva')).not.toHaveLength(0);
+    expect(textNodes(renderer!, 'Segunda nota')).not.toHaveLength(0);
+
+    renderer!.unmount();
+  });
+
+  it('ignores stale author responses after the author changes', async () => {
+    const firstProfile = deferred<PublicAuthor>();
+    const firstPage = deferred<AuthorNotesPage>();
+    const nextAuthor: PublicAuthor = {
+      displayName: 'João Silva',
+      id: 'next-author',
+      noteCount: 1,
+    };
+    const nextProfile = deferred<PublicAuthor>();
+    const nextPage = deferred<AuthorNotesPage>();
+    mocks.getPublicAuthor
+      .mockReturnValueOnce(firstProfile.promise)
+      .mockReturnValueOnce(nextProfile.promise);
+    mocks.listCatalogs.mockResolvedValue(catalogs);
+    mocks.listAuthorNotes
+      .mockReturnValueOnce(firstPage.promise)
+      .mockReturnValueOnce(nextPage.promise);
+
+    let renderer: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <AuthorProfileContent authorID="author-id" onPressNote={() => undefined} />,
+      );
+      await flushPromises();
+    });
+
+    await act(async () => {
+      renderer!.update(
+        <AuthorProfileContent authorID="next-author" onPressNote={() => undefined} />,
+      );
+      await flushPromises();
+    });
+
+    await act(async () => {
+      firstProfile.resolve(author);
+      firstPage.resolve({
+        notes: [note('first-note', 'Primeira nota')],
+        nextCursor: null,
+      });
+      await flushPromises();
+    });
+
+    expect(textNodes(renderer!, 'Marina Alves')).toHaveLength(0);
+    expect(textNodes(renderer!, 'Primeira nota')).toHaveLength(0);
+
+    await act(async () => {
+      nextProfile.resolve(nextAuthor);
+      nextPage.resolve({
+        notes: [note('next-note', 'Segunda nota')],
+        nextCursor: null,
+      });
+      await flushPromises();
+    });
+
+    expect(textNodes(renderer!, 'João Silva')).not.toHaveLength(0);
+    expect(textNodes(renderer!, 'Segunda nota')).not.toHaveLength(0);
 
     renderer!.unmount();
   });
@@ -153,6 +295,23 @@ function note(id: string, title: string): Note {
   };
 }
 
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+};
+
+function deferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+}
+
+function textNodes(renderer: ReactTestRenderer, text: string) {
+  return renderer.root.findAll((node) => node.props.children === text);
+}
+
 function nearEndEvent() {
   return {
     nativeEvent: {
@@ -164,6 +323,8 @@ function nearEndEvent() {
 }
 
 async function flushPromises(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
 }

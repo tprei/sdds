@@ -9,8 +9,9 @@ const rootStyle = { flex: 1 };
 export default function AuthorProfileScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
+  const authorID = typeof id === 'string' ? id.trim() : '';
 
-  if (typeof id !== 'string' || id.length === 0) {
+  if (authorID.length === 0) {
     return (
       <View>
         <Text>Perfil não encontrado.</Text>
@@ -25,7 +26,7 @@ export default function AuthorProfileScreen() {
   return (
     <View style={rootStyle}>
       <FoundationButton label="Voltar" onPress={() => router.back()} />
-      <AuthorProfileContent authorID={id} onPressNote={openNote} />
+      <AuthorProfileContent authorID={authorID} onPressNote={openNote} />
     </View>
   );
 }

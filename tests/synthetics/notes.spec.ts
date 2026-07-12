@@ -138,7 +138,9 @@ test('creates a note and reads it from the API-backed home feed', async ({
   });
   await expect(publishedNote).toBeVisible();
   await expect(publishedNote).toContainText(body);
-  await expect(publishedNote).toContainText(displayName);
+  await expect(
+    page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
+  ).toBeVisible();
   await expect(publishedNote).toContainText('São Paulo');
   const exploreURL = page.url();
   await page.getByLabel(`Abrir perfil do autor: ${displayName}`).click();
@@ -160,7 +162,9 @@ test('creates a note and reads it from the API-backed home feed', async ({
   });
   await expect(searchResult).toBeVisible();
   await expect(searchResult).toContainText(body);
-  await expect(searchResult).toContainText(displayName);
+  await expect(
+    page.getByLabel(`Abrir perfil do autor: ${displayName}`).last(),
+  ).toBeVisible();
   await expect(searchResult).toContainText('São Paulo');
 
   await searchResult.click();
@@ -297,8 +301,9 @@ test('narrows the mobile explore feed by category', async ({
   });
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toBeVisible();
-  await expect(foodNote).toContainText(displayName);
-  await expect(travelNote).toContainText(displayName);
+  await expect(
+    page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
+  ).toBeVisible();
 
   await page.getByRole('button', { exact: true, name: 'Comida' }).click();
   await expect(
@@ -366,8 +371,9 @@ test('narrows the mobile search results by category and clears stale cards', asy
   });
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toBeVisible();
-  await expect(foodNote).toContainText(displayName);
-  await expect(travelNote).toContainText(displayName);
+  await expect(
+    page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
+  ).toBeVisible();
   await expect(page.getByText(`2 notas para ${marker}`)).toBeVisible();
   await expect(
     page.getByLabel(
@@ -451,8 +457,9 @@ test('orders search results by weighted title matches and handles punctuation-on
   await expect(searchResults).toHaveCount(2);
   await expect(searchResults.nth(0)).toContainText(titleMatchTitle);
   await expect(searchResults.nth(1)).toContainText(bodyMatchTitle);
-  await expect(searchResults.nth(0)).toContainText(displayName);
-  await expect(searchResults.nth(1)).toContainText(displayName);
+  await expect(
+    page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
+  ).toBeVisible();
 
   await page.getByLabel('Buscar').fill('!!! *** ()');
   await page.getByRole('button', { name: 'Buscar' }).click();

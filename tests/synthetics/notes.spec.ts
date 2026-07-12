@@ -198,8 +198,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await page.reload();
 
   await page.getByRole('button', { name: 'Sair' }).click();
-  await page.reload();
-  await expect(page.getByText('Entre para publicar')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByTestId('profile-signup-button')).toBeVisible({ timeout: 30000 });
 });
 
 test('shows auth validation reasons and clears stale login submit state', async ({

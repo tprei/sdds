@@ -145,7 +145,7 @@ describe('catalogs API client', () => {
     await expect(listCategories()).rejects.toThrow(CatalogAPIResponseError);
   });
 
-  it('rejects undocumented place response fields', async () => {
+  it('ignores extra place response fields', async () => {
     stubFetch(async () =>
       jsonResponse({
         places: [
@@ -157,7 +157,14 @@ describe('catalogs API client', () => {
       }),
     );
 
-    await expect(listPlaces()).rejects.toThrow(CatalogAPIResponseError);
+    await expect(listPlaces()).resolves.toEqual([
+      {
+        active: true,
+        displayOrder: 10,
+        label: 'Sao Paulo',
+        slug: 'sao-paulo',
+      },
+    ]);
   });
 });
 

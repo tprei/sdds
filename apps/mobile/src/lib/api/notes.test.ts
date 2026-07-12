@@ -334,7 +334,7 @@ describe('notes API client', () => {
     await expect(listNotes()).rejects.toThrow(APIResponseError);
   });
 
-  it('rejects undocumented response fields', async () => {
+  it('ignores extra note response fields', async () => {
     stubFetch(async () =>
       jsonResponse({
         notes: [
@@ -346,7 +346,7 @@ describe('notes API client', () => {
       }),
     );
 
-    await expect(listNotes()).rejects.toThrow(APIResponseError);
+    await expect(listNotes()).resolves.toEqual([expectedNote()]);
   });
 
   it('rejects invalid timestamp values', async () => {
@@ -383,7 +383,7 @@ describe('notes API client', () => {
     await expect(listNotes()).rejects.toThrow(APIResponseError);
   });
 
-  it('rejects legacy city slug response fields', async () => {
+  it('ignores extra legacy city slug response fields', async () => {
     stubFetch(async () =>
       jsonResponse({
         notes: [
@@ -395,7 +395,7 @@ describe('notes API client', () => {
       }),
     );
 
-    await expect(listNotes()).rejects.toThrow(APIResponseError);
+    await expect(listNotes()).resolves.toEqual([expectedNote()]);
   });
 });
 

@@ -40,26 +40,6 @@ type AuthorSummaryResponse = GeneratedSchemas['AuthorSummary'];
 type CreateNoteRequest = GeneratedSchemas['CreateNoteRequest'];
 type ListNotesResponse = GeneratedSchemas['ListNotesResponse'];
 type NoteResponse = GeneratedSchemas['Note'];
-type SchemaKey<T> = Extract<keyof T, string>;
-type SchemaKeyList<T> = readonly SchemaKey<T>[];
-type ExhaustiveSchemaKeyList<T, K extends SchemaKeyList<T>> =
-  Exclude<SchemaKey<T>, K[number]> extends never ? K : never;
-
-const listNotesResponseKeys = schemaKeyList<ListNotesResponse>()(['notes']);
-const authorSummaryResponseKeys = schemaKeyList<AuthorSummaryResponse>()([
-  'display_name',
-  'id',
-]);
-const noteResponseKeys = schemaKeyList<NoteResponse>()([
-  'author',
-  'body',
-  'category_slug',
-  'created_at',
-  'id',
-  'place_slug',
-  'title',
-  'updated_at',
-]);
 
 export class APIRequestError extends Error {
   readonly status: number;
@@ -227,7 +207,6 @@ function parseAuthorSummary(value: AuthorSummaryResponse): NoteAuthor {
 function isNoteResponse(value: unknown): value is NoteResponse {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, noteResponseKeys) &&
     typeof value.id === 'string' &&
     typeof value.title === 'string' &&
     typeof value.body === 'string' &&
@@ -244,7 +223,6 @@ function isAuthorSummaryResponse(
 ): value is AuthorSummaryResponse {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, authorSummaryResponseKeys) &&
     typeof value.id === 'string' &&
     typeof value.display_name === 'string'
   );
@@ -253,7 +231,6 @@ function isAuthorSummaryResponse(
 function isListNotesResponse(value: unknown): value is ListNotesResponse {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, listNotesResponseKeys) &&
     Array.isArray(value.notes)
   );
 }
@@ -262,24 +239,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function hasOnlyKeys(
-  value: Record<string, unknown>,
-  expectedKeys: readonly string[],
-): boolean {
-  const keys = Object.keys(value);
-  return (
-    keys.length === expectedKeys.length &&
-    expectedKeys.every((key) =>
-      Object.prototype.hasOwnProperty.call(value, key),
-    )
-  );
-}
-
-function schemaKeyList<T>() {
-  return <const K extends SchemaKeyList<T>>(
-    keys: ExhaustiveSchemaKeyList<T, K>,
-  ) => keys;
-}
 
 function isUnixMillisecondTimestamp(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0;

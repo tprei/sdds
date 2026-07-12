@@ -287,7 +287,7 @@ describe('auth API client', () => {
     );
   });
 
-  it('rejects undocumented current session response fields', async () => {
+  it('ignores extra current session response fields', async () => {
     stubFetch(async () =>
       jsonResponse({
         ...apiCurrentSession(),
@@ -295,9 +295,17 @@ describe('auth API client', () => {
       }),
     );
 
-    await expect(getAuthSession(exampleToken)).rejects.toThrow(
-      AuthAPIResponseError,
-    );
+    await expect(getAuthSession(exampleToken)).resolves.toEqual({
+      expiresAt: 1782993600000,
+      user: {
+        author: {
+          displayName: 'Thiago',
+          id: exampleAuthorID,
+        },
+        id: exampleUserID,
+        username: 'thiago',
+      },
+    });
   });
 });
 

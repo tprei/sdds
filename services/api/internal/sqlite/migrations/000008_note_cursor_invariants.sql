@@ -34,7 +34,7 @@ CREATE INDEX notes_recent_idx ON notes (created_at DESC, id DESC);
 CREATE INDEX notes_category_idx ON notes (category_slug);
 CREATE INDEX notes_place_idx ON notes (place_slug);
 CREATE INDEX notes_user_idx ON notes (user_id);
-CREATE INDEX notes_author_page_idx ON notes (user_id, created_at DESC, id DESC);
+CREATE INDEX notes_author_page_idx ON notes (user_id, created_at DESC);
 
 CREATE VIRTUAL TABLE note_search USING fts5(
 	note_id UNINDEXED,

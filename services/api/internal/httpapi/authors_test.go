@@ -20,7 +20,7 @@ import (
 const (
 	exampleAuthorID        = author.AuthorID("018ff5b8-0000-7000-8000-000000000010")
 	exampleAuthorNoteID    = "018ff5b8-0000-7000-8000-000000000011"
-	exampleCursorNoteID    = "018ff5b8-0000-7000-8000-000000000012"
+	exampleCursorRowID     = int64(123)
 	exampleAuthorDisplay   = "Marina Alves"
 	exampleAuthorCreatedMS = int64(1782993600000)
 )
@@ -89,7 +89,7 @@ func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 			if input.After != nil {
 				t.Fatalf("cursor = %#v, want nil", input.After)
 			}
-			return note.AuthorNotesPage{Notes: []note.Note{authorHTTPNote(exampleAuthorNoteID, createdAt)}, HasMore: true}, nil
+			return note.AuthorNotesPage{Notes: []note.AuthorNote{authorHTTPAuthorNote(exampleAuthorNoteID, createdAt, exampleCursorRowID)}, HasMore: true}, nil
 		},
 	}, fakeCatalog{}, fakeUserStore{
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
@@ -120,7 +120,7 @@ func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 	if len(problems) > 0 {
 		t.Fatalf("returned cursor did not decode: %#v", problems)
 	}
-	if cursor == nil || cursor.ID != exampleAuthorNoteID || !cursor.CreatedAt.Equal(createdAt) {
+	if cursor == nil || cursor.RowID != exampleCursorRowID || !cursor.CreatedAt.Equal(createdAt) {
 		t.Fatalf("decoded cursor = %#v, want final returned note position", cursor)
 	}
 
@@ -143,13 +143,13 @@ func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 	requireNoPrivateWireFields(t, response.Body.String())
 }
 
-func TestListAuthorNotesAcceptsLongOpaqueID(t *testing.T) {
+func TestListAuthorNotesReturnsCursorForLongLegacyID(t *testing.T) {
 	createdAt := time.UnixMilli(exampleAuthorCreatedMS).UTC()
-	longID := strings.Repeat("x", 100)
+	longID := strings.Repeat("😀", 100)
 	router := NewRouter(fakeNoteStore{
 		listAuthorNotes: func(context.Context, note.AuthorNotesInput) (note.AuthorNotesPage, error) {
 			return note.AuthorNotesPage{
-				Notes:   []note.Note{authorHTTPNote(longID, createdAt)},
+				Notes:   []note.AuthorNote{authorHTTPAuthorNote(longID, createdAt, exampleCursorRowID)},
 				HasMore: true,
 			}, nil
 		},
@@ -179,14 +179,14 @@ func TestListAuthorNotesAcceptsLongOpaqueID(t *testing.T) {
 	if len(problems) > 0 {
 		t.Fatalf("returned cursor did not decode: %#v", problems)
 	}
-	if cursor == nil || cursor.ID != longID {
-		t.Fatalf("decoded cursor = %#v, want ID length %d", cursor, len(longID))
+	if cursor == nil || cursor.RowID != exampleCursorRowID {
+		t.Fatalf("decoded cursor = %#v, want row ID %d", cursor, exampleCursorRowID)
 	}
 }
 
 func TestListAuthorNotesPassesExplicitLimitAndCursor(t *testing.T) {
 	createdAt := time.UnixMilli(exampleAuthorCreatedMS).UTC()
-	encoded, err := encodeAuthorNotesCursor(note.AuthorNotePosition{CreatedAt: createdAt, ID: exampleCursorNoteID})
+	encoded, err := encodeAuthorNotesCursor(note.AuthorNotePosition{CreatedAt: createdAt, RowID: exampleCursorRowID})
 	if err != nil {
 		t.Fatalf("encode cursor: %v", err)
 	}
@@ -198,10 +198,10 @@ func TestListAuthorNotesPassesExplicitLimitAndCursor(t *testing.T) {
 			if input.After == nil {
 				t.Fatal("cursor = nil, want decoded cursor")
 			}
-			if input.After.ID != exampleCursorNoteID || !input.After.CreatedAt.Equal(createdAt) {
+			if input.After.RowID != exampleCursorRowID || !input.After.CreatedAt.Equal(createdAt) {
 				t.Fatalf("cursor = %#v, want request cursor", input.After)
 			}
-			return note.AuthorNotesPage{Notes: []note.Note{}}, nil
+			return note.AuthorNotesPage{Notes: []note.AuthorNote{}}, nil
 		},
 	}, fakeCatalog{}, fakeUserStore{
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
@@ -228,58 +228,12 @@ func TestListAuthorNotesPassesExplicitLimitAndCursor(t *testing.T) {
 		t.Fatalf("next_cursor = %q, want nil", *body.NextCursor)
 	}
 }
-func TestAuthorNotesCursorRoundTripsOpaqueID(t *testing.T) {
-	createdAt := time.UnixMilli(exampleAuthorCreatedMS).UTC()
-	position := note.AuthorNotePosition{CreatedAt: createdAt, ID: "opaque-note-id"}
+func TestAuthorNotesCursorRoundTripsRowID(t *testing.T) {
+	position := note.AuthorNotePosition{CreatedAt: time.UnixMilli(exampleAuthorCreatedMS).UTC(), RowID: exampleCursorRowID}
 	encoded, err := encodeAuthorNotesCursor(position)
 	if err != nil {
 		t.Fatalf("encode cursor: %v", err)
 	}
-	decoded, problems := decodeAuthorNotesCursor(&encoded)
-	if diff := cmp.Diff([]note.ValidationProblem(nil), problems); diff != "" {
-		t.Fatalf("problems mismatch (-want +got):\n%s", diff)
-	}
-	if diff := cmp.Diff(&position, decoded); diff != "" {
-		t.Fatalf("cursor mismatch (-want +got):\n%s", diff)
-	}
-}
-
-func TestAuthorNotesCursorRoundTripsLegacyTextIDs(t *testing.T) {
-	createdAt := time.UnixMilli(exampleAuthorCreatedMS).UTC()
-	tests := []string{
-		"",
-		"legacy/id",
-		"emoji-😀",
-		"nul-\x00-id",
-	}
-	for _, id := range tests {
-		t.Run(id, func(t *testing.T) {
-			position := note.AuthorNotePosition{CreatedAt: createdAt, ID: id}
-			encoded, err := encodeAuthorNotesCursor(position)
-			if err != nil {
-				t.Fatalf("encode cursor: %v", err)
-			}
-			decoded, problems := decodeAuthorNotesCursor(&encoded)
-			if diff := cmp.Diff([]note.ValidationProblem(nil), problems); diff != "" {
-				t.Fatalf("problems mismatch (-want +got):\n%s", diff)
-			}
-			if diff := cmp.Diff(&position, decoded); diff != "" {
-				t.Fatalf("cursor mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestAuthorNotesCursorRoundTripsLongOpaqueID(t *testing.T) {
-	position := note.AuthorNotePosition{
-		CreatedAt: time.UnixMilli(exampleAuthorCreatedMS).UTC(),
-		ID:        strings.Repeat("x", 100),
-	}
-	encoded, err := encodeAuthorNotesCursor(position)
-	if err != nil {
-		t.Fatalf("encode cursor: %v", err)
-	}
-
 	decoded, problems := decodeAuthorNotesCursor(&encoded)
 	if diff := cmp.Diff([]note.ValidationProblem(nil), problems); diff != "" {
 		t.Fatalf("problems mismatch (-want +got):\n%s", diff)
@@ -290,7 +244,7 @@ func TestAuthorNotesCursorRoundTripsLongOpaqueID(t *testing.T) {
 }
 
 func TestListAuthorNotesRejectsInvalidParametersBeforeAuthorLookup(t *testing.T) {
-	unsupportedVersion := rawAuthorCursor(`{"v":2,"created_at":1782993600000,"id":"018ff5b8-0000-7000-8000-000000000012"}`)
+	unsupportedVersion := rawAuthorCursor(`{"v":2,"created_at":1782993600000,"row_id":123}`)
 	tests := []struct {
 		name      string
 		query     string
@@ -384,20 +338,20 @@ func TestListAuthorNotesReturnsInternalError(t *testing.T) {
 }
 
 func TestAuthorNotesCursorRejectsMalformedPayloads(t *testing.T) {
-	validID := "018ff5b8-0000-7000-8000-000000000012"
 	tests := []struct {
 		name   string
 		cursor string
 	}{
 		{name: "empty", cursor: ""},
 		{name: "invalid base64", cursor: "not-base64!"},
-		{name: "unsupported version", cursor: rawAuthorCursor(`{"v":2,"created_at":1782993600000,"id":"` + validID + `"}`)},
-		{name: "missing version", cursor: rawAuthorCursor(`{"created_at":1782993600000,"id":"` + validID + `"}`)},
-		{name: "missing created at", cursor: rawAuthorCursor(`{"v":1,"id":"` + validID + `"}`)},
-		{name: "non-positive created at", cursor: rawAuthorCursor(`{"v":1,"created_at":0,"id":"` + validID + `"}`)},
-		{name: "missing id", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000}`)},
-		{name: "unknown field", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"id":"` + validID + `","extra":true}`)},
-		{name: "trailing json", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"id":"` + validID + `"}{}`)},
+		{name: "unsupported version", cursor: rawAuthorCursor(`{"v":2,"created_at":1782993600000,"row_id":123}`)},
+		{name: "missing version", cursor: rawAuthorCursor(`{"created_at":1782993600000,"row_id":123}`)},
+		{name: "missing created at", cursor: rawAuthorCursor(`{"v":1,"row_id":123}`)},
+		{name: "non-positive created at", cursor: rawAuthorCursor(`{"v":1,"created_at":0,"row_id":123}`)},
+		{name: "missing row id", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000}`)},
+		{name: "non-positive row id", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"row_id":0}`)},
+		{name: "unknown field", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"row_id":123,"extra":true}`)},
+		{name: "trailing json", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"row_id":123}{}`)},
 		{name: "oversized", cursor: strings.Repeat("a", maxAuthorNotesCursorLength+1)},
 	}
 
@@ -426,6 +380,17 @@ func authorHTTPNote(id string, createdAt time.Time) note.Note {
 		Author:       note.AuthorSummary{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay},
 		CreatedAt:    createdAt,
 		UpdatedAt:    createdAt,
+	}
+}
+
+func authorHTTPAuthorNote(id string, createdAt time.Time, rowID int64) note.AuthorNote {
+	found := authorHTTPNote(id, createdAt)
+	return note.AuthorNote{
+		Note: found,
+		Position: note.AuthorNotePosition{
+			CreatedAt: createdAt,
+			RowID:     rowID,
+		},
 	}
 }
 

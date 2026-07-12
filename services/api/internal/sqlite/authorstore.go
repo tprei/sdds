@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/tprei/sdds/services/api/internal/note"
@@ -10,6 +11,7 @@ import (
 const (
 	listAuthorNotesSQL = `
 		SELECT
+			notes.rowid,
 			notes.id,
 			notes.user_id,
 			notes.title,
@@ -23,11 +25,12 @@ const (
 		FROM notes
 		JOIN authors ON authors.user_id = notes.user_id
 		WHERE authors.id = ?
-		ORDER BY notes.created_at DESC, notes.id DESC
+		ORDER BY notes.created_at DESC, notes.rowid DESC
 		LIMIT ?
 	`
 	listAuthorNotesAfterSQL = `
 		SELECT
+			notes.rowid,
 			notes.id,
 			notes.user_id,
 			notes.title,
@@ -43,9 +46,9 @@ const (
 		WHERE authors.id = ?
 			AND (
 				notes.created_at < ?
-				OR (notes.created_at = ? AND notes.id < ?)
+				OR (notes.created_at = ? AND notes.rowid < ?)
 			)
-		ORDER BY notes.created_at DESC, notes.id DESC
+		ORDER BY notes.created_at DESC, notes.rowid DESC
 		LIMIT ?
 	`
 )
@@ -64,7 +67,7 @@ func (store *NoteStore) ListAuthorNotes(ctx context.Context, input note.AuthorNo
 	if input.After != nil {
 		createdAt := unixMillis(input.After.CreatedAt)
 		query = listAuthorNotesAfterSQL
-		args = []any{input.AuthorID, createdAt, createdAt, input.After.ID, fetchLimit}
+		args = []any{input.AuthorID, createdAt, createdAt, input.After.RowID, fetchLimit}
 	}
 
 	rows, err := store.db.QueryContext(ctx, query, args...)
@@ -77,9 +80,9 @@ func (store *NoteStore) ListAuthorNotes(ctx context.Context, input note.AuthorNo
 		}
 	}()
 
-	notes := make([]note.Note, 0, fetchLimit)
+	notes := make([]note.AuthorNote, 0, fetchLimit)
 	for rows.Next() {
-		found, err := scanNote(rows)
+		found, err := scanAuthorNote(rows)
 		if err != nil {
 			return note.AuthorNotesPage{}, err
 		}
@@ -95,4 +98,22 @@ func (store *NoteStore) ListAuthorNotes(ctx context.Context, input note.AuthorNo
 		page.HasMore = true
 	}
 	return page, nil
+}
+
+func scanAuthorNote(rows *sql.Rows) (note.AuthorNote, error) {
+	var rowID int64
+	found, err := scanNoteValues(func(dest ...any) error {
+		destinations := append([]any{&rowID}, dest...)
+		return rows.Scan(destinations...)
+	})
+	if err != nil {
+		return note.AuthorNote{}, err
+	}
+	return note.AuthorNote{
+		Note: found,
+		Position: note.AuthorNotePosition{
+			CreatedAt: found.CreatedAt,
+			RowID:     rowID,
+		},
+	}, nil
 }

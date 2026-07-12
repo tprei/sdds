@@ -15,9 +15,9 @@ import (
 const maxAuthorNotesCursorLength = pagination.MaxCursorLength
 
 type authorNotesCursorPayload struct {
-	Version   int     `json:"v"`
-	CreatedAt int64   `json:"created_at"`
-	ID        *string `json:"id"`
+	Version   int   `json:"v"`
+	CreatedAt int64 `json:"created_at"`
+	RowID     int64 `json:"row_id"`
 }
 
 func (handler server) GetAuthor(w http.ResponseWriter, r *http.Request, authorID string) {
@@ -93,10 +93,10 @@ func decodeAuthorNotesCursor(encoded *string) (*note.AuthorNotePosition, []note.
 	if err := pagination.Decode(*encoded, &payload); err != nil {
 		return nil, []note.ValidationProblem{{Field: "cursor", Message: "invalid"}}
 	}
-	if payload.Version != 1 || payload.CreatedAt <= 0 || payload.ID == nil {
+	if payload.Version != 1 || payload.CreatedAt <= 0 || payload.RowID <= 0 {
 		return nil, []note.ValidationProblem{{Field: "cursor", Message: "invalid"}}
 	}
-	return &note.AuthorNotePosition{CreatedAt: time.UnixMilli(payload.CreatedAt).UTC(), ID: *payload.ID}, nil
+	return &note.AuthorNotePosition{CreatedAt: time.UnixMilli(payload.CreatedAt).UTC(), RowID: payload.RowID}, nil
 }
 
 func newPublicAuthorResponse(profile author.PublicAuthor) openapi.PublicAuthor {
@@ -113,11 +113,11 @@ func newAuthorNotesPageResponse(page note.AuthorNotesPage) (openapi.AuthorNotesP
 		NextCursor: nil,
 	}
 	for _, found := range page.Notes {
-		response.Notes = append(response.Notes, newNoteResponse(found))
+		response.Notes = append(response.Notes, newNoteResponse(found.Note))
 	}
 	if page.HasMore && len(page.Notes) > 0 {
 		last := page.Notes[len(page.Notes)-1]
-		encoded, err := encodeAuthorNotesCursor(note.AuthorNotePosition{CreatedAt: last.CreatedAt, ID: last.ID})
+		encoded, err := encodeAuthorNotesCursor(last.Position)
 		if err != nil {
 			return openapi.AuthorNotesPage{}, err
 		}
@@ -131,7 +131,10 @@ func encodeAuthorNotesCursor(cursor note.AuthorNotePosition) (string, error) {
 	if createdAt <= 0 {
 		return "", fmt.Errorf("encode author notes cursor: non-positive created_at")
 	}
-	payload := authorNotesCursorPayload{Version: 1, CreatedAt: createdAt, ID: &cursor.ID}
+	if cursor.RowID <= 0 {
+		return "", fmt.Errorf("encode author notes cursor: non-positive row_id")
+	}
+	payload := authorNotesCursorPayload{Version: 1, CreatedAt: createdAt, RowID: cursor.RowID}
 	encoded, err := pagination.Encode(payload)
 	if err != nil {
 		return "", fmt.Errorf("encode author notes cursor: %w", err)

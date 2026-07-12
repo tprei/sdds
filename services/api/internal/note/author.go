@@ -14,7 +14,12 @@ const (
 
 type AuthorNotePosition struct {
 	CreatedAt time.Time
-	ID        string
+	RowID     int64
+}
+
+type AuthorNote struct {
+	Note     Note
+	Position AuthorNotePosition
 }
 
 type AuthorNotesInput struct {
@@ -24,7 +29,7 @@ type AuthorNotesInput struct {
 }
 
 type AuthorNotesPage struct {
-	Notes   []Note
+	Notes   []AuthorNote
 	HasMore bool
 }
 

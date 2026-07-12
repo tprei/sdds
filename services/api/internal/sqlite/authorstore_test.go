@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tprei/sdds/services/api/internal/author"
@@ -90,14 +90,14 @@ func TestNoteStoreListsAuthorNotesWithKeysetPagination(t *testing.T) {
 		t.Fatal("first page HasMore = false, want true")
 	}
 	wantFirstIDs := []string{newerTieID, olderTieID}
-	if diff := cmp.Diff(wantFirstIDs, noteIDs(firstPage.Notes)); diff != "" {
+	if diff := cmp.Diff(wantFirstIDs, authorNoteIDs(firstPage.Notes)); diff != "" {
 		t.Fatalf("first page ids mismatch (-want +got):\n%s", diff)
 	}
 
 	secondPage, err := store.ListAuthorNotes(ctx, note.AuthorNotesInput{
 		AuthorID: authorStoreAuthorID,
 		Limit:    2,
-		After:    &note.AuthorNotePosition{CreatedAt: time.UnixMilli(sameTime).UTC(), ID: olderTieID},
+		After:    &firstPage.Notes[1].Position,
 	})
 	if err != nil {
 		t.Fatalf("list second page: %v", err)
@@ -106,14 +106,14 @@ func TestNoteStoreListsAuthorNotesWithKeysetPagination(t *testing.T) {
 		t.Fatal("second page HasMore = true, want false")
 	}
 	wantSecondIDs := []string{oldestID}
-	if diff := cmp.Diff(wantSecondIDs, noteIDs(secondPage.Notes)); diff != "" {
+	if diff := cmp.Diff(wantSecondIDs, authorNoteIDs(secondPage.Notes)); diff != "" {
 		t.Fatalf("second page ids mismatch (-want +got):\n%s", diff)
 	}
 
 	terminalPage, err := store.ListAuthorNotes(ctx, note.AuthorNotesInput{
 		AuthorID: authorStoreAuthorID,
 		Limit:    2,
-		After:    &note.AuthorNotePosition{CreatedAt: time.UnixMilli(olderTime).UTC(), ID: oldestID},
+		After:    &secondPage.Notes[0].Position,
 	})
 	if err != nil {
 		t.Fatalf("list terminal page: %v", err)
@@ -124,6 +124,57 @@ func TestNoteStoreListsAuthorNotesWithKeysetPagination(t *testing.T) {
 	if len(terminalPage.Notes) != 0 {
 		t.Fatalf("terminal note count = %d, want 0", len(terminalPage.Notes))
 	}
+}
+
+func TestNoteStoreListsAuthorNotesWithLongLegacyIDAtPageBoundary(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	insertAuthorStoreUser(t, ctx, db, authorStoreUserID, authorStoreAuthorID, "Marina Alves")
+
+	createdAt := int64(1782993600000)
+	olderID := "018ff5b8-0000-7000-8000-000000000601"
+	longBoundaryID := strings.Repeat("😀", 100)
+	newerID := "018ff5b8-0000-7000-8000-000000000603"
+	insertAuthorStoreNote(t, ctx, db, olderID, authorStoreUserID, createdAt)
+	insertAuthorStoreNote(t, ctx, db, longBoundaryID, authorStoreUserID, createdAt)
+	insertAuthorStoreNote(t, ctx, db, newerID, authorStoreUserID, createdAt)
+
+	store := NewNoteStore(db)
+	firstPage, err := store.ListAuthorNotes(ctx, note.AuthorNotesInput{AuthorID: authorStoreAuthorID, Limit: 2})
+	if err != nil {
+		t.Fatalf("list first page: %v", err)
+	}
+	if !firstPage.HasMore {
+		t.Fatal("first page HasMore = false, want true")
+	}
+	wantFirstIDs := []string{newerID, longBoundaryID}
+	if diff := cmp.Diff(wantFirstIDs, authorNoteIDs(firstPage.Notes)); diff != "" {
+		t.Fatalf("first page ids mismatch (-want +got):\n%s", diff)
+	}
+
+	secondPage, err := store.ListAuthorNotes(ctx, note.AuthorNotesInput{
+		AuthorID: authorStoreAuthorID,
+		Limit:    2,
+		After:    &firstPage.Notes[1].Position,
+	})
+	if err != nil {
+		t.Fatalf("list second page: %v", err)
+	}
+	if secondPage.HasMore {
+		t.Fatal("second page HasMore = true, want false")
+	}
+	wantSecondIDs := []string{olderID}
+	if diff := cmp.Diff(wantSecondIDs, authorNoteIDs(secondPage.Notes)); diff != "" {
+		t.Fatalf("second page ids mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func authorNoteIDs(notes []note.AuthorNote) []string {
+	ids := make([]string, 0, len(notes))
+	for _, found := range notes {
+		ids = append(ids, found.Note.ID)
+	}
+	return ids
 }
 
 func insertAuthorStoreUser(t *testing.T, ctx context.Context, db execer, userID user.UserID, authorID author.AuthorID, displayName string) {

@@ -585,7 +585,9 @@ test('opens a public author profile and appends paginated notes', async ({
   await expect(page.getByText(`Nota pública ${timestamp} 20`)).toBeVisible();
   await expect(page.getByText(`Nome de usuário: ${username}`, { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
-  await expect(page.getByLabel(`Abrir perfil do autor: ${displayName}`).first()).toBeVisible();
+  await expect(
+    page.getByLabel(`Autor da nota: ${displayName}`).first(),
+  ).toBeVisible();
   const firstPage = await request.get(`${apiBaseURL}/v1/authors/${author.id}/notes?limit=20`);
   expect(firstPage.ok()).toBeTruthy();
   const firstPageBody = (await firstPage.json()) as AuthorNotesResponse;

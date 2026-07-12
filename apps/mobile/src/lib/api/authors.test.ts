@@ -19,6 +19,29 @@ const configuredAPIBaseURLEnvName = 'EXPO_PUBLIC_SDDS_API_BASE_URL';
 const authorID = 'author-id';
 const noteID = 'note-id';
 
+const malformedPageCases: [string, unknown][] = [
+  ['missing cursor', { notes: [apiNote()] }],
+  ['empty cursor', { next_cursor: '', notes: [] }],
+  ['oversized cursor', { next_cursor: 'x'.repeat(513), notes: [] }],
+  [
+    'private page field',
+    { next_cursor: null, notes: [], user_id: 'private-user-id' },
+  ],
+  [
+    'private note author field',
+    {
+      next_cursor: null,
+      notes: [
+        {
+          ...apiNote(),
+          author: { display_name: 'Thiago', id: authorID, user_id: 'private' },
+        },
+      ],
+    },
+  ],
+  ['invalid cursor type', { next_cursor: 42, notes: [] }],
+];
+
 type FetchHandler = (request: Request) => Promise<Response>;
 
 describe('authors API client', () => {
@@ -75,6 +98,17 @@ describe('authors API client', () => {
     expect(url.searchParams.get('limit')).toBe('2');
   });
 
+  it.each(malformedPageCases)(
+    'rejects malformed author note page: %s',
+    async (_name, response) => {
+      stubFetch(async () => jsonResponse(response));
+
+      await expect(listAuthorNotes({ authorID })).rejects.toThrow(
+        APIResponseError,
+      );
+    },
+  );
+
   it('rejects private fields in public author responses', async () => {
     stubFetch(async () =>
       jsonResponse({
@@ -93,6 +127,14 @@ describe('authors API client', () => {
 
     await expect(getPublicAuthor(authorID)).rejects.toMatchObject(
       new APIRequestError(404),
+    );
+  });
+
+  it('raises request errors for author note status failures', async () => {
+    stubFetch(async () => jsonResponse({ code: 'invalid_note' }, 400));
+
+    await expect(listAuthorNotes({ authorID })).rejects.toMatchObject(
+      new APIRequestError(400),
     );
   });
 });

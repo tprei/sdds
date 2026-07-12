@@ -40,6 +40,8 @@ const authorNotesPageResponseKeys = schemaKeyList<AuthorNotesPageResponse>()([
   'notes',
 ]);
 
+const maxAuthorNotesCursorLength = 512;
+
 const client = () => createClient<paths>({ baseUrl: apiBaseURL() });
 
 export async function getPublicAuthor(authorID: string): Promise<PublicAuthor> {
@@ -105,7 +107,15 @@ function isAuthorNotesPageResponse(
     isRecord(value) &&
     hasOnlyKeys(value, authorNotesPageResponseKeys) &&
     Array.isArray(value.notes) &&
-    (typeof value.next_cursor === 'string' || value.next_cursor === null)
+    isAuthorNotesCursor(value.next_cursor)
+  );
+}
+
+function isAuthorNotesCursor(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= maxAuthorNotesCursorLength
   );
 }
 

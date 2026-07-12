@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -14,13 +14,14 @@ vi.mock('react-native', () => {
   };
 
   function NativeView({ children, ...props }: NativeProps) {
-    return <native-view {...props}>{children}</native-view>;
+    const content = typeof children === 'function' ? null : children;
+    return createElement('div', props, content);
   }
 
   function NativePressable({ children, ...props }: NativeProps) {
     const content =
       typeof children === 'function' ? children({ pressed: false }) : children;
-    return <native-view {...props}>{content}</native-view>;
+    return createElement('div', props, content);
   }
 
   return {
@@ -40,11 +41,12 @@ vi.mock('../../components/foundation-screen', () => ({
   }: {
     label: string;
     onPress?: () => void;
-  }) => (
-    <button data-action="retry" onClick={onPress}>
-      <text>{label}</text>
-    </button>
-  ),
+  }) =>
+    createElement(
+      'button',
+      { dataAction: 'retry', onClick: onPress },
+      createElement('span', null, label),
+    ),
 }));
 
 const mocks = vi.hoisted(() => ({
@@ -117,7 +119,7 @@ describe('AuthorProfileContent pagination errors', () => {
     });
     expect(mocks.listAuthorNotes).toHaveBeenCalledTimes(2);
 
-    const retryButton = renderer!.root.findByProps({ 'data-action': 'retry' });
+    const retryButton = renderer!.root.findByProps({ dataAction: 'retry' });
     expect(retryButton).toBeDefined();
 
     await act(async () => {

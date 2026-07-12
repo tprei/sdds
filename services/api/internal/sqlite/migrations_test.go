@@ -514,11 +514,17 @@ func TestNoteCursorMigrationEnforcesStoredCursorBounds(t *testing.T) {
 		return err
 	}
 
-	if err := insertNote(strings.Repeat("x", 256), 1782993600000, 1782993600000); err != nil {
+	if err := insertNote(strings.Repeat("x", 240), 1782993600000, 1782993600000); err != nil {
 		t.Fatalf("insert maximum-length note ID: %v", err)
 	}
-	if err := insertNote(strings.Repeat("y", 257), 1782993600000, 1782993600000); err == nil {
+	if err := insertNote(strings.Repeat("y", 241), 1782993600000, 1782993600000); err == nil {
 		t.Fatal("insert oversized note ID error = nil, want constraint error")
+	}
+	if err := insertNote("unsafe-id&", 1782993600000, 1782993600000); err == nil {
+		t.Fatal("insert JSON-escaped note ID error = nil, want constraint error")
+	}
+	if err := insertNote(strings.Repeat("😀", 100), 1782993600000, 1782993600000); err == nil {
+		t.Fatal("insert non-ASCII note ID error = nil, want constraint error")
 	}
 	if err := insertNote("zero-created-at", 0, 1782993600000); err == nil {
 		t.Fatal("insert non-positive created_at error = nil, want constraint error")

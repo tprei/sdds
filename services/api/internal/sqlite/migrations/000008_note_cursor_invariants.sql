@@ -8,7 +8,10 @@ DROP INDEX notes_author_page_idx;
 ALTER TABLE notes RENAME TO notes_legacy;
 
 CREATE TABLE notes (
-	id TEXT PRIMARY KEY NOT NULL CHECK (length(id) BETWEEN 1 AND 256),
+	id TEXT PRIMARY KEY NOT NULL CHECK (
+		length(CAST(id AS BLOB)) BETWEEN 1 AND 240
+		AND id NOT GLOB '*[^A-Za-z0-9._~-]*'
+	),
 	user_id TEXT NOT NULL REFERENCES users(id),
 	title TEXT NOT NULL CHECK (length(trim(title)) BETWEEN 3 AND 120),
 	body TEXT NOT NULL CHECK (length(trim(body)) BETWEEN 1 AND 4000),

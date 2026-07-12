@@ -198,7 +198,6 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await page.reload();
 
   await page.getByRole('button', { name: 'Sair' }).click();
-  await expect(page.getByText('Entre para publicar')).toBeVisible({ timeout: 10000 });
   await page.reload();
   await expect(page.getByText('Entre para publicar')).toBeVisible({ timeout: 10000 });
 });

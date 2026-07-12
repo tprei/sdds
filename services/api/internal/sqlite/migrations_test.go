@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -467,6 +468,63 @@ func TestNoteOwnershipMigrationPreservesExistingNotes(t *testing.T) {
 	wantAuthor := note.AuthorSummary{ID: systemNoteOwnerAuthorID, DisplayName: "sdds"}
 	if diff := cmp.Diff(wantAuthor, gotNote.Author); diff != "" {
 		t.Fatalf("search note author mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestNoteCursorMigrationEnforcesStoredCursorBounds(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	if _, err := db.ExecContext(
+		ctx,
+		`INSERT INTO users (id, state, created_at, updated_at) VALUES (?, 'active', ?, ?)`,
+		"cursor-user",
+		int64(1782993600000),
+		int64(1782993600000),
+	); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	if _, err := db.ExecContext(
+		ctx,
+		`INSERT INTO authors (id, user_id, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		"cursor-author",
+		"cursor-user",
+		"Cursor author",
+		int64(1782993600000),
+		int64(1782993600000),
+	); err != nil {
+		t.Fatalf("insert author: %v", err)
+	}
+
+	insertNote := func(id string, createdAt int64, updatedAt int64) error {
+		_, err := db.ExecContext(
+			ctx,
+			`
+				INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			`,
+			id,
+			"cursor-user",
+			"Cursor note",
+			"Persisted cursor bounds.",
+			"food",
+			"sao-paulo",
+			createdAt,
+			updatedAt,
+		)
+		return err
+	}
+
+	if err := insertNote(strings.Repeat("x", 256), 1782993600000, 1782993600000); err != nil {
+		t.Fatalf("insert maximum-length note ID: %v", err)
+	}
+	if err := insertNote(strings.Repeat("y", 257), 1782993600000, 1782993600000); err == nil {
+		t.Fatal("insert oversized note ID error = nil, want constraint error")
+	}
+	if err := insertNote("zero-created-at", 0, 1782993600000); err == nil {
+		t.Fatal("insert non-positive created_at error = nil, want constraint error")
+	}
+	if err := insertNote("zero-updated-at", 1782993600000, 0); err == nil {
+		t.Fatal("insert non-positive updated_at error = nil, want constraint error")
 	}
 }
 

@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
 	"github.com/tprei/sdds/services/api/internal/user"
@@ -115,8 +114,7 @@ func decodeAuthorNotesCursor(encoded *string) (*note.AuthorNotePosition, []note.
 	if payload.Version != 1 || payload.CreatedAt <= 0 {
 		return nil, []note.ValidationProblem{{Field: "cursor", Message: "invalid"}}
 	}
-	parsedID, err := uuid.Parse(payload.ID)
-	if err != nil || parsedID.String() != payload.ID {
+	if payload.ID == "" {
 		return nil, []note.ValidationProblem{{Field: "cursor", Message: "invalid"}}
 	}
 
@@ -155,9 +153,8 @@ func encodeAuthorNotesCursor(cursor note.AuthorNotePosition) (string, error) {
 	if createdAt <= 0 {
 		return "", fmt.Errorf("encode author notes cursor: non-positive created_at")
 	}
-	parsedID, err := uuid.Parse(cursor.ID)
-	if err != nil || parsedID.String() != cursor.ID {
-		return "", fmt.Errorf("encode author notes cursor: invalid note id")
+	if cursor.ID == "" {
+		return "", fmt.Errorf("encode author notes cursor: empty note id")
 	}
 	payload := authorNotesCursorPayload{Version: 1, CreatedAt: createdAt, ID: cursor.ID}
 	encoded, err := json.Marshal(payload)

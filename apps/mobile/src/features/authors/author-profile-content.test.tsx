@@ -112,6 +112,7 @@ describe('AuthorProfileContent pagination errors', () => {
       cursor: 'cursor-1',
     });
     expect(renderer!.root.findAllByProps({ accessibilityRole: 'alert' })).not.toHaveLength(0);
+    expect(renderer!.root.findAll((node) => node.props.children === 'Primeira nota')).not.toHaveLength(0);
 
     await act(async () => {
       scrollView.props.onScroll(nearEndEvent());

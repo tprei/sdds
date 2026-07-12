@@ -98,6 +98,15 @@ describe('authors API client', () => {
     expect(url.searchParams.get('limit')).toBe('2');
   });
 
+  it('accepts a terminal author note page without a cursor', async () => {
+    stubFetch(async () => jsonResponse({ next_cursor: null, notes: [] }));
+
+    await expect(listAuthorNotes({ authorID })).resolves.toEqual({
+      nextCursor: null,
+      notes: [],
+    });
+  });
+
   it.each(malformedPageCases)(
     'rejects malformed author note page: %s',
     async (_name, response) => {

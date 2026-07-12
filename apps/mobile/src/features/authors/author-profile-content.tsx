@@ -95,8 +95,13 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
   const [error, setError] = useState<ProfileError>(null);
   const [nextError, setNextError] = useState(false);
   const pendingCursor = useRef<string | null | undefined>(undefined);
+  const requestVersion = useRef(0);
 
   const loadInitial = useCallback(async () => {
+    const version = requestVersion.current + 1;
+    requestVersion.current = version;
+    pendingCursor.current = undefined;
+    setLoadingNext(false);
     setLoading(true);
     setError(null);
     try {
@@ -105,6 +110,7 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
         listAuthorNotes({ authorID }),
         listCatalogs(),
       ]);
+      if (version !== requestVersion.current) return;
       const nextCatalog = buildNoteCatalog(catalogs);
       const labelledNotes = labelNotes(nextCatalog, page.notes);
       if (labelledNotes === null) throw new Error('catalog_labels_missing');
@@ -113,19 +119,24 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
       setNotes(labelledNotes);
       setCursor(page.nextCursor);
     } catch (caught) {
-      setError(caught instanceof APIRequestError && caught.status === 404 ? 'not_found' : 'error');
+      if (version === requestVersion.current) {
+        setError(caught instanceof APIRequestError && caught.status === 404 ? 'not_found' : 'error');
+      }
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   }, [authorID]);
 
   const loadNext = useCallback(async (nextCursor: string, nextCatalog: NoteCatalog) => {
     if (pendingCursor.current === nextCursor) return;
     pendingCursor.current = nextCursor;
+    const version = requestVersion.current + 1;
+    requestVersion.current = version;
     setLoadingNext(true);
     setNextError(false);
     try {
       const page = await listAuthorNotes({ authorID, cursor: nextCursor });
+      if (version !== requestVersion.current) return;
       const labelledNotes = labelNotes(nextCatalog, page.notes);
       if (labelledNotes === null) throw new Error('catalog_labels_missing');
       setNotes((current) => {
@@ -134,10 +145,12 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
       });
       setCursor(page.nextCursor);
     } catch {
-      setNextError(true);
+      if (version === requestVersion.current) setNextError(true);
     } finally {
-      pendingCursor.current = undefined;
-      setLoadingNext(false);
+      if (version === requestVersion.current) {
+        pendingCursor.current = undefined;
+        setLoadingNext(false);
+      }
     }
   }, [authorID]);
 

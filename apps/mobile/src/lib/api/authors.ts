@@ -107,7 +107,8 @@ function isAuthorNotesPageResponse(
     isRecord(value) &&
     hasOnlyKeys(value, authorNotesPageResponseKeys) &&
     Array.isArray(value.notes) &&
-    isAuthorNotesCursor(value.next_cursor)
+    (value.next_cursor === null ||
+      isAuthorNotesCursor(value.next_cursor))
   );
 }
 

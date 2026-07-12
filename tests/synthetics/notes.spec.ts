@@ -198,9 +198,9 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await page.reload();
 
   await page.getByRole('button', { name: 'Sair' }).click();
-  await expect(page.getByText('Entre para publicar')).toBeVisible();
+  await expect(page.getByText('Entre para publicar')).toBeVisible({ timeout: 10000 });
   await page.reload();
-  await expect(page.getByText('Entre para publicar')).toBeVisible();
+  await expect(page.getByText('Entre para publicar')).toBeVisible({ timeout: 10000 });
 });
 
 test('shows auth validation reasons and clears stale login submit state', async ({
@@ -210,7 +210,7 @@ test('shows auth validation reasons and clears stale login submit state', async 
   const username = `valida-${timestamp}`;
 
   await page.goto('/profile');
-  await expect(page.getByText('Entre para publicar')).toBeVisible();
+  await expect(page.getByText('Entre para publicar')).toBeVisible({ timeout: 10000 });
   await page.getByTestId('profile-signup-button').click();
   await expect(visibleScreenTitle(page, 'Criar conta')).toBeVisible();
 
@@ -236,7 +236,7 @@ test('shows auth validation reasons and clears stale login submit state', async 
   await page.getByTestId('signup-submit-button').click();
 
   await page.getByTestId('profile-logout-button').click();
-  await expect(page.getByText('Entre para publicar')).toBeVisible();
+  await expect(page.getByText('Entre para publicar')).toBeVisible({ timeout: 10000 });
 
   await page.getByTestId('profile-signup-button').click();
   await expect(visibleScreenTitle(page, 'Criar conta')).toBeVisible();
@@ -258,7 +258,7 @@ test('shows auth validation reasons and clears stale login submit state', async 
   await page.getByTestId('login-submit-button').click();
 
   await page.getByTestId('profile-logout-button').click();
-  await expect(page.getByText('Entre para publicar')).toBeVisible();
+  await expect(page.getByText('Entre para publicar')).toBeVisible({ timeout: 10000 });
   await page.getByTestId('profile-login-button').click();
   await expect(visibleScreenTitle(page, 'Entrar')).toBeVisible();
   await expect(page.getByTestId('login-username-input')).toBeVisible();

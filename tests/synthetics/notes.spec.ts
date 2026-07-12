@@ -550,15 +550,7 @@ test('opens a public author profile and appends paginated notes', async ({
   expect(firstPageBody.notes).toHaveLength(20);
   expect(firstPageBody.next_cursor).not.toBeNull();
 
-  await page.mouse.move(400, 700);
-  await page.mouse.wheel(0, 1000);
-  await page.mouse.wheel(0, 1000);
-  await page.mouse.wheel(0, 1000);
-  await page.mouse.wheel(0, 1000);
-  await page.mouse.wheel(0, 1000);
-  await page.mouse.wheel(0, 1000);
-  await page.mouse.wheel(0, 1000);
-  await page.mouse.wheel(0, 1000);
+  await page.getByText(`Nota pública ${timestamp} 20`).scrollIntoViewIfNeeded();
   await expect(page.getByText(`Nota pública ${timestamp} 0`)).toBeVisible();
   const renderedTitles = await page.getByText(new RegExp(`^Nota pública ${timestamp} `)).allTextContents();
   expect(new Set(renderedTitles).size).toBe(renderedTitles.length);

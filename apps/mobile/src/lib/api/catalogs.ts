@@ -27,27 +27,6 @@ type CatalogCategoryResponse = GeneratedSchemas['CatalogCategory'];
 type CatalogPlaceResponse = GeneratedSchemas['CatalogPlace'];
 type ListCategoriesResponse = GeneratedSchemas['ListCategoriesResponse'];
 type ListPlacesResponse = GeneratedSchemas['ListPlacesResponse'];
-type SchemaKey<T> = Extract<keyof T, string>;
-type SchemaKeyList<T> = readonly SchemaKey<T>[];
-type ExhaustiveSchemaKeyList<T, K extends SchemaKeyList<T>> =
-  Exclude<SchemaKey<T>, K[number]> extends never ? K : never;
-
-const catalogCategoryKeys = schemaKeyList<CatalogCategoryResponse>()([
-  'active',
-  'display_order',
-  'label',
-  'slug',
-]);
-const catalogPlaceKeys = schemaKeyList<CatalogPlaceResponse>()([
-  'active',
-  'display_order',
-  'label',
-  'slug',
-]);
-const listCategoriesResponseKeys = schemaKeyList<ListCategoriesResponse>()([
-  'categories',
-]);
-const listPlacesResponseKeys = schemaKeyList<ListPlacesResponse>()(['places']);
 
 export class CatalogAPIRequestError extends Error {
   readonly status: number;
@@ -153,7 +132,6 @@ function isListCategoriesResponse(
 ): value is ListCategoriesResponse {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, listCategoriesResponseKeys) &&
     Array.isArray(value.categories) &&
     value.categories.every(isCatalogCategoryResponse)
   );
@@ -162,7 +140,6 @@ function isListCategoriesResponse(
 function isListPlacesResponse(value: unknown): value is ListPlacesResponse {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, listPlacesResponseKeys) &&
     Array.isArray(value.places) &&
     value.places.every(isCatalogPlaceResponse)
   );
@@ -173,7 +150,6 @@ function isCatalogCategoryResponse(
 ): value is CatalogCategoryResponse {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, catalogCategoryKeys) &&
     typeof value.slug === 'string' &&
     typeof value.label === 'string' &&
     typeof value.active === 'boolean' &&
@@ -184,7 +160,6 @@ function isCatalogCategoryResponse(
 function isCatalogPlaceResponse(value: unknown): value is CatalogPlaceResponse {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, catalogPlaceKeys) &&
     typeof value.slug === 'string' &&
     typeof value.label === 'string' &&
     typeof value.active === 'boolean' &&
@@ -196,24 +171,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function hasOnlyKeys(
-  value: Record<string, unknown>,
-  expectedKeys: readonly string[],
-): boolean {
-  const keys = Object.keys(value);
-  return (
-    keys.length === expectedKeys.length &&
-    expectedKeys.every((key) =>
-      Object.prototype.hasOwnProperty.call(value, key),
-    )
-  );
-}
 
-function schemaKeyList<T>() {
-  return <const K extends SchemaKeyList<T>>(
-    keys: ExhaustiveSchemaKeyList<T, K>,
-  ) => keys;
-}
 
 function isCatalogDisplayOrder(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value);

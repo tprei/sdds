@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/openapi"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
@@ -635,7 +636,7 @@ func authCurrentSession(username string, displayName string, tokenHash string, e
 			State: user.UserStateActive,
 		},
 		Author: user.Author{
-			ID:          user.AuthorID("author-id-" + username),
+			ID:          author.AuthorID("author-id-" + username),
 			UserID:      user.UserID("user-id-" + username),
 			DisplayName: displayName,
 		},

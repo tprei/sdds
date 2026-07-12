@@ -47,37 +47,11 @@ type ErrorCode = GeneratedSchemas['ErrorCode'];
 type ErrorResponse = GeneratedSchemas['ErrorResponse'];
 type ValidationField = GeneratedSchemas['ValidationField'];
 type ValidationProblemResponse = GeneratedSchemas['ValidationProblem'];
-type SchemaKey<T> = Extract<keyof T, string>;
-type SchemaKeyList<T> = readonly SchemaKey<T>[];
-type ExhaustiveSchemaKeyList<T, K extends SchemaKeyList<T>> =
-  Exclude<SchemaKey<T>, K[number]> extends never ? K : never;
 type SchemaValueList<T extends string> = readonly T[];
 type ExhaustiveSchemaValueList<
   T extends string,
   K extends SchemaValueList<T>,
 > = Exclude<T, K[number]> extends never ? K : never;
-
-const authSessionResponseKeys = schemaKeyList<AuthSessionResponse>()([
-  'expires_at',
-  'token',
-  'user',
-]);
-const authorSummaryResponseKeys = schemaKeyList<AuthorSummaryResponse>()([
-  'display_name',
-  'id',
-]);
-const currentSessionResponseKeys = schemaKeyList<CurrentSessionResponse>()([
-  'expires_at',
-  'user',
-]);
-const currentUserResponseKeys = schemaKeyList<CurrentUserResponse>()([
-  'author',
-  'id',
-  'username',
-]);
-const errorResponseKeys = schemaKeyList<ErrorResponse>()(['code', 'fields']);
-const validationProblemResponseKeys =
-  schemaKeyList<ValidationProblemResponse>()(['code', 'field']);
 
 const errorCodes = schemaValueList<ErrorCode>()([
   'internal_error',
@@ -100,6 +74,8 @@ const validationFields = schemaValueList<ValidationField>()([
   'username',
   'password',
   'display_name',
+  'limit',
+  'cursor',
 ]);
 const validationProblemCodes = schemaValueList<
   ValidationProblemResponse['code']
@@ -288,7 +264,6 @@ function parseErrorResponse(value: unknown): ErrorResponse | null {
 function isAuthSessionResponse(value: unknown): value is AuthSessionResponse {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, authSessionResponseKeys) &&
     typeof value.token === 'string' &&
     isUnixMillisecondTimestamp(value.expires_at) &&
     isCurrentUserResponse(value.user)
@@ -300,7 +275,6 @@ function isCurrentSessionResponse(
 ): value is CurrentSessionResponse {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, currentSessionResponseKeys) &&
     isUnixMillisecondTimestamp(value.expires_at) &&
     isCurrentUserResponse(value.user)
   );
@@ -309,7 +283,6 @@ function isCurrentSessionResponse(
 function isCurrentUserResponse(value: unknown): value is CurrentUserResponse {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, currentUserResponseKeys) &&
     typeof value.id === 'string' &&
     typeof value.username === 'string' &&
     isAuthorSummaryResponse(value.author)
@@ -321,7 +294,6 @@ function isAuthorSummaryResponse(
 ): value is AuthorSummaryResponse {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, authorSummaryResponseKeys) &&
     typeof value.id === 'string' &&
     typeof value.display_name === 'string'
   );
@@ -330,7 +302,6 @@ function isAuthorSummaryResponse(
 function isErrorResponse(value: unknown): value is ErrorResponse {
   return (
     isRecord(value) &&
-    hasOnlyKnownKeys(value, errorResponseKeys) &&
     hasOwnKey(value, 'code') &&
     isKnownValue(value.code, errorCodes) &&
     (!hasOwnKey(value, 'fields') ||
@@ -344,7 +315,6 @@ function isValidationProblemResponse(
 ): value is ValidationProblemResponse {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, validationProblemResponseKeys) &&
     isKnownValue(value.code, validationProblemCodes) &&
     isKnownValue(value.field, validationFields)
   );
@@ -354,36 +324,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function hasOnlyKeys(
-  value: Record<string, unknown>,
-  expectedKeys: readonly string[],
-): boolean {
-  const keys = Object.keys(value);
-  return (
-    keys.length === expectedKeys.length &&
-    expectedKeys.every((key) =>
-      Object.prototype.hasOwnProperty.call(value, key),
-    )
-  );
-}
-
-function hasOnlyKnownKeys(
-  value: Record<string, unknown>,
-  knownKeys: readonly string[],
-): boolean {
-  return Object.keys(value).every((key) =>
-    knownKeys.some((knownKey) => knownKey === key),
-  );
-}
-
 function hasOwnKey(value: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
-}
-
-function schemaKeyList<T>() {
-  return <const K extends SchemaKeyList<T>>(
-    keys: ExhaustiveSchemaKeyList<T, K>,
-  ) => keys;
 }
 
 function schemaValueList<T extends string>() {

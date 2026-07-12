@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
 
@@ -23,7 +24,7 @@ type Note struct {
 }
 
 type AuthorSummary struct {
-	ID          user.AuthorID
+	ID          author.AuthorID
 	DisplayName string
 }
 

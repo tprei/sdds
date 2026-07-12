@@ -17,6 +17,8 @@ tags:
     description: Backend-owned category and place catalogs.
   - name: Auth
     description: User account and session endpoints.
+  - name: Authors
+    description: Public author profile endpoints.
   - name: Notes
     description: Text-first recommendation notes.
 paths:
@@ -259,6 +261,97 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/authors/{author_id}:
+    get:
+      operationId: getAuthor
+      summary: Get a public author profile
+      tags:
+        - Authors
+      parameters:
+        - name: author_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Public author profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicAuthor"
+        "400":
+          description: The request does not match the API contract.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The author was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not get the author.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/authors/{author_id}/notes:
+    get:
+      operationId: listAuthorNotes
+      summary: List an author's notes
+      tags:
+        - Authors
+      parameters:
+        - name: author_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Optional page size. Defaults to 20 and must be between 1 and 50.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor returned by the preceding author-notes page.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+      responses:
+        "200":
+          description: A page of the author's notes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthorNotesPage"
+        "400":
+          description: The request parameters are invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The author was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not list the author's notes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/notes:
     get:
       operationId: listNotes
@@ -444,6 +537,33 @@ components:
           type: string
         display_name:
           type: string
+    PublicAuthor:
+      type: object
+      additionalProperties: false
+      required: [id, display_name, note_count]
+      properties:
+        id:
+          type: string
+        display_name:
+          type: string
+        note_count:
+          type: integer
+          format: int64
+          minimum: 0
+    AuthorNotesPage:
+      type: object
+      additionalProperties: false
+      required: [notes, next_cursor]
+      properties:
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Note"
+        next_cursor:
+          type: string
+          minLength: 1
+          maxLength: 512
+          nullable: true
     CategorySlug:
       type: string
     PlaceSlug:
@@ -657,12 +777,10 @@ components:
         created_at:
           type: integer
           format: int64
-          minimum: 0
           description: Unix timestamp in milliseconds.
         updated_at:
           type: integer
           format: int64
-          minimum: 0
           description: Unix timestamp in milliseconds.
     ValidationField:
       type: string
@@ -675,6 +793,8 @@ components:
         - ValidationFieldUsername
         - ValidationFieldPassword
         - ValidationFieldDisplayName
+        - ValidationFieldLimit
+        - ValidationFieldCursor
       enum:
         - title
         - body
@@ -684,6 +804,8 @@ components:
         - username
         - password
         - display_name
+        - limit
+        - cursor
     ValidationProblem:
       type: object
       additionalProperties: false

@@ -50,6 +50,14 @@ func TestNormalizeCreateInputTrimsBoundaryFields(t *testing.T) {
 	}
 }
 
+func TestNormalizeAuthorNotesInputDefaultsLimit(t *testing.T) {
+	input := NormalizeAuthorNotesInput(AuthorNotesInput{})
+
+	if input.Limit != AuthorNotesDefaultLimit {
+		t.Fatalf("limit = %d, want %d", input.Limit, AuthorNotesDefaultLimit)
+	}
+}
+
 func TestValidateCreateInputTreatsTrimmedEmptyCategoryAsRequired(t *testing.T) {
 	problems := ValidateCreateInput(CreateInput{
 		Title:        "Café bom",

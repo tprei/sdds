@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -46,6 +47,7 @@ func TestApplyMigrationsCreatesCatalogIndexes(t *testing.T) {
 		"notes_category_idx",
 		"notes_place_idx",
 		"notes_user_idx",
+		"notes_author_page_idx",
 		"user_login_identities_user_idx",
 		"user_login_identities_one_password_provider_per_user_idx",
 		"sessions_user_idx",
@@ -434,7 +436,7 @@ func TestNoteOwnershipMigrationPreservesExistingNotes(t *testing.T) {
 		t.Fatalf("migrated note user id = %q, want %q", migratedUserID, systemNoteOwnerUserID)
 	}
 
-	for _, index := range []string{"notes_recent_idx", "notes_category_idx", "notes_place_idx", "notes_user_idx"} {
+	for _, index := range []string{"notes_recent_idx", "notes_category_idx", "notes_place_idx", "notes_user_idx", "notes_author_page_idx"} {
 		t.Run(index, func(t *testing.T) {
 			var count int
 			if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?`, index).Scan(&count); err != nil {
@@ -466,6 +468,181 @@ func TestNoteOwnershipMigrationPreservesExistingNotes(t *testing.T) {
 	wantAuthor := note.AuthorSummary{ID: systemNoteOwnerAuthorID, DisplayName: "sdds"}
 	if diff := cmp.Diff(wantAuthor, gotNote.Author); diff != "" {
 		t.Fatalf("search note author mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestNoteCursorMigrationPreservesLegacyNoteIDsAndTimestamps(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close database: %v", err)
+		}
+	})
+	applyMigrationFiles(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs", "000004_note_places", "000005_users_authors_sessions", "000006_note_ownership", "000007_author_notes_index")
+	if _, err := db.ExecContext(
+		ctx,
+		`INSERT INTO users (id, state, created_at, updated_at) VALUES (?, 'active', ?, ?)`,
+		string(systemNoteOwnerUserID),
+		int64(0),
+		int64(0),
+	); err != nil {
+		t.Fatalf("insert legacy owner user: %v", err)
+	}
+	if _, err := db.ExecContext(
+		ctx,
+		`INSERT INTO authors (id, user_id, display_name, created_at, updated_at) VALUES (?, ?, 'sdds', ?, ?)`,
+		string(systemNoteOwnerAuthorID),
+		string(systemNoteOwnerUserID),
+		int64(0),
+		int64(0),
+	); err != nil {
+		t.Fatalf("insert legacy owner author: %v", err)
+	}
+
+	legacyNotes := []struct {
+		inputID   any
+		storedID  string
+		createdAt int64
+		updatedAt int64
+	}{
+		{inputID: "", storedID: "", createdAt: 0, updatedAt: 0},
+		{inputID: "legacy/id", storedID: "legacy/id", createdAt: -1, updatedAt: -2},
+		{inputID: "emoji-😀", storedID: "emoji-😀", createdAt: 1782993600000, updatedAt: 1782993600000},
+		{inputID: strings.Repeat("x", 260), storedID: strings.Repeat("x", 260), createdAt: 1782993600001, updatedAt: 1782993600001},
+		{inputID: "nul-\x00-id", storedID: "nul-\x00-id", createdAt: 1782993600002, updatedAt: 1782993600002},
+		{inputID: "same-id", storedID: "same-id", createdAt: 1782993600003, updatedAt: 1782993600003},
+		{inputID: []byte("same-id"), storedID: "legacy-blob-id-7-73616d652d6964", createdAt: 1782993600004, updatedAt: 1782993600004},
+		{inputID: "legacy-blob-id-9-626c6f622d6e6f74652d6964", storedID: "legacy-blob-id-9-626c6f622d6e6f74652d6964", createdAt: 1782993600005, updatedAt: 1782993600005},
+		{inputID: []byte("blob-note-id"), storedID: "legacy-blob-id-9-626c6f622d6e6f74652d6964-1", createdAt: 1782993600006, updatedAt: 1782993600006},
+	}
+	for _, legacy := range legacyNotes {
+		if _, err := db.ExecContext(
+			ctx,
+			`
+				INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			`,
+			legacy.inputID,
+			string(systemNoteOwnerUserID),
+			"Cafe legado",
+			"Nota legada com identificador antigo.",
+			"food",
+			"sao-paulo",
+			legacy.createdAt,
+			legacy.updatedAt,
+		); err != nil {
+			t.Fatalf("insert legacy note %q: %v", legacy.storedID, err)
+		}
+	}
+
+	if err := ApplyMigrations(ctx, db); err != nil {
+		t.Fatalf("apply remaining migrations: %v", err)
+	}
+
+	for _, legacy := range legacyNotes {
+		var storedID string
+		var createdAt int64
+		var updatedAt int64
+		if err := db.QueryRowContext(ctx, `SELECT id, created_at, updated_at FROM notes WHERE id = ?`, legacy.storedID).Scan(&storedID, &createdAt, &updatedAt); err != nil {
+			t.Fatalf("query migrated note %q: %v", legacy.storedID, err)
+		}
+		if storedID != legacy.storedID {
+			t.Fatalf("migrated note id = %q, want %q", storedID, legacy.storedID)
+		}
+		if createdAt != legacy.createdAt {
+			t.Fatalf("migrated note created_at = %d, want %d", createdAt, legacy.createdAt)
+		}
+		if updatedAt != legacy.updatedAt {
+			t.Fatalf("migrated note updated_at = %d, want %d", updatedAt, legacy.updatedAt)
+		}
+		var searchRows int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM note_search WHERE note_id = ?`, legacy.storedID).Scan(&searchRows); err != nil {
+			t.Fatalf("query search row %q: %v", legacy.storedID, err)
+		}
+		if searchRows != 1 {
+			t.Fatalf("search rows for %q = %d, want 1", legacy.storedID, searchRows)
+		}
+	}
+}
+
+func TestNoteCursorMigrationEnforcesStoredCursorTypes(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	if _, err := db.ExecContext(
+		ctx,
+		`INSERT INTO users (id, state, created_at, updated_at) VALUES (?, 'active', ?, ?)`,
+		"cursor-user",
+		int64(1782993600000),
+		int64(1782993600000),
+	); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	if _, err := db.ExecContext(
+		ctx,
+		`INSERT INTO authors (id, user_id, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		"cursor-author",
+		"cursor-user",
+		"Cursor author",
+		int64(1782993600000),
+		int64(1782993600000),
+	); err != nil {
+		t.Fatalf("insert author: %v", err)
+	}
+
+	insertNote := func(id any, createdAt any, updatedAt any) error {
+		_, err := db.ExecContext(
+			ctx,
+			`
+				INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			`,
+			id,
+			"cursor-user",
+			"Cursor note",
+			"Persisted cursor bounds.",
+			"food",
+			"sao-paulo",
+			createdAt,
+			updatedAt,
+		)
+		return err
+	}
+
+	for _, id := range []string{
+		strings.Repeat("x", 240),
+		strings.Repeat("y", 241),
+		"unsafe-id&",
+		strings.Repeat("😀", 100),
+		"nul-\x00-id",
+	} {
+		if err := insertNote(id, 1782993600000, 1782993600000); err != nil {
+			t.Fatalf("insert text note ID %q: %v", id, err)
+		}
+	}
+	if err := insertNote("zero-created-at", 0, 1782993600000); err != nil {
+		t.Fatalf("insert zero created_at: %v", err)
+	}
+	if err := insertNote("negative-created-at", -1, 1782993600000); err != nil {
+		t.Fatalf("insert negative created_at: %v", err)
+	}
+	if err := insertNote("zero-updated-at", 1782993600000, 0); err != nil {
+		t.Fatalf("insert zero updated_at: %v", err)
+	}
+	if err := insertNote("negative-updated-at", 1782993600000, -1); err != nil {
+		t.Fatalf("insert negative updated_at: %v", err)
+	}
+	if err := insertNote([]byte("blob-note-id"), 1782993600000, 1782993600000); err == nil {
+		t.Fatal("insert BLOB note ID error = nil, want constraint error")
+	}
+	if err := insertNote("text-created-at", "not-a-timestamp", int64(1782993600000)); err == nil {
+		t.Fatal("insert text created_at error = nil, want constraint error")
+	}
+	if err := insertNote("real-created-at", 1e100, int64(1782993600000)); err == nil {
+		t.Fatal("insert real created_at error = nil, want constraint error")
 	}
 }
 

@@ -186,6 +186,31 @@ describe('auth API client', () => {
     );
   });
 
+  it('ignores extra auth error response fields', async () => {
+    stubFetch(async () =>
+      jsonResponse(
+        {
+          code: 'invalid_auth',
+          fields: [{ code: 'too_short', field: 'password', request_id: 'abc' }],
+          request_id: 'abc',
+        },
+        httpStatusBadRequest,
+      ),
+    );
+
+    await expect(
+      createAuthSession({
+        password: 'short',
+        username: 'thiago',
+      }),
+    ).rejects.toMatchObject(
+      new AuthAPIRequestError(httpStatusBadRequest, {
+        code: 'invalid_auth',
+        fields: [{ code: 'too_short', field: 'password' }],
+      }),
+    );
+  });
+
   it('preserves username-taken error bodies', async () => {
     stubFetch(async () =>
       jsonResponse(
@@ -287,7 +312,7 @@ describe('auth API client', () => {
     );
   });
 
-  it('rejects undocumented current session response fields', async () => {
+  it('ignores extra current session response fields', async () => {
     stubFetch(async () =>
       jsonResponse({
         ...apiCurrentSession(),
@@ -295,9 +320,17 @@ describe('auth API client', () => {
       }),
     );
 
-    await expect(getAuthSession(exampleToken)).rejects.toThrow(
-      AuthAPIResponseError,
-    );
+    await expect(getAuthSession(exampleToken)).resolves.toEqual({
+      expiresAt: 1782993600000,
+      user: {
+        author: {
+          displayName: 'Thiago',
+          id: exampleAuthorID,
+        },
+        id: exampleUserID,
+        username: 'thiago',
+      },
+    });
   });
 });
 

@@ -3,18 +3,32 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
 
+type noteStores interface {
+	note.Store
+	note.AuthorNoteStore
+}
+
+type userStores interface {
+	user.Store
+	author.PublicAuthorStore
+}
+
 type server struct {
 	notes                 note.Store
 	catalog               note.Catalog
 	users                 user.Store
+	publicAuthors         author.PublicAuthorStore
+	authorNotes           note.AuthorNoteStore
 	passwordHasher        passwordHasher
 	invalidCredentialHash string
 	authRateLimiters      authRateLimiters
@@ -47,15 +61,15 @@ func DefaultAuthLimits() AuthLimits {
 	}
 }
 
-func NewRouter(notes note.Store, catalog note.Catalog, users user.Store, authLimits AuthLimits) http.Handler {
+func NewRouter(notes noteStores, catalog note.Catalog, users userStores, authLimits AuthLimits) http.Handler {
 	hasher := newBoundedPasswordHasher(user.NewPasswordHasher(), authLimits.PasswordHashConcurrency)
 	return newRouter(notes, catalog, users, hasher, mustInvalidCredentialHash(hasher), user.NewSessionToken, time.Now, authLimits)
 }
 
 func newRouter(
-	notes note.Store,
+	notes noteStores,
 	catalog note.Catalog,
-	users user.Store,
+	users userStores,
 	passwordHasher passwordHasher,
 	invalidCredentialHash string,
 	newSessionToken func() (string, error),
@@ -72,6 +86,8 @@ func newRouter(
 		notes:                 notes,
 		catalog:               catalog,
 		users:                 users,
+		publicAuthors:         users,
+		authorNotes:           notes,
 		passwordHasher:        passwordHasher,
 		invalidCredentialHash: invalidCredentialHash,
 		authRateLimiters:      authRateLimiters,
@@ -91,6 +107,8 @@ func newRouter(
 			router.Get("/categories", wrapper.ListCategories)
 			router.Get("/places", wrapper.ListPlaces)
 			router.Get("/notes", wrapper.ListNotes)
+			router.Get("/authors/{author_id}", wrapper.GetAuthor)
+			router.Get("/authors/{author_id}/notes", wrapper.ListAuthorNotes)
 			router.Get("/notes/{note_id}", wrapper.GetNote)
 			router.Get("/search/notes", wrapper.SearchNotes)
 			router.Post("/auth/users", wrapper.CreateAuthUser)
@@ -119,6 +137,10 @@ func mustInvalidCredentialHash(hasher passwordHasher) string {
 func writeGeneratedOpenAPIError(w http.ResponseWriter, r *http.Request, err error) {
 	var invalidParamError *openapi.InvalidParamFormatError
 	if errors.As(err, &invalidParamError) {
+		if response, ok := generatedInvalidAuthorNotesParamError(r.URL.Path, invalidParamError.ParamName); ok {
+			writeError(w, http.StatusBadRequest, response)
+			return
+		}
 		if code, ok := generatedInvalidParamErrorCode(r.URL.Path, invalidParamError.ParamName); ok {
 			writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: code})
 			return
@@ -126,6 +148,20 @@ func writeGeneratedOpenAPIError(w http.ResponseWriter, r *http.Request, err erro
 	}
 
 	writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidJSON})
+}
+
+func generatedInvalidAuthorNotesParamError(path string, paramName string) (openapi.ErrorResponse, bool) {
+	if !strings.HasPrefix(path, "/v1/authors/") || !strings.HasSuffix(path, "/notes") {
+		return openapi.ErrorResponse{}, false
+	}
+	if paramName != "limit" && paramName != "cursor" {
+		return openapi.ErrorResponse{}, false
+	}
+	fields := []openapi.ValidationProblem{{
+		Field: openapi.ValidationField(paramName),
+		Code:  openapi.ValidationProblemCodeInvalid,
+	}}
+	return openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidNote, Fields: &fields}, true
 }
 
 func generatedInvalidParamErrorCode(path string, paramName string) (openapi.ErrorCode, bool) {

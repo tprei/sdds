@@ -124,6 +124,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/authors/{author_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a public author profile */
+        get: operations["getAuthor"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/authors/{author_id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List an author's notes */
+        get: operations["listAuthorNotes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/notes": {
         parameters: {
             query?: never;
@@ -192,6 +226,16 @@ export interface components {
         AuthorSummary: {
             id: string;
             display_name: string;
+        };
+        PublicAuthor: {
+            id: string;
+            display_name: string;
+            /** Format: int64 */
+            note_count: number;
+        };
+        AuthorNotesPage: {
+            notes: components["schemas"]["Note"][];
+            next_cursor: string | null;
         };
         CategorySlug: string;
         PlaceSlug: string;
@@ -271,7 +315,7 @@ export interface components {
             updated_at: number;
         };
         /** @enum {string} */
-        ValidationField: "title" | "body" | "category_slug" | "place_slug" | "q" | "username" | "password" | "display_name";
+        ValidationField: "title" | "body" | "category_slug" | "place_slug" | "q" | "username" | "password" | "display_name" | "limit" | "cursor";
         ValidationProblem: {
             field: components["schemas"]["ValidationField"];
             /** @enum {string} */
@@ -636,6 +680,109 @@ export interface operations {
                 };
             };
             /** @description The API could not revoke the session. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getAuthor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                author_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Public author profile. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicAuthor"];
+                };
+            };
+            /** @description The request does not match the API contract. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The author was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not get the author. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listAuthorNotes: {
+        parameters: {
+            query?: {
+                /** @description Optional page size. Defaults to 20 and must be between 1 and 50. */
+                limit?: number;
+                /** @description Opaque cursor returned by the preceding author-notes page. */
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                author_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of the author's notes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorNotesPage"];
+                };
+            };
+            /** @description The request parameters are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The author was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not list the author's notes. */
             500: {
                 headers: {
                     [name: string]: unknown;

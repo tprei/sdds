@@ -325,6 +325,7 @@ paths:
           description: Opaque cursor returned by the preceding author-notes page.
           schema:
             type: string
+            minLength: 1
             maxLength: 512
       responses:
         "200":
@@ -560,6 +561,8 @@ components:
             $ref: "#/components/schemas/Note"
         next_cursor:
           type: string
+          minLength: 1
+          maxLength: 512
           nullable: true
     CategorySlug:
       type: string

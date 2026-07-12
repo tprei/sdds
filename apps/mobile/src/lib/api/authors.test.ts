@@ -65,14 +65,9 @@ describe('authors API client', () => {
 
     await expect(
       listAuthorNotes({ authorID, cursor: 'after-cursor', limit: 2 }),
-    ).resolves.toMatchObject({
+    ).resolves.toEqual({
       nextCursor: 'next-cursor',
-      notes: [
-        expect.objectContaining({
-          author: { displayName: 'Thiago', id: authorID },
-          id: noteID,
-        }),
-      ],
+      notes: [expectedNote()],
     });
 
     const request = onlyRequest(requests);
@@ -105,14 +100,9 @@ describe('authors API client', () => {
       }),
     );
 
-    await expect(listAuthorNotes({ authorID })).resolves.toMatchObject({
+    await expect(listAuthorNotes({ authorID })).resolves.toEqual({
       nextCursor: null,
-      notes: [
-        expect.objectContaining({
-          author: { displayName: 'Thiago', id: authorID },
-          id: noteID,
-        }),
-      ],
+      notes: [expectedNote()],
     });
   });
 
@@ -159,6 +149,22 @@ describe('authors API client', () => {
       new APIRequestError(400),
     );
   });
+
+  it('raises request errors for unreadable author status bodies', async () => {
+    stubFetch(async () => unreadableResponse(404));
+
+    await expect(getPublicAuthor(authorID)).rejects.toMatchObject(
+      new APIRequestError(404),
+    );
+  });
+
+  it('raises request errors for unreadable author note status bodies', async () => {
+    stubFetch(async () => unreadableResponse(500));
+
+    await expect(listAuthorNotes({ authorID })).rejects.toMatchObject(
+      new APIRequestError(500),
+    );
+  });
 });
 
 function apiNote() {
@@ -177,6 +183,22 @@ function apiNote() {
   };
 }
 
+function expectedNote() {
+  return {
+    author: {
+      displayName: 'Thiago',
+      id: authorID,
+    },
+    body: 'Tem pão de queijo decente.',
+    categorySlug: 'food',
+    createdAt: 1782993600000,
+    id: noteID,
+    placeSlug: null,
+    title: 'Café bom',
+    updatedAt: 1782993600000,
+  };
+}
+
 function jsonResponse(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), {
     headers: {
@@ -184,6 +206,16 @@ function jsonResponse(value: unknown, status = 200): Response {
     },
     status,
   });
+}
+
+function unreadableResponse(status: number): Response {
+  const body = new ReadableStream({
+    start(controller) {
+      controller.error(new Error('body_unreadable'));
+    },
+  });
+
+  return new Response(body, { status });
 }
 
 function onlyRequest(requests: Request[]): Request {

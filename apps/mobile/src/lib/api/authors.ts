@@ -28,10 +28,31 @@ type AuthorNotesPageResponse = GeneratedSchemas['AuthorNotesPage'];
 
 const maxAuthorNotesCursorLength = 512;
 
-const client = () => createClient<paths>({ baseUrl: apiBaseURL() });
+function apiClient() {
+  return createClient<paths>({
+    baseUrl: apiBaseURL(),
+    fetch: apiFetch,
+  });
+}
+
+async function apiFetch(request: Request): Promise<Response> {
+  const response = await fetch(request);
+  if (response.ok) {
+    return response;
+  }
+
+  const headers = new Headers(response.headers);
+  headers.delete('content-length');
+  headers.delete('transfer-encoding');
+  return new Response(null, {
+    headers,
+    status: response.status,
+    statusText: response.statusText,
+  });
+}
 
 export async function getPublicAuthor(authorID: string): Promise<PublicAuthor> {
-  const { data, response } = await client().GET('/v1/authors/{author_id}', {
+  const { data, response } = await apiClient().GET('/v1/authors/{author_id}', {
     params: { path: { author_id: authorID } },
   });
   if (!response.ok) {
@@ -50,7 +71,7 @@ export async function getPublicAuthor(authorID: string): Promise<PublicAuthor> {
 export async function listAuthorNotes(
   input: ListAuthorNotesInput,
 ): Promise<AuthorNotesPage> {
-  const { data, response } = await client().GET(
+  const { data, response } = await apiClient().GET(
     '/v1/authors/{author_id}/notes',
     {
       params: {

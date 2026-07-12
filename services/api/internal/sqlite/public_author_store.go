@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tprei/sdds/services/api/internal/user"
+	"github.com/tprei/sdds/services/api/internal/author"
 )
 
 const findPublicAuthorSQL = `
@@ -17,18 +17,18 @@ const findPublicAuthorSQL = `
 	GROUP BY authors.id, authors.display_name
 `
 
-var _ user.PublicAuthorStore = (*UserStore)(nil)
+var _ author.PublicAuthorStore = (*UserStore)(nil)
 
-func (store *UserStore) FindPublicAuthor(ctx context.Context, authorID user.AuthorID) (user.PublicAuthor, error) {
-	var author user.PublicAuthor
+func (store *UserStore) FindPublicAuthor(ctx context.Context, authorID author.AuthorID) (author.PublicAuthor, error) {
+	var profile author.PublicAuthor
 	var id string
-	err := store.db.QueryRowContext(ctx, findPublicAuthorSQL, authorID).Scan(&id, &author.DisplayName, &author.NoteCount)
+	err := store.db.QueryRowContext(ctx, findPublicAuthorSQL, authorID).Scan(&id, &profile.DisplayName, &profile.NoteCount)
 	if err == nil {
-		author.ID = user.AuthorID(id)
-		return author, nil
+		profile.ID = author.AuthorID(id)
+		return profile, nil
 	}
 	if errors.Is(err, sql.ErrNoRows) {
-		return user.PublicAuthor{}, user.ErrAuthorNotFound
+		return author.PublicAuthor{}, author.ErrAuthorNotFound
 	}
-	return user.PublicAuthor{}, fmt.Errorf("find public author: %w", err)
+	return author.PublicAuthor{}, fmt.Errorf("find public author: %w", err)
 }

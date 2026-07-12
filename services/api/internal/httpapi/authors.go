@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
 	"github.com/tprei/sdds/services/api/internal/pagination"
-	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 const maxAuthorNotesCursorLength = pagination.MaxCursorLength
@@ -25,8 +25,8 @@ func (handler server) GetAuthor(w http.ResponseWriter, r *http.Request, authorID
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}
-	author, err := handler.publicAuthors.FindPublicAuthor(r.Context(), user.AuthorID(authorID))
-	if errors.Is(err, user.ErrAuthorNotFound) {
+	profile, err := handler.publicAuthors.FindPublicAuthor(r.Context(), author.AuthorID(authorID))
+	if errors.Is(err, author.ErrAuthorNotFound) {
 		writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
 		return
 	}
@@ -35,7 +35,7 @@ func (handler server) GetAuthor(w http.ResponseWriter, r *http.Request, authorID
 		return
 	}
 
-	writeJSON(w, http.StatusOK, newPublicAuthorResponse(author))
+	writeJSON(w, http.StatusOK, newPublicAuthorResponse(profile))
 }
 
 func (handler server) ListAuthorNotes(w http.ResponseWriter, r *http.Request, authorID string, params openapi.ListAuthorNotesParams) {
@@ -44,14 +44,14 @@ func (handler server) ListAuthorNotes(w http.ResponseWriter, r *http.Request, au
 		return
 	}
 	cursor, problems := decodeAuthorNotesCursor(params.Cursor)
-	input := authorNotesInput(authorID, params, cursor)
+	input := note.NormalizeAuthorNotesInput(authorNotesInput(authorID, params, cursor))
 	problems = append(problems, note.ValidateAuthorNotesInput(input)...)
 	if len(problems) > 0 {
 		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, problems))
 		return
 	}
 
-	if _, err := handler.publicAuthors.FindPublicAuthor(r.Context(), user.AuthorID(authorID)); errors.Is(err, user.ErrAuthorNotFound) {
+	if _, err := handler.publicAuthors.FindPublicAuthor(r.Context(), author.AuthorID(authorID)); errors.Is(err, author.ErrAuthorNotFound) {
 		writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
 		return
 	} else if err != nil {
@@ -74,12 +74,12 @@ func (handler server) ListAuthorNotes(w http.ResponseWriter, r *http.Request, au
 }
 
 func authorNotesInput(authorID string, params openapi.ListAuthorNotesParams, cursor *note.AuthorNotePosition) note.AuthorNotesInput {
-	limit := note.AuthorNotesDefaultLimit
+	var limit int
 	if params.Limit != nil {
 		limit = *params.Limit
 	}
 	return note.AuthorNotesInput{
-		AuthorID: user.AuthorID(authorID),
+		AuthorID: author.AuthorID(authorID),
 		Limit:    limit,
 		After:    cursor,
 	}
@@ -99,11 +99,11 @@ func decodeAuthorNotesCursor(encoded *string) (*note.AuthorNotePosition, []note.
 	return &note.AuthorNotePosition{CreatedAt: time.UnixMilli(payload.CreatedAt).UTC(), ID: payload.ID}, nil
 }
 
-func newPublicAuthorResponse(author user.PublicAuthor) openapi.PublicAuthor {
+func newPublicAuthorResponse(profile author.PublicAuthor) openapi.PublicAuthor {
 	return openapi.PublicAuthor{
-		Id:          string(author.ID),
-		DisplayName: author.DisplayName,
-		NoteCount:   author.NoteCount,
+		Id:          string(profile.ID),
+		DisplayName: profile.DisplayName,
+		NoteCount:   profile.NoteCount,
 	}
 }
 

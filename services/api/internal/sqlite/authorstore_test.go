@@ -8,15 +8,16 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 const (
 	authorStoreUserID        = user.UserID("018ff5b8-0000-7000-8000-000000000101")
-	authorStoreAuthorID      = user.AuthorID("018ff5b8-0000-7000-8000-000000000102")
+	authorStoreAuthorID      = author.AuthorID("018ff5b8-0000-7000-8000-000000000102")
 	otherAuthorStoreUserID   = user.UserID("018ff5b8-0000-7000-8000-000000000201")
-	otherAuthorStoreAuthorID = user.AuthorID("018ff5b8-0000-7000-8000-000000000202")
+	otherAuthorStoreAuthorID = author.AuthorID("018ff5b8-0000-7000-8000-000000000202")
 )
 
 func TestUserStoreFindsPublicAuthorWithNoteCount(t *testing.T) {
@@ -32,7 +33,7 @@ func TestUserStoreFindsPublicAuthorWithNoteCount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("find public author: %v", err)
 	}
-	want := user.PublicAuthor{ID: authorStoreAuthorID, DisplayName: "Marina Alves", NoteCount: 2}
+	want := author.PublicAuthor{ID: authorStoreAuthorID, DisplayName: "Marina Alves", NoteCount: 2}
 	if diff := cmp.Diff(want, found); diff != "" {
 		t.Fatalf("public author mismatch (-want +got):\n%s", diff)
 	}
@@ -56,8 +57,8 @@ func TestUserStoreFindsUnknownPublicAuthorAsNotFound(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 
-	_, err := NewUserStore(db).FindPublicAuthor(ctx, user.AuthorID("018ff5b8-0000-7000-8000-000000000999"))
-	if !errors.Is(err, user.ErrAuthorNotFound) {
+	_, err := NewUserStore(db).FindPublicAuthor(ctx, author.AuthorID("018ff5b8-0000-7000-8000-000000000999"))
+	if !errors.Is(err, author.ErrAuthorNotFound) {
 		t.Fatalf("find public author error = %v, want ErrAuthorNotFound", err)
 	}
 }
@@ -125,7 +126,7 @@ func TestNoteStoreListsAuthorNotesWithKeysetPagination(t *testing.T) {
 	}
 }
 
-func insertAuthorStoreUser(t *testing.T, ctx context.Context, db execer, userID user.UserID, authorID user.AuthorID, displayName string) {
+func insertAuthorStoreUser(t *testing.T, ctx context.Context, db execer, userID user.UserID, authorID author.AuthorID, displayName string) {
 	t.Helper()
 	if _, err := db.ExecContext(ctx, `INSERT INTO users (id, state, created_at, updated_at) VALUES (?, 'active', 0, 0)`, userID); err != nil {
 		t.Fatalf("insert user %s: %v", userID, err)

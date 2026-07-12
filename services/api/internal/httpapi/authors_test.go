@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
-	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 const (
-	exampleAuthorID        = user.AuthorID("018ff5b8-0000-7000-8000-000000000010")
+	exampleAuthorID        = author.AuthorID("018ff5b8-0000-7000-8000-000000000010")
 	exampleAuthorNoteID    = "018ff5b8-0000-7000-8000-000000000011"
 	exampleCursorNoteID    = "018ff5b8-0000-7000-8000-000000000012"
 	exampleAuthorDisplay   = "Marina Alves"
@@ -27,11 +27,11 @@ const (
 
 func TestGetAuthorReturnsPublicProfileWithoutAuthentication(t *testing.T) {
 	router := NewRouter(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
-		findPublicAuthor: func(_ context.Context, authorID user.AuthorID) (user.PublicAuthor, error) {
+		findPublicAuthor: func(_ context.Context, authorID author.AuthorID) (author.PublicAuthor, error) {
 			if authorID != exampleAuthorID {
 				t.Fatalf("author id = %q, want %q", authorID, exampleAuthorID)
 			}
-			return user.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 27}, nil
+			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 27}, nil
 		},
 	}, DefaultAuthLimits())
 
@@ -60,8 +60,8 @@ func TestGetAuthorReturnsPublicProfileWithoutAuthentication(t *testing.T) {
 
 func TestGetAuthorReturnsNotFound(t *testing.T) {
 	router := NewRouter(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
-		findPublicAuthor: func(context.Context, user.AuthorID) (user.PublicAuthor, error) {
-			return user.PublicAuthor{}, user.ErrAuthorNotFound
+		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
+			return author.PublicAuthor{}, author.ErrAuthorNotFound
 		},
 	}, DefaultAuthLimits())
 	response := httptest.NewRecorder()
@@ -92,8 +92,8 @@ func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 			return note.AuthorNotesPage{Notes: []note.Note{authorHTTPNote(exampleAuthorNoteID, createdAt)}, HasMore: true}, nil
 		},
 	}, fakeCatalog{}, fakeUserStore{
-		findPublicAuthor: func(context.Context, user.AuthorID) (user.PublicAuthor, error) {
-			return user.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 2}, nil
+		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
+			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 2}, nil
 		},
 	}, DefaultAuthLimits())
 
@@ -163,8 +163,8 @@ func TestListAuthorNotesPassesExplicitLimitAndCursor(t *testing.T) {
 			return note.AuthorNotesPage{Notes: []note.Note{}}, nil
 		},
 	}, fakeCatalog{}, fakeUserStore{
-		findPublicAuthor: func(context.Context, user.AuthorID) (user.PublicAuthor, error) {
-			return user.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 0}, nil
+		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
+			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 0}, nil
 		},
 	}, DefaultAuthLimits())
 	response := httptest.NewRecorder()
@@ -226,9 +226,9 @@ func TestListAuthorNotesRejectsInvalidParametersBeforeAuthorLookup(t *testing.T)
 					return note.AuthorNotesPage{}, nil
 				},
 			}, fakeCatalog{}, fakeUserStore{
-				findPublicAuthor: func(context.Context, user.AuthorID) (user.PublicAuthor, error) {
+				findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 					t.Fatal("FindPublicAuthor should not be called")
-					return user.PublicAuthor{}, nil
+					return author.PublicAuthor{}, nil
 				},
 			}, DefaultAuthLimits())
 			response := httptest.NewRecorder()
@@ -259,8 +259,8 @@ func TestListAuthorNotesReturnsNotFoundForUnknownAuthor(t *testing.T) {
 			return note.AuthorNotesPage{}, nil
 		},
 	}, fakeCatalog{}, fakeUserStore{
-		findPublicAuthor: func(context.Context, user.AuthorID) (user.PublicAuthor, error) {
-			return user.PublicAuthor{}, user.ErrAuthorNotFound
+		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
+			return author.PublicAuthor{}, author.ErrAuthorNotFound
 		},
 	}, DefaultAuthLimits())
 	response := httptest.NewRecorder()
@@ -281,8 +281,8 @@ func TestListAuthorNotesReturnsInternalError(t *testing.T) {
 			return note.AuthorNotesPage{}, errors.New("database unavailable")
 		},
 	}, fakeCatalog{}, fakeUserStore{
-		findPublicAuthor: func(context.Context, user.AuthorID) (user.PublicAuthor, error) {
-			return user.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 1}, nil
+		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
+			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 1}, nil
 		},
 	}, DefaultAuthLimits())
 	response := httptest.NewRecorder()

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	authordomain "github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/user"
 	modernsqlite "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
@@ -249,14 +250,14 @@ func (store *UserStore) FindAuthorByUserID(ctx context.Context, userID user.User
 	var updatedAt int64
 	err := store.db.QueryRowContext(ctx, findAuthorByUserIDSQL, userID).Scan(&id, &scannedUserID, &author.DisplayName, &createdAt, &updatedAt)
 	if err == nil {
-		author.ID = user.AuthorID(id)
+		author.ID = authordomain.AuthorID(id)
 		author.UserID = user.UserID(scannedUserID)
 		author.CreatedAt = timeFromUnixMillis(createdAt)
 		author.UpdatedAt = timeFromUnixMillis(updatedAt)
 		return author, nil
 	}
 	if errors.Is(err, sql.ErrNoRows) {
-		return user.Author{}, user.ErrAuthorNotFound
+		return user.Author{}, authordomain.ErrAuthorNotFound
 	}
 	return user.Author{}, fmt.Errorf("find author by user id: %w", err)
 }
@@ -266,7 +267,7 @@ func newPasswordUserRecords(input user.CreatePasswordUserInput, now time.Time) (
 	if err != nil {
 		return user.User{}, user.Author{}, "", user.Session{}, fmt.Errorf("create user id: %w", err)
 	}
-	authorID, err := user.NewAuthorID()
+	authorID, err := authordomain.NewAuthorID()
 	if err != nil {
 		return user.User{}, user.Author{}, "", user.Session{}, fmt.Errorf("create author id: %w", err)
 	}
@@ -340,7 +341,7 @@ func scanPasswordLogin(scan *sql.Row) (user.PasswordLogin, error) {
 			UpdatedAt: timeFromUnixMillis(userUpdatedAt),
 		},
 		Author: user.Author{
-			ID:          user.AuthorID(authorID),
+			ID:          authordomain.AuthorID(authorID),
 			UserID:      currentUserID,
 			DisplayName: displayName,
 			CreatedAt:   timeFromUnixMillis(authorCreatedAt),
@@ -407,7 +408,7 @@ func scanCurrentSession(scan *sql.Row) (user.CurrentSession, error) {
 			UpdatedAt: timeFromUnixMillis(userUpdatedAt),
 		},
 		Author: user.Author{
-			ID:          user.AuthorID(authorID),
+			ID:          authordomain.AuthorID(authorID),
 			UserID:      currentUserID,
 			DisplayName: displayName,
 			CreatedAt:   timeFromUnixMillis(authorCreatedAt),

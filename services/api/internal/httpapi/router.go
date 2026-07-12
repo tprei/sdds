@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
 	"github.com/tprei/sdds/services/api/internal/user"
@@ -19,14 +20,14 @@ type noteStores interface {
 
 type userStores interface {
 	user.Store
-	user.PublicAuthorStore
+	author.PublicAuthorStore
 }
 
 type server struct {
 	notes                 note.Store
 	catalog               note.Catalog
 	users                 user.Store
-	publicAuthors         user.PublicAuthorStore
+	publicAuthors         author.PublicAuthorStore
 	authorNotes           note.AuthorNoteStore
 	passwordHasher        passwordHasher
 	invalidCredentialHash string
@@ -168,8 +169,6 @@ func generatedInvalidParamErrorCode(path string, paramName string) (openapi.Erro
 	case path == "/v1/search/notes" && (paramName == "q" || paramName == "category_slug"):
 		return openapi.ErrorCodeInvalidSearch, true
 	case path == "/v1/notes" && paramName == "category_slug":
-		return openapi.ErrorCodeInvalidNote, true
-	case strings.HasPrefix(path, "/v1/authors/") && strings.HasSuffix(path, "/notes") && (paramName == "limit" || paramName == "cursor"):
 		return openapi.ErrorCodeInvalidNote, true
 	default:
 		return "", false

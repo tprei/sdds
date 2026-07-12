@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/openapi"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
@@ -405,7 +406,7 @@ func authRateLimitFindPasswordLogin(t *testing.T, findCalls *int) func(context.C
 		(*findCalls)++
 		return user.PasswordLogin{
 			User:       user.User{ID: user.UserID("user-id-" + username), State: user.UserStateActive},
-			Author:     user.Author{ID: user.AuthorID("author-id-" + username), UserID: user.UserID("user-id-" + username), DisplayName: username},
+			Author:     user.Author{ID: author.AuthorID("author-id-" + username), UserID: user.UserID("user-id-" + username), DisplayName: username},
 			Username:   username,
 			SecretHash: secretHash,
 		}, nil

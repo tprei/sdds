@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/tprei/sdds/services/api/internal/author"
 )
 
 func TestNewIDsCreateUUIDv7Values(t *testing.T) {
@@ -21,7 +22,7 @@ func TestNewIDsCreateUUIDv7Values(t *testing.T) {
 		{
 			name: "author",
 			create: func() (string, error) {
-				id, err := NewAuthorID()
+				id, err := author.NewAuthorID()
 				return string(id), err
 			},
 		},

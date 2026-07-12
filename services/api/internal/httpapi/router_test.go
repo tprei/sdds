@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
@@ -246,7 +247,7 @@ type fakeUserStore struct {
 	findCurrentSession func(ctx context.Context, tokenHash string, now time.Time) (user.CurrentSession, error)
 	revokeSession      func(ctx context.Context, sessionID user.SessionID, revokedAt time.Time) error
 	findAuthorByUserID func(ctx context.Context, userID user.UserID) (user.Author, error)
-	findPublicAuthor   func(ctx context.Context, authorID user.AuthorID) (user.PublicAuthor, error)
+	findPublicAuthor   func(ctx context.Context, authorID author.AuthorID) (author.PublicAuthor, error)
 }
 
 func (store fakeUserStore) CreatePasswordUser(ctx context.Context, input user.CreatePasswordUserInput) (user.CurrentSession, error) {
@@ -291,9 +292,9 @@ func (store fakeUserStore) FindAuthorByUserID(ctx context.Context, userID user.U
 	return store.findAuthorByUserID(ctx, userID)
 }
 
-func (store fakeUserStore) FindPublicAuthor(ctx context.Context, authorID user.AuthorID) (user.PublicAuthor, error) {
+func (store fakeUserStore) FindPublicAuthor(ctx context.Context, authorID author.AuthorID) (author.PublicAuthor, error) {
 	if store.findPublicAuthor == nil {
-		return user.PublicAuthor{}, fmt.Errorf("find public author not implemented")
+		return author.PublicAuthor{}, fmt.Errorf("find public author not implemented")
 	}
 	return store.findPublicAuthor(ctx, authorID)
 }

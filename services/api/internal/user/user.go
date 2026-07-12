@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/tprei/sdds/services/api/internal/author"
 )
 
 var (
@@ -13,11 +15,9 @@ var (
 	ErrSessionExpired     = errors.New("session expired")
 	ErrSessionRevoked     = errors.New("session revoked")
 	ErrUserDisabled       = errors.New("user disabled")
-	ErrAuthorNotFound     = errors.New("author not found")
 )
 
 type UserID string
-type AuthorID string
 type LoginIdentityID string
 type SessionID string
 
@@ -45,7 +45,7 @@ type User struct {
 }
 
 type Author struct {
-	ID          AuthorID
+	ID          author.AuthorID
 	UserID      UserID
 	DisplayName string
 	CreatedAt   time.Time

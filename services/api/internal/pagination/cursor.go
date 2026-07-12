@@ -10,6 +10,8 @@ import (
 
 const MaxCursorLength = 160
 
+var ErrCursorTooLong = errors.New("cursor exceeds maximum length")
+
 var ErrInvalidCursor = errors.New("invalid cursor")
 
 func Encode(value any) (string, error) {
@@ -17,7 +19,11 @@ func Encode(value any) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return base64.RawURLEncoding.EncodeToString(payload), nil
+	encoded := base64.RawURLEncoding.EncodeToString(payload)
+	if len(encoded) > MaxCursorLength {
+		return "", ErrCursorTooLong
+	}
+	return encoded, nil
 }
 
 func Decode(encoded string, target any) error {

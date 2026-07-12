@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
@@ -358,7 +359,7 @@ func scanNoteValues(scan func(dest ...any) error) (note.Note, error) {
 	if placeSlug.Valid {
 		found.PlaceSlug = note.PlaceSlug(placeSlug.String)
 	}
-	found.Author.ID = user.AuthorID(authorID)
+	found.Author.ID = author.AuthorID(authorID)
 	found.CreatedAt = timeFromUnixMillis(createdAt)
 	found.UpdatedAt = timeFromUnixMillis(updatedAt)
 	return found, nil

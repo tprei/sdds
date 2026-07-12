@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/tprei/sdds/services/api/internal/user"
+	"github.com/tprei/sdds/services/api/internal/author"
 )
 
 const (
@@ -18,7 +18,7 @@ type AuthorNotePosition struct {
 }
 
 type AuthorNotesInput struct {
-	AuthorID user.AuthorID
+	AuthorID author.AuthorID
 	Limit    int
 	After    *AuthorNotePosition
 }
@@ -30,6 +30,13 @@ type AuthorNotesPage struct {
 
 type AuthorNoteStore interface {
 	ListAuthorNotes(context.Context, AuthorNotesInput) (AuthorNotesPage, error)
+}
+
+func NormalizeAuthorNotesInput(input AuthorNotesInput) AuthorNotesInput {
+	if input.Limit == 0 {
+		input.Limit = AuthorNotesDefaultLimit
+	}
+	return input
 }
 
 func ValidateAuthorNotesInput(input AuthorNotesInput) []ValidationProblem {

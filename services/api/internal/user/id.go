@@ -14,14 +14,6 @@ func NewUserID() (UserID, error) {
 	return UserID(id), nil
 }
 
-func NewAuthorID() (AuthorID, error) {
-	id, err := newUUIDv7()
-	if err != nil {
-		return "", err
-	}
-	return AuthorID(id), nil
-}
-
 func NewLoginIdentityID() (LoginIdentityID, error) {
 	id, err := newUUIDv7()
 	if err != nil {

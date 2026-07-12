@@ -53,6 +53,7 @@ const (
 var _ note.AuthorNoteStore = (*NoteStore)(nil)
 
 func (store *NoteStore) ListAuthorNotes(ctx context.Context, input note.AuthorNotesInput) (page note.AuthorNotesPage, err error) {
+	input = note.NormalizeAuthorNotesInput(input)
 	if problems := note.ValidateAuthorNotesInput(input); len(problems) > 0 {
 		return note.AuthorNotesPage{}, fmt.Errorf("list author notes: invalid input")
 	}
@@ -76,7 +77,7 @@ func (store *NoteStore) ListAuthorNotes(ctx context.Context, input note.AuthorNo
 		}
 	}()
 
-	notes := make([]note.Note, 0, input.Limit)
+	notes := make([]note.Note, 0, fetchLimit)
 	for rows.Next() {
 		found, err := scanNote(rows)
 		if err != nil {

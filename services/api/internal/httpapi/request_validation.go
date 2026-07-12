@@ -40,14 +40,6 @@ func openAPIRequestValidator() func(http.Handler) http.Handler {
 			}
 
 			if route.Operation.RequestBody == nil && requestHasBody(r) {
-				var requestError *openapi3filter.RequestError
-				if errors.As(err, &requestError) && requestError.Parameter != nil {
-					if response, ok := generatedInvalidAuthorNotesParamError(r.URL.Path, requestError.Parameter.Name); ok {
-						writeError(w, http.StatusBadRequest, response)
-						return
-					}
-				}
-
 				writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidJSON})
 				return
 			}

@@ -101,7 +101,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
 
-  await page.getByText('Escrever', { exact: true }).click();
+  await page.getByText('Escrever', { exact: true }).last().click();
   await expect(page.getByText('Entre para escrever')).toBeVisible();
 
   await page.getByRole('button', { name: 'Criar conta' }).click();
@@ -116,6 +116,16 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(page.getByText('Conta uma dica')).toBeVisible();
   await expect(page).toHaveURL(/\/compose(?:[?#]|$)/);
   await page.reload();
+  await expect(page.getByText('Conta uma dica')).toBeVisible();
+
+  await page.getByText('Perfil', { exact: true }).last().click();
+  await expect(
+    page.getByTestId('author-profile-header').getByRole('heading', {
+      name: displayName,
+    }),
+  ).toBeVisible();
+  await expect(page.getByText('0 Notas')).toBeVisible();
+  await page.getByText('Escrever', { exact: true }).last().click();
   await expect(page.getByText('Conta uma dica')).toBeVisible();
 
   await page.getByLabel('Título da nota').fill(title);
@@ -172,11 +182,17 @@ test('creates a note and reads it from the API-backed home feed', async ({
     page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).last(),
   ).toBeVisible();
   await expect(searchResult).toContainText('São Paulo');
-  const searchAuthor = page.getByLabel(`Abrir perfil do autor: ${displayName}`).last();
+  const searchAuthor = page.getByRole('button', {
+    name: `Abrir perfil do autor: ${displayName}`,
+  }).last();
   await expect(searchAuthor).toBeVisible();
   await searchAuthor.click();
   await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
-  await expect(page.getByText(displayName, { exact: true }).last()).toBeVisible();
+  await expect(
+    page.getByTestId('author-profile-header').getByRole('heading', {
+      name: displayName,
+    }),
+  ).toBeVisible();
   await page.goto(exploreURL);
   await page.getByText('Buscar', { exact: true }).click();
   await page.getByLabel('Buscar').fill(title);
@@ -205,11 +221,17 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(page.getByLabel('Categoria da nota: Comida')).toBeVisible();
   await expect(page.getByLabel('Lugar da nota: São Paulo')).toBeVisible();
 
-  await page.getByText('Perfil', { exact: true }).click();
-  await page.reload();
-  await expect(page.getByText(displayName, { exact: true }).first()).toBeVisible({ timeout: 10000 });
-  await expect(page.getByText('1 Nota')).toBeVisible();
-  await expect(page.getByText(body)).toBeVisible();
+  await page.getByText('Perfil', { exact: true }).last().click();
+  const profileRoot = page.getByTestId('author-profile-scroll');
+  await expect(
+    profileRoot.getByTestId('author-profile-header').getByRole('heading', {
+      name: displayName,
+    }),
+  ).toBeVisible({ timeout: 10000 });
+  await expect(profileRoot.getByTestId('author-profile-note-count')).toHaveText('1 Nota');
+  await expect(
+    profileRoot.getByRole('button', { name: `Abrir nota: ${title}` }),
+  ).toContainText(body);
   await expect(page.getByText(`Nome de usuário: ${username}`)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Sair' })).toBeVisible();
 

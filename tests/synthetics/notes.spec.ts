@@ -140,6 +140,11 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(publishedNote).toContainText(body);
   await expect(publishedNote).toContainText(displayName);
   await expect(publishedNote).toContainText('São Paulo');
+  await page.getByLabel(`Abrir perfil do autor: ${displayName}`).click();
+  await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
+  await expect(page.getByText(displayName, { exact: true })).toBeVisible();
+  await page.goBack();
+  await expect(publishedNote).toBeVisible();
 
   await page.getByText('Buscar', { exact: true }).click();
   await expect(
@@ -163,6 +168,10 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Nota$/ }),
   ).toBeVisible();
+  await page.getByLabel(`Abrir perfil do autor: ${displayName}`).last().click();
+  await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
+  await expect(page.getByText(displayName, { exact: true })).toBeVisible();
+  await page.goBack();
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(
     page.getByLabel(`Abrir perfil do autor: ${displayName}`).last(),

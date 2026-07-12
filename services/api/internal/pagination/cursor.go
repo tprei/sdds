@@ -8,7 +8,7 @@ import (
 	"io"
 )
 
-const MaxCursorLength = 160
+const MaxCursorLength = 512
 
 var ErrCursorTooLong = errors.New("cursor exceeds maximum length")
 

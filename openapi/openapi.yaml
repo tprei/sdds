@@ -325,7 +325,7 @@ paths:
           description: Opaque cursor returned by the preceding author-notes page.
           schema:
             type: string
-            maxLength: 160
+            maxLength: 512
       responses:
         "200":
           description: A page of the author's notes.

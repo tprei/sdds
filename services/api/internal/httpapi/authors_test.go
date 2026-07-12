@@ -203,6 +203,25 @@ func TestAuthorNotesCursorRoundTripsOpaqueID(t *testing.T) {
 	}
 }
 
+func TestAuthorNotesCursorRoundTripsLongOpaqueID(t *testing.T) {
+	position := note.AuthorNotePosition{
+		CreatedAt: time.UnixMilli(exampleAuthorCreatedMS).UTC(),
+		ID:        strings.Repeat("x", 100),
+	}
+	encoded, err := encodeAuthorNotesCursor(position)
+	if err != nil {
+		t.Fatalf("encode cursor: %v", err)
+	}
+
+	decoded, problems := decodeAuthorNotesCursor(&encoded)
+	if diff := cmp.Diff([]note.ValidationProblem(nil), problems); diff != "" {
+		t.Fatalf("problems mismatch (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(&position, decoded); diff != "" {
+		t.Fatalf("cursor mismatch (-want +got):\n%s", diff)
+	}
+}
+
 func TestListAuthorNotesRejectsInvalidParametersBeforeAuthorLookup(t *testing.T) {
 	unsupportedVersion := rawAuthorCursor(`{"v":2,"created_at":1782993600000,"id":"018ff5b8-0000-7000-8000-000000000012"}`)
 	tests := []struct {

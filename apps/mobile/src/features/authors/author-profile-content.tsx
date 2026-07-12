@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 import { FoundationButton } from '../../components/foundation-screen';
+import { buildNoteCatalog, labelNotes } from '../notes/catalog';
+import { listCatalogs } from '../../lib/api/catalogs';
 import { NoteCard } from '../../components/note-card';
 import { APIRequestError } from '../../lib/api/notes';
 import { getPublicAuthor, listAuthorNotes } from '../../lib/api/authors';
@@ -21,6 +23,7 @@ function noteCount(count: number): string {
 
 export function AuthorProfileContent({ authorID, onPressNote }: Props) {
   const [author, setAuthor] = useState<PublicAuthor | null>(null);
+  const [catalog, setCatalog] = useState<ReturnType<typeof buildNoteCatalog> | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,18 +44,26 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
     }
     try {
       if (next === undefined) {
-        const [profile, page] = await Promise.all([
+        const [profile, page, catalogs] = await Promise.all([
           getPublicAuthor(authorID),
           listAuthorNotes({ authorID }),
+          listCatalogs(),
         ]);
+        const nextCatalog = buildNoteCatalog(catalogs);
+        const labelledNotes = labelNotes(nextCatalog, page.notes);
+        if (labelledNotes === null) throw new Error('catalog_labels_missing');
         setAuthor(profile);
-        setNotes(page.notes);
+        setCatalog(nextCatalog);
+        setNotes(labelledNotes);
         setCursor(page.nextCursor);
       } else {
         const page = await listAuthorNotes({ authorID, cursor: next });
+        if (catalog === null) throw new Error('catalog_missing');
+        const labelledNotes = labelNotes(catalog, page.notes);
+        if (labelledNotes === null) throw new Error('catalog_labels_missing');
         setNotes((current) => {
           const ids = new Set(current.map((note) => note.id));
-          return [...current, ...page.notes.filter((note) => !ids.has(note.id))];
+          return [...current, ...labelledNotes.filter((note) => !ids.has(note.id))];
         });
         setCursor(page.nextCursor);
       }
@@ -69,7 +80,7 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
       setLoading(false);
       setLoadingNext(false);
     }
-  }, [authorID]);
+  }, [authorID, catalog]);
 
   useEffect(() => {
     queueMicrotask(() => void load(undefined));
@@ -77,7 +88,7 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
 
   if (loading) return <Text style={styles.message}>Carregando perfil…</Text>;
   if (error === 'not_found') return <View><Text style={styles.message}>Perfil não encontrado.</Text><FoundationButton label="Tentar de novo" onPress={() => void load(undefined)} /></View>;
-  if (error === 'error' || author === null) return <View><Text accessibilityRole="alert" style={styles.message}>Não foi possível carregar este perfil.</Text><FoundationButton label="Tentar de novo" onPress={() => void load(undefined)} /></View>;
+  if (error === 'error' || author === null || catalog === null) return <View><Text accessibilityRole="alert" style={styles.message}>Não foi possível carregar este perfil.</Text><FoundationButton label="Tentar de novo" onPress={() => void load(undefined)} /></View>;
 
   return (
     <ScrollView
@@ -93,7 +104,7 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
         <Text style={styles.name}>{author.displayName}</Text>
         <Text style={styles.count}>{noteCount(author.noteCount)}</Text>
       </View>
-      {notes.length === 0 ? <Text style={styles.message}>Nenhuma nota ainda.</Text> : notes.map((note) => <NoteCard key={note.id} categoryLabel={note.categorySlug} note={note} placeLabel={note.placeSlug} onPress={() => onPressNote(note.id)} />)}
+      {notes.length === 0 ? <Text style={styles.message}>Nenhuma nota ainda.</Text> : notes.map((note) => <NoteCard key={note.id} categoryLabel={catalog.categoryLabels.get(note.categorySlug) ?? ''} note={note} placeLabel={note.placeSlug === null ? null : catalog.placeLabels.get(note.placeSlug) ?? null} onPress={() => onPressNote(note.id)} />)}
       {nextError ? <View><Text accessibilityRole="alert" style={styles.message}>Não foi possível carregar mais notas.</Text><FoundationButton label="Tentar de novo" onPress={() => cursor !== null && void load(cursor)} /></View> : null}
       {loadingNext ? <Text style={styles.message}>Carregando mais notas…</Text> : null}
     </ScrollView>

@@ -42,29 +42,32 @@ export function NoteCard({
       accessibilityLabel={`Abrir perfil do autor: ${note.author.displayName}`}
       accessibilityRole="button"
       onPress={() => onPressAuthor(note.author.id)}
+      style={({ pressed }) => [
+        styles.authorControl,
+        pressed ? styles.authorPressed : null,
+      ]}
     >
       <Text style={styles.author}>{note.author.displayName}</Text>
     </Pressable>
   );
 
-  const noteBody = (
+  const noteContent = (
     <>
       {metadata}
       <Text style={styles.title}>{note.title}</Text>
       <Text style={styles.body}>{note.body}</Text>
-      {onPressAuthor === undefined ? null : (
-        <Text style={styles.authorHidden}>{note.author.displayName}</Text>
-      )}
+    </>
+  );
+
+  const cardContent = (
+    <>
+      {noteContent}
+      {author}
     </>
   );
 
   if (onPress === undefined) {
-    return (
-      <View style={styles.card}>
-        {noteBody}
-        {author}
-      </View>
-    );
+    return <View style={[styles.card, styles.noteTarget]}>{cardContent}</View>;
   }
 
   if (onPressAuthor === undefined) {
@@ -73,16 +76,13 @@ export function NoteCard({
         accessibilityLabel={`Abrir nota: ${note.title}`}
         accessibilityRole="button"
         onPress={onPress}
-        style={styles.pressable}
+        style={({ pressed }) => [
+          styles.card,
+          styles.noteTarget,
+          pressed ? styles.pressed : null,
+        ]}
       >
-        {({ pressed }) => (
-          <View style={pressed ? styles.pressed : null}>
-            <View style={styles.card}>
-              {noteBody}
-              {author}
-            </View>
-          </View>
-        )}
+        {cardContent}
       </Pressable>
     );
   }
@@ -93,11 +93,12 @@ export function NoteCard({
         accessibilityLabel={`Abrir nota: ${note.title}`}
         accessibilityRole="button"
         onPress={onPress}
-        style={styles.pressable}
+        style={({ pressed }) => [
+          styles.noteTarget,
+          pressed ? styles.pressed : null,
+        ]}
       >
-        {({ pressed }) => (
-          <View style={pressed ? styles.pressed : null}>{noteBody}</View>
-        )}
+        {noteContent}
       </Pressable>
       {author}
     </View>

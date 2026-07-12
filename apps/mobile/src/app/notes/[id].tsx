@@ -140,6 +140,10 @@ function ReadyNoteDetail({ note, onPressAuthor }: { note: LabelledNote; onPressA
         accessibilityLabel={`Abrir perfil do autor: ${note.author.displayName}`}
         accessibilityRole="button"
         onPress={() => onPressAuthor(note.author.id)}
+        style={({ pressed }) => [
+          styles.authorControl,
+          pressed ? styles.authorPressed : null,
+        ]}
       >
         <Text style={styles.author}>{note.author.displayName}</Text>
       </Pressable>

@@ -8,6 +8,14 @@ export const styles = StyleSheet.create({
     fontSize: typography.sizeBody,
     fontWeight: typography.weightSemibold,
   },
+  authorControl: {
+    justifyContent: 'center',
+    minHeight: 44,
+    minWidth: 44,
+  },
+  authorPressed: {
+    opacity: 0.7,
+  },
   body: {
     color: semanticColors.textBody,
     fontSize: typography.sizeBodyLarge,

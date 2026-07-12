@@ -196,7 +196,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
 
   await page.getByText('Perfil', { exact: true }).click();
   await page.reload();
-  await expect(page.getByText(displayName, { exact: true })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText(displayName, { exact: true }).first()).toBeVisible({ timeout: 10000 });
   await expect(page.getByText('1 Nota')).toBeVisible();
   await expect(page.getByText(body)).toBeVisible();
   await expect(page.getByText(`Nome de usuário: ${username}`)).toHaveCount(0);

@@ -471,7 +471,88 @@ func TestNoteOwnershipMigrationPreservesExistingNotes(t *testing.T) {
 	}
 }
 
-func TestNoteCursorMigrationEnforcesStoredCursorBounds(t *testing.T) {
+func TestNoteCursorMigrationPreservesLegacyTextNoteIDs(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close database: %v", err)
+		}
+	})
+	applyMigrationFiles(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs", "000004_note_places", "000005_users_authors_sessions", "000006_note_ownership", "000007_author_notes_index")
+	if _, err := db.ExecContext(
+		ctx,
+		`INSERT INTO users (id, state, created_at, updated_at) VALUES (?, 'active', ?, ?)`,
+		string(systemNoteOwnerUserID),
+		int64(0),
+		int64(0),
+	); err != nil {
+		t.Fatalf("insert legacy owner user: %v", err)
+	}
+	if _, err := db.ExecContext(
+		ctx,
+		`INSERT INTO authors (id, user_id, display_name, created_at, updated_at) VALUES (?, ?, 'sdds', ?, ?)`,
+		string(systemNoteOwnerAuthorID),
+		string(systemNoteOwnerUserID),
+		int64(0),
+		int64(0),
+	); err != nil {
+		t.Fatalf("insert legacy owner author: %v", err)
+	}
+
+	legacyIDs := []string{
+		"",
+		"legacy/id",
+		"emoji-😀",
+		strings.Repeat("x", 260),
+		"nul-\x00-id",
+	}
+	for index, id := range legacyIDs {
+		if _, err := db.ExecContext(
+			ctx,
+			`
+				INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			`,
+			id,
+			string(systemNoteOwnerUserID),
+			"Cafe legado",
+			"Nota legada com identificador antigo.",
+			"food",
+			"sao-paulo",
+			int64(1782993600000+index),
+			int64(1782993600000+index),
+		); err != nil {
+			t.Fatalf("insert legacy note %q: %v", id, err)
+		}
+	}
+
+	if err := ApplyMigrations(ctx, db); err != nil {
+		t.Fatalf("apply remaining migrations: %v", err)
+	}
+
+	for _, id := range legacyIDs {
+		var storedID string
+		if err := db.QueryRowContext(ctx, `SELECT id FROM notes WHERE id = ?`, id).Scan(&storedID); err != nil {
+			t.Fatalf("query migrated note %q: %v", id, err)
+		}
+		if storedID != id {
+			t.Fatalf("migrated note id = %q, want %q", storedID, id)
+		}
+		var searchRows int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM note_search WHERE note_id = ?`, id).Scan(&searchRows); err != nil {
+			t.Fatalf("query search row %q: %v", id, err)
+		}
+		if searchRows != 1 {
+			t.Fatalf("search rows for %q = %d, want 1", id, searchRows)
+		}
+	}
+}
+
+func TestNoteCursorMigrationEnforcesStoredTimestampTypes(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 	if _, err := db.ExecContext(
@@ -514,20 +595,16 @@ func TestNoteCursorMigrationEnforcesStoredCursorBounds(t *testing.T) {
 		return err
 	}
 
-	if err := insertNote(strings.Repeat("x", 240), 1782993600000, 1782993600000); err != nil {
-		t.Fatalf("insert maximum-length note ID: %v", err)
-	}
-	if err := insertNote(strings.Repeat("y", 241), 1782993600000, 1782993600000); err == nil {
-		t.Fatal("insert oversized note ID error = nil, want constraint error")
-	}
-	if err := insertNote("unsafe-id&", 1782993600000, 1782993600000); err == nil {
-		t.Fatal("insert JSON-escaped note ID error = nil, want constraint error")
-	}
-	if err := insertNote(strings.Repeat("😀", 100), 1782993600000, 1782993600000); err == nil {
-		t.Fatal("insert non-ASCII note ID error = nil, want constraint error")
-	}
-	if err := insertNote(strings.Repeat("\x00", 240), 1782993600000, 1782993600000); err == nil {
-		t.Fatal("insert NUL note ID error = nil, want constraint error")
+	for _, id := range []string{
+		strings.Repeat("x", 240),
+		strings.Repeat("y", 241),
+		"unsafe-id&",
+		strings.Repeat("😀", 100),
+		"nul-\x00-id",
+	} {
+		if err := insertNote(id, 1782993600000, 1782993600000); err != nil {
+			t.Fatalf("insert text note ID %q: %v", id, err)
+		}
 	}
 	if err := insertNote([]byte("blob-note-id"), 1782993600000, 1782993600000); err == nil {
 		t.Fatal("insert BLOB note ID error = nil, want constraint error")

@@ -244,6 +244,32 @@ func TestAuthorNotesCursorRoundTripsOpaqueID(t *testing.T) {
 	}
 }
 
+func TestAuthorNotesCursorRoundTripsLegacyTextIDs(t *testing.T) {
+	createdAt := time.UnixMilli(exampleAuthorCreatedMS).UTC()
+	tests := []string{
+		"",
+		"legacy/id",
+		"emoji-😀",
+		"nul-\x00-id",
+	}
+	for _, id := range tests {
+		t.Run(id, func(t *testing.T) {
+			position := note.AuthorNotePosition{CreatedAt: createdAt, ID: id}
+			encoded, err := encodeAuthorNotesCursor(position)
+			if err != nil {
+				t.Fatalf("encode cursor: %v", err)
+			}
+			decoded, problems := decodeAuthorNotesCursor(&encoded)
+			if diff := cmp.Diff([]note.ValidationProblem(nil), problems); diff != "" {
+				t.Fatalf("problems mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(&position, decoded); diff != "" {
+				t.Fatalf("cursor mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestAuthorNotesCursorRoundTripsLongOpaqueID(t *testing.T) {
 	position := note.AuthorNotePosition{
 		CreatedAt: time.UnixMilli(exampleAuthorCreatedMS).UTC(),
@@ -370,7 +396,6 @@ func TestAuthorNotesCursorRejectsMalformedPayloads(t *testing.T) {
 		{name: "missing created at", cursor: rawAuthorCursor(`{"v":1,"id":"` + validID + `"}`)},
 		{name: "non-positive created at", cursor: rawAuthorCursor(`{"v":1,"created_at":0,"id":"` + validID + `"}`)},
 		{name: "missing id", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000}`)},
-		{name: "empty id", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"id":""}`)},
 		{name: "unknown field", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"id":"` + validID + `","extra":true}`)},
 		{name: "trailing json", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"id":"` + validID + `"}{}`)},
 		{name: "oversized", cursor: strings.Repeat("a", maxAuthorNotesCursorLength+1)},

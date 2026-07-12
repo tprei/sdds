@@ -15,9 +15,9 @@ import (
 const maxAuthorNotesCursorLength = pagination.MaxCursorLength
 
 type authorNotesCursorPayload struct {
-	Version   int    `json:"v"`
-	CreatedAt int64  `json:"created_at"`
-	ID        string `json:"id"`
+	Version   int     `json:"v"`
+	CreatedAt int64   `json:"created_at"`
+	ID        *string `json:"id"`
 }
 
 func (handler server) GetAuthor(w http.ResponseWriter, r *http.Request, authorID string) {
@@ -93,10 +93,10 @@ func decodeAuthorNotesCursor(encoded *string) (*note.AuthorNotePosition, []note.
 	if err := pagination.Decode(*encoded, &payload); err != nil {
 		return nil, []note.ValidationProblem{{Field: "cursor", Message: "invalid"}}
 	}
-	if payload.Version != 1 || payload.CreatedAt <= 0 || payload.ID == "" {
+	if payload.Version != 1 || payload.CreatedAt <= 0 || payload.ID == nil {
 		return nil, []note.ValidationProblem{{Field: "cursor", Message: "invalid"}}
 	}
-	return &note.AuthorNotePosition{CreatedAt: time.UnixMilli(payload.CreatedAt).UTC(), ID: payload.ID}, nil
+	return &note.AuthorNotePosition{CreatedAt: time.UnixMilli(payload.CreatedAt).UTC(), ID: *payload.ID}, nil
 }
 
 func newPublicAuthorResponse(profile author.PublicAuthor) openapi.PublicAuthor {
@@ -131,10 +131,7 @@ func encodeAuthorNotesCursor(cursor note.AuthorNotePosition) (string, error) {
 	if createdAt <= 0 {
 		return "", fmt.Errorf("encode author notes cursor: non-positive created_at")
 	}
-	if cursor.ID == "" {
-		return "", fmt.Errorf("encode author notes cursor: empty note id")
-	}
-	payload := authorNotesCursorPayload{Version: 1, CreatedAt: createdAt, ID: cursor.ID}
+	payload := authorNotesCursorPayload{Version: 1, CreatedAt: createdAt, ID: &cursor.ID}
 	encoded, err := pagination.Encode(payload)
 	if err != nil {
 		return "", fmt.Errorf("encode author notes cursor: %w", err)

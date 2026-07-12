@@ -186,6 +186,31 @@ describe('auth API client', () => {
     );
   });
 
+  it('ignores extra auth error response fields', async () => {
+    stubFetch(async () =>
+      jsonResponse(
+        {
+          code: 'invalid_auth',
+          fields: [{ code: 'too_short', field: 'password', request_id: 'abc' }],
+          request_id: 'abc',
+        },
+        httpStatusBadRequest,
+      ),
+    );
+
+    await expect(
+      createAuthSession({
+        password: 'short',
+        username: 'thiago',
+      }),
+    ).rejects.toMatchObject(
+      new AuthAPIRequestError(httpStatusBadRequest, {
+        code: 'invalid_auth',
+        fields: [{ code: 'too_short', field: 'password' }],
+      }),
+    );
+  });
+
   it('preserves username-taken error bodies', async () => {
     stubFetch(async () =>
       jsonResponse(

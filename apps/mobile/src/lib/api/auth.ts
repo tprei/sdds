@@ -53,8 +53,6 @@ type ExhaustiveSchemaValueList<
   K extends SchemaValueList<T>,
 > = Exclude<T, K[number]> extends never ? K : never;
 
-const errorResponseKeys = ['code', 'fields'] as const;
-
 const errorCodes = schemaValueList<ErrorCode>()([
   'internal_error',
   'invalid_auth',
@@ -304,7 +302,6 @@ function isAuthorSummaryResponse(
 function isErrorResponse(value: unknown): value is ErrorResponse {
   return (
     isRecord(value) &&
-    hasOnlyKnownKeys(value, errorResponseKeys) &&
     hasOwnKey(value, 'code') &&
     isKnownValue(value.code, errorCodes) &&
     (!hasOwnKey(value, 'fields') ||
@@ -327,20 +324,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-
-function hasOnlyKnownKeys(
-  value: Record<string, unknown>,
-  knownKeys: readonly string[],
-): boolean {
-  return Object.keys(value).every((key) =>
-    knownKeys.some((knownKey) => knownKey === key),
-  );
-}
-
 function hasOwnKey(value: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
-
 
 function schemaValueList<T extends string>() {
   return <const K extends SchemaValueList<T>>(

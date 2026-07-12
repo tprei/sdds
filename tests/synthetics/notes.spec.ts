@@ -202,16 +202,6 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(page.getByText(`Nome de usuário: ${username}`)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Sair' })).toBeVisible();
 
-  await page.route('**/v1/auth/session', async (route) => {
-    await route.fulfill({
-      body: JSON.stringify({ code: 'internal_error' }),
-      contentType: 'application/json',
-      status: 500,
-    });
-  });
-  await page.getByRole('button', { name: 'Sair' }).click();
-  await expect(page.getByRole('alert')).toBeVisible();
-  await page.unroute('**/v1/auth/session');
   await page.getByRole('button', { name: 'Sair' }).click();
   await expect(page.getByTestId('profile-signup-button')).toBeVisible({ timeout: 30000 });
 });

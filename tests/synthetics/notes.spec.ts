@@ -522,16 +522,15 @@ test('opens a public author profile and appends paginated notes', async ({
     password: syntheticPassword,
     username,
   });
-  const notes = await Promise.all(
-    Array.from({ length: 21 }, (_, index) =>
-      createNote(request, session.token, {
-        body: `Texto público ${timestamp} ${index}.`,
-        category_slug: index % 2 === 0 ? 'food' : 'travel',
-        place_slug: null,
-        title: `Nota pública ${timestamp} ${index}`,
-      }),
-    ),
-  );
+  const notes: NoteResponse[] = [];
+  for (let index = 0; index < 21; index += 1) {
+    notes.push(await createNote(request, session.token, {
+      body: `Texto público ${timestamp} ${index}.`,
+      category_slug: index % 2 === 0 ? 'food' : 'travel',
+      place_slug: null,
+      title: `Nota pública ${timestamp} ${index}`,
+    }));
+  }
   const authorResponse = await request.get(`${apiBaseURL}/v1/authors/${session.user.author.id}`);
   expect(authorResponse.ok()).toBeTruthy();
   const author = (await authorResponse.json()) as PublicAuthorResponse;

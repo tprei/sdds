@@ -1,14 +1,22 @@
 import { useState } from 'react';
-import { Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+
+import { spacing } from '@sdds/tokens';
 
 import {
   EmptyStateCard,
   FoundationButton,
   FoundationScreen,
 } from '@/components/foundation-screen';
-import { styles } from '@/features/auth/auth-screen.styles';
+import { AuthorProfileContent } from '@/features/authors/author-profile-content';
+import { styles as authStyles } from '@/features/auth/auth-screen.styles';
 import { useAuth } from '@/lib/auth/auth-provider';
+
+const styles = StyleSheet.create({
+  authenticatedRoot: { flex: 1 },
+  logoutSection: { gap: spacing.sp3, padding: spacing.sp4 },
+});
 
 type LogoutState =
   | { status: 'idle' }
@@ -39,6 +47,30 @@ export default function ProfileScreen() {
     }
   }
 
+  if (state.status === 'authenticated') {
+    return (
+      <View style={styles.authenticatedRoot}>
+        <AuthorProfileContent
+          authorID={state.user.author.id}
+          onPressNote={(noteID) => router.push({ pathname: '/notes/[id]', params: { id: noteID } })}
+        />
+        <View style={styles.logoutSection}>
+          {logoutState.status === 'error' ? (
+            <Text accessibilityRole="alert" style={authStyles.statusError}>
+              {logoutState.message}
+            </Text>
+          ) : null}
+          <FoundationButton
+            disabled={logoutState.status === 'submitting'}
+            label={logoutState.status === 'submitting' ? 'Saindo...' : 'Sair'}
+            onPress={handleLogout}
+            testID="profile-logout-button"
+          />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <FoundationScreen
       eyebrow="Perfil"
@@ -59,13 +91,8 @@ export default function ProfileScreen() {
           />
           <FoundationButton
             label="Entrar de novo"
-            onPress={() => {
-              router.push({
-                pathname: '/login',
-                params: { next: '/profile' },
-              });
-            }}
-			testID="profile-retry-login-button"
+            onPress={() => router.push({ pathname: '/login', params: { next: '/profile' } })}
+            testID="profile-retry-login-button"
           />
         </>
       ) : null}
@@ -77,45 +104,13 @@ export default function ProfileScreen() {
           />
           <FoundationButton
             label="Criar conta"
-            onPress={() => {
-              router.push({
-                pathname: '/signup',
-                params: { next: '/profile' },
-              });
-            }}
-			testID="profile-signup-button"
+            onPress={() => router.push({ pathname: '/signup', params: { next: '/profile' } })}
+            testID="profile-signup-button"
           />
           <FoundationButton
             label="Entrar"
-            onPress={() => {
-              router.push({
-                pathname: '/login',
-                params: { next: '/profile' },
-              });
-            }}
-			testID="profile-login-button"
-          />
-        </>
-      ) : null}
-      {state.status === 'authenticated' ? (
-        <>
-          <EmptyStateCard
-            title={state.user.author.displayName}
-            body={`Nome de usuário: ${state.user.username}`}
-          />
-          <Text style={styles.metaText}>
-            Suas próximas notas vão sair com esse nome público.
-          </Text>
-          {logoutState.status === 'error' ? (
-            <Text accessibilityRole="alert" style={styles.statusError}>
-              {logoutState.message}
-            </Text>
-          ) : null}
-          <FoundationButton
-            disabled={logoutState.status === 'submitting'}
-            label={logoutState.status === 'submitting' ? 'Saindo...' : 'Sair'}
-            onPress={handleLogout}
-			testID="profile-logout-button"
+            onPress={() => router.push({ pathname: '/login', params: { next: '/profile' } })}
+            testID="profile-login-button"
           />
         </>
       ) : null}

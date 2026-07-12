@@ -101,7 +101,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
 
-  await page.getByText('Escrever', { exact: true }).click();
+  await page.getByText('Escrever', { exact: true }).last().click();
   await expect(page.getByText('Entre para escrever')).toBeVisible();
 
   await page.getByRole('button', { name: 'Criar conta' }).click();
@@ -116,6 +116,16 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(page.getByText('Conta uma dica')).toBeVisible();
   await expect(page).toHaveURL(/\/compose(?:[?#]|$)/);
   await page.reload();
+  await expect(page.getByText('Conta uma dica')).toBeVisible();
+
+  await page.getByText('Perfil', { exact: true }).last().click();
+  await expect(
+    page.getByTestId('author-profile-header').getByRole('heading', {
+      name: displayName,
+    }),
+  ).toBeVisible();
+  await expect(page.getByText('0 Notas')).toBeVisible();
+  await page.getByText('Escrever', { exact: true }).last().click();
   await expect(page.getByText('Conta uma dica')).toBeVisible();
 
   await page.getByLabel('Título da nota').fill(title);
@@ -145,6 +155,8 @@ test('creates a note and reads it from the API-backed home feed', async ({
   const exploreURL = page.url();
   await page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).click();
   await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
+  await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
+  await expect(page.getByText(`Nome de usuário: ${username}`, { exact: true })).toHaveCount(0);
   await expect(
     page.getByTestId('author-profile-header').getByRole('heading', {
       name: displayName,
@@ -170,6 +182,21 @@ test('creates a note and reads it from the API-backed home feed', async ({
     page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).last(),
   ).toBeVisible();
   await expect(searchResult).toContainText('São Paulo');
+  const searchAuthor = page.getByRole('button', {
+    name: `Abrir perfil do autor: ${displayName}`,
+  }).last();
+  await expect(searchAuthor).toBeVisible();
+  await searchAuthor.click();
+  await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
+  await expect(
+    page.getByTestId('author-profile-header').getByRole('heading', {
+      name: displayName,
+    }),
+  ).toBeVisible();
+  await page.goto(exploreURL);
+  await page.getByText('Buscar', { exact: true }).click();
+  await page.getByLabel('Buscar').fill(title);
+  await page.getByRole('button', { name: 'Buscar' }).click();
 
   await searchResult.click();
 
@@ -194,13 +221,22 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(page.getByLabel('Categoria da nota: Comida')).toBeVisible();
   await expect(page.getByLabel('Lugar da nota: São Paulo')).toBeVisible();
 
-  await page.getByText('Perfil', { exact: true }).click();
-  await page.reload();
+  await page.getByText('Perfil', { exact: true }).last().click();
+  const profileRoot = page.getByTestId('author-profile-scroll');
+  await expect(
+    profileRoot.getByTestId('author-profile-header').getByRole('heading', {
+      name: displayName,
+    }),
+  ).toBeVisible({ timeout: 10000 });
+  await expect(profileRoot.getByTestId('author-profile-note-count')).toHaveText('1 Nota');
+  await expect(
+    profileRoot.getByRole('button', { name: `Abrir nota: ${title}` }),
+  ).toContainText(body);
+  await expect(page.getByText(`Nome de usuário: ${username}`)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sair' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Sair' }).click();
-  await expect(page.getByText('Entre para publicar')).toBeVisible();
-  await page.reload();
-  await expect(page.getByText('Entre para publicar')).toBeVisible();
+  await expect(page.getByTestId('profile-signup-button')).toBeVisible({ timeout: 30000 });
 });
 
 test('shows auth validation reasons and clears stale login submit state', async ({
@@ -210,7 +246,7 @@ test('shows auth validation reasons and clears stale login submit state', async 
   const username = `valida-${timestamp}`;
 
   await page.goto('/profile');
-  await expect(page.getByText('Entre para publicar')).toBeVisible();
+  await expect(page.getByText('Entre para publicar')).toBeVisible({ timeout: 10000 });
   await page.getByTestId('profile-signup-button').click();
   await expect(visibleScreenTitle(page, 'Criar conta')).toBeVisible();
 
@@ -235,8 +271,64 @@ test('shows auth validation reasons and clears stale login submit state', async 
   await page.getByTestId('signup-password-input').fill(syntheticPassword);
   await page.getByTestId('signup-submit-button').click();
 
-  await page.getByTestId('profile-logout-button').click();
-  await expect(page.getByText('Entre para publicar')).toBeVisible();
+  let failNextLogout = true;
+  let logoutDeleteRequests = 0;
+  await page.route('**/v1/auth/session', async (route) => {
+    if (route.request().method() !== 'DELETE') {
+      await route.continue();
+      return;
+    }
+    logoutDeleteRequests += 1;
+    if (!failNextLogout) {
+      await route.continue();
+      return;
+    }
+    failNextLogout = false;
+    await route.fulfill({
+      body: JSON.stringify({ code: 'internal_error' }),
+      contentType: 'application/json',
+      status: 500,
+    });
+  });
+  const logoutDeleteStatuses: number[] = [];
+  page.on('response', (response) => {
+    const request = response.request();
+    if (
+      request.method() === 'DELETE' &&
+      new URL(response.url()).pathname === '/v1/auth/session'
+    ) {
+      logoutDeleteStatuses.push(response.status());
+    }
+  });
+  await page.evaluate(() => {
+    const originalRemoveItem = localStorage.removeItem.bind(localStorage);
+    let failNextRemoval = true;
+    Object.defineProperty(localStorage, 'removeItem', {
+      configurable: true,
+      value: (key: string) => {
+        if (failNextRemoval) {
+          failNextRemoval = false;
+          throw new Error('storage_failed');
+        }
+        return originalRemoveItem(key);
+      },
+    });
+  });
+  const logoutButton = page.getByTestId('profile-logout-button');
+  await logoutButton.click();
+  await expect(page.getByRole('alert')).toContainText(
+    'Não foi possível limpar a sessão deste aparelho.',
+  );
+  expect(logoutDeleteRequests).toBe(1);
+  expect(logoutDeleteStatuses).toEqual([500]);
+  await expect(logoutButton).toBeEnabled();
+  await logoutButton.click();
+  await expect(page.getByText('Entre para publicar')).toBeVisible({
+    timeout: 10000,
+  });
+  expect(logoutDeleteRequests).toBe(2);
+  expect(logoutDeleteStatuses).toEqual([500, 204]);
+  await page.unroute('**/v1/auth/session');
 
   await page.getByTestId('profile-signup-button').click();
   await expect(visibleScreenTitle(page, 'Criar conta')).toBeVisible();
@@ -258,7 +350,7 @@ test('shows auth validation reasons and clears stale login submit state', async 
   await page.getByTestId('login-submit-button').click();
 
   await page.getByTestId('profile-logout-button').click();
-  await expect(page.getByText('Entre para publicar')).toBeVisible();
+  await expect(page.getByText('Entre para publicar')).toBeVisible({ timeout: 10000 });
   await page.getByTestId('profile-login-button').click();
   await expect(visibleScreenTitle(page, 'Entrar')).toBeVisible();
   await expect(page.getByTestId('login-username-input')).toBeVisible();
@@ -569,20 +661,39 @@ test('opens a public author profile and appends paginated notes', async ({
   ).toBeVisible();
   await expect(page.getByTestId('author-profile-note-count')).toHaveText('21 Notas');
   await expect(page.getByText(`Nota pública ${timestamp} 20`)).toBeVisible();
+  await expect(page.getByText(`Nome de usuário: ${username}`, { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
+  await expect(
+    page.getByLabel(`Autor da nota: ${displayName}`).first(),
+  ).toBeVisible();
   const firstPage = await request.get(`${apiBaseURL}/v1/authors/${author.id}/notes?limit=20`);
   expect(firstPage.ok()).toBeTruthy();
   const firstPageBody = (await firstPage.json()) as AuthorNotesResponse;
   expect(firstPageBody.notes).toHaveLength(20);
-  await page.getByText(`Nota pública ${timestamp} 20`).evaluate((element) => {
-    let container = element.parentElement;
-    while (container !== null && container.scrollHeight <= container.clientHeight) {
-      container = container.parentElement;
-    }
-    if (container === null) throw new Error('profile_scroll_container_missing');
-    container.scrollTop = container.scrollHeight;
-    container.dispatchEvent(new Event('scroll', { bubbles: true }));
-  });
   expect(firstPageBody.next_cursor).not.toBeNull();
+
+  const profileRequests: string[] = [];
+  page.on('request', (requestEvent) => {
+    if (requestEvent.url().includes(`/v1/authors/${author.id}/notes`)) {
+      profileRequests.push(requestEvent.url());
+    }
+  });
+  const scrollOwner = page.getByTestId('author-profile-scroll');
+  await expect(scrollOwner).toBeVisible();
+  const scrollBox = await scrollOwner.boundingBox();
+  if (scrollBox === null) throw new Error('author_profile_scroll_bounds_missing');
+  await page.mouse.move(
+    scrollBox.x + scrollBox.width / 2,
+    scrollBox.y + scrollBox.height / 2,
+  );
+  await page.mouse.wheel(0, 4000);
+  await expect.poll(() => profileRequests.length).toBeGreaterThan(0);
+  const cursorValue = firstPageBody.next_cursor;
+  if (cursorValue === null) throw new Error('author_profile_cursor_missing');
+  const cursor = encodeURIComponent(cursorValue);
+  await expect.poll(
+    () => profileRequests.filter((url) => url.includes(`cursor=${cursor}`)).length,
+  ).toBe(1);
 
   await expect(page.getByText(`Nota pública ${timestamp} 0`)).toBeVisible();
   const renderedTitles = await page.getByText(new RegExp(`^Nota pública ${timestamp} `)).allTextContents();

@@ -43,6 +43,16 @@ type NoteResponse = {
   title: string;
   updated_at: number;
 };
+type PublicAuthorResponse = {
+  display_name: string;
+  id: string;
+  note_count: number;
+};
+
+type AuthorNotesResponse = {
+  next_cursor: string | null;
+  notes: NoteResponse[];
+};
 
 type ListNotesResponse = {
   notes: NoteResponse[];
@@ -490,6 +500,7 @@ test('filters note discovery by category through the public API', async ({
     categorySlug: 'travel',
   });
   expect(noteTitles(travelSearch)).toContain(travelTitle);
+
   expect(noteTitles(travelSearch)).not.toContain(foodTitle);
 
   await expectCategoryFilterError(request, '/v1/notes', {
@@ -498,6 +509,56 @@ test('filters note discovery by category through the public API', async ({
   await expectCategoryFilterError(request, '/v1/search/notes?q=balcao', {
     code: 'invalid_search',
   });
+});
+test('opens a public author profile and appends paginated notes', async ({
+  page,
+  request,
+}) => {
+  const timestamp = Date.now();
+  const displayName = `Perfil Público ${timestamp}`;
+  const username = `perfil-publico-${timestamp}`;
+  const session = await createAuthUser(request, {
+    display_name: displayName,
+    password: syntheticPassword,
+    username,
+  });
+  const notes = await Promise.all(
+    Array.from({ length: 21 }, (_, index) =>
+      createNote(request, session.token, {
+        body: `Texto público ${timestamp} ${index}.`,
+        category_slug: index % 2 === 0 ? 'food' : 'travel',
+        place_slug: null,
+        title: `Nota pública ${timestamp} ${index}`,
+      }),
+    ),
+  );
+  const authorResponse = await request.get(`${apiBaseURL}/v1/authors/${session.user.author.id}`);
+  expect(authorResponse.ok()).toBeTruthy();
+  const author = (await authorResponse.json()) as PublicAuthorResponse;
+  expect(author).toEqual({
+    display_name: displayName,
+    id: session.user.author.id,
+    note_count: 21,
+  });
+
+  await page.goto(`/authors/${author.id}`);
+  await expect(page.getByText(displayName, { exact: true })).toBeVisible();
+  await expect(page.getByText(`Nota pública ${timestamp} 20`)).toBeVisible();
+  const firstPage = await request.get(`${apiBaseURL}/v1/authors/${author.id}/notes?limit=20`);
+  expect(firstPage.ok()).toBeTruthy();
+  const firstPageBody = (await firstPage.json()) as AuthorNotesResponse;
+  expect(firstPageBody.notes).toHaveLength(20);
+  expect(firstPageBody.next_cursor).not.toBeNull();
+
+  await page.mouse.wheel(0, 5000);
+  await page.mouse.wheel(0, 5000);
+  await page.mouse.wheel(0, 5000);
+  await expect(page.getByText(`Nota pública ${timestamp} 0`)).toBeVisible();
+  const renderedTitles = await page.getByText(new RegExp(`^Nota pública ${timestamp} `)).allTextContents();
+  expect(new Set(renderedTitles).size).toBe(renderedTitles.length);
+  expect(renderedTitles).toContain(`Nota pública ${timestamp} 20`);
+  expect(renderedTitles).toContain(`Nota pública ${timestamp} 0`);
+  expect(notes).toHaveLength(21);
 });
 
 test('shows distinct authors when a second user signs in', async ({

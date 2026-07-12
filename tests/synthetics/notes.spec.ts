@@ -262,6 +262,20 @@ test('shows auth validation reasons and clears stale login submit state', async 
       status: 500,
     });
   });
+  await page.evaluate(() => {
+    const originalRemoveItem = localStorage.removeItem.bind(localStorage);
+    let failNextRemoval = true;
+    Object.defineProperty(localStorage, 'removeItem', {
+      configurable: true,
+      value: (key: string) => {
+        if (failNextRemoval) {
+          failNextRemoval = false;
+          throw new Error('storage_failed');
+        }
+        return originalRemoveItem(key);
+      },
+    });
+  });
   const logoutButton = page.getByTestId('profile-logout-button');
   await logoutButton.click();
   await expect(page.getByRole('alert')).toContainText(

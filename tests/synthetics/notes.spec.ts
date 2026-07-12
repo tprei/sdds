@@ -139,13 +139,17 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(publishedNote).toBeVisible();
   await expect(publishedNote).toContainText(body);
   await expect(
-    page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
+    page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).first(),
   ).toBeVisible();
   await expect(publishedNote).toContainText('São Paulo');
   const exploreURL = page.url();
-  await page.getByLabel(`Abrir perfil do autor: ${displayName}`).click();
+  await page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).click();
   await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
-  await expect(page.getByText(displayName, { exact: true }).last()).toBeVisible();
+  await expect(
+    page.getByTestId('author-profile-header').getByRole('heading', {
+      name: displayName,
+    }),
+  ).toBeVisible();
   await page.goto(exploreURL);
   await expect(publishedNote).toBeVisible();
 
@@ -163,7 +167,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(searchResult).toBeVisible();
   await expect(searchResult).toContainText(body);
   await expect(
-    page.getByLabel(`Abrir perfil do autor: ${displayName}`).last(),
+    page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).last(),
   ).toBeVisible();
   await expect(searchResult).toContainText('São Paulo');
 
@@ -174,13 +178,17 @@ test('creates a note and reads it from the API-backed home feed', async ({
     page.getByTestId('screen-title').filter({ hasText: /^Nota$/ }),
   ).toBeVisible();
   const noteURL = page.url();
-  await page.getByLabel(`Abrir perfil do autor: ${displayName}`).last().click();
+  await page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).last().click();
   await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
-  await expect(page.getByText(displayName, { exact: true }).last()).toBeVisible();
+  await expect(
+    page.getByTestId('author-profile-header').getByRole('heading', {
+      name: displayName,
+    }),
+  ).toBeVisible();
   await page.goto(noteURL);
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(
-    page.getByLabel(`Abrir perfil do autor: ${displayName}`).last(),
+    page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).last(),
   ).toBeVisible();
   await expect(page.getByLabel(`Texto da nota: ${body}`)).toBeVisible();
   await expect(page.getByLabel('Categoria da nota: Comida')).toBeVisible();
@@ -640,11 +648,17 @@ test('shows distinct authors when a second user signs in', async ({
   await expect(secondCard).toBeVisible();
   await expect(firstCard).toContainText(firstDisplayName);
   await expect(secondCard).toContainText(secondDisplayName);
+  await expect(
+    page.getByRole('button', { name: `Abrir perfil do autor: ${firstDisplayName}` }),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole('button', { name: `Abrir perfil do autor: ${secondDisplayName}` }),
+  ).toHaveCount(1);
 
   await firstCard.click();
   await expect(page.getByRole('heading', { name: firstTitle })).toBeVisible();
   await expect(
-    page.getByLabel(`Abrir perfil do autor: ${firstDisplayName}`).last(),
+    page.getByRole('button', { name: `Abrir perfil do autor: ${firstDisplayName}` }).last(),
   ).toBeVisible();
 });
 

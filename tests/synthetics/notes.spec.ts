@@ -537,7 +537,11 @@ test('opens a public author profile and appends paginated notes', async ({
   });
 
   await page.goto(`/authors/${author.id}`);
-  await expect(page.getByText(displayName, { exact: true }).last()).toBeVisible();
+  const profileHeader = page.getByTestId('author-profile-header');
+  await expect(
+    profileHeader.getByRole('heading', { name: displayName }),
+  ).toBeVisible();
+  await expect(page.getByTestId('author-profile-note-count')).toHaveText('21 Notas');
   await expect(page.getByText(`Nota pública ${timestamp} 20`)).toBeVisible();
   const firstPage = await request.get(`${apiBaseURL}/v1/authors/${author.id}/notes?limit=20`);
   expect(firstPage.ok()).toBeTruthy();
@@ -556,10 +560,9 @@ test('opens a public author profile and appends paginated notes', async ({
 
   await expect(page.getByText(`Nota pública ${timestamp} 0`)).toBeVisible();
   const renderedTitles = await page.getByText(new RegExp(`^Nota pública ${timestamp} `)).allTextContents();
+  expect(renderedTitles).toHaveLength(21);
   expect(new Set(renderedTitles).size).toBe(renderedTitles.length);
-  expect(renderedTitles).toContain(`Nota pública ${timestamp} 20`);
-  expect(renderedTitles).toContain(`Nota pública ${timestamp} 0`);
-  expect(notes).toHaveLength(21);
+  expect(new Set(renderedTitles)).toEqual(new Set(notes.map((note) => note.title)));
 });
 
 test('shows distinct authors when a second user signs in', async ({

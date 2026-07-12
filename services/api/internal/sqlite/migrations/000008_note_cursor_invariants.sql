@@ -10,6 +10,7 @@ ALTER TABLE notes RENAME TO notes_legacy;
 CREATE TABLE notes (
 	id TEXT PRIMARY KEY NOT NULL CHECK (
 		length(CAST(id AS BLOB)) BETWEEN 1 AND 240
+		AND instr(id, char(0)) = 0
 		AND id NOT GLOB '*[^A-Za-z0-9._~-]*'
 	),
 	user_id TEXT NOT NULL REFERENCES users(id),
@@ -17,8 +18,8 @@ CREATE TABLE notes (
 	body TEXT NOT NULL CHECK (length(trim(body)) BETWEEN 1 AND 4000),
 	category_slug TEXT NOT NULL REFERENCES categories(slug),
 	place_slug TEXT REFERENCES places(slug),
-	created_at INTEGER NOT NULL CHECK (created_at > 0),
-	updated_at INTEGER NOT NULL CHECK (updated_at > 0)
+	created_at INTEGER NOT NULL CHECK (typeof(created_at) = 'integer' AND created_at > 0),
+	updated_at INTEGER NOT NULL CHECK (typeof(updated_at) = 'integer' AND updated_at > 0)
 );
 
 INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at)

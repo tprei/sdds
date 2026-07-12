@@ -495,7 +495,7 @@ func TestNoteCursorMigrationEnforcesStoredCursorBounds(t *testing.T) {
 		t.Fatalf("insert author: %v", err)
 	}
 
-	insertNote := func(id string, createdAt int64, updatedAt int64) error {
+	insertNote := func(id string, createdAt any, updatedAt any) error {
 		_, err := db.ExecContext(
 			ctx,
 			`
@@ -526,11 +526,20 @@ func TestNoteCursorMigrationEnforcesStoredCursorBounds(t *testing.T) {
 	if err := insertNote(strings.Repeat("😀", 100), 1782993600000, 1782993600000); err == nil {
 		t.Fatal("insert non-ASCII note ID error = nil, want constraint error")
 	}
+	if err := insertNote(strings.Repeat("\x00", 240), 1782993600000, 1782993600000); err == nil {
+		t.Fatal("insert NUL note ID error = nil, want constraint error")
+	}
 	if err := insertNote("zero-created-at", 0, 1782993600000); err == nil {
 		t.Fatal("insert non-positive created_at error = nil, want constraint error")
 	}
 	if err := insertNote("zero-updated-at", 1782993600000, 0); err == nil {
 		t.Fatal("insert non-positive updated_at error = nil, want constraint error")
+	}
+	if err := insertNote("text-created-at", "not-a-timestamp", int64(1782993600000)); err == nil {
+		t.Fatal("insert text created_at error = nil, want constraint error")
+	}
+	if err := insertNote("real-created-at", 1e100, int64(1782993600000)); err == nil {
+		t.Fatal("insert real created_at error = nil, want constraint error")
 	}
 }
 

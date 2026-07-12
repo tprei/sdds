@@ -70,6 +70,9 @@ export default function SearchScreen() {
     status: 'loading',
   });
   const [state, setState] = useState<SearchScreenState>(idleSearchState);
+  const openAuthor = useCallback((authorID: string) => {
+    router.push({ pathname: '/authors/[id]', params: { id: authorID } });
+  }, [router]);
   const openNote = useCallback(
     (note: Note) => {
       router.push({
@@ -299,6 +302,7 @@ export default function SearchScreen() {
         <CatalogError />
       ) : (
         <SearchStateContent
+          onOpenAuthor={openAuthor}
           onOpenNote={openNote}
           onSelectRecentQuery={handleSelectRecentQuery}
           recentQueries={recentQueries}
@@ -310,11 +314,13 @@ export default function SearchScreen() {
 }
 
 function SearchStateContent({
+  onOpenAuthor,
   onOpenNote,
   onSelectRecentQuery,
   recentQueries,
   state,
 }: {
+  onOpenAuthor: (authorID: string) => void;
   onOpenNote: (note: Note) => void;
   onSelectRecentQuery: (query: string) => void;
   recentQueries: string[];
@@ -374,6 +380,7 @@ function SearchStateContent({
           key={labelledNote.id}
           note={labelledNote}
           onPress={() => onOpenNote(labelledNote)}
+          onPressAuthor={onOpenAuthor}
           placeLabel={labelledNote.placeLabel}
         />
       ))}

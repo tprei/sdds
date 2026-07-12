@@ -8,6 +8,7 @@ type NoteCardProps = {
   categoryLabel: string;
   note: Note;
   onPress?: () => void;
+  onPressAuthor?: (authorID: string) => void;
   placeLabel: string | null;
 };
 
@@ -15,43 +16,91 @@ export function NoteCard({
   categoryLabel,
   note,
   onPress,
+  onPressAuthor,
   placeLabel,
 }: NoteCardProps) {
-  const content = (
-    <View style={styles.card}>
-      <View style={styles.metaRow}>
-        <View style={styles.pill}>
-          <Text style={styles.pillText}>{categoryLabel}</Text>
-        </View>
-        {placeLabel === null ? null : (
-          <Text style={styles.place}>{placeLabel}</Text>
-        )}
+  const metadata = (
+    <View style={styles.metaRow}>
+      <View style={styles.pill}>
+        <Text style={styles.pillText}>{categoryLabel}</Text>
       </View>
-      <Text style={styles.title}>{note.title}</Text>
-      <Text
-        accessibilityLabel={`Autor da nota: ${note.author.displayName}`}
-        style={styles.author}
-      >
-        {note.author.displayName}
-      </Text>
-      <Text style={styles.body}>{note.body}</Text>
+      {placeLabel === null ? null : (
+        <Text style={styles.place}>{placeLabel}</Text>
+      )}
     </View>
   );
 
+  const author = onPressAuthor === undefined ? (
+    <Text
+      accessibilityLabel={`Autor da nota: ${note.author.displayName}`}
+      style={styles.author}
+    >
+      {note.author.displayName}
+    </Text>
+  ) : (
+    <Pressable
+      accessibilityLabel={`Abrir perfil do autor: ${note.author.displayName}`}
+      accessibilityRole="button"
+      onPress={() => onPressAuthor(note.author.id)}
+      style={({ pressed }) => [
+        styles.authorControl,
+        pressed ? styles.authorPressed : null,
+      ]}
+    >
+      <Text style={styles.author}>{note.author.displayName}</Text>
+    </Pressable>
+  );
+
+  const noteContent = (
+    <>
+      {metadata}
+      <Text style={styles.title}>{note.title}</Text>
+      <Text style={styles.body}>{note.body}</Text>
+    </>
+  );
+
+  const cardContent = (
+    <>
+      {noteContent}
+      {author}
+    </>
+  );
+
   if (onPress === undefined) {
-    return content;
+    return <View style={[styles.card, styles.noteTarget]}>{cardContent}</View>;
+  }
+
+  if (onPressAuthor === undefined) {
+    return (
+      <Pressable
+        accessibilityLabel={`Abrir nota: ${note.title}`}
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.card,
+          styles.noteTarget,
+          pressed ? styles.pressed : null,
+        ]}
+      >
+        {cardContent}
+      </Pressable>
+    );
   }
 
   return (
-    <Pressable
-      accessibilityLabel={`Abrir nota: ${note.title}`}
-      accessibilityRole="button"
-      onPress={onPress}
-      style={styles.pressable}
-    >
-      {({ pressed }) => (
-        <View style={pressed ? styles.pressed : null}>{content}</View>
-      )}
-    </Pressable>
+    <View style={styles.card}>
+      <Pressable
+        accessibilityLabel={`Abrir nota: ${note.title}`}
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.noteTarget,
+          pressed ? styles.pressed : null,
+        ]}
+      >
+        {noteContent}
+      </Pressable>
+      {author}
+    </View>
   );
 }

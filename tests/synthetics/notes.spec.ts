@@ -138,8 +138,20 @@ test('creates a note and reads it from the API-backed home feed', async ({
   });
   await expect(publishedNote).toBeVisible();
   await expect(publishedNote).toContainText(body);
-  await expect(publishedNote).toContainText(displayName);
+  await expect(
+    page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).first(),
+  ).toBeVisible();
   await expect(publishedNote).toContainText('São Paulo');
+  const exploreURL = page.url();
+  await page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).click();
+  await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
+  await expect(
+    page.getByTestId('author-profile-header').getByRole('heading', {
+      name: displayName,
+    }),
+  ).toBeVisible();
+  await page.goto(exploreURL);
+  await expect(publishedNote).toBeVisible();
 
   await page.getByText('Buscar', { exact: true }).click();
   await expect(
@@ -154,7 +166,9 @@ test('creates a note and reads it from the API-backed home feed', async ({
   });
   await expect(searchResult).toBeVisible();
   await expect(searchResult).toContainText(body);
-  await expect(searchResult).toContainText(displayName);
+  await expect(
+    page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).last(),
+  ).toBeVisible();
   await expect(searchResult).toContainText('São Paulo');
 
   await searchResult.click();
@@ -163,9 +177,18 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Nota$/ }),
   ).toBeVisible();
+  const noteURL = page.url();
+  await page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).last().click();
+  await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
+  await expect(
+    page.getByTestId('author-profile-header').getByRole('heading', {
+      name: displayName,
+    }),
+  ).toBeVisible();
+  await page.goto(noteURL);
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(
-    page.getByLabel(`Autor da nota: ${displayName}`).last(),
+    page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).last(),
   ).toBeVisible();
   await expect(page.getByLabel(`Texto da nota: ${body}`)).toBeVisible();
   await expect(page.getByLabel('Categoria da nota: Comida')).toBeVisible();
@@ -286,8 +309,9 @@ test('narrows the mobile explore feed by category', async ({
   });
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toBeVisible();
-  await expect(foodNote).toContainText(displayName);
-  await expect(travelNote).toContainText(displayName);
+  await expect(
+    page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
+  ).toBeVisible();
 
   await page.getByRole('button', { exact: true, name: 'Comida' }).click();
   await expect(
@@ -355,8 +379,9 @@ test('narrows the mobile search results by category and clears stale cards', asy
   });
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toBeVisible();
-  await expect(foodNote).toContainText(displayName);
-  await expect(travelNote).toContainText(displayName);
+  await expect(
+    page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
+  ).toBeVisible();
   await expect(page.getByText(`2 notas para ${marker}`)).toBeVisible();
   await expect(
     page.getByLabel(
@@ -440,8 +465,9 @@ test('orders search results by weighted title matches and handles punctuation-on
   await expect(searchResults).toHaveCount(2);
   await expect(searchResults.nth(0)).toContainText(titleMatchTitle);
   await expect(searchResults.nth(1)).toContainText(bodyMatchTitle);
-  await expect(searchResults.nth(0)).toContainText(displayName);
-  await expect(searchResults.nth(1)).toContainText(displayName);
+  await expect(
+    page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
+  ).toBeVisible();
 
   await page.getByLabel('Buscar').fill('!!! *** ()');
   await page.getByRole('button', { name: 'Buscar' }).click();
@@ -609,7 +635,7 @@ test('shows distinct authors when a second user signs in', async ({
   await page.getByLabel('Nome de usuário').fill(secondUsername);
   await page.getByLabel('Senha').fill(syntheticPassword);
   await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.getByText(secondDisplayName)).toBeVisible();
+  await expect(page.getByText(secondDisplayName).last()).toBeVisible();
 
   await page.goto('/');
   const firstCard = page.getByRole('button', {
@@ -622,11 +648,17 @@ test('shows distinct authors when a second user signs in', async ({
   await expect(secondCard).toBeVisible();
   await expect(firstCard).toContainText(firstDisplayName);
   await expect(secondCard).toContainText(secondDisplayName);
+  await expect(
+    page.getByRole('button', { name: `Abrir perfil do autor: ${firstDisplayName}` }),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole('button', { name: `Abrir perfil do autor: ${secondDisplayName}` }),
+  ).toHaveCount(1);
 
   await firstCard.click();
   await expect(page.getByRole('heading', { name: firstTitle })).toBeVisible();
   await expect(
-    page.getByLabel(`Autor da nota: ${firstDisplayName}`).last(),
+    page.getByRole('button', { name: `Abrir perfil do autor: ${firstDisplayName}` }).last(),
   ).toBeVisible();
 });
 

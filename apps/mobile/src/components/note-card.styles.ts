@@ -8,6 +8,17 @@ export const styles = StyleSheet.create({
     fontSize: typography.sizeSmall,
     fontWeight: typography.weightSemibold,
   },
+  authorControl: {
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    marginBottom: spacing.sp5,
+    marginHorizontal: spacing.sp5,
+    minHeight: 44,
+    minWidth: 44,
+  },
+  authorPressed: {
+    opacity: 0.7,
+  },
   body: {
     color: semanticColors.textBody,
     fontSize: typography.sizeBody,
@@ -18,6 +29,8 @@ export const styles = StyleSheet.create({
     borderColor: semanticColors.borderSubtle,
     borderRadius: radius.lg,
     borderWidth: 1,
+  },
+  noteTarget: {
     gap: spacing.sp4,
     padding: spacing.sp5,
   },
@@ -45,9 +58,6 @@ export const styles = StyleSheet.create({
     fontWeight: typography.weightExtraBold,
     letterSpacing: 0,
     textTransform: 'uppercase',
-  },
-  pressable: {
-    borderRadius: radius.lg,
   },
   pressed: {
     opacity: 0.82,

@@ -143,6 +143,47 @@ func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 	requireNoPrivateWireFields(t, response.Body.String())
 }
 
+func TestListAuthorNotesAcceptsLongOpaqueID(t *testing.T) {
+	createdAt := time.UnixMilli(exampleAuthorCreatedMS).UTC()
+	longID := strings.Repeat("x", 100)
+	router := NewRouter(fakeNoteStore{
+		listAuthorNotes: func(context.Context, note.AuthorNotesInput) (note.AuthorNotesPage, error) {
+			return note.AuthorNotesPage{
+				Notes:   []note.Note{authorHTTPNote(longID, createdAt)},
+				HasMore: true,
+			}, nil
+		},
+	}, fakeCatalog{}, fakeUserStore{
+		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
+			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 2}, nil
+		},
+	}, DefaultAuthLimits())
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/authors/"+string(exampleAuthorID)+"/notes", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+	var body openapi.AuthorNotesPage
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.NextCursor == nil {
+		t.Fatal("next_cursor = nil, want cursor")
+	}
+	cursor, problems := decodeAuthorNotesCursor(body.NextCursor)
+	if len(problems) > 0 {
+		t.Fatalf("returned cursor did not decode: %#v", problems)
+	}
+	if cursor == nil || cursor.ID != longID {
+		t.Fatalf("decoded cursor = %#v, want ID length %d", cursor, len(longID))
+	}
+}
+
 func TestListAuthorNotesPassesExplicitLimitAndCursor(t *testing.T) {
 	createdAt := time.UnixMilli(exampleAuthorCreatedMS).UTC()
 	encoded, err := encodeAuthorNotesCursor(note.AuthorNotePosition{CreatedAt: createdAt, ID: exampleCursorNoteID})

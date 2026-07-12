@@ -1,21 +1,18 @@
 package httpapi
 
 import (
-	"bytes"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
+	"github.com/tprei/sdds/services/api/internal/pagination"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
 
-const maxAuthorNotesCursorLength = 160
+const maxAuthorNotesCursorLength = pagination.MaxCursorLength
 
 type authorNotesCursorPayload struct {
 	Version   int    `json:"v"`
@@ -92,32 +89,13 @@ func decodeAuthorNotesCursor(encoded *string) (*note.AuthorNotePosition, []note.
 	if encoded == nil {
 		return nil, nil
 	}
-	if len(*encoded) > maxAuthorNotesCursorLength {
-		return nil, []note.ValidationProblem{{Field: "cursor", Message: "invalid"}}
-	}
-
-	decoded, err := base64.RawURLEncoding.DecodeString(*encoded)
-	if err != nil {
-		return nil, []note.ValidationProblem{{Field: "cursor", Message: "invalid"}}
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(decoded))
-	decoder.DisallowUnknownFields()
 	var payload authorNotesCursorPayload
-	if err := decoder.Decode(&payload); err != nil {
+	if err := pagination.Decode(*encoded, &payload); err != nil {
 		return nil, []note.ValidationProblem{{Field: "cursor", Message: "invalid"}}
 	}
-	var trailing struct{}
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+	if payload.Version != 1 || payload.CreatedAt <= 0 || payload.ID == "" {
 		return nil, []note.ValidationProblem{{Field: "cursor", Message: "invalid"}}
 	}
-	if payload.Version != 1 || payload.CreatedAt <= 0 {
-		return nil, []note.ValidationProblem{{Field: "cursor", Message: "invalid"}}
-	}
-	if payload.ID == "" {
-		return nil, []note.ValidationProblem{{Field: "cursor", Message: "invalid"}}
-	}
-
 	return &note.AuthorNotePosition{CreatedAt: time.UnixMilli(payload.CreatedAt).UTC(), ID: payload.ID}, nil
 }
 
@@ -157,9 +135,9 @@ func encodeAuthorNotesCursor(cursor note.AuthorNotePosition) (string, error) {
 		return "", fmt.Errorf("encode author notes cursor: empty note id")
 	}
 	payload := authorNotesCursorPayload{Version: 1, CreatedAt: createdAt, ID: cursor.ID}
-	encoded, err := json.Marshal(payload)
+	encoded, err := pagination.Encode(payload)
 	if err != nil {
 		return "", fmt.Errorf("encode author notes cursor: %w", err)
 	}
-	return base64.RawURLEncoding.EncodeToString(encoded), nil
+	return encoded, nil
 }

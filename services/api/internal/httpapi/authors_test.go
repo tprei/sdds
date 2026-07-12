@@ -187,6 +187,21 @@ func TestListAuthorNotesPassesExplicitLimitAndCursor(t *testing.T) {
 		t.Fatalf("next_cursor = %q, want nil", *body.NextCursor)
 	}
 }
+func TestAuthorNotesCursorRoundTripsOpaqueID(t *testing.T) {
+	createdAt := time.UnixMilli(exampleAuthorCreatedMS).UTC()
+	position := note.AuthorNotePosition{CreatedAt: createdAt, ID: "opaque-note-id"}
+	encoded, err := encodeAuthorNotesCursor(position)
+	if err != nil {
+		t.Fatalf("encode cursor: %v", err)
+	}
+	decoded, problems := decodeAuthorNotesCursor(&encoded)
+	if diff := cmp.Diff([]note.ValidationProblem(nil), problems); diff != "" {
+		t.Fatalf("problems mismatch (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(&position, decoded); diff != "" {
+		t.Fatalf("cursor mismatch (-want +got):\n%s", diff)
+	}
+}
 
 func TestListAuthorNotesRejectsInvalidParametersBeforeAuthorLookup(t *testing.T) {
 	unsupportedVersion := rawAuthorCursor(`{"v":2,"created_at":1782993600000,"id":"018ff5b8-0000-7000-8000-000000000012"}`)
@@ -295,7 +310,7 @@ func TestAuthorNotesCursorRejectsMalformedPayloads(t *testing.T) {
 		{name: "missing created at", cursor: rawAuthorCursor(`{"v":1,"id":"` + validID + `"}`)},
 		{name: "non-positive created at", cursor: rawAuthorCursor(`{"v":1,"created_at":0,"id":"` + validID + `"}`)},
 		{name: "missing id", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000}`)},
-		{name: "empty id", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"id":""`)},
+		{name: "empty id", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"id":""}`)},
 		{name: "unknown field", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"id":"` + validID + `","extra":true}`)},
 		{name: "trailing json", cursor: rawAuthorCursor(`{"v":1,"created_at":1782993600000,"id":"` + validID + `"}{}`)},
 		{name: "oversized", cursor: strings.Repeat("a", maxAuthorNotesCursorLength+1)},

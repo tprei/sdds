@@ -145,6 +145,8 @@ test('creates a note and reads it from the API-backed home feed', async ({
   const exploreURL = page.url();
   await page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).click();
   await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
+  await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
+  await expect(page.getByText(`Nome de usuário: ${username}`, { exact: true })).toHaveCount(0);
   await expect(
     page.getByTestId('author-profile-header').getByRole('heading', {
       name: displayName,
@@ -170,6 +172,15 @@ test('creates a note and reads it from the API-backed home feed', async ({
     page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).last(),
   ).toBeVisible();
   await expect(searchResult).toContainText('São Paulo');
+  const searchAuthor = page.getByLabel(`Abrir perfil do autor: ${displayName}`).last();
+  await expect(searchAuthor).toBeVisible();
+  await searchAuthor.click();
+  await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
+  await expect(page.getByText(displayName, { exact: true }).last()).toBeVisible();
+  await page.goto(exploreURL);
+  await page.getByText('Buscar', { exact: true }).click();
+  await page.getByLabel('Buscar').fill(title);
+  await page.getByRole('button', { name: 'Buscar' }).click();
 
   await searchResult.click();
 
@@ -572,20 +583,37 @@ test('opens a public author profile and appends paginated notes', async ({
   ).toBeVisible();
   await expect(page.getByTestId('author-profile-note-count')).toHaveText('21 Notas');
   await expect(page.getByText(`Nota pública ${timestamp} 20`)).toBeVisible();
+  await expect(page.getByText(`Nome de usuário: ${username}`, { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
+  await expect(page.getByLabel(`Abrir perfil do autor: ${displayName}`).first()).toBeVisible();
   const firstPage = await request.get(`${apiBaseURL}/v1/authors/${author.id}/notes?limit=20`);
   expect(firstPage.ok()).toBeTruthy();
   const firstPageBody = (await firstPage.json()) as AuthorNotesResponse;
   expect(firstPageBody.notes).toHaveLength(20);
-  await page.getByText(`Nota pública ${timestamp} 20`).evaluate((element) => {
-    let container = element.parentElement;
-    while (container !== null && container.scrollHeight <= container.clientHeight) {
-      container = container.parentElement;
-    }
-    if (container === null) throw new Error('profile_scroll_container_missing');
-    container.scrollTop = container.scrollHeight;
-    container.dispatchEvent(new Event('scroll', { bubbles: true }));
-  });
   expect(firstPageBody.next_cursor).not.toBeNull();
+
+  const profileRequests: string[] = [];
+  page.on('request', (requestEvent) => {
+    if (requestEvent.url().includes(`/v1/authors/${author.id}/notes`)) {
+      profileRequests.push(requestEvent.url());
+    }
+  });
+  const scrollOwner = page.getByTestId('author-profile-scroll');
+  await expect(scrollOwner).toBeVisible();
+  const scrollBox = await scrollOwner.boundingBox();
+  if (scrollBox === null) throw new Error('author_profile_scroll_bounds_missing');
+  await page.mouse.move(
+    scrollBox.x + scrollBox.width / 2,
+    scrollBox.y + scrollBox.height / 2,
+  );
+  await page.mouse.wheel(0, 4000);
+  await expect.poll(() => profileRequests.length).toBeGreaterThan(0);
+  const cursorValue = firstPageBody.next_cursor;
+  if (cursorValue === null) throw new Error('author_profile_cursor_missing');
+  const cursor = encodeURIComponent(cursorValue);
+  await expect.poll(
+    () => profileRequests.filter((url) => url.includes(`cursor=${cursor}`)).length,
+  ).toBe(1);
 
   await expect(page.getByText(`Nota pública ${timestamp} 0`)).toBeVisible();
   const renderedTitles = await page.getByText(new RegExp(`^Nota pública ${timestamp} `)).allTextContents();

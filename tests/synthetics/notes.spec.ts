@@ -268,6 +268,16 @@ test('shows auth validation reasons and clears stale login submit state', async 
       status: 500,
     });
   });
+  const logoutDeleteStatuses: number[] = [];
+  page.on('response', (response) => {
+    const request = response.request();
+    if (
+      request.method() === 'DELETE' &&
+      new URL(response.url()).pathname === '/v1/auth/session'
+    ) {
+      logoutDeleteStatuses.push(response.status());
+    }
+  });
   await page.evaluate(() => {
     const originalRemoveItem = localStorage.removeItem.bind(localStorage);
     let failNextRemoval = true;
@@ -288,12 +298,14 @@ test('shows auth validation reasons and clears stale login submit state', async 
     'Não foi possível limpar a sessão deste aparelho.',
   );
   expect(logoutDeleteRequests).toBe(1);
+  expect(logoutDeleteStatuses).toEqual([500]);
   await expect(logoutButton).toBeEnabled();
   await logoutButton.click();
   await expect(page.getByText('Entre para publicar')).toBeVisible({
     timeout: 10000,
   });
   expect(logoutDeleteRequests).toBe(2);
+  expect(logoutDeleteStatuses).toEqual([500, 204]);
   await page.unroute('**/v1/auth/session');
 
   await page.getByTestId('profile-signup-button').click();

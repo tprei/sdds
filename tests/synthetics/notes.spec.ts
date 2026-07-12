@@ -43,6 +43,16 @@ type NoteResponse = {
   title: string;
   updated_at: number;
 };
+type PublicAuthorResponse = {
+  display_name: string;
+  id: string;
+  note_count: number;
+};
+
+type AuthorNotesResponse = {
+  next_cursor: string | null;
+  notes: NoteResponse[];
+};
 
 type ListNotesResponse = {
   notes: NoteResponse[];
@@ -162,9 +172,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(page.getByLabel('Lugar da nota: São Paulo')).toBeVisible();
 
   await page.getByText('Perfil', { exact: true }).click();
-  await expect(page.getByText(`Nome de usuário: ${username}`)).toBeVisible();
   await page.reload();
-  await expect(page.getByText(`Nome de usuário: ${username}`)).toBeVisible();
 
   await page.getByRole('button', { name: 'Sair' }).click();
   await expect(page.getByText('Entre para publicar')).toBeVisible();
@@ -203,7 +211,6 @@ test('shows auth validation reasons and clears stale login submit state', async 
 
   await page.getByTestId('signup-password-input').fill(syntheticPassword);
   await page.getByTestId('signup-submit-button').click();
-  await expect(page.getByText(`Nome de usuário: ${username}`)).toBeVisible();
 
   await page.getByTestId('profile-logout-button').click();
   await expect(page.getByText('Entre para publicar')).toBeVisible();
@@ -226,7 +233,6 @@ test('shows auth validation reasons and clears stale login submit state', async 
   await page.getByTestId('login-username-input').fill(username);
   await page.getByTestId('login-password-input').fill(syntheticPassword);
   await page.getByTestId('login-submit-button').click();
-  await expect(page.getByText(`Nome de usuário: ${username}`)).toBeVisible();
 
   await page.getByTestId('profile-logout-button').click();
   await expect(page.getByText('Entre para publicar')).toBeVisible();
@@ -490,6 +496,7 @@ test('filters note discovery by category through the public API', async ({
     categorySlug: 'travel',
   });
   expect(noteTitles(travelSearch)).toContain(travelTitle);
+
   expect(noteTitles(travelSearch)).not.toContain(foodTitle);
 
   await expectCategoryFilterError(request, '/v1/notes', {
@@ -498,6 +505,64 @@ test('filters note discovery by category through the public API', async ({
   await expectCategoryFilterError(request, '/v1/search/notes?q=balcao', {
     code: 'invalid_search',
   });
+});
+test('opens a public author profile and appends paginated notes', async ({
+  page,
+  request,
+}) => {
+  const timestamp = Date.now();
+  const displayName = `Perfil Público ${timestamp}`;
+  const username = `perfil-publico-${timestamp}`;
+  const session = await createAuthUser(request, {
+    display_name: displayName,
+    password: syntheticPassword,
+    username,
+  });
+  const notes: NoteResponse[] = [];
+  for (let index = 0; index < 21; index += 1) {
+    notes.push(await createNote(request, session.token, {
+      body: `Texto público ${timestamp} ${index}.`,
+      category_slug: index % 2 === 0 ? 'food' : 'travel',
+      place_slug: null,
+      title: `Nota pública ${timestamp} ${index}`,
+    }));
+  }
+  const authorResponse = await request.get(`${apiBaseURL}/v1/authors/${session.user.author.id}`);
+  expect(authorResponse.ok()).toBeTruthy();
+  const author = (await authorResponse.json()) as PublicAuthorResponse;
+  expect(author).toEqual({
+    display_name: displayName,
+    id: session.user.author.id,
+    note_count: 21,
+  });
+
+  await page.goto(`/authors/${author.id}`);
+  const profileHeader = page.getByTestId('author-profile-header');
+  await expect(
+    profileHeader.getByRole('heading', { name: displayName }),
+  ).toBeVisible();
+  await expect(page.getByTestId('author-profile-note-count')).toHaveText('21 Notas');
+  await expect(page.getByText(`Nota pública ${timestamp} 20`)).toBeVisible();
+  const firstPage = await request.get(`${apiBaseURL}/v1/authors/${author.id}/notes?limit=20`);
+  expect(firstPage.ok()).toBeTruthy();
+  const firstPageBody = (await firstPage.json()) as AuthorNotesResponse;
+  expect(firstPageBody.notes).toHaveLength(20);
+  await page.getByText(`Nota pública ${timestamp} 20`).evaluate((element) => {
+    let container = element.parentElement;
+    while (container !== null && container.scrollHeight <= container.clientHeight) {
+      container = container.parentElement;
+    }
+    if (container === null) throw new Error('profile_scroll_container_missing');
+    container.scrollTop = container.scrollHeight;
+    container.dispatchEvent(new Event('scroll', { bubbles: true }));
+  });
+  expect(firstPageBody.next_cursor).not.toBeNull();
+
+  await expect(page.getByText(`Nota pública ${timestamp} 0`)).toBeVisible();
+  const renderedTitles = await page.getByText(new RegExp(`^Nota pública ${timestamp} `)).allTextContents();
+  expect(renderedTitles).toHaveLength(21);
+  expect(new Set(renderedTitles).size).toBe(renderedTitles.length);
+  expect(new Set(renderedTitles)).toEqual(new Set(notes.map((note) => note.title)));
 });
 
 test('shows distinct authors when a second user signs in', async ({

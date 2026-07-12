@@ -180,7 +180,7 @@ function parseListNotesResponse(value: unknown): Note[] {
   return value.notes.map(parseNoteResponse);
 }
 
-function parseNoteResponse(value: unknown): Note {
+export function parseNoteResponse(value: unknown): Note {
   if (!isNoteResponse(value)) {
     throw new APIResponseError();
   }

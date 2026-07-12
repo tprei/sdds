@@ -45,6 +45,7 @@ export default function RootLayout() {
         <Tabs.Screen name="saved" options={{ title: 'Salvos' }} />
         <Tabs.Screen name="profile" options={{ title: 'Perfil' }} />
         <Tabs.Screen name="notes/[id]" options={{ href: null, title: 'Nota' }} />
+        <Tabs.Screen name="authors/[id]" options={{ href: null, title: 'Perfil público' }} />
         <Tabs.Screen name="login" options={{ href: null, title: 'Entrar' }} />
         <Tabs.Screen
           name="signup"

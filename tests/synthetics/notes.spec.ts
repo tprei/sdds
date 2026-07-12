@@ -542,7 +542,7 @@ test('opens a public author profile and appends paginated notes', async ({
   });
 
   await page.goto(`/authors/${author.id}`);
-  await expect(page.getByText(displayName, { exact: true })).toBeVisible();
+  await expect(page.getByText(displayName, { exact: true }).first()).toBeVisible();
   await expect(page.getByText(`Nota pública ${timestamp} 20`)).toBeVisible();
   const firstPage = await request.get(`${apiBaseURL}/v1/authors/${author.id}/notes?limit=20`);
   expect(firstPage.ok()).toBeTruthy();

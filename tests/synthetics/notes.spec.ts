@@ -196,7 +196,22 @@ test('creates a note and reads it from the API-backed home feed', async ({
 
   await page.getByText('Perfil', { exact: true }).click();
   await page.reload();
+  await expect(page.getByText(displayName, { exact: true })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText('1 Nota')).toBeVisible();
+  await expect(page.getByText(body)).toBeVisible();
+  await expect(page.getByText(`Nome de usuário: ${username}`)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sair' })).toBeVisible();
 
+  await page.route('**/v1/auth/session', async (route) => {
+    await route.fulfill({
+      body: JSON.stringify({ code: 'internal_error' }),
+      contentType: 'application/json',
+      status: 500,
+    });
+  });
+  await page.getByRole('button', { name: 'Sair' }).click();
+  await expect(page.getByText('Não foi possível limpar a sessão deste aparelho. Tente novamente.')).toBeVisible();
+  await page.unroute('**/v1/auth/session');
   await page.getByRole('button', { name: 'Sair' }).click();
   await expect(page.getByTestId('profile-signup-button')).toBeVisible({ timeout: 30000 });
 });

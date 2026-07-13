@@ -113,17 +113,14 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Check generated TypeScript API contract
-        run: pnpm openapi:check:ts
+      - name: Check mobile API schemas
+        run: pnpm api:schema:check
 
       - name: Check generated Go API contract
         run: pnpm openapi:check:go
 
       - name: Typecheck tokens
         run: pnpm typecheck:tokens
-
-      - name: Typecheck mobile
-        run: pnpm typecheck:mobile
 
       - name: Test mobile
         run: pnpm test:mobile

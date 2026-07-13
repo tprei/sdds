@@ -64,6 +64,7 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugFood),
 		PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
+		Images:       []openapi.NoteImage{},
 		CreatedAt:    now.UnixMilli(),
 		UpdatedAt:    now.UnixMilli(),
 	}}}
@@ -84,7 +85,7 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 	if !ok {
 		t.Fatalf("note = %T, want map[string]any", notesValue[0])
 	}
-	requireJSONKeys(t, noteValue, "id", "title", "body", "category_slug", "place_slug", "created_at", "updated_at")
+	requireJSONKeys(t, noteValue, "id", "title", "body", "category_slug", "place_slug", "images", "created_at", "updated_at")
 	requireJSONNumber(t, noteValue, "created_at", now.UnixMilli())
 	requireJSONNumber(t, noteValue, "updated_at", now.UnixMilli())
 }
@@ -244,6 +245,7 @@ func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugFood),
 		PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
+		Images:       []openapi.NoteImage{},
 		CreatedAt:    now.UnixMilli(),
 		UpdatedAt:    now.UnixMilli(),
 	}}}
@@ -584,6 +586,7 @@ func TestGetNoteReturnsNote(t *testing.T) {
 		Title:        "Café bom",
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugFood),
+		Images:       []openapi.NoteImage{},
 		PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
 		CreatedAt:    now.UnixMilli(),
 		UpdatedAt:    now.UnixMilli(),
@@ -692,6 +695,7 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugFood),
 		PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
+		Images:       []openapi.NoteImage{},
 		CreatedAt:    now.UnixMilli(),
 		UpdatedAt:    now.UnixMilli(),
 	}

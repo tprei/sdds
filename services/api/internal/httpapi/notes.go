@@ -210,6 +210,22 @@ func newNoteResponse(found note.Note) openapi.Note {
 	if found.PlaceSlug == "" {
 		placeSlugPointer = nil
 	}
+
+	images := make([]openapi.NoteImage, 0, len(found.Images))
+	for _, image := range found.Images {
+		images = append(images, openapi.NoteImage{
+			Id:          image.ID,
+			Url:         "/v1/media/images/" + image.ID,
+			ContentType: openapi.NoteImageContentType(image.ContentType),
+			ByteSize:    image.ByteSize,
+			Width:       int32(image.Width),
+			Height:      int32(image.Height),
+			Position:    int32(image.Position),
+			CreatedAt:   image.CreatedAt.UTC().UnixMilli(),
+			UpdatedAt:   image.UpdatedAt.UTC().UnixMilli(),
+		})
+	}
+
 	return openapi.Note{
 		Id:           found.ID,
 		Title:        found.Title,
@@ -220,6 +236,7 @@ func newNoteResponse(found note.Note) openapi.Note {
 			Id:          string(found.Author.ID),
 			DisplayName: found.Author.DisplayName,
 		},
+		Images:    images,
 		CreatedAt: found.CreatedAt.UTC().UnixMilli(),
 		UpdatedAt: found.UpdatedAt.UTC().UnixMilli(),
 	}

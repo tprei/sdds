@@ -134,7 +134,11 @@ func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 	if !ok {
 		t.Fatalf("wire note = %T, want object", notesValue[0])
 	}
-	requireExactJSONKeys(t, noteValue, "id", "title", "body", "category_slug", "place_slug", "author", "created_at", "updated_at")
+	requireExactJSONKeys(t, noteValue, "id", "title", "body", "category_slug", "place_slug", "author", "images", "created_at", "updated_at")
+	imagesValue, ok := noteValue["images"].([]any)
+	if !ok || len(imagesValue) != 0 {
+		t.Fatalf("wire note images = %#v, want empty array", noteValue["images"])
+	}
 	authorValue, ok := noteValue["author"].(map[string]any)
 	if !ok {
 		t.Fatalf("wire author = %T, want object", noteValue["author"])

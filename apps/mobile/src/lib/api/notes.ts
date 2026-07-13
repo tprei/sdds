@@ -9,9 +9,22 @@ export type Note = {
   categorySlug: string;
   createdAt: number;
   id: string;
+  images: NoteImage[];
   placeSlug: string | null;
   title: string;
   updatedAt: number;
+};
+
+export type NoteImage = {
+  byteSize: number;
+  contentType: NoteImageResponse['content_type'];
+  createdAt: number;
+  height: number;
+  id: string;
+  position: number;
+  updatedAt: number;
+  url: string;
+  width: number;
 };
 
 export type NoteAuthor = {
@@ -40,6 +53,7 @@ type AuthorSummaryResponse = GeneratedSchemas['AuthorSummary'];
 type CreateNoteRequest = GeneratedSchemas['CreateNoteRequest'];
 type ListNotesResponse = GeneratedSchemas['ListNotesResponse'];
 type NoteResponse = GeneratedSchemas['Note'];
+type NoteImageResponse = GeneratedSchemas['NoteImage'];
 
 export class APIRequestError extends Error {
   readonly status: number;
@@ -191,6 +205,7 @@ export function parseNoteResponse(value: unknown): Note {
     categorySlug: value.category_slug,
     createdAt: value.created_at,
     id: value.id,
+    images: value.images.map(parseNoteImage),
     placeSlug: value.place_slug,
     title: value.title,
     updatedAt: value.updated_at,
@@ -204,6 +219,40 @@ function parseAuthorSummary(value: AuthorSummaryResponse): NoteAuthor {
   };
 }
 
+function parseNoteImage(value: NoteImageResponse): NoteImage {
+  return {
+    byteSize: value.byte_size,
+    contentType: value.content_type,
+    createdAt: value.created_at,
+    height: value.height,
+    id: value.id,
+    position: value.position,
+    updatedAt: value.updated_at,
+    url: resolveNoteImageURL(value.url),
+    width: value.width,
+  };
+}
+
+function resolveNoteImageURL(value: string): string {
+  try {
+    if (isAbsoluteURL(value)) {
+      return value;
+    }
+    return new URL(value, apiBaseURL()).toString();
+  } catch {
+    throw new APIResponseError();
+  }
+}
+
+function isAbsoluteURL(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function isNoteResponse(value: unknown): value is NoteResponse {
   return (
     isRecord(value) &&
@@ -214,8 +263,46 @@ function isNoteResponse(value: unknown): value is NoteResponse {
     (typeof value.place_slug === 'string' || value.place_slug === null) &&
     isAuthorSummaryResponse(value.author) &&
     isUnixMillisecondTimestamp(value.created_at) &&
+    isUnixMillisecondTimestamp(value.updated_at) &&
+    isNoteImagesResponse(value.images)
+  );
+}
+
+function isNoteImagesResponse(value: unknown): value is NoteImageResponse[] {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  let previousPosition = -1;
+  for (const image of value) {
+    if (!isNoteImageResponse(image) || image.position <= previousPosition) {
+      return false;
+    }
+    previousPosition = image.position;
+  }
+  return true;
+}
+
+function isNoteImageResponse(value: unknown): value is NoteImageResponse {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.url === 'string' &&
+    value.url.length > 0 &&
+    isNoteImageContentType(value.content_type) &&
+    isPositiveInteger(value.byte_size) &&
+    isPositiveInteger(value.width) &&
+    isPositiveInteger(value.height) &&
+    isUnixMillisecondTimestamp(value.position) &&
+    isUnixMillisecondTimestamp(value.created_at) &&
     isUnixMillisecondTimestamp(value.updated_at)
   );
+}
+
+function isNoteImageContentType(
+  value: unknown,
+): value is NoteImageResponse['content_type'] {
+  return value === 'image/jpeg' || value === 'image/png';
 }
 
 function isAuthorSummaryResponse(
@@ -242,4 +329,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isUnixMillisecondTimestamp(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }

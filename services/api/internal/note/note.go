@@ -11,6 +11,17 @@ import (
 
 var ErrNoteNotFound = errors.New("note not found")
 
+type Image struct {
+	ID          string
+	ContentType string
+	ByteSize    int64
+	Width       int
+	Height      int
+	Position    int
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 type Note struct {
 	ID           string
 	UserID       user.UserID
@@ -19,6 +30,7 @@ type Note struct {
 	CategorySlug CategorySlug
 	PlaceSlug    PlaceSlug
 	Author       AuthorSummary
+	Images       []Image
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

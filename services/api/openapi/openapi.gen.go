@@ -62,6 +62,24 @@ func (e ErrorCode) Valid() bool {
 	}
 }
 
+// Defines values for NoteImageContentType.
+const (
+	Imagejpeg NoteImageContentType = "image/jpeg"
+	Imagepng  NoteImageContentType = "image/png"
+)
+
+// Valid indicates whether the value is a known member of the NoteImageContentType enum.
+func (e NoteImageContentType) Valid() bool {
+	switch e {
+	case Imagejpeg:
+		return true
+	case Imagepng:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ValidationField.
 const (
 	ValidationFieldBody         ValidationField = "body"
@@ -239,14 +257,31 @@ type Note struct {
 	CategorySlug CategorySlug  `json:"category_slug"`
 
 	// CreatedAt Unix timestamp in milliseconds.
-	CreatedAt int64      `json:"created_at"`
-	Id        string     `json:"id"`
-	PlaceSlug *PlaceSlug `json:"place_slug"`
-	Title     string     `json:"title"`
+	CreatedAt int64       `json:"created_at"`
+	Id        string      `json:"id"`
+	Images    []NoteImage `json:"images"`
+	PlaceSlug *PlaceSlug  `json:"place_slug"`
+	Title     string      `json:"title"`
 
 	// UpdatedAt Unix timestamp in milliseconds.
 	UpdatedAt int64 `json:"updated_at"`
 }
+
+// NoteImage defines model for NoteImage.
+type NoteImage struct {
+	ByteSize    int64                `json:"byte_size"`
+	ContentType NoteImageContentType `json:"content_type"`
+	CreatedAt   int64                `json:"created_at"`
+	Height      int32                `json:"height"`
+	Id          string               `json:"id"`
+	Position    int32                `json:"position"`
+	UpdatedAt   int64                `json:"updated_at"`
+	Url         string               `json:"url"`
+	Width       int32                `json:"width"`
+}
+
+// NoteImageContentType defines model for NoteImage.ContentType.
+type NoteImageContentType string
 
 // PlaceSlug defines model for PlaceSlug.
 type PlaceSlug = string

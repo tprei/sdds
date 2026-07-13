@@ -91,11 +91,25 @@ func (store *NoteStore) ListAuthorNotes(ctx context.Context, input note.AuthorNo
 	if err := rows.Err(); err != nil {
 		return note.AuthorNotesPage{}, fmt.Errorf("read author notes: %w", err)
 	}
+	if err := rows.Close(); err != nil {
+		return note.AuthorNotesPage{}, fmt.Errorf("close author notes rows: %w", err)
+	}
 
 	page.Notes = notes
 	if len(notes) > input.Limit {
 		page.Notes = notes[:input.Limit]
 		page.HasMore = true
+	}
+
+	hydrated := make([]note.Note, len(page.Notes))
+	for index := range page.Notes {
+		hydrated[index] = page.Notes[index].Note
+	}
+	if err := store.hydrateNoteImages(ctx, hydrated); err != nil {
+		return note.AuthorNotesPage{}, fmt.Errorf("hydrate author note images: %w", err)
+	}
+	for index := range page.Notes {
+		page.Notes[index].Note = hydrated[index]
 	}
 	return page, nil
 }

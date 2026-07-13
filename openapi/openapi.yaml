@@ -746,6 +746,53 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CatalogPlace"
+    NoteImage:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - url
+        - content_type
+        - byte_size
+        - width
+        - height
+        - position
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+          minLength: 1
+          format: uri-reference
+        content_type:
+          type: string
+          enum:
+            - image/jpeg
+            - image/png
+        byte_size:
+          type: integer
+          format: int64
+          minimum: 1
+        width:
+          type: integer
+          format: int32
+          minimum: 1
+        height:
+          type: integer
+          format: int32
+          minimum: 1
+        position:
+          type: integer
+          format: int32
+          minimum: 0
+        created_at:
+          type: integer
+          format: int64
+        updated_at:
+          type: integer
+          format: int64
     Note:
       type: object
       additionalProperties: false
@@ -758,6 +805,7 @@ components:
         - author
         - created_at
         - updated_at
+        - images
       properties:
         id:
           type: string
@@ -782,6 +830,10 @@ components:
           type: integer
           format: int64
           description: Unix timestamp in milliseconds.
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/NoteImage"
     ValidationField:
       type: string
       x-enum-varnames:

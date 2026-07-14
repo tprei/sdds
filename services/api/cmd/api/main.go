@@ -28,11 +28,15 @@ func main() {
 }
 
 func run() error {
-	config, err := loadConfig()
+	args := os.Args[1:]
+	if len(args) > 0 && (len(args) != 1 || args[0] != commandMigrate) {
+		return runWithArgs(context.Background(), config{}, args)
+	}
+	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
-	return runWithArgs(context.Background(), config, os.Args[1:])
+	return runWithArgs(context.Background(), cfg, args)
 }
 
 func runWithArgs(ctx context.Context, config config, args []string) error {

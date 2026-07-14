@@ -19,3 +19,5 @@ apps/*/web-build/
 *.db
 *.sqlite
 *.sqlite3
+/infra/compose/secrets/*
+!/infra/compose/secrets/*.example

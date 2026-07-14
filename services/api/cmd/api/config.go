@@ -30,6 +30,7 @@ type config struct {
 	authLimits   httpapi.AuthLimits
 	databasePath string
 	httpAddr     string
+	media        media.Config
 }
 
 func loadConfig() (config, error) {
@@ -43,6 +44,18 @@ func loadConfig() (config, error) {
 		databasePath: envString("SDDS_DATABASE_PATH", defaultDatabasePath),
 		httpAddr:     envString("SDDS_HTTP_ADDR", defaultHTTPAddr),
 	}, nil
+}
+
+func loadServerConfig() (config, error) {
+	cfg, err := loadConfig()
+	if err != nil {
+		return config{}, err
+	}
+	cfg.media, err = loadMediaConfig()
+	if err != nil {
+		return config{}, err
+	}
+	return cfg, nil
 }
 
 func loadMediaConfig() (media.Config, error) {

@@ -202,38 +202,66 @@ pnpm typecheck:tokens
 pnpm typecheck:mobile
 ```
 
-Run the API with Docker Compose:
+Run the Compose stack (API + RustFS):
+
+Compose requires four secret files on the host. Set these path variables before starting it:
 
 ```sh
-docker compose -f infra/compose/compose.yaml up --build api
+export SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE="$HOME/.config/sdds/rustfs-root-access"
+export SDDS_COMPOSE_RUSTFS_ROOT_SECRET_KEY_FILE="$HOME/.config/sdds/rustfs-root-secret"
+export SDDS_COMPOSE_SDDS_MEDIA_ACCESS_KEY_FILE="$HOME/.config/sdds/sdds-media-access"
+export SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE="$HOME/.config/sdds/sdds-media-secret"
 ```
 
-Validate migrations with Docker Compose:
+Copy the matching `infra/compose/secrets/*.example` files to those private paths and replace every placeholder. The examples are placeholders, not defaults; keep the real files outside Git.
 
 ```sh
-docker compose -p sdds-migrations -f infra/compose/compose.yaml down -v
-docker compose -p sdds-migrations -f infra/compose/compose.yaml run --build --rm api migrate
-docker compose -p sdds-migrations -f infra/compose/compose.yaml down -v
+docker compose -f infra/compose/compose.yaml up --build -d
+until curl --fail --silent http://127.0.0.1:8080/readyz >/dev/null; do sleep 1; done
 ```
 
-Run the API integration test against the Dockerized API:
+Compose publishes only the API port (`8080`, or `SDDS_HTTP_PORT`). RustFS stays private at `http://rustfs:9000` with its console disabled. Data uses separate `api-data`, `rustfs-data`, and `rustfs-logs` volumes. Back up `api-data` and `rustfs-data` together; restoring one without the other can leave data out of sync. RustFS is beta, not HA, and Compose is not a backup system.
+
+Validate migrations without starting dependencies or requiring media secrets:
 
 ```sh
-docker compose -p sdds-api-integration -f infra/compose/compose.yaml down -v
-SDDS_HTTP_PORT=18080 docker compose -p sdds-api-integration -f infra/compose/compose.yaml up --build -d api
+docker compose -f infra/compose/compose.yaml run --build --rm --no-deps api migrate
+```
+
+Run the RustFS integration:
+
+```sh
+pnpm test:rustfs
+```
+
+The test creates temporary credentials and removes its Compose project and volumes when it exits.
+
+Stop the stack (destructive; removes `api-data`, `rustfs-data`, and `rustfs-logs`):
+
+```sh
+docker compose -f infra/compose/compose.yaml down --volumes
+```
+
+Run the API integration test against the Dockerized stack:
+
+```sh
+docker compose -p sdds-api-integration -f infra/compose/compose.yaml down --volumes
+SDDS_HTTP_PORT=18080 docker compose -p sdds-api-integration -f infra/compose/compose.yaml up --build -d
+until curl --fail --silent http://127.0.0.1:18080/readyz >/dev/null; do sleep 1; done
 SDDS_API_BASE_URL=http://127.0.0.1:18080 pnpm test:api:integration
-docker compose -p sdds-api-integration -f infra/compose/compose.yaml down -v
+docker compose -p sdds-api-integration -f infra/compose/compose.yaml down --volumes
 ```
 
 `pnpm test:api:integration` expects a live API and exercises public HTTP endpoints through the generated Go OpenAPI client. Keep it on the Compose path when checking runtime boundaries so it covers the built image, migrations, routing, SQLite persistence, and JSON contract together.
 
-Run the browser-level synthetic against the Dockerized API:
+Run the browser-level synthetic against the Dockerized stack:
 
 ```sh
-docker compose -p sdds-synthetics -f infra/compose/compose.yaml down -v
-SDDS_HTTP_PORT=18080 SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE=60 SDDS_AUTH_LOGIN_REQUESTS_PER_MINUTE=60 docker compose -p sdds-synthetics -f infra/compose/compose.yaml up --build -d api
+docker compose -p sdds-synthetics -f infra/compose/compose.yaml down --volumes
+SDDS_HTTP_PORT=18080 SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE=60 SDDS_AUTH_LOGIN_REQUESTS_PER_MINUTE=60 docker compose -p sdds-synthetics -f infra/compose/compose.yaml up --build -d
+until curl --fail --silent http://127.0.0.1:18080/readyz >/dev/null; do sleep 1; done
 pnpm test:synthetics
-docker compose -p sdds-synthetics -f infra/compose/compose.yaml down -v
+docker compose -p sdds-synthetics -f infra/compose/compose.yaml down --volumes
 ```
 
 `pnpm test:synthetics` starts Expo web on `http://localhost:19006` and points it at `http://127.0.0.1:18080`. Keep the API on the Compose path for this check so it exercises `services/api/Dockerfile`, `infra/compose/compose.yaml`, the real HTTP API, and the web client together.

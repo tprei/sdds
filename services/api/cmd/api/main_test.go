@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -56,6 +57,17 @@ func TestRunWithArgsAppliesMigrations(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("notes table count = %d, want 1", count)
+	}
+}
+
+func TestRunMigrateDoesNotLoadMediaConfig(t *testing.T) {
+	clearConfigEnv(t)
+	t.Setenv("SDDS_DATABASE_PATH", filepath.Join(t.TempDir(), "sdds.db"))
+	originalArgs := os.Args
+	os.Args = []string{"api", commandMigrate}
+	t.Cleanup(func() { os.Args = originalArgs })
+	if err := run(); err != nil {
+		t.Fatalf("run migrate command without media secrets: %v", err)
 	}
 }
 

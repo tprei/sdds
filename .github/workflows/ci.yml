@@ -37,7 +37,7 @@ jobs:
         run: docker compose -f infra/compose/compose.yaml down --volumes
 
       - name: Validate API migrations
-        run: docker compose -f infra/compose/compose.yaml run --build --rm api migrate
+        run: docker compose -f infra/compose/compose.yaml run --build --rm --no-deps api migrate
 
       - name: Stop API migrations
         if: always()
@@ -64,6 +64,16 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Provision Compose secrets
+        run: |
+          dir="$RUNNER_TEMP/sdds-compose"; install -d -m 700 "$dir"
+          for name in rustfs-root-access rustfs-root-secret sdds-media-access sdds-media-secret; do openssl rand -hex 32 >"$dir/$name"; chmod 600 "$dir/$name"; done
+          {
+            printf 'SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE=%s\n' "$dir/rustfs-root-access"
+            printf 'SDDS_COMPOSE_RUSTFS_ROOT_SECRET_KEY_FILE=%s\n' "$dir/rustfs-root-secret"
+            printf 'SDDS_COMPOSE_SDDS_MEDIA_ACCESS_KEY_FILE=%s\n' "$dir/sdds-media-access"
+            printf 'SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE=%s\n' "$dir/sdds-media-secret"
+          } >>"$GITHUB_ENV"
 
       - name: Reset API Docker integration state
         run: docker compose -f infra/compose/compose.yaml down --volumes
@@ -83,6 +93,23 @@ jobs:
       - name: Stop API
         if: always()
         run: docker compose -f infra/compose/compose.yaml down --volumes
+
+  rustfs-integration:
+    name: RustFS Integration
+    runs-on: ubuntu-latest
+    needs: api-docker-integration
+    timeout-minutes: 20
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+
+      - name: Test RustFS integration
+        run: pnpm test:rustfs
 
   mobile:
     name: Mobile And Tokens

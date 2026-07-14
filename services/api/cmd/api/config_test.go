@@ -91,21 +91,24 @@ func TestLoadConfigRejectsInvalidAuthLimits(t *testing.T) {
 	}
 }
 
-func TestLoadMediaConfigUsesEnvironment(t *testing.T) {
+func TestLoadServerConfigUsesMediaEnvironment(t *testing.T) {
 	clearConfigEnv(t)
 	accessKeyFile, secretKeyFile := setValidMediaEnv(t)
-	got, err := loadMediaConfig()
+	got, err := loadServerConfig()
 	if err != nil {
-		t.Fatalf("load media config: %v", err)
+		t.Fatalf("load server config: %v", err)
 	}
 
-	want := media.Config{
-		Endpoint: "http://rustfs:9000/", Region: "us-east-1", Bucket: "sdds-media", UsePathStyle: true,
-		AccessKeyFile: accessKeyFile, SecretKeyFile: secretKeyFile,
-		Timeout: mediaRequestTimeout, RetryMaxAttempts: mediaRetryMaxAttempts,
+	want := config{
+		authLimits: httpapi.DefaultAuthLimits(), databasePath: defaultDatabasePath, httpAddr: defaultHTTPAddr,
+		media: media.Config{
+			Endpoint: "http://rustfs:9000/", Region: "us-east-1", Bucket: "sdds-media", UsePathStyle: true,
+			AccessKeyFile: accessKeyFile, SecretKeyFile: secretKeyFile,
+			Timeout: mediaRequestTimeout, RetryMaxAttempts: mediaRetryMaxAttempts,
+		},
 	}
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Fatalf("media config mismatch (-want +got):\n%s", diff)
+	if diff := cmp.Diff(want, got, cmp.AllowUnexported(config{})); diff != "" {
+		t.Fatalf("config mismatch (-want +got):\n%s", diff)
 	}
 }
 

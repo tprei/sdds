@@ -1,6 +1,68 @@
 name: sdds
 
 services:
+  rustfs-permissions:
+    image: alpine:3.22.1@sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1
+    user: "0:0"
+    command: ["/bin/sh", "-ec", "mkdir -p /data /logs && chown 10001:10001 /data /logs"]
+    volumes:
+      - rustfs-data:/data
+      - rustfs-logs:/logs
+    restart: "no"
+    networks:
+      - sdds
+
+  rustfs:
+    image: rustfs/rustfs:1.0.0-beta.8@sha256:fa19210ac4697c79d7ccca1ec9b0eb91aebacc6691991ffb14014bb3c67e6cc3
+    user: "10001:10001"
+    environment:
+      RUSTFS_ACCESS_KEY_FILE: /run/secrets/rustfs_root_access_key
+      RUSTFS_SECRET_KEY_FILE: /run/secrets/rustfs_root_secret_key
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ENABLE: "false"
+      RUSTFS_VOLUMES: /data
+    secrets:
+      - rustfs_root_access_key
+      - rustfs_root_secret_key
+    volumes:
+      - rustfs-data:/data
+      - rustfs-logs:/logs
+    depends_on:
+      rustfs-permissions:
+        condition: service_completed_successfully
+    networks:
+      - sdds
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:9000/health/ready"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
+    restart: "no"
+
+  rustfs-init:
+    build:
+      context: ./rustfs-init
+      dockerfile: Dockerfile
+    environment:
+      RUSTFS_ENDPOINT: http://rustfs:9000
+      AWS_REGION: us-east-1
+      RUSTFS_ROOT_ACCESS_KEY_FILE: /run/secrets/rustfs_root_access_key
+      RUSTFS_ROOT_SECRET_KEY_FILE: /run/secrets/rustfs_root_secret_key
+      SDDS_MEDIA_ACCESS_KEY_FILE: /run/secrets/sdds_media_access_key
+      SDDS_MEDIA_SECRET_KEY_FILE: /run/secrets/sdds_media_secret_key
+    secrets:
+      - rustfs_root_access_key
+      - rustfs_root_secret_key
+      - sdds_media_access_key
+      - sdds_media_secret_key
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    networks:
+      - sdds
+    restart: "no"
+
   api:
     build:
       context: ../..
@@ -13,12 +75,41 @@ services:
       SDDS_AUTH_GLOBAL_SIGNUP_REQUESTS_PER_MINUTE: "${SDDS_AUTH_GLOBAL_SIGNUP_REQUESTS_PER_MINUTE:-60}"
       SDDS_AUTH_GLOBAL_LOGIN_REQUESTS_PER_MINUTE: "${SDDS_AUTH_GLOBAL_LOGIN_REQUESTS_PER_MINUTE:-120}"
       SDDS_AUTH_HASH_CONCURRENCY: "${SDDS_AUTH_HASH_CONCURRENCY:-2}"
+      SDDS_MEDIA_S3_ENDPOINT: http://rustfs:9000
+      SDDS_MEDIA_S3_REGION: us-east-1
+      SDDS_MEDIA_S3_BUCKET: sdds-media
+      SDDS_MEDIA_S3_PATH_STYLE: "true"
+      SDDS_MEDIA_S3_ACCESS_KEY_FILE: /run/secrets/sdds_media_access_key
+      SDDS_MEDIA_S3_SECRET_KEY_FILE: /run/secrets/sdds_media_secret_key
+    secrets:
+      - sdds_media_access_key
+      - sdds_media_secret_key
+    depends_on:
+      rustfs-init:
+        condition: service_completed_successfully
     ports:
       - target: 8080
         published: "${SDDS_HTTP_PORT:-8080}"
         protocol: tcp
     volumes:
       - api-data:/data
+    networks:
+      - sdds
 
 volumes:
   api-data:
+  rustfs-data:
+  rustfs-logs:
+
+networks:
+  sdds:
+
+secrets:
+  rustfs_root_access_key:
+    file: "${SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE:-/dev/null}"
+  rustfs_root_secret_key:
+    file: "${SDDS_COMPOSE_RUSTFS_ROOT_SECRET_KEY_FILE:-/dev/null}"
+  sdds_media_access_key:
+    file: "${SDDS_COMPOSE_SDDS_MEDIA_ACCESS_KEY_FILE:-/dev/null}"
+  sdds_media_secret_key:
+    file: "${SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE:-/dev/null}"

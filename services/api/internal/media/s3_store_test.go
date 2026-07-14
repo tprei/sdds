@@ -8,7 +8,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"io"
@@ -30,16 +32,18 @@ type fakeS3Client struct {
 	getOutput                          *s3.GetObjectOutput
 	headContextErr                     error
 	headDeadline                       time.Time
+	headChecksumMode                   s3types.ChecksumMode
 }
 
 func (fake *fakeS3Client) PutObject(_ context.Context, _ *s3.PutObjectInput, _ ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
 	fake.putCalls++
 	return &s3.PutObjectOutput{}, fake.putErr
 }
-func (fake *fakeS3Client) HeadObject(ctx context.Context, _ *s3.HeadObjectInput, _ ...func(*s3.Options)) (*s3.HeadObjectOutput, error) {
+func (fake *fakeS3Client) HeadObject(ctx context.Context, input *s3.HeadObjectInput, _ ...func(*s3.Options)) (*s3.HeadObjectOutput, error) {
 	fake.headCalls++
 	fake.headContextErr = ctx.Err()
 	fake.headDeadline, _ = ctx.Deadline()
+	fake.headChecksumMode = input.ChecksumMode
 	return fake.headOutput, fake.headErr
 }
 func (fake *fakeS3Client) GetObject(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
@@ -196,6 +200,52 @@ func TestValidateEndpoint(t *testing.T) {
 		if got := validateEndpoint(test.raw) == nil; got != test.ok {
 			t.Errorf("validateEndpoint(%q) = %v, want %v", test.raw, got, test.ok)
 		}
+	}
+}
+
+func validReadinessHead() *s3.HeadObjectOutput {
+	return &s3.HeadObjectOutput{ContentLength: aws.Int64(readinessSentinelContentLength), ChecksumSHA256: aws.String(readinessSentinelChecksumSHA256), Metadata: map[string]string{digestMetadataKey: readinessSentinelDigest}}
+}
+func TestVerifyReadinessContract(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		edit func(*s3.HeadObjectOutput)
+	}{
+		{"valid", nil, nil},
+		{"empty response", ErrObjectIntegrity, nil},
+		{"missing length", ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { h.ContentLength = nil }},
+		{"wrong length", ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { n := readinessSentinelContentLength + 1; h.ContentLength = &n }},
+		{"missing checksum", ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { h.ChecksumSHA256 = nil }},
+		{"same-length corrupt checksum", ErrObjectIntegrity, func(h *s3.HeadObjectOutput) {
+			payload := []byte(readinessSentinelPayload)
+			payload[len(payload)-2] = '0'
+			checksum := sha256.Sum256(payload)
+			value := base64.StdEncoding.EncodeToString(checksum[:])
+			h.ChecksumSHA256 = &value
+		}},
+		{"missing metadata", ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { h.Metadata = nil }},
+		{"unexpected metadata", ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { h.Metadata["extra"] = "value" }},
+		{"provider missing", ErrObjectNotFound, nil},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fake := &fakeS3Client{headOutput: validReadinessHead()}
+			if test.name == "empty response" {
+				fake.headOutput = nil
+			} else if test.name == "provider missing" {
+				fake.headErr = &smithy.GenericAPIError{Code: "NoSuchKey"}
+			} else if test.edit != nil {
+				test.edit(fake.headOutput)
+			}
+			err := newFakeStore(t, fake).VerifyReadiness(context.Background())
+			if !errors.Is(err, test.err) {
+				t.Fatalf("VerifyReadiness = %v, want %v", err, test.err)
+			}
+			if test.name == "valid" && (fake.headCalls != 1 || fake.headContextErr != nil || fake.headDeadline.IsZero() || fake.headChecksumMode != s3types.ChecksumModeEnabled) {
+				t.Fatalf("head calls=%d context=%v deadline=%v mode=%q", fake.headCalls, fake.headContextErr, fake.headDeadline, fake.headChecksumMode)
+			}
+		})
 	}
 }
 func TestNewS3StoreSDKWireContract(t *testing.T) {

@@ -386,7 +386,7 @@ func newAuthRateLimitTestRouter(
 	t.Helper()
 	return newRouter(fakeNoteStore{}, fakeCatalog{}, users, authTestPasswordHasher(), authTestCredentialProbeHash(t), func() (string, error) {
 		return "rate-limit-token", nil
-	}, clock, limits)
+	}, clock, limits, fakeReadiness{})
 }
 
 func newAuthRateLimitLoginStore(t *testing.T, findCalls *int) fakeUserStore {

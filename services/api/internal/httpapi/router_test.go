@@ -10,9 +10,21 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tprei/sdds/services/api/internal/author"
+	"github.com/tprei/sdds/services/api/internal/media"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
+
+type fakeReadiness struct {
+	check func(context.Context) error
+}
+
+func (fake fakeReadiness) Check(ctx context.Context) error {
+	if fake.check == nil {
+		return nil
+	}
+	return fake.check(ctx)
+}
 
 func newTestRouter(notes fakeNoteStore) http.Handler {
 	handler := NewRouter(notes, fakeCatalog{}, fakeUserStore{
@@ -26,7 +38,7 @@ func newTestRouter(notes fakeNoteStore) http.Handler {
 				Author:  user.Author{ID: "author-id-thiago", UserID: "user-id-thiago", DisplayName: "Thiago"},
 			}, nil
 		},
-	}, DefaultAuthLimits())
+	}, DefaultAuthLimits(), fakeReadiness{})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Header.Set("Authorization", "Bearer current-token")
 		handler.ServeHTTP(w, r)
@@ -58,6 +70,65 @@ func TestHealthRoutesReturnNoContent(t *testing.T) {
 				t.Fatalf("body length = %d, want 0", response.Body.Len())
 			}
 		})
+	}
+}
+
+func TestReadinessDegradesAndRecovers(t *testing.T) {
+	available := true
+	router := NewRouter(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{
+		check: func(ctx context.Context) error {
+			if _, ok := ctx.Deadline(); !ok {
+				t.Fatal("readiness context has no deadline")
+			}
+			if !available {
+				return fmt.Errorf("dependency unavailable")
+			}
+			return nil
+		},
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("ready status = %d, want %d", response.Code, http.StatusNoContent)
+	}
+
+	available = false
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("degraded ready status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	}
+	if response.Body.Len() != 0 {
+		t.Fatalf("degraded ready body length = %d, want 0", response.Body.Len())
+	}
+
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("health status while degraded = %d, want %d", response.Code, http.StatusNoContent)
+	}
+
+	available = true
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("recovered ready status = %d, want %d", response.Code, http.StatusNoContent)
+	}
+}
+
+func TestReadinessRejectsSentinelMismatch(t *testing.T) {
+	router := NewRouter(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{
+		check: func(context.Context) error {
+			return media.ErrObjectIntegrity
+		},
+	})
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("sentinel mismatch status = %d, want %d", response.Code, http.StatusServiceUnavailable)
 	}
 }
 

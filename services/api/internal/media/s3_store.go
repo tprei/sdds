@@ -13,6 +13,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"github.com/google/uuid"
@@ -33,6 +34,14 @@ const (
 	defaultMaxAttempts    = 3
 	maxRequestTimeout     = 5 * time.Minute
 	maxRetryAttempts      = 10
+)
+
+const (
+	readinessSentinelKey            ObjectKey = "system/readiness"
+	readinessSentinelPayload                  = "sdds-media-ready-v1\n"
+	readinessSentinelContentLength  int64     = int64(len(readinessSentinelPayload))
+	readinessSentinelDigest                   = "5aff33ce5e386989939a8a504923897432db5b5a818518ccd876dadf2ad7398f"
+	readinessSentinelChecksumSHA256           = "Wv8zzl44aYmTmopQSSOJdDLbW1qBhRjM2Hba3yrXOY8="
 )
 
 type Config struct {
@@ -94,6 +103,28 @@ func newS3Store(ctx context.Context, cfg Config, httpClient aws.HTTPClient) (*S3
 		options.Retryer = retry.NewStandard(func(retryOptions *retry.StandardOptions) { retryOptions.MaxAttempts = cfg.RetryMaxAttempts })
 	})
 	return &S3Store{client: client, bucket: cfg.Bucket, timeout: cfg.Timeout}, nil
+}
+
+func (store *S3Store) VerifyReadiness(ctx context.Context) error {
+	requestCtx, cancel := store.withTimeout(ctx)
+	defer cancel()
+	output, err := store.client.HeadObject(requestCtx, &s3.HeadObjectInput{
+		Bucket:       aws.String(store.bucket),
+		Key:          aws.String(string(readinessSentinelKey)),
+		ChecksumMode: s3types.ChecksumModeEnabled,
+	})
+	if err != nil {
+		return mapProviderError(err)
+	}
+	if output == nil || output.ContentLength == nil || *output.ContentLength != readinessSentinelContentLength ||
+		output.ChecksumSHA256 == nil || *output.ChecksumSHA256 != readinessSentinelChecksumSHA256 {
+		return ErrObjectIntegrity
+	}
+	digest, ok := metadataDigest(output.Metadata)
+	if !ok || digest != readinessSentinelDigest || len(output.Metadata) != 1 {
+		return ErrObjectIntegrity
+	}
+	return nil
 }
 func normalizeConfig(cfg Config) (Config, error) {
 	cfg.Endpoint, cfg.Region, cfg.Bucket = strings.TrimSpace(cfg.Endpoint), strings.TrimSpace(cfg.Region), strings.TrimSpace(cfg.Bucket)

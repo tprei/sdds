@@ -1,16 +1,16 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
-	"net/http"
-	"strings"
-	"time"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
 	"github.com/tprei/sdds/services/api/internal/user"
+	"net/http"
+	"strings"
+	"time"
 )
 
 type noteStores interface {
@@ -34,6 +34,7 @@ type server struct {
 	authRateLimiters      authRateLimiters
 	newSessionToken       func() (string, error)
 	clock                 func() time.Time
+	readiness             ReadinessChecker
 }
 
 var _ openapi.ServerInterface = server{}
@@ -41,6 +42,10 @@ var _ openapi.ServerInterface = server{}
 type passwordHasher interface {
 	Hash(password string) (string, error)
 	Verify(password string, encoded string) (bool, error)
+}
+
+type ReadinessChecker interface {
+	Check(context.Context) error
 }
 
 type AuthLimits struct {
@@ -61,9 +66,9 @@ func DefaultAuthLimits() AuthLimits {
 	}
 }
 
-func NewRouter(notes noteStores, catalog note.Catalog, users userStores, authLimits AuthLimits) http.Handler {
+func NewRouter(notes noteStores, catalog note.Catalog, users userStores, authLimits AuthLimits, readiness ReadinessChecker) http.Handler {
 	hasher := newBoundedPasswordHasher(user.NewPasswordHasher(), authLimits.PasswordHashConcurrency)
-	return newRouter(notes, catalog, users, hasher, mustInvalidCredentialHash(hasher), user.NewSessionToken, time.Now, authLimits)
+	return newRouter(notes, catalog, users, hasher, mustInvalidCredentialHash(hasher), user.NewSessionToken, time.Now, authLimits, readiness)
 }
 
 func newRouter(
@@ -75,6 +80,7 @@ func newRouter(
 	newSessionToken func() (string, error),
 	clock func() time.Time,
 	authLimits AuthLimits,
+	readiness ReadinessChecker,
 ) http.Handler {
 	router := chi.NewRouter()
 	router.Use(localBrowserCORS)
@@ -93,6 +99,7 @@ func newRouter(
 		authRateLimiters:      authRateLimiters,
 		newSessionToken:       newSessionToken,
 		clock:                 clock,
+		readiness:             readiness,
 	}
 	wrapper := openapi.ServerInterfaceWrapper{
 		Handler:          handler,
@@ -183,6 +190,14 @@ func (server) GetHealth(w http.ResponseWriter, r *http.Request) {
 	noContent(w, r)
 }
 
-func (server) GetReadiness(w http.ResponseWriter, r *http.Request) {
+const readinessCheckTimeout = 2 * time.Second
+
+func (handler server) GetReadiness(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), readinessCheckTimeout)
+	defer cancel()
+	if handler.readiness == nil || handler.readiness.Check(ctx) != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
 	noContent(w, r)
 }

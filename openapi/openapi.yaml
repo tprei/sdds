@@ -52,6 +52,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: The API cannot serve traffic because a required dependency is unavailable.
   /v1/categories:
     get:
       operationId: listCategories

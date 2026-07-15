@@ -25,16 +25,14 @@ const testUploadRequestID = "c6bf4f8d-3a5a-4c98-bf3f-5ddf8ecb87f6"
 
 func TestPrepareImageUploadAuthenticatesBeforeReadingBody(t *testing.T) {
 	body := &countingReader{Reader: strings.NewReader("not-read")}
-	router := NewRouter(
-		fakeNoteStore{},
+	router := NewRouter(fakeNoteStore{},
 		fakeCatalog{},
 		fakeUserStore{findCurrentSession: func(context.Context, string, time.Time) (user.CurrentSession, error) {
 			return user.CurrentSession{}, user.ErrSessionNotFound
 		}},
 		DefaultAuthLimits(),
 		fakeReadiness{},
-		fakeUploadPreparer{},
-	)
+		fakeUploadPreparer{}, fakeAttachedImageReader{})
 	request := httptest.NewRequest(http.MethodPost, "/v1/media/image-uploads", body)
 	request.Header.Set("Content-Type", "multipart/form-data; boundary=boundary")
 	response := httptest.NewRecorder()
@@ -147,8 +145,7 @@ func TestPrepareImageUploadMapsRetryableErrors(t *testing.T) {
 }
 
 func authenticatedUploadRouter(service uploadPreparer) http.Handler {
-	handler := NewRouter(
-		fakeNoteStore{},
+	handler := NewRouter(fakeNoteStore{},
 		fakeCatalog{},
 		fakeUserStore{findCurrentSession: func(_ context.Context, tokenHash string, _ time.Time) (user.CurrentSession, error) {
 			if tokenHash != user.HashSessionToken("current-token") {
@@ -158,8 +155,7 @@ func authenticatedUploadRouter(service uploadPreparer) http.Handler {
 		}},
 		DefaultAuthLimits(),
 		fakeReadiness{},
-		service,
-	)
+		service, fakeAttachedImageReader{})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Header.Set("Authorization", "Bearer current-token")
 		handler.ServeHTTP(w, r)

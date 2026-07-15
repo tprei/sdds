@@ -142,6 +142,7 @@ func runServer(ctx context.Context, config config) (err error) {
 	if err != nil {
 		return fmt.Errorf("create upload service: %w", err)
 	}
+	imageReader := media.NewImageReader(noteStore, objectStore)
 	cleanupCtx, cleanupCancel := context.WithTimeout(ctx, startupReadinessTimeout)
 	if err := uploadService.CleanupExpired(cleanupCtx, time.Now()); err != nil {
 		cleanupCancel()
@@ -149,7 +150,7 @@ func runServer(ctx context.Context, config config) (err error) {
 	}
 	cleanupCancel()
 	readiness := runtimeReadiness{database: db, media: store}
-	server := newServer(config, httpapi.NewRouter(noteStore, catalogStore, userStore, config.authLimits, readiness, uploadService))
+	server := newServer(config, httpapi.NewRouter(noteStore, catalogStore, userStore, config.authLimits, readiness, uploadService, imageReader))
 
 	slog.Info("api listening", "addr", config.httpAddr)
 	if err := listenAndServe(server); err != nil && !errors.Is(err, http.ErrServerClosed) {

@@ -650,6 +650,7 @@ func TestGetNoteReturnsInternalError(t *testing.T) {
 
 func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
+	imageCreatedAt := now.Add(-time.Hour)
 	router := newTestRouter(fakeNoteStore{
 		createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
 			if input.UserID != user.UserID("user-id-thiago") {
@@ -661,19 +662,35 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 			if input.CategorySlug != "food" {
 				t.Fatalf("category = %q, want food", input.CategorySlug)
 			}
+			if input.ClientRequestID != "http-created-note" {
+				t.Fatalf("client request id = %q, want http-created-note", input.ClientRequestID)
+			}
+			if diff := cmp.Diff([]string{"upload-1"}, input.ImageUploadIDs); diff != "" {
+				t.Fatalf("image upload IDs mismatch (-want +got):\n%s", diff)
+			}
 			return note.Note{
 				ID:           exampleNoteID,
 				Title:        input.Title,
 				Body:         input.Body,
 				CategorySlug: input.CategorySlug,
 				PlaceSlug:    input.PlaceSlug,
-				CreatedAt:    now,
-				UpdatedAt:    now,
+				Images: []note.Image{{
+					ID:          "image-1",
+					ContentType: "image/jpeg",
+					ByteSize:    12345,
+					Width:       1200,
+					Height:      800,
+					Position:    0,
+					CreatedAt:   imageCreatedAt,
+					UpdatedAt:   now,
+				}},
+				CreatedAt: now,
+				UpdatedAt: now,
 			}, nil
 		},
 	})
 
-	requestBody := []byte(`{"title":" Café bom ","body":"Tem pão de queijo decente.","category_slug":"food","client_request_id":"http-created-note","place_slug":"sao-paulo"}`)
+	requestBody := []byte(`{"title":" Café bom ","body":"Tem pão de queijo decente.","category_slug":"food","client_request_id":"http-created-note","place_slug":"sao-paulo","image_upload_ids":["upload-1"]}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -695,15 +712,38 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugFood),
 		PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
-		Images:       []openapi.NoteImage{},
-		CreatedAt:    now.UnixMilli(),
-		UpdatedAt:    now.UnixMilli(),
+		Images: []openapi.NoteImage{{
+			Id:          "image-1",
+			Url:         "/v1/media/images/image-1",
+			ContentType: openapi.NoteImageContentTypeImagejpeg,
+			ByteSize:    12345,
+			Width:       1200,
+			Height:      800,
+			Position:    0,
+			CreatedAt:   imageCreatedAt.UnixMilli(),
+			UpdatedAt:   now.UnixMilli(),
+		}},
+		CreatedAt: now.UnixMilli(),
+		UpdatedAt: now.UnixMilli(),
 	}
 	if diff := cmp.Diff(want, body); diff != "" {
 		t.Fatalf("response body mismatch (-want +got):\n%s", diff)
 	}
 
 	wireBody := decodeResponseObject(t, response.Body.Bytes())
+	if diff := cmp.Diff([]any{map[string]any{
+		"id":           "image-1",
+		"url":          "/v1/media/images/image-1",
+		"content_type": "image/jpeg",
+		"byte_size":    float64(12345),
+		"width":        float64(1200),
+		"height":       float64(800),
+		"position":     float64(0),
+		"created_at":   float64(imageCreatedAt.UnixMilli()),
+		"updated_at":   float64(now.UnixMilli()),
+	}}, wireBody["images"]); diff != "" {
+		t.Fatalf("wire images mismatch (-want +got):\n%s", diff)
+	}
 	requireJSONNumber(t, wireBody, "created_at", now.UnixMilli())
 	requireJSONNumber(t, wireBody, "updated_at", now.UnixMilli())
 }
@@ -901,19 +941,91 @@ func TestCreateNoteRejectsOpenAPIRequestSchemaProblems(t *testing.T) {
 	}
 }
 
-func TestCreateNoteMapsTooManyImageUploadsToConflict(t *testing.T) {
-	router := newTestRouter(fakeNoteStore{createNote: func(context.Context, note.CreateInput) (note.Note, error) {
-		t.Fatal("CreateNote should not be called")
-		return note.Note{}, nil
-	}})
-	request := jsonRequest(http.MethodPost, "/v1/notes", `{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-too-many-images","image_upload_ids":["upload-a","upload-b"]}`)
-	response := httptest.NewRecorder()
-	router.ServeHTTP(response, request)
-	requireOpenAPIResponse(t, request, response)
-	if response.Code != http.StatusConflict {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusConflict)
+func TestCreateNoteMapsCreateErrors(t *testing.T) {
+	validBody := `{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-create-error"}`
+	tests := []struct {
+		name       string
+		body       string
+		createErr  error
+		wantStatus int
+		wantCode   openapi.ErrorCode
+		wantFields []openapi.ValidationProblem
+	}{
+		{
+			name:       "idempotency conflict",
+			body:       validBody,
+			createErr:  note.ErrIdempotencyConflict,
+			wantStatus: http.StatusConflict,
+			wantCode:   openapi.ErrorCodeIdempotencyConflict,
+		},
+		{
+			name:       "expired upload",
+			body:       validBody,
+			createErr:  note.ErrImageUploadExpired,
+			wantStatus: http.StatusConflict,
+			wantCode:   openapi.ErrorCodeUploadExpired,
+		},
+		{
+			name:       "unavailable upload",
+			body:       validBody,
+			createErr:  note.ErrImageUploadUnavailable,
+			wantStatus: http.StatusConflict,
+			wantCode:   openapi.ErrorCodeInvalidNote,
+			wantFields: []openapi.ValidationProblem{{Field: openapi.ValidationFieldImageUploadIDs, Code: openapi.ValidationProblemCodeInvalid}},
+		},
+		{
+			name:       "too many images",
+			body:       validBody[:len(validBody)-1] + `,"image_upload_ids":["upload-1","upload-2"]}`,
+			wantStatus: http.StatusConflict,
+			wantCode:   openapi.ErrorCodeTooManyImages,
+		},
+		{
+			name:       "internal storage error",
+			body:       validBody,
+			createErr:  errors.New("storage unavailable"),
+			wantStatus: http.StatusInternalServerError,
+			wantCode:   openapi.ErrorCodeInternal,
+		},
 	}
-	requireErrorCode(t, response, openapi.ErrorCodeTooManyImages)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			createCalled := false
+			router := newTestRouter(fakeNoteStore{
+				createNote: func(context.Context, note.CreateInput) (note.Note, error) {
+					createCalled = true
+					if tt.createErr == nil {
+						t.Fatal("CreateNote should not be called")
+					}
+					return note.Note{}, tt.createErr
+				},
+			})
+			response := httptest.NewRecorder()
+			request := jsonRequest(http.MethodPost, "/v1/notes", tt.body)
+
+			router.ServeHTTP(response, request)
+			requireOpenAPIResponse(t, request, response)
+
+			if response.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d", response.Code, tt.wantStatus)
+			}
+			requireErrorCode(t, response, tt.wantCode)
+			var body openapi.ErrorResponse
+			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if tt.wantFields == nil {
+				if body.Fields != nil {
+					t.Fatalf("fields = %#v, want nil", *body.Fields)
+				}
+			} else {
+				requireValidationProblems(t, body.Fields, tt.wantFields)
+			}
+			if tt.createErr == nil && createCalled {
+				t.Fatal("CreateNote should not be called for validation errors")
+			}
+		})
+	}
 }
 
 func TestCreateNotePassesCatalogValidationToStore(t *testing.T) {

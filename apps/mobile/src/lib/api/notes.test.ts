@@ -49,6 +49,7 @@ describe('notes API client', () => {
       {
         body: 'Tem pao de queijo decente.',
         categorySlug: 'food',
+        clientRequestId: 'mobile-create-note-wire',
         placeSlug: 'sao-paulo',
         title: 'Cafe bom',
       },
@@ -63,6 +64,7 @@ describe('notes API client', () => {
     await expect(requestJSON(request)).resolves.toEqual({
       body: 'Tem pao de queijo decente.',
       category_slug: 'food',
+      client_request_id: 'mobile-create-note-wire',
       place_slug: 'sao-paulo',
       title: 'Cafe bom',
     });
@@ -79,6 +81,7 @@ describe('notes API client', () => {
       {
         body: 'Tem pao de queijo decente.',
         categorySlug: 'food',
+        clientRequestId: 'mobile-create-note-without-place',
         title: 'Cafe bom',
       },
       exampleToken,
@@ -96,6 +99,7 @@ describe('notes API client', () => {
       {
         body: 'Tem pao de queijo decente.',
         categorySlug: 'food',
+        clientRequestId: 'mobile-create-note-response',
         placeSlug: 'sao-paulo',
         title: 'Cafe bom',
       },
@@ -134,6 +138,7 @@ describe('notes API client', () => {
         {
           body: 'Tem pao de queijo decente.',
           categorySlug: 'food',
+          clientRequestId: 'mobile-create-note-error',
           placeSlug: 'sao-paulo',
           title: 'Cafe bom',
         },

@@ -25,6 +25,7 @@ func TestApplyMigrationsCreatesInitialSchema(t *testing.T) {
 		"user_login_identities",
 		"sessions",
 		"note_images",
+		"note_create_requests",
 	}
 	for _, table := range tables {
 		t.Run(table, func(t *testing.T) {

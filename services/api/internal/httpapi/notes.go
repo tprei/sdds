@@ -65,20 +65,31 @@ func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {
 
 	input := createNoteInput(request, current.User.ID)
 	if problems := note.ValidateCreateInput(input); len(problems) > 0 {
-		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, problems))
-		return
-	}
-	if problems, err := handler.validateCreateNoteCatalogs(r.Context(), input); err != nil {
-		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
-		return
-	} else if len(problems) > 0 {
-		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, problems))
+		status := http.StatusBadRequest
+		code := openapi.ErrorCodeInvalidNote
+		for _, problem := range problems {
+			if problem.Field == "image_upload_ids" && problem.Message == "too_long" {
+				status = http.StatusConflict
+				code = openapi.ErrorCodeTooManyImages
+				break
+			}
+		}
+		writeError(w, status, validationErrorResponse(code, problems))
 		return
 	}
 
 	created, err := handler.notes.CreateNote(r.Context(), input)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		switch {
+		case errors.Is(err, note.ErrIdempotencyConflict):
+			writeError(w, http.StatusConflict, openapi.ErrorResponse{Code: openapi.ErrorCodeIdempotencyConflict})
+		case errors.Is(err, note.ErrImageUploadExpired):
+			writeError(w, http.StatusConflict, openapi.ErrorResponse{Code: openapi.ErrorCodeUploadExpired})
+		case errors.Is(err, note.ErrImageUploadUnavailable):
+			writeError(w, http.StatusConflict, validationErrorResponse(openapi.ErrorCodeInvalidNote, []note.ValidationProblem{{Field: "image_upload_ids", Message: "invalid"}}))
+		default:
+			writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		}
 		return
 	}
 
@@ -135,35 +146,19 @@ func createNoteInput(request openapi.CreateNoteRequest, userID user.UserID) note
 	if request.PlaceSlug != nil {
 		placeSlug = note.PlaceSlug(*request.PlaceSlug)
 	}
+	imageUploadIDs := []string(nil)
+	if request.ImageUploadIds != nil {
+		imageUploadIDs = *request.ImageUploadIds
+	}
 	return note.NormalizeCreateInput(note.CreateInput{
-		UserID:       userID,
-		Title:        request.Title,
-		Body:         request.Body,
-		CategorySlug: note.CategorySlug(request.CategorySlug),
-		PlaceSlug:    placeSlug,
+		UserID:          userID,
+		Title:           request.Title,
+		Body:            request.Body,
+		CategorySlug:    note.CategorySlug(request.CategorySlug),
+		PlaceSlug:       placeSlug,
+		ClientRequestID: request.ClientRequestId,
+		ImageUploadIDs:  imageUploadIDs,
 	})
-}
-
-func (handler server) validateCreateNoteCatalogs(ctx context.Context, input note.CreateInput) ([]note.ValidationProblem, error) {
-	problems := make([]note.ValidationProblem, 0, 2)
-
-	if input.CategorySlug != "" {
-		if _, err := handler.catalog.FindActiveCategory(ctx, input.CategorySlug); errors.Is(err, note.ErrCategoryNotFound) {
-			problems = append(problems, note.ValidationProblem{Field: "category_slug", Message: "unknown"})
-		} else if err != nil {
-			return nil, err
-		}
-	}
-
-	if input.PlaceSlug != "" {
-		if _, err := handler.catalog.FindActivePlace(ctx, input.PlaceSlug); errors.Is(err, note.ErrPlaceNotFound) {
-			problems = append(problems, note.ValidationProblem{Field: "place_slug", Message: "unknown"})
-		} else if err != nil {
-			return nil, err
-		}
-	}
-
-	return problems, nil
 }
 
 func (handler server) validateCategoryFilter(ctx context.Context, slug note.CategorySlug) ([]note.ValidationProblem, error) {

@@ -673,7 +673,7 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 		},
 	})
 
-	requestBody := []byte(`{"title":" Café bom ","body":"Tem pão de queijo decente.","category_slug":"food","place_slug":"sao-paulo"}`)
+	requestBody := []byte(`{"title":" Café bom ","body":"Tem pão de queijo decente.","category_slug":"food","client_request_id":"http-created-note","place_slug":"sao-paulo"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -749,7 +749,7 @@ func TestCreateNoteAcceptsOmittedPlace(t *testing.T) {
 	})
 
 	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(`{"title":"Café bom","body":"Funciona.","category_slug":"food"}`))
+	request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(`{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-omitted-place"}`))
 	request.Header.Set("Content-Type", "application/json")
 
 	router.ServeHTTP(response, request)
@@ -786,7 +786,7 @@ func TestCreateNoteAcceptsNullPlace(t *testing.T) {
 	})
 
 	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(`{"title":"Café bom","body":"Funciona.","category_slug":"food","place_slug":null}`))
+	request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(`{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-null-place","place_slug":null}`))
 	request.Header.Set("Content-Type", "application/json")
 
 	router.ServeHTTP(response, request)
@@ -807,7 +807,7 @@ func TestCreateNoteAcceptsNullPlace(t *testing.T) {
 
 func TestCreateNoteRejectsValidationProblems(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{})
-	requestBody := []byte(`{"title":"   ","body":"   ","category_slug":"food","place_slug":"sao-paulo"}`)
+	requestBody := []byte(`{"title":"   ","body":"   ","category_slug":"food","client_request_id":"http-validation","place_slug":"sao-paulo"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -859,11 +859,11 @@ func TestCreateNoteRejectsOpenAPIRequestSchemaProblems(t *testing.T) {
 	}{
 		{
 			name: "title too long",
-			body: `{"title":"` + strings.Repeat("a", note.TitleMaxLength+1) + `","body":"Funciona.","category_slug":"food","place_slug":"sao-paulo"}`,
+			body: `{"title":"` + strings.Repeat("a", note.TitleMaxLength+1) + `","body":"Funciona.","category_slug":"food","client_request_id":"http-title-too-long","place_slug":"sao-paulo"}`,
 		},
 		{
 			name: "body too long",
-			body: `{"title":"Café bom","body":"` + strings.Repeat("a", note.BodyMaxLength+1) + `","category_slug":"food","place_slug":"sao-paulo"}`,
+			body: `{"title":"Café bom","body":"` + strings.Repeat("a", note.BodyMaxLength+1) + `","category_slug":"food","client_request_id":"http-body-too-long","place_slug":"sao-paulo"}`,
 		},
 	}
 
@@ -901,9 +901,43 @@ func TestCreateNoteRejectsOpenAPIRequestSchemaProblems(t *testing.T) {
 	}
 }
 
-func TestCreateNoteRejectsUnknownSlugsThroughCatalogValidation(t *testing.T) {
-	router := newTestRouter(fakeNoteStore{})
-	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"qualquer","place_slug":"qualquer"}`)
+func TestCreateNoteMapsTooManyImageUploadsToConflict(t *testing.T) {
+	router := newTestRouter(fakeNoteStore{createNote: func(context.Context, note.CreateInput) (note.Note, error) {
+		t.Fatal("CreateNote should not be called")
+		return note.Note{}, nil
+	}})
+	request := jsonRequest(http.MethodPost, "/v1/notes", `{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-too-many-images","image_upload_ids":["upload-a","upload-b"]}`)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+	if response.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusConflict)
+	}
+	requireErrorCode(t, response, openapi.ErrorCodeTooManyImages)
+}
+
+func TestCreateNotePassesCatalogValidationToStore(t *testing.T) {
+	router := newTestRouter(fakeNoteStore{
+		createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
+			if input.CategorySlug != "qualquer" {
+				t.Fatalf("category slug = %q, want qualquer", input.CategorySlug)
+			}
+			if input.PlaceSlug != "qualquer" {
+				t.Fatalf("place slug = %q, want qualquer", input.PlaceSlug)
+			}
+			return note.Note{
+				ID:           exampleNoteID,
+				Title:        input.Title,
+				Body:         input.Body,
+				CategorySlug: input.CategorySlug,
+				PlaceSlug:    input.PlaceSlug,
+				Images:       []note.Image{},
+				CreatedAt:    time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
+				UpdatedAt:    time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
+			}, nil
+		},
+	})
+	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"qualquer","client_request_id":"http-unknown-catalog","place_slug":"qualquer"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -911,21 +945,9 @@ func TestCreateNoteRejectsUnknownSlugsThroughCatalogValidation(t *testing.T) {
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)
 
-	if response.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusCreated)
 	}
-
-	var body openapi.ErrorResponse
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if body.Code != openapi.ErrorCodeInvalidNote {
-		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInvalidNote)
-	}
-	requireValidationProblems(t, body.Fields, []openapi.ValidationProblem{
-		{Field: openapi.ValidationFieldCategorySlug, Code: openapi.ValidationProblemCodeUnknown},
-		{Field: openapi.ValidationFieldPlaceSlug, Code: openapi.ValidationProblemCodeUnknown},
-	})
 }
 
 func TestCreateNoteRejectsInvalidJSON(t *testing.T) {
@@ -965,7 +987,7 @@ func TestCreateNoteRejectsMissingOrUnsupportedContentType(t *testing.T) {
 			return note.Note{}, nil
 		},
 	})
-	requestBody := `{"title":"Café bom","body":"Funciona.","category_slug":"food","place_slug":"sao-paulo"}`
+	requestBody := `{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-content-type","place_slug":"sao-paulo"}`
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1000,7 +1022,7 @@ func TestCreateNoteRejectsOldCitySlugJSON(t *testing.T) {
 			return note.Note{}, nil
 		},
 	})
-	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"food","city_slug":"sao-paulo"}`)
+	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-old-city","city_slug":"sao-paulo"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -1028,7 +1050,7 @@ func TestCreateNoteRejectsUnknownJSONFields(t *testing.T) {
 			return note.Note{}, nil
 		},
 	})
-	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"food","place_slug":"sao-paulo","unexpected":true}`)
+	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-unknown-field","place_slug":"sao-paulo","unexpected":true}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -1051,7 +1073,7 @@ func TestCreateNoteRejectsUnknownJSONFields(t *testing.T) {
 
 func TestCreateNoteRejectsTrailingJSON(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{})
-	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"food","place_slug":"sao-paulo"} {}`)
+	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-trailing-json","place_slug":"sao-paulo"} {}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -1074,7 +1096,7 @@ func TestCreateNoteRejectsTrailingJSON(t *testing.T) {
 
 func TestCreateNoteRejectsOversizedRequestBody(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{})
-	requestBody := []byte(`{"title":"Café bom","body":"` + strings.Repeat("a", int(maxCreateNoteRequestBytes)) + `","category_slug":"food","place_slug":"sao-paulo"}`)
+	requestBody := []byte(`{"title":"Café bom","body":"` + strings.Repeat("a", int(maxCreateNoteRequestBytes)) + `","category_slug":"food","client_request_id":"http-oversized","place_slug":"sao-paulo"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")

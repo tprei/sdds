@@ -294,6 +294,8 @@ export interface components {
             title: string;
             body: string;
             category_slug: components["schemas"]["CategorySlug"];
+            client_request_id: string;
+            image_upload_ids?: string[];
             place_slug?: (string & components["schemas"]["PlaceSlug"]) | null;
         };
         CreateSessionRequest: {
@@ -1030,6 +1032,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description The note request or image association conflicts with an existing request. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description The request body is too large. */
             413: {
                 headers: {
@@ -1041,6 +1052,15 @@ export interface operations {
             };
             /** @description The API could not create the note. */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The image association is temporarily unavailable. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

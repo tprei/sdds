@@ -36,6 +36,8 @@ export type NoteAuthor = {
 export type CreateNoteInput = {
   body: string;
   categorySlug: string;
+  clientRequestId: string;
+  imageUploadIds?: string[];
   placeSlug?: string | null;
   title: string;
 };
@@ -139,6 +141,8 @@ export async function createNote(
   const request: CreateNoteRequest = {
     body: input.body,
     category_slug: input.categorySlug,
+    client_request_id: input.clientRequestId,
+    image_upload_ids: input.imageUploadIds,
     place_slug: input.placeSlug ?? null,
     title: input.title,
   };

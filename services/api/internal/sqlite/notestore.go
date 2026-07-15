@@ -23,6 +23,34 @@ const (
 		INSERT INTO note_search (note_id, title, body)
 		VALUES (?, ?, ?)
 	`
+	findNoteCreateRequestSQL = `
+		SELECT request_sha256, note_id
+		FROM note_create_requests
+		WHERE user_id = ? AND client_request_id = ?
+	`
+	insertNoteCreateRequestSQL = `
+		INSERT INTO note_create_requests (user_id, client_request_id, request_sha256, note_id, created_at)
+		VALUES (?, ?, ?, ?, ?)
+	`
+	consumeImageUploadSQL = `
+		UPDATE image_uploads
+		SET state = 'consumed', consumed_note_id = ?, updated_at = ?
+		WHERE id = ? AND user_id = ? AND state = 'ready'
+			AND consumed_note_id IS NULL AND expires_at > ?
+	`
+	findImageUploadForAssociationSQL = `
+		SELECT id, user_id, storage_key, state, consumed_note_id,
+			content_type, byte_size, width, height, sha256,
+			created_at, updated_at, expires_at
+		FROM image_uploads
+		WHERE id = ?
+	`
+	insertNoteImageSQL = `
+		INSERT INTO note_images (
+			id, note_id, storage_key, content_type, byte_size, width, height,
+			sha256, position, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
 	listRecentNotesSQL = `
 		SELECT
 			notes.id,
@@ -134,32 +162,69 @@ func newNoteStore(db *sql.DB, clock func() time.Time) *NoteStore {
 }
 
 func (store *NoteStore) CreateNote(ctx context.Context, input note.CreateInput) (created note.Note, err error) {
-	now := normalizeTime(store.clock())
-	id, err := note.NewID()
-	if err != nil {
-		return note.Note{}, fmt.Errorf("create note id: %w", err)
+	normalized := note.NormalizeCreateInput(input)
+	if problems := note.ValidateCreateInput(normalized); len(problems) > 0 {
+		return note.Note{}, fmt.Errorf("create note: invalid input")
 	}
-
-	created = note.Note{
-		ID:           id,
-		UserID:       input.UserID,
-		Title:        input.Title,
-		Body:         input.Body,
-		CategorySlug: input.CategorySlug,
-		PlaceSlug:    input.PlaceSlug,
-		CreatedAt:    now,
-		UpdatedAt:    now,
-	}
+	requestSHA256 := noteCreateFingerprint(normalized)
 
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return note.Note{}, fmt.Errorf("begin create note: %w", err)
 	}
+	now := normalizeTime(store.clock())
 	defer func() {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && err == nil {
 			err = fmt.Errorf("rollback create note: %w", rollbackErr)
 		}
 	}()
+
+	storedSHA256, storedNoteID, found, err := readNoteCreateRequest(ctx, tx, string(normalized.UserID), normalized.ClientRequestID)
+	if err != nil {
+		return note.Note{}, fmt.Errorf("read note create request: %w", err)
+	}
+	if found {
+		if storedSHA256 != requestSHA256 {
+			return note.Note{}, note.ErrIdempotencyConflict
+		}
+		created, err = store.loadNoteForCreate(ctx, tx, storedNoteID)
+		if err != nil {
+			return note.Note{}, fmt.Errorf("load replayed note: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return note.Note{}, fmt.Errorf("commit replayed note: %w", err)
+		}
+		return created, nil
+	}
+	if _, err := scanCategoryRow(tx.QueryRowContext(ctx, findActiveCategorySQL, string(normalized.CategorySlug))); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return note.Note{}, fmt.Errorf("constraint failed: %w", note.ErrCategoryNotFound)
+		}
+		return note.Note{}, fmt.Errorf("check active category: %w", err)
+	}
+	if normalized.PlaceSlug != "" {
+		if _, err := scanPlaceRow(tx.QueryRowContext(ctx, findActivePlaceSQL, string(normalized.PlaceSlug))); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return note.Note{}, fmt.Errorf("constraint failed: %w", note.ErrPlaceNotFound)
+			}
+			return note.Note{}, fmt.Errorf("check active place: %w", err)
+		}
+	}
+
+	id, err := note.NewID()
+	if err != nil {
+		return note.Note{}, fmt.Errorf("create note id: %w", err)
+	}
+	created = note.Note{
+		ID:           id,
+		UserID:       normalized.UserID,
+		Title:        normalized.Title,
+		Body:         normalized.Body,
+		CategorySlug: normalized.CategorySlug,
+		PlaceSlug:    normalized.PlaceSlug,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
 
 	if _, err := tx.ExecContext(
 		ctx,
@@ -175,26 +240,77 @@ func (store *NoteStore) CreateNote(ctx context.Context, input note.CreateInput) 
 	); err != nil {
 		return note.Note{}, fmt.Errorf("insert note: %w", err)
 	}
-
-	if _, err := tx.ExecContext(
-		ctx,
-		insertNoteSearchSQL,
-		created.ID,
-		created.Title,
-		created.Body,
-	); err != nil {
+	if _, err := tx.ExecContext(ctx, insertNoteSearchSQL, created.ID, created.Title, created.Body); err != nil {
 		return note.Note{}, fmt.Errorf("insert note search: %w", err)
 	}
 
-	created, err = scanNoteRow(tx.QueryRowContext(ctx, findNoteSQL, created.ID))
+	for position, imageUploadID := range normalized.ImageUploadIDs {
+		upload, err := consumeImageUpload(ctx, tx, string(normalized.UserID), imageUploadID, created.ID, now)
+		if err != nil {
+			return note.Note{}, fmt.Errorf("consume image upload %q: %w", imageUploadID, err)
+		}
+		upload.Position = position
+		if _, err := tx.ExecContext(
+			ctx,
+			insertNoteImageSQL,
+			upload.ID,
+			created.ID,
+			upload.StorageKey,
+			upload.ContentType,
+			upload.ByteSize,
+			upload.Width,
+			upload.Height,
+			upload.SHA256,
+			upload.Position,
+			unixMillis(now),
+			unixMillis(now),
+		); err != nil {
+			return note.Note{}, fmt.Errorf("insert note image: %w", err)
+		}
+	}
+
+	if _, insertErr := tx.ExecContext(
+		ctx,
+		insertNoteCreateRequestSQL,
+		normalized.UserID,
+		normalized.ClientRequestID,
+		requestSHA256,
+		created.ID,
+		unixMillis(now),
+	); insertErr != nil {
+		if !isUniqueConstraintError(insertErr) {
+			return note.Note{}, fmt.Errorf("insert note create request: %w", insertErr)
+		}
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			return note.Note{}, errors.Join(
+				fmt.Errorf("rollback conflicting note create: %w", rollbackErr),
+				fmt.Errorf("insert note create request: %w", insertErr),
+			)
+		}
+		storedSHA256, storedNoteID, found, readErr := readNoteCreateRequest(ctx, store.db, string(normalized.UserID), normalized.ClientRequestID)
+		if readErr != nil {
+			return note.Note{}, fmt.Errorf("read conflicting note create request: %w", readErr)
+		}
+		if !found {
+			return note.Note{}, fmt.Errorf("insert note create request: %w", insertErr)
+		}
+		if storedSHA256 != requestSHA256 {
+			return note.Note{}, note.ErrIdempotencyConflict
+		}
+		created, err = store.loadNoteForCreate(ctx, store.db, storedNoteID)
+		if err != nil {
+			return note.Note{}, fmt.Errorf("load conflicting note: %w", err)
+		}
+		return created, nil
+	}
+
+	created, err = store.loadNoteForCreate(ctx, tx, created.ID)
 	if err != nil {
 		return note.Note{}, fmt.Errorf("load created note: %w", err)
 	}
-
 	if err := tx.Commit(); err != nil {
 		return note.Note{}, fmt.Errorf("commit create note: %w", err)
 	}
-
 	return created, nil
 }
 

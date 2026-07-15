@@ -501,8 +501,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The note request or image association conflicts with an existing request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "413":
           description: The request body is too large.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: The image association is temporarily unavailable.
           content:
             application/json:
               schema:
@@ -745,6 +757,7 @@ components:
         - title
         - body
         - category_slug
+        - client_request_id
       properties:
         title:
           type: string
@@ -756,6 +769,16 @@ components:
           maxLength: 4000
         category_slug:
           $ref: "#/components/schemas/CategorySlug"
+        client_request_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        image_upload_ids:
+          type: array
+          uniqueItems: true
+          maxItems: 1
+          items:
+            type: string
         place_slug:
           type: string
           nullable: true

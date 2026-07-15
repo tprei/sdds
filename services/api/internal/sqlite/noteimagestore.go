@@ -25,6 +25,10 @@ const listNoteImagesSQL = `
 `
 
 func (store *NoteStore) hydrateNoteImages(ctx context.Context, notes []note.Note) error {
+	return hydrateNoteImagesWithQueryer(ctx, store.db, notes)
+}
+
+func hydrateNoteImagesWithQueryer(ctx context.Context, queryer noteCreateQueryer, notes []note.Note) (err error) {
 	if len(notes) == 0 {
 		return nil
 	}
@@ -41,7 +45,7 @@ func (store *NoteStore) hydrateNoteImages(ctx context.Context, notes []note.Note
 		}
 	}
 
-	rows, err := store.db.QueryContext(ctx, fmt.Sprintf(listNoteImagesSQL, strings.Join(placeholders, ", ")), args...)
+	rows, err := queryer.QueryContext(ctx, fmt.Sprintf(listNoteImagesSQL, strings.Join(placeholders, ", ")), args...)
 	if err != nil {
 		return fmt.Errorf("query note images: %w", err)
 	}

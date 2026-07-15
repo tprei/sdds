@@ -37,11 +37,11 @@ func TestPublicAuthorProfileRuntimeBoundaries(t *testing.T) {
 	firstClient := newAuthenticatedAPIClient(t, firstSession.Token)
 	secondClient := newAuthenticatedAPIClient(t, secondSession.Token)
 	createdFirstNotes := []openapi.Note{
-		createNote(t, firstClient, openapi.CreateNoteJSONRequestBody{Title: fmt.Sprintf("Perfil A 1 %d", suffix), Body: "Primeira nota da autora.", CategorySlug: "food"}),
-		createNote(t, firstClient, openapi.CreateNoteJSONRequestBody{Title: fmt.Sprintf("Perfil A 2 %d", suffix), Body: "Segunda nota da autora.", CategorySlug: "travel"}),
-		createNote(t, firstClient, openapi.CreateNoteJSONRequestBody{Title: fmt.Sprintf("Perfil A 3 %d", suffix), Body: "Terceira nota da autora.", CategorySlug: "finds"}),
+		createNote(t, firstClient, openapi.CreateNoteJSONRequestBody{Title: fmt.Sprintf("Perfil A 1 %d", suffix), Body: "Primeira nota da autora.", CategorySlug: "food", ClientRequestId: fmt.Sprintf("author-a-1-%d", suffix)}),
+		createNote(t, firstClient, openapi.CreateNoteJSONRequestBody{Title: fmt.Sprintf("Perfil A 2 %d", suffix), Body: "Segunda nota da autora.", CategorySlug: "travel", ClientRequestId: fmt.Sprintf("author-a-2-%d", suffix)}),
+		createNote(t, firstClient, openapi.CreateNoteJSONRequestBody{Title: fmt.Sprintf("Perfil A 3 %d", suffix), Body: "Terceira nota da autora.", CategorySlug: "finds", ClientRequestId: fmt.Sprintf("author-a-3-%d", suffix)}),
 	}
-	secondNote := createNote(t, secondClient, openapi.CreateNoteJSONRequestBody{Title: fmt.Sprintf("Perfil B %d", suffix), Body: "Nota do segundo autor.", CategorySlug: "food"})
+	secondNote := createNote(t, secondClient, openapi.CreateNoteJSONRequestBody{Title: fmt.Sprintf("Perfil B %d", suffix), Body: "Nota do segundo autor.", CategorySlug: "food", ClientRequestId: fmt.Sprintf("author-b-1-%d", suffix)})
 
 	publicClient := newAPIClient(t)
 	profileResponse, err := publicClient.GetAuthorWithResponse(context.Background(), firstSession.User.Author.Id)

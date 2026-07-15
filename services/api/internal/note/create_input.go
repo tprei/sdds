@@ -6,9 +6,11 @@ import (
 )
 
 const (
-	TitleMinLength = 3
-	TitleMaxLength = 120
-	BodyMaxLength  = 4000
+	TitleMinLength           = 3
+	TitleMaxLength           = 120
+	BodyMaxLength            = 4000
+	ClientRequestIDMaxLength = 128
+	MaxImagesPerNote         = 1
 )
 
 type ValidationProblem struct {
@@ -18,20 +20,53 @@ type ValidationProblem struct {
 
 func NormalizeCreateInput(input CreateInput) CreateInput {
 	return CreateInput{
-		UserID:       input.UserID,
-		Title:        strings.TrimSpace(input.Title),
-		Body:         strings.TrimSpace(input.Body),
-		CategorySlug: NormalizeCategorySlug(input.CategorySlug),
-		PlaceSlug:    NormalizePlaceSlug(input.PlaceSlug),
+		UserID:          input.UserID,
+		Title:           strings.TrimSpace(input.Title),
+		Body:            strings.TrimSpace(input.Body),
+		CategorySlug:    NormalizeCategorySlug(input.CategorySlug),
+		PlaceSlug:       NormalizePlaceSlug(input.PlaceSlug),
+		ClientRequestID: input.ClientRequestID,
+		ImageUploadIDs:  input.ImageUploadIDs,
 	}
 }
 
 func ValidateCreateInput(input CreateInput) []ValidationProblem {
 	normalized := NormalizeCreateInput(input)
-	problems := make([]ValidationProblem, 0, 4)
+	problems := make([]ValidationProblem, 0, 6)
 	problems = appendTitleValidationProblems(problems, normalized.Title)
 	problems = appendBodyValidationProblems(problems, normalized.Body)
 	problems = appendCategoryValidationProblems(problems, normalized.CategorySlug)
+	problems = appendClientRequestIDValidationProblems(problems, input.ClientRequestID)
+	problems = appendImageUploadIDValidationProblems(problems, input.ImageUploadIDs)
+	return problems
+}
+func appendClientRequestIDValidationProblems(problems []ValidationProblem, clientRequestID string) []ValidationProblem {
+	clientRequestIDLength := utf8.RuneCountInString(clientRequestID)
+	if clientRequestIDLength == 0 {
+		return append(problems, ValidationProblem{Field: "client_request_id", Message: "required"})
+	}
+	if clientRequestIDLength > ClientRequestIDMaxLength {
+		return append(problems, ValidationProblem{Field: "client_request_id", Message: "too_long"})
+	}
+	return problems
+}
+
+func appendImageUploadIDValidationProblems(problems []ValidationProblem, imageUploadIDs []string) []ValidationProblem {
+	if len(imageUploadIDs) > MaxImagesPerNote {
+		problems = append(problems, ValidationProblem{Field: "image_upload_ids", Message: "too_long"})
+	}
+	seen := make(map[string]struct{}, len(imageUploadIDs))
+	for _, imageUploadID := range imageUploadIDs {
+		if imageUploadID == "" {
+			problems = append(problems, ValidationProblem{Field: "image_upload_ids", Message: "invalid"})
+			continue
+		}
+		if _, ok := seen[imageUploadID]; ok {
+			problems = append(problems, ValidationProblem{Field: "image_upload_ids", Message: "invalid"})
+			continue
+		}
+		seen[imageUploadID] = struct{}{}
+	}
 	return problems
 }
 

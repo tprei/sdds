@@ -8,6 +8,7 @@ const syntheticPassword = 'secret-password';
 type CreateNoteRequest = {
   body: string;
   category_slug: string;
+  client_request_id: string;
   place_slug: string | null;
   title: string;
 };
@@ -481,12 +482,14 @@ test('narrows the mobile explore feed by category', async ({
 
   await createNote(request, session.token, {
     body: `Nota de comida criada para testar Explorar ${timestamp}.`,
+    client_request_id: `synthetic-explore-food-${timestamp}`,
     category_slug: 'food',
     place_slug: 'sao-paulo',
     title: foodTitle,
   });
   await createNote(request, session.token, {
     body: `Nota de viagem criada para testar Explorar ${timestamp}.`,
+    client_request_id: `synthetic-explore-travel-${timestamp}`,
     category_slug: 'travel',
     place_slug: 'rio-de-janeiro',
     title: travelTitle,
@@ -546,12 +549,14 @@ test('narrows the mobile search results by category and clears stale cards', asy
 
   await createNote(request, session.token, {
     body: `Marcador ${marker} para resultado de comida.`,
+    client_request_id: `synthetic-search-food-${timestamp}`,
     category_slug: 'food',
     place_slug: 'sao-paulo',
     title: foodTitle,
   });
   await createNote(request, session.token, {
     body: `Marcador ${marker} para resultado de viagem.`,
+    client_request_id: `synthetic-search-travel-${timestamp}`,
     category_slug: 'travel',
     place_slug: 'rio-de-janeiro',
     title: travelTitle,
@@ -639,12 +644,14 @@ test('orders search results by weighted title matches and handles punctuation-on
 
   await createNote(request, session.token, {
     body: `Nota antiga para ranking ${timestamp}.`,
+    client_request_id: `synthetic-ranking-title-${timestamp}`,
     category_slug: 'food',
     place_slug: 'sao-paulo',
     title: titleMatchTitle,
   });
   await createNote(request, session.token, {
     body: `${marker}.`,
+    client_request_id: `synthetic-ranking-body-${timestamp}`,
     category_slug: 'food',
     place_slug: 'sao-paulo',
     title: bodyMatchTitle,
@@ -689,12 +696,14 @@ test('filters note discovery by category through the public API', async ({
 
   const foodNote = await createNote(request, session.token, {
     body: `Marcador ${marker} para comida.`,
+    client_request_id: `synthetic-category-food-${timestamp}`,
     category_slug: 'food',
     place_slug: 'sao-paulo',
     title: foodTitle,
   });
   const travelNote = await createNote(request, session.token, {
     body: `Marcador ${marker} para viagem.`,
+    client_request_id: `synthetic-category-travel-${timestamp}`,
     category_slug: 'travel',
     place_slug: 'rio-de-janeiro',
     title: travelTitle,
@@ -747,6 +756,7 @@ test('opens a public author profile and appends paginated notes', async ({
     notes.push(
       await createNote(request, session.token, {
         body: `Texto público ${timestamp} ${index}.`,
+        client_request_id: `synthetic-profile-${timestamp}-${index}`,
         category_slug: index % 2 === 0 ? 'food' : 'travel',
         place_slug: null,
         title: `Nota pública ${timestamp} ${index}`,
@@ -852,12 +862,14 @@ test('shows distinct authors when a second user signs in', async ({
 
   const firstNote = await createNote(request, firstSession.token, {
     body: `Texto publicado pela Ana ${timestamp}.`,
+    client_request_id: `synthetic-author-first-${timestamp}`,
     category_slug: 'food',
     place_slug: 'sao-paulo',
     title: firstTitle,
   });
   const secondNote = await createNote(request, secondSession.token, {
     body: `Texto publicado pela Luiza ${timestamp}.`,
+    client_request_id: `synthetic-author-second-${timestamp}`,
     category_slug: 'travel',
     place_slug: 'rio-de-janeiro',
     title: secondTitle,

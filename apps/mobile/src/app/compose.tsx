@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import * as Crypto from 'expo-crypto';
 import { Pressable, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
@@ -32,6 +33,7 @@ type CatalogState =
   | { status: 'ready'; catalog: NoteCatalog }
   | { status: 'error' };
 
+
 export default function ComposeScreen() {
   const router = useRouter();
   const { logout, state: authState } = useAuth();
@@ -47,6 +49,7 @@ export default function ComposeScreen() {
   const [submitState, setSubmitState] = useState<SubmitState>({
     status: 'idle',
   });
+  const clientRequestIdentityRef = useRef<{ fingerprint: string; id: string } | null>(null);
 
   const trimmedTitle = title.trim();
   const trimmedBody = body.trim();
@@ -64,14 +67,17 @@ export default function ComposeScreen() {
     !isSubmitting;
 
   const selectCategorySlug = useCallback((nextSlug: string | null) => {
+    if (isSubmitting) return;
     categorySlugRef.current = nextSlug;
     setCategorySlug(nextSlug);
-  }, []);
+  }, [isSubmitting]);
 
   const selectPlaceSlug = useCallback((nextSlug: string | null) => {
+    if (isSubmitting) return;
     placeSlugRef.current = nextSlug;
     setPlaceSlug(nextSlug);
-  }, []);
+  }, [isSubmitting]);
+
 
   useFocusEffect(
     useCallback(() => {
@@ -114,6 +120,27 @@ export default function ComposeScreen() {
     }, [selectCategorySlug, selectPlaceSlug]),
   );
 
+  function stableClientRequestId(
+    nextTitle: string,
+    nextBody: string,
+    nextCategorySlug: string,
+    nextPlaceSlug: string | null,
+  ): string {
+    const fingerprint = JSON.stringify({
+      body: nextBody.trim(),
+      category_slug: nextCategorySlug.trim(),
+      place_slug: nextPlaceSlug?.trim() ?? '',
+      title: nextTitle.trim(),
+    });
+    const current = clientRequestIdentityRef.current;
+    if (current?.fingerprint === fingerprint) {
+      return current.id;
+    }
+    const id = Crypto.randomUUID();
+    clientRequestIdentityRef.current = { fingerprint, id };
+    return id;
+  }
+
   async function handleSubmit() {
     if (
       !canSubmit ||
@@ -122,7 +149,13 @@ export default function ComposeScreen() {
     ) {
       return;
     }
-
+    const clientRequestId = stableClientRequestId(
+      trimmedTitle,
+      trimmedBody,
+      categorySlug,
+      placeSlug,
+    );
+    const submittedFingerprint = clientRequestIdentityRef.current?.fingerprint;
     setSubmitState({ status: 'submitting' });
 
     try {
@@ -130,16 +163,30 @@ export default function ComposeScreen() {
         {
           body: trimmedBody,
           categorySlug,
+          clientRequestId,
           placeSlug,
           title: trimmedTitle,
         },
         authState.token,
       );
+      if (
+        clientRequestIdentityRef.current?.fingerprint !== submittedFingerprint
+      ) {
+        setSubmitState({ status: 'idle' });
+        return;
+      }
+      clientRequestIdentityRef.current = null;
       setTitle('');
       setBody('');
       setSubmitState({ status: 'success' });
       router.navigate('/');
     } catch (error) {
+      if (
+        clientRequestIdentityRef.current?.fingerprint !== submittedFingerprint
+      ) {
+        setSubmitState({ status: 'idle' });
+        return;
+      }
       if (
         error instanceof APIRequestError &&
         error.status === unauthorizedStatus
@@ -158,7 +205,6 @@ export default function ComposeScreen() {
         });
         return;
       }
-
       setSubmitState({
         status: 'error',
         message: 'Não deu pra publicar agora. Tente de novo em instantes.',
@@ -192,6 +238,7 @@ export default function ComposeScreen() {
         <>
           <FoundationTextInput
             accessibilityLabel="Título da nota"
+            editable={!isSubmitting}
             onChangeText={setTitle}
             placeholder="Título"
             value={title}
@@ -199,6 +246,7 @@ export default function ComposeScreen() {
           <FoundationTextInput
             accessibilityLabel="Texto da nota"
             multiline
+            editable={!isSubmitting}
             onChangeText={setBody}
             placeholder="O que você quer compartilhar?"
             value={body}

@@ -8,9 +8,10 @@ import (
 
 func TestValidateCreateInputAcceptsCategoryAndOptionalPlace(t *testing.T) {
 	problems := ValidateCreateInput(CreateInput{
-		Title:        "Café bom",
-		Body:         "Tem pão de queijo decente.",
-		CategorySlug: "food",
+		Title:           "Café bom",
+		Body:            "Tem pão de queijo decente.",
+		ClientRequestID: "domain-valid",
+		CategorySlug:    "food",
 	})
 
 	if len(problems) != 0 {
@@ -20,10 +21,11 @@ func TestValidateCreateInputAcceptsCategoryAndOptionalPlace(t *testing.T) {
 
 func TestValidateCreateInputAllowsUnknownCatalogMetadata(t *testing.T) {
 	problems := ValidateCreateInput(CreateInput{
-		Title:        "Café bom",
-		Body:         "Tem pão de queijo decente.",
-		CategorySlug: "qualquer",
-		PlaceSlug:    "qualquer-lugar",
+		Title:           "Café bom",
+		Body:            "Tem pão de queijo decente.",
+		CategorySlug:    "qualquer",
+		ClientRequestID: "domain-unknown-catalog",
+		PlaceSlug:       "qualquer-lugar",
 	})
 
 	if len(problems) != 0 {
@@ -60,10 +62,11 @@ func TestNormalizeAuthorNotesInputDefaultsLimit(t *testing.T) {
 
 func TestValidateCreateInputTreatsTrimmedEmptyCategoryAsRequired(t *testing.T) {
 	problems := ValidateCreateInput(CreateInput{
-		Title:        "Café bom",
-		Body:         "Tem pão de queijo decente.",
-		CategorySlug: "   ",
-		PlaceSlug:    "\n\t",
+		Title:           "Café bom",
+		Body:            "Tem pão de queijo decente.",
+		ClientRequestID: "domain-invalid-category",
+		CategorySlug:    "   ",
+		PlaceSlug:       "\n\t",
 	})
 
 	want := []ValidationProblem{

@@ -73,10 +73,10 @@ media_aws s3api put-object --bucket sdds-media --key note-images/persist-marker 
 check_object note-images/persist-marker "$TMP/marker" /tmp/sdds-test/marker-before "$TMP/marker-before" "$marker_hash"
 check_object system/readiness "$TMP/sentinel" /tmp/sdds-test/sentinel-before "$TMP/sentinel-before" "$sentinel_hash"
 
-username=rustfs$(date +%s)$$; password=rustfs-integration-password
+client_request_id=018ff5b8-0000-7000-8000-000000000012; username=rustfs$(date +%s)$$; password=rustfs-integration-password
 session=$(printf '{"username":"%s","password":"%s","display_name":"RustFS integration"}' "$username" "$password" | curl --silent --show-error --fail --max-time 10 -H 'Content-Type: application/json' --data-binary @- "$API_URL/v1/auth/users")
 token=$(printf '%s' "$session" | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
-note=$(printf '%s' '{"title":"RustFS persistence marker","body":"Compose volume marker","category_slug":"food"}' | curl --silent --show-error --fail --max-time 10 -H 'Content-Type: application/json' -H "Authorization: Bearer $token" --data-binary @- "$API_URL/v1/notes")
+note=$(printf '{"title":"RustFS persistence marker","body":"Compose volume marker","category_slug":"food","client_request_id":"%s"}' "$client_request_id" | curl --silent --show-error --fail --max-time 10 -H 'Content-Type: application/json' -H "Authorization: Bearer $token" --data-binary @- "$API_URL/v1/notes")
 note_id=$(printf '%s' "$note" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
 compose up --force-recreate -d api rustfs >/dev/null; wait_for_api
 check_object note-images/persist-marker "$TMP/marker" /tmp/sdds-test/marker-after "$TMP/marker-after" "$marker_hash"

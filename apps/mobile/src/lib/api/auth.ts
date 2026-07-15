@@ -50,9 +50,86 @@ type ErrorCode = GeneratedSchemas['ErrorCode'];
 type ErrorResponse = GeneratedSchemas['ErrorResponse'];
 type ValidationProblemResponse = GeneratedSchemas['ValidationProblem'];
 
-export type AuthAPIErrorCode = ErrorCode;
-export type AuthAPIErrorBody = ErrorResponse;
-export type AuthAPIErrorField = ValidationProblemResponse;
+export type AuthAPIErrorCode =
+  | 'internal_error'
+  | 'invalid_auth'
+  | 'invalid_json'
+  | 'rate_limited'
+  | 'request_too_large'
+  | 'unauthenticated'
+  | 'username_taken';
+export type AuthValidationField = 'display_name' | 'password' | 'username';
+export type AuthValidationProblemCode =
+  | 'required'
+  | 'too_short'
+  | 'too_long'
+  | 'unknown'
+  | 'invalid'
+  | 'taken';
+
+type ValidationField = GeneratedSchemas['ValidationField'];
+const errorCodes = [
+  'internal_error',
+  'invalid_auth',
+  'invalid_json',
+  'rate_limited',
+  'request_too_large',
+  'unauthenticated',
+  'username_taken',
+] as const satisfies readonly AuthAPIErrorCode[];
+const validationFields = [
+  'display_name',
+  'password',
+  'username',
+] as const satisfies readonly AuthValidationField[];
+const validationProblemCodes = [
+  'required',
+  'too_short',
+  'too_long',
+  'unknown',
+  'invalid',
+  'taken',
+] as const satisfies readonly AuthValidationProblemCode[];
+
+type MissingAuthAPIErrorCodes = Exclude<
+  AuthAPIErrorCode,
+  (typeof errorCodes)[number]
+>;
+type MissingAuthValidationFields = Exclude<
+  AuthValidationField,
+  (typeof validationFields)[number]
+>;
+type MissingAuthValidationProblemCodes = Exclude<
+  AuthValidationProblemCode,
+  (typeof validationProblemCodes)[number]
+>;
+type IsNever<T> = [T] extends [never] ? true : false;
+function assertType<T extends true>(value: T): void {
+  void value;
+}
+assertType<IsNever<MissingAuthAPIErrorCodes>>(true);
+assertType<IsNever<MissingAuthValidationFields>>(true);
+assertType<IsNever<MissingAuthValidationProblemCodes>>(true);
+assertType<AuthAPIErrorCode extends ErrorCode ? true : false>(true);
+assertType<AuthValidationField extends ValidationField ? true : false>(true);
+assertType<
+  AuthValidationProblemCode extends ValidationProblemResponse['code']
+    ? true
+    : false
+>(true);
+
+export type AuthAPIErrorBody = {
+  code: AuthAPIErrorCode;
+  fields?: AuthAPIErrorField[];
+};
+export type AuthAPIErrorField = {
+  code: AuthValidationProblemCode;
+  field: AuthValidationField;
+};
+assertType<AuthAPIErrorBody extends ErrorResponse ? true : false>(true);
+assertType<AuthAPIErrorField extends ValidationProblemResponse ? true : false>(
+  true,
+);
 
 export class AuthAPIRequestError extends Error {
   readonly code: AuthAPIErrorCode | undefined;
@@ -61,7 +138,7 @@ export class AuthAPIRequestError extends Error {
 
   readonly status: number;
 
-  constructor(status: number, errorResponse: ErrorResponse | null = null) {
+  constructor(status: number, errorResponse: AuthAPIErrorBody | null = null) {
     super('auth_api_request_failed');
     this.code = errorResponse?.code;
     this.fields = errorResponse?.fields?.map((field) => ({
@@ -220,11 +297,51 @@ function parseAuthorSummary(value: AuthorSummaryResponse): AuthAuthor {
   };
 }
 
-function parseErrorResponse(value: unknown): ErrorResponse | null {
+function parseErrorResponse(value: unknown): AuthAPIErrorBody | null {
   const errorResponse = errorResponseSchema.safeParse(value);
-  if (!errorResponse.success) {
+  if (!errorResponse.success || !isErrorResponse(errorResponse.data)) {
     return null;
   }
 
   return errorResponse.data;
+}
+
+function isErrorResponse(value: unknown): value is AuthAPIErrorBody {
+  return (
+    isRecord(value) &&
+    hasOwnKey(value, 'code') &&
+    isKnownValue(value.code, errorCodes) &&
+    (!hasOwnKey(value, 'fields') ||
+      value.fields === undefined ||
+      (Array.isArray(value.fields) &&
+        value.fields.every(isValidationProblemResponse)))
+  );
+}
+
+function isValidationProblemResponse(
+  value: unknown,
+): value is AuthAPIErrorField {
+  return (
+    isRecord(value) &&
+    isKnownValue(value.code, validationProblemCodes) &&
+    isKnownValue(value.field, validationFields)
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasOwnKey(value: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function isKnownValue<T extends string>(
+  value: unknown,
+  knownValues: readonly T[],
+): value is T {
+  return (
+    typeof value === 'string' &&
+    knownValues.some((knownValue) => knownValue === value)
+  );
 }

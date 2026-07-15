@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
@@ -22,30 +23,49 @@ const (
 
 // Defines values for ErrorCode.
 const (
-	ErrorCodeInternal        ErrorCode = "internal_error"
-	ErrorCodeInvalidAuth     ErrorCode = "invalid_auth"
-	ErrorCodeInvalidJSON     ErrorCode = "invalid_json"
-	ErrorCodeInvalidNote     ErrorCode = "invalid_note"
-	ErrorCodeInvalidSearch   ErrorCode = "invalid_search"
-	ErrorCodeNotFound        ErrorCode = "not_found"
-	ErrorCodeRateLimited     ErrorCode = "rate_limited"
-	ErrorCodeRequestTooLarge ErrorCode = "request_too_large"
-	ErrorCodeUnauthenticated ErrorCode = "unauthenticated"
-	ErrorCodeUsernameTaken   ErrorCode = "username_taken"
+	ErrorCodeIdempotencyConflict       ErrorCode = "idempotency_conflict"
+	ErrorCodeInternal                  ErrorCode = "internal_error"
+	ErrorCodeInvalidAuth               ErrorCode = "invalid_auth"
+	ErrorCodeInvalidJSON               ErrorCode = "invalid_json"
+	ErrorCodeInvalidMedia              ErrorCode = "invalid_media"
+	ErrorCodeInvalidNote               ErrorCode = "invalid_note"
+	ErrorCodeInvalidSearch             ErrorCode = "invalid_search"
+	ErrorCodeMediaIntegrityError       ErrorCode = "media_integrity_error"
+	ErrorCodeMediaStagingQuotaExceeded ErrorCode = "media_staging_quota_exceeded"
+	ErrorCodeMediaStorageUnavailable   ErrorCode = "media_storage_unavailable"
+	ErrorCodeNotFound                  ErrorCode = "not_found"
+	ErrorCodeRateLimited               ErrorCode = "rate_limited"
+	ErrorCodeRequestTooLarge           ErrorCode = "request_too_large"
+	ErrorCodeTooManyImages             ErrorCode = "too_many_images"
+	ErrorCodeUnauthenticated           ErrorCode = "unauthenticated"
+	ErrorCodeUnsupportedMediaType      ErrorCode = "unsupported_media_type"
+	ErrorCodeUploadExpired             ErrorCode = "upload_expired"
+	ErrorCodeUploadInProgress          ErrorCode = "upload_in_progress"
+	ErrorCodeUsernameTaken             ErrorCode = "username_taken"
 )
 
 // Valid indicates whether the value is a known member of the ErrorCode enum.
 func (e ErrorCode) Valid() bool {
 	switch e {
+	case ErrorCodeIdempotencyConflict:
+		return true
 	case ErrorCodeInternal:
 		return true
 	case ErrorCodeInvalidAuth:
 		return true
 	case ErrorCodeInvalidJSON:
 		return true
+	case ErrorCodeInvalidMedia:
+		return true
 	case ErrorCodeInvalidNote:
 		return true
 	case ErrorCodeInvalidSearch:
+		return true
+	case ErrorCodeMediaIntegrityError:
+		return true
+	case ErrorCodeMediaStagingQuotaExceeded:
+		return true
+	case ErrorCodeMediaStorageUnavailable:
 		return true
 	case ErrorCodeNotFound:
 		return true
@@ -53,7 +73,15 @@ func (e ErrorCode) Valid() bool {
 		return true
 	case ErrorCodeRequestTooLarge:
 		return true
+	case ErrorCodeTooManyImages:
+		return true
 	case ErrorCodeUnauthenticated:
+		return true
+	case ErrorCodeUnsupportedMediaType:
+		return true
+	case ErrorCodeUploadExpired:
+		return true
+	case ErrorCodeUploadInProgress:
 		return true
 	case ErrorCodeUsernameTaken:
 		return true
@@ -62,18 +90,36 @@ func (e ErrorCode) Valid() bool {
 	}
 }
 
+// Defines values for ImageUploadReceiptContentType.
+const (
+	ImageUploadReceiptContentTypeImagejpeg ImageUploadReceiptContentType = "image/jpeg"
+	ImageUploadReceiptContentTypeImagepng  ImageUploadReceiptContentType = "image/png"
+)
+
+// Valid indicates whether the value is a known member of the ImageUploadReceiptContentType enum.
+func (e ImageUploadReceiptContentType) Valid() bool {
+	switch e {
+	case ImageUploadReceiptContentTypeImagejpeg:
+		return true
+	case ImageUploadReceiptContentTypeImagepng:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for NoteImageContentType.
 const (
-	Imagejpeg NoteImageContentType = "image/jpeg"
-	Imagepng  NoteImageContentType = "image/png"
+	NoteImageContentTypeImagejpeg NoteImageContentType = "image/jpeg"
+	NoteImageContentTypeImagepng  NoteImageContentType = "image/png"
 )
 
 // Valid indicates whether the value is a known member of the NoteImageContentType enum.
 func (e NoteImageContentType) Valid() bool {
 	switch e {
-	case Imagejpeg:
+	case NoteImageContentTypeImagejpeg:
 		return true
-	case Imagepng:
+	case NoteImageContentTypeImagepng:
 		return true
 	default:
 		return false
@@ -82,16 +128,20 @@ func (e NoteImageContentType) Valid() bool {
 
 // Defines values for ValidationField.
 const (
-	ValidationFieldBody         ValidationField = "body"
-	ValidationFieldCategorySlug ValidationField = "category_slug"
-	ValidationFieldCursor       ValidationField = "cursor"
-	ValidationFieldDisplayName  ValidationField = "display_name"
-	ValidationFieldLimit        ValidationField = "limit"
-	ValidationFieldPassword     ValidationField = "password"
-	ValidationFieldPlaceSlug    ValidationField = "place_slug"
-	ValidationFieldQ            ValidationField = "q"
-	ValidationFieldTitle        ValidationField = "title"
-	ValidationFieldUsername     ValidationField = "username"
+	ValidationFieldBody            ValidationField = "body"
+	ValidationFieldCategorySlug    ValidationField = "category_slug"
+	ValidationFieldClientRequestID ValidationField = "client_request_id"
+	ValidationFieldCursor          ValidationField = "cursor"
+	ValidationFieldDisplayName     ValidationField = "display_name"
+	ValidationFieldFile            ValidationField = "file"
+	ValidationFieldImageUploadIDs  ValidationField = "image_upload_ids"
+	ValidationFieldLimit           ValidationField = "limit"
+	ValidationFieldPassword        ValidationField = "password"
+	ValidationFieldPlaceSlug       ValidationField = "place_slug"
+	ValidationFieldQ               ValidationField = "q"
+	ValidationFieldTitle           ValidationField = "title"
+	ValidationFieldUploadRequestID ValidationField = "upload_request_id"
+	ValidationFieldUsername        ValidationField = "username"
 )
 
 // Valid indicates whether the value is a known member of the ValidationField enum.
@@ -101,9 +151,15 @@ func (e ValidationField) Valid() bool {
 		return true
 	case ValidationFieldCategorySlug:
 		return true
+	case ValidationFieldClientRequestID:
+		return true
 	case ValidationFieldCursor:
 		return true
 	case ValidationFieldDisplayName:
+		return true
+	case ValidationFieldFile:
+		return true
+	case ValidationFieldImageUploadIDs:
 		return true
 	case ValidationFieldLimit:
 		return true
@@ -114,6 +170,8 @@ func (e ValidationField) Valid() bool {
 	case ValidationFieldQ:
 		return true
 	case ValidationFieldTitle:
+		return true
+	case ValidationFieldUploadRequestID:
 		return true
 	case ValidationFieldUsername:
 		return true
@@ -235,6 +293,19 @@ type ErrorResponse struct {
 	Fields *[]ValidationProblem `json:"fields,omitempty"`
 }
 
+// ImageUploadReceipt defines model for ImageUploadReceipt.
+type ImageUploadReceipt struct {
+	ByteSize      int64                         `json:"byte_size"`
+	ContentType   ImageUploadReceiptContentType `json:"content_type"`
+	ExpiresAt     int64                         `json:"expires_at"`
+	Height        int32                         `json:"height"`
+	ImageUploadId openapi_types.UUID            `json:"image_upload_id"`
+	Width         int32                         `json:"width"`
+}
+
+// ImageUploadReceiptContentType defines model for ImageUploadReceipt.ContentType.
+type ImageUploadReceiptContentType string
+
 // ListCategoriesResponse defines model for ListCategoriesResponse.
 type ListCategoriesResponse struct {
 	Categories []CatalogCategory `json:"categories"`
@@ -285,6 +356,12 @@ type NoteImageContentType string
 
 // PlaceSlug defines model for PlaceSlug.
 type PlaceSlug = string
+
+// PrepareImageUploadMultipart defines model for PrepareImageUploadMultipart.
+type PrepareImageUploadMultipart struct {
+	File            openapi_types.File `json:"file"`
+	UploadRequestId openapi_types.UUID `json:"upload_request_id"`
+}
 
 // PublicAuthor defines model for PublicAuthor.
 type PublicAuthor struct {
@@ -337,6 +414,9 @@ type CreateAuthSessionJSONRequestBody = CreateSessionRequest
 
 // CreateAuthUserJSONRequestBody defines body for CreateAuthUser for application/json ContentType.
 type CreateAuthUserJSONRequestBody = CreateUserRequest
+
+// PrepareImageUploadMultipartRequestBody defines body for PrepareImageUpload for multipart/form-data ContentType.
+type PrepareImageUploadMultipartRequestBody = PrepareImageUploadMultipart
 
 // CreateNoteJSONRequestBody defines body for CreateNote for application/json ContentType.
 type CreateNoteJSONRequestBody = CreateNoteRequest
@@ -444,6 +524,9 @@ type ClientInterface interface {
 
 	// ListCategories request
 	ListCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PrepareImageUploadWithBody request with any body
+	PrepareImageUploadWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListNotes request
 	ListNotes(ctx context.Context, params *ListNotesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -585,6 +668,18 @@ func (c *Client) ListAuthorNotes(ctx context.Context, authorId string, params *L
 
 func (c *Client) ListCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListCategoriesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PrepareImageUploadWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPrepareImageUploadRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -989,6 +1084,35 @@ func NewListCategoriesRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewPrepareImageUploadRequestWithBody generates requests for PrepareImageUpload with any type of body
+func NewPrepareImageUploadRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/media/image-uploads")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListNotesRequest generates requests for ListNotes
 func NewListNotesRequest(server string, params *ListNotesParams) (*http.Request, error) {
 	var err error
@@ -1283,6 +1407,9 @@ type ClientWithResponsesInterface interface {
 
 	// ListCategoriesWithResponse request
 	ListCategoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCategoriesHTTPResponse, error)
+
+	// PrepareImageUploadWithBodyWithResponse request with any body
+	PrepareImageUploadWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PrepareImageUploadHTTPResponse, error)
 
 	// ListNotesWithResponse request
 	ListNotesWithResponse(ctx context.Context, params *ListNotesParams, reqEditors ...RequestEditorFn) (*ListNotesHTTPResponse, error)
@@ -1595,6 +1722,44 @@ func (r ListCategoriesHTTPResponse) ContentType() string {
 	return ""
 }
 
+type PrepareImageUploadHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *ImageUploadReceipt
+	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
+	JSON409      *ErrorResponse
+	JSON413      *ErrorResponse
+	JSON415      *ErrorResponse
+	JSON429      *ErrorResponse
+	JSON500      *ErrorResponse
+	JSON503      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r PrepareImageUploadHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PrepareImageUploadHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PrepareImageUploadHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListNotesHTTPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1853,6 +2018,15 @@ func (c *ClientWithResponses) ListCategoriesWithResponse(ctx context.Context, re
 		return nil, err
 	}
 	return ParseListCategoriesHTTPResponse(rsp)
+}
+
+// PrepareImageUploadWithBodyWithResponse request with arbitrary body returning *PrepareImageUploadHTTPResponse
+func (c *ClientWithResponses) PrepareImageUploadWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PrepareImageUploadHTTPResponse, error) {
+	rsp, err := c.PrepareImageUploadWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePrepareImageUploadHTTPResponse(rsp)
 }
 
 // ListNotesWithResponse request returning *ListNotesHTTPResponse
@@ -2297,6 +2471,88 @@ func ParseListCategoriesHTTPResponse(rsp *http.Response) (*ListCategoriesHTTPRes
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePrepareImageUploadHTTPResponse parses an HTTP response from a PrepareImageUploadWithResponse call
+func ParsePrepareImageUploadHTTPResponse(rsp *http.Response) (*PrepareImageUploadHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PrepareImageUploadHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest ImageUploadReceipt
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

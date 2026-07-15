@@ -50,6 +50,15 @@ const errorCodes = [
   'request_too_large',
   'unauthenticated',
   'username_taken',
+  'invalid_media',
+  'unsupported_media_type',
+  'idempotency_conflict',
+  'upload_in_progress',
+  'upload_expired',
+  'media_staging_quota_exceeded',
+  'media_storage_unavailable',
+  'media_integrity_error',
+  'too_many_images',
 ] satisfies readonly ErrorCode[];
 
 const validationFields = [
@@ -63,6 +72,10 @@ const validationFields = [
   'display_name',
   'limit',
   'cursor',
+  'client_request_id',
+  'upload_request_id',
+  'image_upload_ids',
+  'file',
 ] satisfies readonly ValidationField[];
 
 const validationProblemCodes = [

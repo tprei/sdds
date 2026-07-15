@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/v1/media/image-uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stage one private image upload */
+        post: operations["prepareImageUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -253,6 +270,26 @@ export interface components {
             /** Format: int32 */
             display_order: number;
         };
+        ImageUploadReceipt: {
+            /** Format: uuid */
+            image_upload_id: string;
+            /** @enum {string} */
+            content_type: "image/jpeg" | "image/png";
+            /** Format: int64 */
+            byte_size: number;
+            /** Format: int32 */
+            width: number;
+            /** Format: int32 */
+            height: number;
+            /** Format: int64 */
+            expires_at: number;
+        };
+        PrepareImageUploadMultipart: {
+            /** Format: uuid */
+            upload_request_id: string;
+            /** Format: binary */
+            file: string;
+        };
         CreateNoteRequest: {
             title: string;
             body: string;
@@ -282,7 +319,7 @@ export interface components {
             author: components["schemas"]["AuthorSummary"];
         };
         /** @enum {string} */
-        ErrorCode: "internal_error" | "invalid_auth" | "invalid_json" | "invalid_note" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken";
+        ErrorCode: "internal_error" | "invalid_auth" | "invalid_json" | "invalid_note" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken" | "invalid_media" | "unsupported_media_type" | "idempotency_conflict" | "upload_in_progress" | "upload_expired" | "media_staging_quota_exceeded" | "media_storage_unavailable" | "media_integrity_error" | "too_many_images";
         ErrorResponse: {
             code: components["schemas"]["ErrorCode"];
             fields?: components["schemas"]["ValidationProblem"][];
@@ -335,7 +372,7 @@ export interface components {
             images: components["schemas"]["NoteImage"][];
         };
         /** @enum {string} */
-        ValidationField: "title" | "body" | "category_slug" | "place_slug" | "q" | "username" | "password" | "display_name" | "limit" | "cursor";
+        ValidationField: "title" | "body" | "category_slug" | "place_slug" | "q" | "username" | "password" | "display_name" | "limit" | "cursor" | "client_request_id" | "upload_request_id" | "image_upload_ids" | "file";
         ValidationProblem: {
             field: components["schemas"]["ValidationField"];
             /** @enum {string} */
@@ -350,6 +387,105 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    prepareImageUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["PrepareImageUploadMultipart"];
+            };
+        };
+        responses: {
+            /** @description Image staged and ready for association. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageUploadReceipt"];
+                };
+            };
+            /** @description Invalid multipart structure or image metadata. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Upload identity conflict, in-progress retry, or expired identity. */
+            409: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Encoded image or multipart body exceeds the limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unsupported image format. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Staged-upload quota exceeded. */
+            429: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The media could not be persisted due to an internal error. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Media storage is temporarily unavailable. */
+            503: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     getHealth: {
         parameters: {
             query?: never;

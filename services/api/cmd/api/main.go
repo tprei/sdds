@@ -55,6 +55,10 @@ var listenAndServe = func(server *http.Server) error {
 	return server.ListenAndServe()
 }
 
+var closeDatabase = func(database *sql.DB) error {
+	return database.Close()
+}
+
 func main() {
 	if err := run(); err != nil {
 		slog.Error("api stopped", "error", err)
@@ -112,7 +116,7 @@ func runServer(ctx context.Context, config config) (err error) {
 		return err
 	}
 	defer func() {
-		if closeErr := db.Close(); closeErr != nil && err == nil {
+		if closeErr := closeDatabase(db); closeErr != nil && err == nil {
 			err = fmt.Errorf("close database: %w", closeErr)
 		}
 	}()
@@ -126,12 +130,26 @@ func runServer(ctx context.Context, config config) (err error) {
 	if err := store.VerifyReadiness(readinessCtx); err != nil {
 		return fmt.Errorf("verify media readiness: %w", err)
 	}
-
+	objectStore, ok := store.(media.ObjectStore)
+	if !ok {
+		return errors.New("media store does not support object operations")
+	}
 	noteStore := sqlite.NewNoteStore(db)
 	catalogStore := sqlite.NewCatalogStore(db)
 	userStore := sqlite.NewUserStore(db)
+	uploadStore := sqlite.NewImageUploadStore(db)
+	uploadService, err := media.NewUploadService(uploadStore, objectStore, media.UploadConfig{})
+	if err != nil {
+		return fmt.Errorf("create upload service: %w", err)
+	}
+	cleanupCtx, cleanupCancel := context.WithTimeout(ctx, startupReadinessTimeout)
+	if err := uploadService.CleanupExpired(cleanupCtx, time.Now()); err != nil {
+		cleanupCancel()
+		return fmt.Errorf("cleanup expired uploads: %w", err)
+	}
+	cleanupCancel()
 	readiness := runtimeReadiness{database: db, media: store}
-	server := newServer(config, httpapi.NewRouter(noteStore, catalogStore, userStore, config.authLimits, readiness))
+	server := newServer(config, httpapi.NewRouter(noteStore, catalogStore, userStore, config.authLimits, readiness, uploadService))
 
 	slog.Info("api listening", "addr", config.httpAddr)
 	if err := listenAndServe(server); err != nil && !errors.Is(err, http.ErrServerClosed) {

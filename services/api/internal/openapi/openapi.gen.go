@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path"
@@ -19,6 +20,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
@@ -27,30 +29,49 @@ const (
 
 // Defines values for ErrorCode.
 const (
-	ErrorCodeInternal        ErrorCode = "internal_error"
-	ErrorCodeInvalidAuth     ErrorCode = "invalid_auth"
-	ErrorCodeInvalidJSON     ErrorCode = "invalid_json"
-	ErrorCodeInvalidNote     ErrorCode = "invalid_note"
-	ErrorCodeInvalidSearch   ErrorCode = "invalid_search"
-	ErrorCodeNotFound        ErrorCode = "not_found"
-	ErrorCodeRateLimited     ErrorCode = "rate_limited"
-	ErrorCodeRequestTooLarge ErrorCode = "request_too_large"
-	ErrorCodeUnauthenticated ErrorCode = "unauthenticated"
-	ErrorCodeUsernameTaken   ErrorCode = "username_taken"
+	ErrorCodeIdempotencyConflict       ErrorCode = "idempotency_conflict"
+	ErrorCodeInternal                  ErrorCode = "internal_error"
+	ErrorCodeInvalidAuth               ErrorCode = "invalid_auth"
+	ErrorCodeInvalidJSON               ErrorCode = "invalid_json"
+	ErrorCodeInvalidMedia              ErrorCode = "invalid_media"
+	ErrorCodeInvalidNote               ErrorCode = "invalid_note"
+	ErrorCodeInvalidSearch             ErrorCode = "invalid_search"
+	ErrorCodeMediaIntegrityError       ErrorCode = "media_integrity_error"
+	ErrorCodeMediaStagingQuotaExceeded ErrorCode = "media_staging_quota_exceeded"
+	ErrorCodeMediaStorageUnavailable   ErrorCode = "media_storage_unavailable"
+	ErrorCodeNotFound                  ErrorCode = "not_found"
+	ErrorCodeRateLimited               ErrorCode = "rate_limited"
+	ErrorCodeRequestTooLarge           ErrorCode = "request_too_large"
+	ErrorCodeTooManyImages             ErrorCode = "too_many_images"
+	ErrorCodeUnauthenticated           ErrorCode = "unauthenticated"
+	ErrorCodeUnsupportedMediaType      ErrorCode = "unsupported_media_type"
+	ErrorCodeUploadExpired             ErrorCode = "upload_expired"
+	ErrorCodeUploadInProgress          ErrorCode = "upload_in_progress"
+	ErrorCodeUsernameTaken             ErrorCode = "username_taken"
 )
 
 // Valid indicates whether the value is a known member of the ErrorCode enum.
 func (e ErrorCode) Valid() bool {
 	switch e {
+	case ErrorCodeIdempotencyConflict:
+		return true
 	case ErrorCodeInternal:
 		return true
 	case ErrorCodeInvalidAuth:
 		return true
 	case ErrorCodeInvalidJSON:
 		return true
+	case ErrorCodeInvalidMedia:
+		return true
 	case ErrorCodeInvalidNote:
 		return true
 	case ErrorCodeInvalidSearch:
+		return true
+	case ErrorCodeMediaIntegrityError:
+		return true
+	case ErrorCodeMediaStagingQuotaExceeded:
+		return true
+	case ErrorCodeMediaStorageUnavailable:
 		return true
 	case ErrorCodeNotFound:
 		return true
@@ -58,7 +79,15 @@ func (e ErrorCode) Valid() bool {
 		return true
 	case ErrorCodeRequestTooLarge:
 		return true
+	case ErrorCodeTooManyImages:
+		return true
 	case ErrorCodeUnauthenticated:
+		return true
+	case ErrorCodeUnsupportedMediaType:
+		return true
+	case ErrorCodeUploadExpired:
+		return true
+	case ErrorCodeUploadInProgress:
 		return true
 	case ErrorCodeUsernameTaken:
 		return true
@@ -67,18 +96,36 @@ func (e ErrorCode) Valid() bool {
 	}
 }
 
+// Defines values for ImageUploadReceiptContentType.
+const (
+	ImageUploadReceiptContentTypeImagejpeg ImageUploadReceiptContentType = "image/jpeg"
+	ImageUploadReceiptContentTypeImagepng  ImageUploadReceiptContentType = "image/png"
+)
+
+// Valid indicates whether the value is a known member of the ImageUploadReceiptContentType enum.
+func (e ImageUploadReceiptContentType) Valid() bool {
+	switch e {
+	case ImageUploadReceiptContentTypeImagejpeg:
+		return true
+	case ImageUploadReceiptContentTypeImagepng:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for NoteImageContentType.
 const (
-	Imagejpeg NoteImageContentType = "image/jpeg"
-	Imagepng  NoteImageContentType = "image/png"
+	NoteImageContentTypeImagejpeg NoteImageContentType = "image/jpeg"
+	NoteImageContentTypeImagepng  NoteImageContentType = "image/png"
 )
 
 // Valid indicates whether the value is a known member of the NoteImageContentType enum.
 func (e NoteImageContentType) Valid() bool {
 	switch e {
-	case Imagejpeg:
+	case NoteImageContentTypeImagejpeg:
 		return true
-	case Imagepng:
+	case NoteImageContentTypeImagepng:
 		return true
 	default:
 		return false
@@ -87,16 +134,20 @@ func (e NoteImageContentType) Valid() bool {
 
 // Defines values for ValidationField.
 const (
-	ValidationFieldBody         ValidationField = "body"
-	ValidationFieldCategorySlug ValidationField = "category_slug"
-	ValidationFieldCursor       ValidationField = "cursor"
-	ValidationFieldDisplayName  ValidationField = "display_name"
-	ValidationFieldLimit        ValidationField = "limit"
-	ValidationFieldPassword     ValidationField = "password"
-	ValidationFieldPlaceSlug    ValidationField = "place_slug"
-	ValidationFieldQ            ValidationField = "q"
-	ValidationFieldTitle        ValidationField = "title"
-	ValidationFieldUsername     ValidationField = "username"
+	ValidationFieldBody            ValidationField = "body"
+	ValidationFieldCategorySlug    ValidationField = "category_slug"
+	ValidationFieldClientRequestID ValidationField = "client_request_id"
+	ValidationFieldCursor          ValidationField = "cursor"
+	ValidationFieldDisplayName     ValidationField = "display_name"
+	ValidationFieldFile            ValidationField = "file"
+	ValidationFieldImageUploadIDs  ValidationField = "image_upload_ids"
+	ValidationFieldLimit           ValidationField = "limit"
+	ValidationFieldPassword        ValidationField = "password"
+	ValidationFieldPlaceSlug       ValidationField = "place_slug"
+	ValidationFieldQ               ValidationField = "q"
+	ValidationFieldTitle           ValidationField = "title"
+	ValidationFieldUploadRequestID ValidationField = "upload_request_id"
+	ValidationFieldUsername        ValidationField = "username"
 )
 
 // Valid indicates whether the value is a known member of the ValidationField enum.
@@ -106,9 +157,15 @@ func (e ValidationField) Valid() bool {
 		return true
 	case ValidationFieldCategorySlug:
 		return true
+	case ValidationFieldClientRequestID:
+		return true
 	case ValidationFieldCursor:
 		return true
 	case ValidationFieldDisplayName:
+		return true
+	case ValidationFieldFile:
+		return true
+	case ValidationFieldImageUploadIDs:
 		return true
 	case ValidationFieldLimit:
 		return true
@@ -119,6 +176,8 @@ func (e ValidationField) Valid() bool {
 	case ValidationFieldQ:
 		return true
 	case ValidationFieldTitle:
+		return true
+	case ValidationFieldUploadRequestID:
 		return true
 	case ValidationFieldUsername:
 		return true
@@ -240,6 +299,19 @@ type ErrorResponse struct {
 	Fields *[]ValidationProblem `json:"fields,omitempty"`
 }
 
+// ImageUploadReceipt defines model for ImageUploadReceipt.
+type ImageUploadReceipt struct {
+	ByteSize      int64                         `json:"byte_size"`
+	ContentType   ImageUploadReceiptContentType `json:"content_type"`
+	ExpiresAt     int64                         `json:"expires_at"`
+	Height        int32                         `json:"height"`
+	ImageUploadId openapi_types.UUID            `json:"image_upload_id"`
+	Width         int32                         `json:"width"`
+}
+
+// ImageUploadReceiptContentType defines model for ImageUploadReceipt.ContentType.
+type ImageUploadReceiptContentType string
+
 // ListCategoriesResponse defines model for ListCategoriesResponse.
 type ListCategoriesResponse struct {
 	Categories []CatalogCategory `json:"categories"`
@@ -290,6 +362,12 @@ type NoteImageContentType string
 
 // PlaceSlug defines model for PlaceSlug.
 type PlaceSlug = string
+
+// PrepareImageUploadMultipart defines model for PrepareImageUploadMultipart.
+type PrepareImageUploadMultipart struct {
+	File            openapi_types.File `json:"file"`
+	UploadRequestId openapi_types.UUID `json:"upload_request_id"`
+}
 
 // PublicAuthor defines model for PublicAuthor.
 type PublicAuthor struct {
@@ -343,6 +421,9 @@ type CreateAuthSessionJSONRequestBody = CreateSessionRequest
 // CreateAuthUserJSONRequestBody defines body for CreateAuthUser for application/json ContentType.
 type CreateAuthUserJSONRequestBody = CreateUserRequest
 
+// PrepareImageUploadMultipartRequestBody defines body for PrepareImageUpload for multipart/form-data ContentType.
+type PrepareImageUploadMultipartRequestBody = PrepareImageUploadMultipart
+
 // CreateNoteJSONRequestBody defines body for CreateNote for application/json ContentType.
 type CreateNoteJSONRequestBody = CreateNoteRequest
 
@@ -375,6 +456,9 @@ type ServerInterface interface {
 	// List category catalog
 	// (GET /v1/categories)
 	ListCategories(w http.ResponseWriter, r *http.Request)
+	// Stage one private image upload
+	// (POST /v1/media/image-uploads)
+	PrepareImageUpload(w http.ResponseWriter, r *http.Request)
 	// List recent notes
 	// (GET /v1/notes)
 	ListNotes(w http.ResponseWriter, r *http.Request, params ListNotesParams)
@@ -447,6 +531,12 @@ func (_ Unimplemented) ListAuthorNotes(w http.ResponseWriter, r *http.Request, a
 // List category catalog
 // (GET /v1/categories)
 func (_ Unimplemented) ListCategories(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Stage one private image upload
+// (POST /v1/media/image-uploads)
+func (_ Unimplemented) PrepareImageUpload(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -671,6 +761,26 @@ func (siw *ServerInterfaceWrapper) ListCategories(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListCategories(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PrepareImageUpload operation middleware
+func (siw *ServerInterfaceWrapper) PrepareImageUpload(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PrepareImageUpload(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -958,6 +1068,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/categories", wrapper.ListCategories)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/media/image-uploads", wrapper.PrepareImageUpload)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/notes", wrapper.ListNotes)
@@ -1526,6 +1639,170 @@ func (response ListCategories500JSONResponse) VisitListCategoriesResponse(w http
 	return err
 }
 
+type PrepareImageUploadRequestObject struct {
+	Body *multipart.Reader
+}
+
+type PrepareImageUploadResponseObject interface {
+	VisitPrepareImageUploadResponse(w http.ResponseWriter) error
+}
+
+type PrepareImageUpload201JSONResponse ImageUploadReceipt
+
+func (response PrepareImageUpload201JSONResponse) VisitPrepareImageUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PrepareImageUpload400JSONResponse ErrorResponse
+
+func (response PrepareImageUpload400JSONResponse) VisitPrepareImageUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PrepareImageUpload401JSONResponse ErrorResponse
+
+func (response PrepareImageUpload401JSONResponse) VisitPrepareImageUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PrepareImageUpload409ResponseHeaders struct {
+	RetryAfter *int
+}
+
+type PrepareImageUpload409JSONResponse struct {
+	Body    ErrorResponse
+	Headers PrepareImageUpload409ResponseHeaders
+}
+
+func (response PrepareImageUpload409JSONResponse) VisitPrepareImageUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PrepareImageUpload413JSONResponse ErrorResponse
+
+func (response PrepareImageUpload413JSONResponse) VisitPrepareImageUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PrepareImageUpload415JSONResponse ErrorResponse
+
+func (response PrepareImageUpload415JSONResponse) VisitPrepareImageUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PrepareImageUpload429ResponseHeaders struct {
+	RetryAfter *int
+}
+
+type PrepareImageUpload429JSONResponse struct {
+	Body    ErrorResponse
+	Headers PrepareImageUpload429ResponseHeaders
+}
+
+func (response PrepareImageUpload429JSONResponse) VisitPrepareImageUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PrepareImageUpload500JSONResponse ErrorResponse
+
+func (response PrepareImageUpload500JSONResponse) VisitPrepareImageUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PrepareImageUpload503ResponseHeaders struct {
+	RetryAfter *int
+}
+
+type PrepareImageUpload503JSONResponse struct {
+	Body    ErrorResponse
+	Headers PrepareImageUpload503ResponseHeaders
+}
+
+func (response PrepareImageUpload503JSONResponse) VisitPrepareImageUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListNotesRequestObject struct {
 	Params ListNotesParams
 }
@@ -1846,6 +2123,9 @@ type StrictServerInterface interface {
 	// List category catalog
 	// (GET /v1/categories)
 	ListCategories(ctx context.Context, request ListCategoriesRequestObject) (ListCategoriesResponseObject, error)
+	// Stage one private image upload
+	// (POST /v1/media/image-uploads)
+	PrepareImageUpload(ctx context.Context, request PrepareImageUploadRequestObject) (PrepareImageUploadResponseObject, error)
 	// List recent notes
 	// (GET /v1/notes)
 	ListNotes(ctx context.Context, request ListNotesRequestObject) (ListNotesResponseObject, error)
@@ -2127,6 +2407,37 @@ func (sh *strictHandler) ListCategories(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// PrepareImageUpload operation middleware
+func (sh *strictHandler) PrepareImageUpload(w http.ResponseWriter, r *http.Request) {
+	var request PrepareImageUploadRequestObject
+
+	if reader, err := r.MultipartReader(); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+		return
+	} else {
+		request.Body = reader
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PrepareImageUpload(ctx, request.(PrepareImageUploadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PrepareImageUpload")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PrepareImageUploadResponseObject); ok {
+		if err := validResponse.VisitPrepareImageUploadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListNotes operation middleware
 func (sh *strictHandler) ListNotes(w http.ResponseWriter, r *http.Request, params ListNotesParams) {
 	var request ListNotesRequestObject
@@ -2265,52 +2576,62 @@ func (sh *strictHandler) SearchNotes(w http.ResponseWriter, r *http.Request, par
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"7FvbT+M6Gv9XLO9K+xLawjArnb4xzJxzWHEYlsu+jFBlkq+ph8QOtgN0EP/7ypfcnV5YCmXFWxsnX37f",
-	"/WLnEYc8zTgDpiQeP2IZziAl5udBrmbnICXl7AxkxpkEfZlEEVWUM5KcCp6BUBQkHk9JIiHAWe3SI4aH",
-	"jAqQE6L0vwhkKGimn8VjfMnoA1I0BalImiHKUEqThEoIOYvkAAd4ykWqn8SUqX/u4wCnlNE0T/F4FGA1",
-	"z8AuQQwCPwVY8Rtg+j1uSSpBWaxXcglCL/xdwBSP8d+GFctDx+/wMBcCmLrUtz49BVjAbU4FRHj8w1EO",
-	"6uw4olclEH79E0Kl36bFxsUJVyBPSbyuyBg8qEmYC8kN5JQ8HAOL1QyPP+/uGREU/3cDzPIkIdcJ4LES",
-	"OQRdzplGoelQBalcJgON2UjSkiFCkHlHGJZk0ADaL4bzPE2JmK8phIjKLCHzCSMpeDVKI8/lFlAa4aBJ",
-	"yQfzkCiS8PiQKIj52kBJqOhdHeI15wkQpikXr+YisuZXt+dPe9hnwwm5hsTLsUzyeKkNOybO9b1tcRgC",
-	"xRuCAnkb5gIRnSYkhHctH8PBywunkrkP2KEAokC71hnc5iDVmiK85tG8FQn2R6NROxR03hs6YJP1LSfA",
-	"mZZU+SRJku9TPP6xsnSvVghNiqoEWozt7i3jqx2ZDZHACqnNs1ddRhtlVnuOQjIi5T0XUW+q6YlaLejl",
-	"nUFFsR+xzkvPg7s0lm6Qn1Xir82776jO+F+ridWqiDqFNWOuSbzLEDbTc19KXccATL6tWYHD4WPumxBc",
-	"HPLIUAWmRf3DiFgwkkxAr+IAU3ZHEhpNNKHa35+Ss9pfXY/U/kogItS3M64mU54zjUoQBZOEplSB+Wsd",
-	"aaI4nyRExPr5nOnXAFNUB5E6KxNFdPl31Y5FAX7Y0dh37oi5T2omSs6OHDc4qF8zGA8sP+3L/zr/fuK5",
-	"fGL5a18+L/gsF064+t3xW147IwqOS76ry1YAF5wfO/bLpcuOHKolJ5ALK49Cj8/02dCpf5GRVnbyFOAp",
-	"hSRavZj9j5YS0WBOBb9OIF1a2RpEPnM9plK5DElBPpffksDKLLRr06UMVK/oY8O0Jc/kYGPNRB9YU1E8",
-	"F60pYdaWtS1yl8F2tH24DduvErCLwvBlK7/QlBvRS6XSbvrsyTM0JfGa1nWkH+nq6nWr127CzKJNCtCX",
-	"dBdWwQ1xlFm5oegG6FIVfdZtxb5mEzNXMJH0F7T7vGa9teszmJAzBUxN7EqtXtA4hj8ziAvMw4zF3Tzd",
-	"MeoVjHQGNJ4pb1O6GGyPdWdcUmsDiyj6y82GPa2APRdJ485c0B0BUxDAQsBL+8Z7GumlNTn31oJCVz8N",
-	"9QU1SyheVUq7JqZ+8/RZZeW7Ptmf5tcJDQ/KILvxOZQdu01CnjO12N5HqwmyAaNB3SeNqvD5XVdMdZdZ",
-	"J1DcNqv5vp4uwKau1tTas8BFdXIL5IUD1rr8xeJsXW2krM5qZQydpX93L11WHLbpVAy3Vr5a/k+8jx07",
-	"abQxO+E09FMUps8rnAulluYSYN3QyBkXyv1OuJF/zm4Yv681TXp5jaamg7joIdxrvesXnJ87KH3rxxae",
-	"d/myxOxdPioZ8RMvW5Rp4QOr9QrWZdpeaIkEfR3CU4AlhLmgan6uKbqcB0SAMM1esa9iJqDmchW5Z0pl",
-	"+EnToGzKuzXDnxcXp0j3hkhHUkFChaZcIDUDJKNIooPTo4HxwhBckWyjFb48OT46/HZy/u2ri8X2XXI8",
-	"HMosehhwEQ/dU3JY3TyYqTSplTi4eAsO8B0IaVGNBqPBSN/FM2Ako3iMPw1Gg08mUqiZEcBwBiRRs1/6",
-	"dwwmFGo7NnI+ivAY/wHqT3OL6cltlW+e3BvtdwVxMQMNA2WChyAlohKJnDHK4oEGsj8aWe8w6cb4VJYl",
-	"uoulnA3N0KDc3lqp7yz7DqOcLhY3RUARB4kYVyglKpwZxWiYhbYG1j6KfRB8OIPwpmRiVvCvSGx87Xsh",
-	"IYmv9INDASSaL5ThGZCIMpByLTGGhCEJ4g6QEmQ6peG2SzHAn0efFvKjH2+whK4hJLkERFDhziiCDFgE",
-	"LJxrC8oZuSPU1Pp+RWnSoibgXj3d7Q51bT2UdpJpgSZgu8Gmzr6a67Xt1ZUV54ijeyKRgDt+A9H2q21/",
-	"tPs24KiF1hhoOUN6ZXFZmeRJZABZzdkQbhU6aCQR06zW08ePK92UVqZpDcgQCO2cuMlkQbZmr4aQToh9",
-	"UWShOb6cuHrm/T1yK7irxPRh6+/L1mNQDTt9nsH/0aKyorV74rKdDXLpcQK709b2AyPeL27W9jIu4NuD",
-	"fGrWnErk8NRxw5ezLd/Znj4fFBBpWZNEonsQgOAhnBEWQ2QKUbIdzmkqZA0nVzNktwoQEYBcx/M2zlkX",
-	"XQfM7qe3kZRu/nW4UJwjs/tl4ez99opwOEcpYXOU8JiyAlkhIzRNaDxTWpsCQmAqmSOiFKTZlsQ0O5vy",
-	"5O+qdrR3EPacSJVLECuFKbM5vMkYVT91sL0BSsvLVMRuZogIi5CkMYMI0XcRln57XXDFWE9HAZKYBhOZ",
-	"edBHYCoCkzafPHvPkUkruS8sWZchoR0iLwpGXMjho/0xodHTojHEQbGzlBFBUlAmiP14xFRDzYiZcrjR",
-	"VEkQt0NKUJNN+7jJ1QbbksYmgUfUdh1Z4CgTfEoTeA/tyP7rgnMC0tFYQzMHcLapDbH42n6h2wuCMp+O",
-	"W97BhVzoIMPykITXTY6pVLXz4Rt0lqA9Pvqe2f0FlJEYkKS/YIC+wpTkidIhF+2NTN5Mcx2JAV2Dugdg",
-	"aNdc/TwamN0DPMa3OYh5ha7Y/amQRJYoHpvDnOTBbnV9Hi3bQOwCJre5afmkibcqFzqjX8+NIjMdgCPK",
-	"YqevHSN4w1wfVLdBVce6+Hj9awag9lcDHqs+sKrj05ol/8P4Gci3DUWVEXuKm48IZIAkVCq/4hqhSEeI",
-	"om+o7loUhZoHy3rDTnWAbZPjvZ6jch4JFbu4KLQnr5Dg9/I97EG8vRVVGvdaT9iSbM143Cm3yniWp6ue",
-	"RNWTXOyXExUEmeSxrjYjnWIYEYLfu9K5MP+eWN06mrBi19r8AOZqw4bePEzp0d9Zg9MP015u2v0xsW41",
-	"NYu25nllz1j1TkvcIerNTUrq3/e88qTEHrT1S1hLqz4a2Y5hiEHlXq8b/jed0dY2UFIqpakokcHjn91t",
-	"44xke6YOWrVr7u2UQwn3JUfbs+uZavhoDr8tmUQ4b1/eWjliWzOFWObKHwOH/gi3leOGmju0hg2Ljb36",
-	"eKG3LrMfR2y6lm99guGbjOk7Por4tSsdq2JvqZPVRbqoercfuy0p4u2XYiuV8Wfk3o6GLWGk4EEN0F82",
-	"LQboOiHsJtAZnN+BSDiLdaLMQbrpDGp+hNdX29/i5w2uVuktHHABMk/U/3l38Zc2cF2vvGF/4eRt5Nsu",
-	"5d7Yyxw0b0dxXlvzRWFTv4g7v5ccWDvUb+OCxpSV52uH5uMhR63jXDlTNAV35BMBizJOmTVSZ5e1Q4Vd",
-	"P/hCwhtg0Q6/ZxBVXkBY1AwYdYJFxOhSu6ztANkNU3e00IfLFG5dGt5NkV4CXPi4uoAHtTOlwnZ4PE2B",
-	"2ZPY1XzA0bDKebp6+m8AAAD//w==",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

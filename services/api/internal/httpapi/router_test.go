@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,17 @@ import (
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
+
+type fakeUploadPreparer struct {
+	prepare func(context.Context, string, media.UploadReceiver) (media.UploadReceipt, error)
+}
+
+func (fake fakeUploadPreparer) Prepare(ctx context.Context, userID string, receive media.UploadReceiver) (media.UploadReceipt, error) {
+	if fake.prepare == nil {
+		return media.UploadReceipt{}, errors.New("upload service not implemented")
+	}
+	return fake.prepare(ctx, userID, receive)
+}
 
 type fakeReadiness struct {
 	check func(context.Context) error
@@ -38,7 +50,7 @@ func newTestRouter(notes fakeNoteStore) http.Handler {
 				Author:  user.Author{ID: "author-id-thiago", UserID: "user-id-thiago", DisplayName: "Thiago"},
 			}, nil
 		},
-	}, DefaultAuthLimits(), fakeReadiness{})
+	}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Header.Set("Authorization", "Bearer current-token")
 		handler.ServeHTTP(w, r)
@@ -85,7 +97,7 @@ func TestReadinessDegradesAndRecovers(t *testing.T) {
 			}
 			return nil
 		},
-	})
+	}, fakeUploadPreparer{})
 
 	request := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	response := httptest.NewRecorder()
@@ -124,7 +136,7 @@ func TestReadinessRejectsSentinelMismatch(t *testing.T) {
 		check: func(context.Context) error {
 			return media.ErrObjectIntegrity
 		},
-	})
+	}, fakeUploadPreparer{})
 
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/readyz", nil))

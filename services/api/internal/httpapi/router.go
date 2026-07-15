@@ -29,6 +29,7 @@ type server struct {
 	users                 user.Store
 	publicAuthors         author.PublicAuthorStore
 	authorNotes           note.AuthorNoteStore
+	uploadService         uploadPreparer
 	passwordHasher        passwordHasher
 	invalidCredentialHash string
 	authRateLimiters      authRateLimiters
@@ -66,9 +67,9 @@ func DefaultAuthLimits() AuthLimits {
 	}
 }
 
-func NewRouter(notes noteStores, catalog note.Catalog, users userStores, authLimits AuthLimits, readiness ReadinessChecker) http.Handler {
+func NewRouter(notes noteStores, catalog note.Catalog, users userStores, authLimits AuthLimits, readiness ReadinessChecker, uploadService uploadPreparer) http.Handler {
 	hasher := newBoundedPasswordHasher(user.NewPasswordHasher(), authLimits.PasswordHashConcurrency)
-	return newRouter(notes, catalog, users, hasher, mustInvalidCredentialHash(hasher), user.NewSessionToken, time.Now, authLimits, readiness)
+	return newRouter(notes, catalog, users, hasher, mustInvalidCredentialHash(hasher), user.NewSessionToken, time.Now, authLimits, readiness, uploadService)
 }
 
 func newRouter(
@@ -81,7 +82,11 @@ func newRouter(
 	clock func() time.Time,
 	authLimits AuthLimits,
 	readiness ReadinessChecker,
+	uploadService uploadPreparer,
 ) http.Handler {
+	if uploadService == nil {
+		panic("upload service is required")
+	}
 	router := chi.NewRouter()
 	router.Use(localBrowserCORS)
 	validateOpenAPIRequest := openAPIRequestValidator()
@@ -100,6 +105,7 @@ func newRouter(
 		newSessionToken:       newSessionToken,
 		clock:                 clock,
 		readiness:             readiness,
+		uploadService:         uploadService,
 	}
 	wrapper := openapi.ServerInterfaceWrapper{
 		Handler:          handler,
@@ -120,6 +126,11 @@ func newRouter(
 			router.Get("/search/notes", wrapper.SearchNotes)
 			router.Post("/auth/users", wrapper.CreateAuthUser)
 			router.Post("/auth/sessions", wrapper.CreateAuthSession)
+		})
+		router.Group(func(router chi.Router) {
+			router.Use(requireCurrentSession)
+			router.Use(validateOpenAPIRequest)
+			router.Post("/media/image-uploads", wrapper.PrepareImageUpload)
 		})
 		router.Group(func(router chi.Router) {
 			router.Use(requireCurrentSession)

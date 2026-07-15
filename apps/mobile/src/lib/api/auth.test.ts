@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 import {
   AuthAPIRequestError,
@@ -7,6 +7,12 @@ import {
   createAuthUser,
   deleteAuthSession,
   getAuthSession,
+} from './auth';
+import type {
+  AuthAPIErrorBody,
+  AuthAPIErrorCode,
+  AuthValidationField,
+  AuthValidationProblemCode,
 } from './auth';
 import type { components } from './generated/schema';
 
@@ -36,6 +42,20 @@ describe('auth API client', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('keeps upload values out of auth error types', () => {
+    expectTypeOf<'invalid_auth'>().toMatchTypeOf<AuthAPIErrorCode>();
+    expectTypeOf<'invalid_media'>().not.toMatchTypeOf<AuthAPIErrorCode>();
+    expectTypeOf<'username'>().toMatchTypeOf<AuthValidationField>();
+    expectTypeOf<'file'>().not.toMatchTypeOf<AuthValidationField>();
+    expectTypeOf<'invalid'>().toMatchTypeOf<AuthValidationProblemCode>();
+    expectTypeOf<'upload_expired'>().not.toMatchTypeOf<AuthValidationProblemCode>();
+    expectTypeOf<{ code: 'invalid_media' }>().not.toMatchTypeOf<AuthAPIErrorBody>();
+    expectTypeOf<{
+      code: 'invalid_auth';
+      fields: [{ code: 'invalid'; field: 'file' }];
+    }>().not.toMatchTypeOf<AuthAPIErrorBody>();
   });
 
   it('sends create user requests with API wire keys', async () => {
@@ -271,6 +291,46 @@ describe('auth API client', () => {
         username: 'thiago',
       }),
     ).rejects.toMatchObject(new AuthAPIRequestError(httpStatusBadRequest));
+  });
+
+  it('rejects upload error codes in auth error bodies', async () => {
+    stubFetch(async () =>
+      jsonResponse({ code: 'invalid_media' }, httpStatusBadRequest),
+    );
+
+    await expect(
+      createAuthSession({
+        password: 'secret-password',
+        username: 'thiago',
+      }),
+    ).rejects.toMatchObject({
+      status: httpStatusBadRequest,
+      code: undefined,
+      fields: undefined,
+    });
+  });
+
+  it('rejects upload validation fields in auth error bodies', async () => {
+    stubFetch(async () =>
+      jsonResponse(
+        {
+          code: 'invalid_auth',
+          fields: [{ code: 'invalid', field: 'file' }],
+        },
+        httpStatusBadRequest,
+      ),
+    );
+
+    await expect(
+      createAuthSession({
+        password: 'secret-password',
+        username: 'thiago',
+      }),
+    ).rejects.toMatchObject({
+      status: httpStatusBadRequest,
+      code: undefined,
+      fields: undefined,
+    });
   });
 
   it('rejects malformed auth session responses', async () => {

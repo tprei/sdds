@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	createAuthSessionGeneratedOperationID = "CreateAuthSession"
-	createAuthUserGeneratedOperationID    = "CreateAuthUser"
-	createNoteGeneratedOperationID        = "CreateNote"
+	createAuthSessionGeneratedOperationID  = "CreateAuthSession"
+	createAuthUserGeneratedOperationID     = "CreateAuthUser"
+	createNoteGeneratedOperationID         = "CreateNote"
+	prepareImageUploadGeneratedOperationID = "PrepareImageUpload"
 )
 
 func openAPIRequestValidator() func(http.Handler) http.Handler {
@@ -48,11 +49,19 @@ func openAPIRequestValidator() func(http.Handler) http.Handler {
 				r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 			}
 
+			requestOptions := options
+			validationRequest := r
+			if route.Operation.OperationID == prepareImageUploadGeneratedOperationID {
+				requestOptions.ExcludeRequestBody = true
+				validationRequest = r.Clone(r.Context())
+				validationRequest.Body = http.NoBody
+				validationRequest.ContentLength = 0
+			}
 			err = openapi3filter.ValidateRequest(r.Context(), &openapi3filter.RequestValidationInput{
-				Request:    r,
+				Request:    validationRequest,
 				PathParams: pathParams,
 				Route:      route,
-				Options:    &options,
+				Options:    &requestOptions,
 			})
 			if err != nil {
 				writeOpenAPIRequestValidationError(w, r, err)

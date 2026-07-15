@@ -1,6 +1,7 @@
 import createClient from 'openapi-fetch';
 
 import { apiBaseURL } from './config';
+import { listNotesResponseSchema, noteSchema } from './schema';
 import type { components, paths } from './generated/schema';
 
 export type Note = {
@@ -51,7 +52,6 @@ export type SearchNotesInput = {
 type GeneratedSchemas = components['schemas'];
 type AuthorSummaryResponse = GeneratedSchemas['AuthorSummary'];
 type CreateNoteRequest = GeneratedSchemas['CreateNoteRequest'];
-type ListNotesResponse = GeneratedSchemas['ListNotesResponse'];
 type NoteResponse = GeneratedSchemas['Note'];
 type NoteImageResponse = GeneratedSchemas['NoteImage'];
 
@@ -187,18 +187,24 @@ function authenticatedRequest(request: Request, token?: string): Request {
 }
 
 function parseListNotesResponse(value: unknown): Note[] {
-  if (!isListNotesResponse(value)) {
+  const listNotesResponse = listNotesResponseSchema.safeParse(value);
+  if (!listNotesResponse.success) {
     throw new APIResponseError();
   }
 
-  return value.notes.map(parseNoteResponse);
+  return listNotesResponse.data.notes.map(mapNoteResponse);
 }
 
 export function parseNoteResponse(value: unknown): Note {
-  if (!isNoteResponse(value)) {
+  const noteResponse = noteSchema.safeParse(value);
+  if (!noteResponse.success) {
     throw new APIResponseError();
   }
 
+  return mapNoteResponse(noteResponse.data);
+}
+
+export function mapNoteResponse(value: NoteResponse): Note {
   return {
     author: parseAuthorSummary(value.author),
     body: value.body,
@@ -251,86 +257,4 @@ function isAbsoluteURL(value: string): boolean {
   } catch {
     return false;
   }
-}
-
-function isNoteResponse(value: unknown): value is NoteResponse {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    typeof value.title === 'string' &&
-    typeof value.body === 'string' &&
-    typeof value.category_slug === 'string' &&
-    (typeof value.place_slug === 'string' || value.place_slug === null) &&
-    isAuthorSummaryResponse(value.author) &&
-    isUnixMillisecondTimestamp(value.created_at) &&
-    isUnixMillisecondTimestamp(value.updated_at) &&
-    isNoteImagesResponse(value.images)
-  );
-}
-
-function isNoteImagesResponse(value: unknown): value is NoteImageResponse[] {
-  if (!Array.isArray(value)) {
-    return false;
-  }
-
-  let previousPosition = -1;
-  for (const image of value) {
-    if (!isNoteImageResponse(image) || image.position <= previousPosition) {
-      return false;
-    }
-    previousPosition = image.position;
-  }
-  return true;
-}
-
-function isNoteImageResponse(value: unknown): value is NoteImageResponse {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    typeof value.url === 'string' &&
-    value.url.length > 0 &&
-    isNoteImageContentType(value.content_type) &&
-    isPositiveInteger(value.byte_size) &&
-    isPositiveInteger(value.width) &&
-    isPositiveInteger(value.height) &&
-    isUnixMillisecondTimestamp(value.position) &&
-    isUnixMillisecondTimestamp(value.created_at) &&
-    isUnixMillisecondTimestamp(value.updated_at)
-  );
-}
-
-function isNoteImageContentType(
-  value: unknown,
-): value is NoteImageResponse['content_type'] {
-  return value === 'image/jpeg' || value === 'image/png';
-}
-
-function isAuthorSummaryResponse(
-  value: unknown,
-): value is AuthorSummaryResponse {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    typeof value.display_name === 'string'
-  );
-}
-
-function isListNotesResponse(value: unknown): value is ListNotesResponse {
-  return (
-    isRecord(value) &&
-    Array.isArray(value.notes)
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-
-function isUnixMillisecondTimestamp(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-}
-
-function isPositiveInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }

@@ -243,7 +243,8 @@ describe('notes API client', () => {
   });
 
   it('resolves root-relative image URLs against a configured API base', async () => {
-    process.env[configuredAPIBaseURLEnvName] = 'https://api.example.com/mobile/';
+    process.env[configuredAPIBaseURLEnvName] =
+      'https://api.example.com/mobile/';
     stubFetch(async () =>
       jsonResponse(
         apiNote({
@@ -263,9 +264,7 @@ describe('notes API client', () => {
 
   it('rejects malformed image URLs', async () => {
     stubFetch(async () =>
-      jsonResponse(
-        apiNote({ images: [apiImage({ url: 'http://[::1' })] }),
-      ),
+      jsonResponse(apiNote({ images: [apiImage({ url: 'http://[::1' })] })),
     );
 
     await expect(getNote(exampleNoteID)).rejects.toThrow(APIResponseError);

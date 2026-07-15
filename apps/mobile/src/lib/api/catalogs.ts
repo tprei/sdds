@@ -1,6 +1,10 @@
 import createClient from 'openapi-fetch';
 
 import { apiBaseURL } from './config';
+import {
+  listCategoriesResponseSchema,
+  listPlacesResponseSchema,
+} from './schema';
 import type { components, paths } from './generated/schema';
 
 export type CatalogCategory = {
@@ -25,8 +29,6 @@ export type Catalogs = {
 type GeneratedSchemas = components['schemas'];
 type CatalogCategoryResponse = GeneratedSchemas['CatalogCategory'];
 type CatalogPlaceResponse = GeneratedSchemas['CatalogPlace'];
-type ListCategoriesResponse = GeneratedSchemas['ListCategoriesResponse'];
-type ListPlacesResponse = GeneratedSchemas['ListPlacesResponse'];
 
 export class CatalogAPIRequestError extends Error {
   readonly status: number;
@@ -94,19 +96,21 @@ async function apiFetch(request: Request): Promise<Response> {
 }
 
 function parseListCategoriesResponse(value: unknown): CatalogCategory[] {
-  if (!isListCategoriesResponse(value)) {
+  const categoriesResponse = listCategoriesResponseSchema.safeParse(value);
+  if (!categoriesResponse.success) {
     throw new CatalogAPIResponseError();
   }
 
-  return value.categories.map(parseCatalogCategory);
+  return categoriesResponse.data.categories.map(parseCatalogCategory);
 }
 
 function parseListPlacesResponse(value: unknown): CatalogPlace[] {
-  if (!isListPlacesResponse(value)) {
+  const placesResponse = listPlacesResponseSchema.safeParse(value);
+  if (!placesResponse.success) {
     throw new CatalogAPIResponseError();
   }
 
-  return value.places.map(parseCatalogPlace);
+  return placesResponse.data.places.map(parseCatalogPlace);
 }
 
 function parseCatalogCategory(value: CatalogCategoryResponse): CatalogCategory {
@@ -125,54 +129,4 @@ function parseCatalogPlace(value: CatalogPlaceResponse): CatalogPlace {
     label: value.label,
     slug: value.slug,
   };
-}
-
-function isListCategoriesResponse(
-  value: unknown,
-): value is ListCategoriesResponse {
-  return (
-    isRecord(value) &&
-    Array.isArray(value.categories) &&
-    value.categories.every(isCatalogCategoryResponse)
-  );
-}
-
-function isListPlacesResponse(value: unknown): value is ListPlacesResponse {
-  return (
-    isRecord(value) &&
-    Array.isArray(value.places) &&
-    value.places.every(isCatalogPlaceResponse)
-  );
-}
-
-function isCatalogCategoryResponse(
-  value: unknown,
-): value is CatalogCategoryResponse {
-  return (
-    isRecord(value) &&
-    typeof value.slug === 'string' &&
-    typeof value.label === 'string' &&
-    typeof value.active === 'boolean' &&
-    isCatalogDisplayOrder(value.display_order)
-  );
-}
-
-function isCatalogPlaceResponse(value: unknown): value is CatalogPlaceResponse {
-  return (
-    isRecord(value) &&
-    typeof value.slug === 'string' &&
-    typeof value.label === 'string' &&
-    typeof value.active === 'boolean' &&
-    isCatalogDisplayOrder(value.display_order)
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-
-
-function isCatalogDisplayOrder(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value);
 }

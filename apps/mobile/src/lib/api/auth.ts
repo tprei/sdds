@@ -1,6 +1,11 @@
 import createClient from 'openapi-fetch';
 
 import { apiBaseURL } from './config';
+import {
+  authSessionResponseSchema,
+  currentSessionResponseSchema,
+  errorResponseSchema,
+} from './schema';
 import type { components, paths } from './generated/schema';
 
 export type AuthAuthor = {
@@ -37,49 +42,13 @@ export type CreateAuthSessionInput = {
 };
 
 type GeneratedSchemas = components['schemas'];
-type AuthSessionResponse = GeneratedSchemas['AuthSessionResponse'];
 type AuthorSummaryResponse = GeneratedSchemas['AuthorSummary'];
 type CreateSessionRequest = GeneratedSchemas['CreateSessionRequest'];
 type CreateUserRequest = GeneratedSchemas['CreateUserRequest'];
-type CurrentSessionResponse = GeneratedSchemas['CurrentSessionResponse'];
 type CurrentUserResponse = GeneratedSchemas['CurrentUser'];
 type ErrorCode = GeneratedSchemas['ErrorCode'];
 type ErrorResponse = GeneratedSchemas['ErrorResponse'];
-type ValidationField = GeneratedSchemas['ValidationField'];
 type ValidationProblemResponse = GeneratedSchemas['ValidationProblem'];
-type SchemaValueList<T extends string> = readonly T[];
-type ExhaustiveSchemaValueList<
-  T extends string,
-  K extends SchemaValueList<T>,
-> = Exclude<T, K[number]> extends never ? K : never;
-
-const errorCodes = schemaValueList<ErrorCode>()([
-  'internal_error',
-  'invalid_auth',
-  'invalid_json',
-  'invalid_note',
-  'invalid_search',
-  'not_found',
-  'rate_limited',
-  'request_too_large',
-  'unauthenticated',
-  'username_taken',
-]);
-const validationFields = schemaValueList<ValidationField>()([
-  'title',
-  'body',
-  'category_slug',
-  'place_slug',
-  'q',
-  'username',
-  'password',
-  'display_name',
-  'limit',
-  'cursor',
-]);
-const validationProblemCodes = schemaValueList<
-  ValidationProblemResponse['code']
->()(['required', 'too_short', 'too_long', 'unknown', 'invalid', 'taken']);
 
 export type AuthAPIErrorCode = ErrorCode;
 export type AuthAPIErrorBody = ErrorResponse;
@@ -152,9 +121,8 @@ export async function createAuthSession(
 export async function getAuthSession(
   token: string,
 ): Promise<CurrentAuthSession> {
-  const { data, error, response } = await apiClient(token).GET(
-    '/v1/auth/session',
-  );
+  const { data, error, response } =
+    await apiClient(token).GET('/v1/auth/session');
   if (!response.ok) {
     throw new AuthAPIRequestError(response.status, parseErrorResponse(error));
   }
@@ -213,25 +181,27 @@ function authenticatedRequest(request: Request, token?: string): Request {
 }
 
 function parseAuthSessionResponse(value: unknown): AuthSession {
-  if (!isAuthSessionResponse(value)) {
+  const authSessionResponse = authSessionResponseSchema.safeParse(value);
+  if (!authSessionResponse.success) {
     throw new AuthAPIResponseError();
   }
 
   return {
-    expiresAt: value.expires_at,
-    token: value.token,
-    user: parseCurrentUser(value.user),
+    expiresAt: authSessionResponse.data.expires_at,
+    token: authSessionResponse.data.token,
+    user: parseCurrentUser(authSessionResponse.data.user),
   };
 }
 
 function parseCurrentSessionResponse(value: unknown): CurrentAuthSession {
-  if (!isCurrentSessionResponse(value)) {
+  const currentSessionResponse = currentSessionResponseSchema.safeParse(value);
+  if (!currentSessionResponse.success) {
     throw new AuthAPIResponseError();
   }
 
   return {
-    expiresAt: value.expires_at,
-    user: parseCurrentUser(value.user),
+    expiresAt: currentSessionResponse.data.expires_at,
+    user: parseCurrentUser(currentSessionResponse.data.user),
   };
 }
 
@@ -251,99 +221,10 @@ function parseAuthorSummary(value: AuthorSummaryResponse): AuthAuthor {
 }
 
 function parseErrorResponse(value: unknown): ErrorResponse | null {
-  if (!isErrorResponse(value)) {
+  const errorResponse = errorResponseSchema.safeParse(value);
+  if (!errorResponse.success) {
     return null;
   }
 
-  return {
-    code: value.code,
-    fields: value.fields,
-  };
-}
-
-function isAuthSessionResponse(value: unknown): value is AuthSessionResponse {
-  return (
-    isRecord(value) &&
-    typeof value.token === 'string' &&
-    isUnixMillisecondTimestamp(value.expires_at) &&
-    isCurrentUserResponse(value.user)
-  );
-}
-
-function isCurrentSessionResponse(
-  value: unknown,
-): value is CurrentSessionResponse {
-  return (
-    isRecord(value) &&
-    isUnixMillisecondTimestamp(value.expires_at) &&
-    isCurrentUserResponse(value.user)
-  );
-}
-
-function isCurrentUserResponse(value: unknown): value is CurrentUserResponse {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    typeof value.username === 'string' &&
-    isAuthorSummaryResponse(value.author)
-  );
-}
-
-function isAuthorSummaryResponse(
-  value: unknown,
-): value is AuthorSummaryResponse {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    typeof value.display_name === 'string'
-  );
-}
-
-function isErrorResponse(value: unknown): value is ErrorResponse {
-  return (
-    isRecord(value) &&
-    hasOwnKey(value, 'code') &&
-    isKnownValue(value.code, errorCodes) &&
-    (!hasOwnKey(value, 'fields') ||
-      (Array.isArray(value.fields) &&
-        value.fields.every(isValidationProblemResponse)))
-  );
-}
-
-function isValidationProblemResponse(
-  value: unknown,
-): value is ValidationProblemResponse {
-  return (
-    isRecord(value) &&
-    isKnownValue(value.code, validationProblemCodes) &&
-    isKnownValue(value.field, validationFields)
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function hasOwnKey(value: Record<string, unknown>, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(value, key);
-}
-
-function schemaValueList<T extends string>() {
-  return <const K extends SchemaValueList<T>>(
-    values: ExhaustiveSchemaValueList<T, K>,
-  ) => values;
-}
-
-function isKnownValue<T extends string>(
-  value: unknown,
-  knownValues: readonly T[],
-): value is T {
-  return (
-    typeof value === 'string' &&
-    knownValues.some((knownValue) => knownValue === value)
-  );
-}
-
-function isUnixMillisecondTimestamp(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+  return errorResponse.data;
 }

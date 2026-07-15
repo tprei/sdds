@@ -12,12 +12,10 @@ import (
 	"github.com/tprei/sdds/services/api/internal/note"
 )
 
-const noteImageInsertSQL = `
-		INSERT INTO note_images (
-			id, note_id, storage_key, content_type, byte_size, width, height,
-			sha256, position, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
+const noteImageInsertSQL = `INSERT INTO note_images (
+	id, note_id, storage_key, content_type, byte_size, width, height,
+	sha256, position, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 const noteImageTestTimestamp int64 = 1782993600000
 
@@ -149,11 +147,11 @@ func TestNoteStoreHydratesOrderedImagesForEveryReadPath(t *testing.T) {
 		label string
 		read  func() ([]note.Note, error)
 	}{
-		{label: "list recent notes", read: func() ([]note.Note, error) { return store.ListRecentNotes(ctx, note.ListInput{Limit: 10}) }},
-		{label: "list category notes", read: func() ([]note.Note, error) {
+		{"list recent notes", func() ([]note.Note, error) { return store.ListRecentNotes(ctx, note.ListInput{Limit: 10}) }},
+		{"list category notes", func() ([]note.Note, error) {
 			return store.ListRecentNotes(ctx, note.ListInput{CategorySlug: note.CategorySlugFood, Limit: 10})
 		}},
-		{label: "search notes", read: func() ([]note.Note, error) {
+		{"search notes", func() ([]note.Note, error) {
 			return store.SearchNotes(ctx, note.SearchInput{Query: "fotos", Limit: 10})
 		}},
 	}
@@ -219,17 +217,13 @@ func TestNoteStoreHydratesAuthorNotesWithoutChangingPagination(t *testing.T) {
 	if !firstPage.HasMore || len(firstPage.Notes) != 2 {
 		t.Fatalf("first author page = %#v, want two notes and HasMore", firstPage)
 	}
-	for _, test := range []struct {
-		label string
-		index int
-		id    string
-	}{
-		{label: "newest", index: 0, id: "author-image-newest-media"},
-		{label: "middle", index: 1, id: "author-image-middle-media"},
+	for index, id := range []string{
+		"author-image-newest-media",
+		"author-image-middle-media",
 	} {
-		images := firstPage.Notes[test.index].Note.Images
-		if len(images) != 1 || images[0].ID != test.id {
-			t.Fatalf("%s note images = %#v", test.label, images)
+		images := firstPage.Notes[index].Note.Images
+		if len(images) != 1 || images[0].ID != id {
+			t.Fatalf("note %s images = %#v", id, images)
 		}
 	}
 
@@ -264,11 +258,7 @@ type noteImageTestRow struct {
 }
 
 func noteImageRow(id, noteID, contentType string, byteSize int64, width, height, position int, sha256 string, storageKey ...string) noteImageTestRow {
-	row := noteImageTestRow{
-		ID: id, NoteID: noteID, StorageKey: "note-images/" + id,
-		ContentType: contentType, ByteSize: byteSize, Width: width, Height: height,
-		SHA256: sha256, Position: position, CreatedAt: noteImageTestTimestamp, UpdatedAt: noteImageTestTimestamp,
-	}
+	row := noteImageTestRow{ID: id, NoteID: noteID, StorageKey: "note-images/" + id, ContentType: contentType, ByteSize: byteSize, Width: width, Height: height, SHA256: sha256, Position: position, CreatedAt: noteImageTestTimestamp, UpdatedAt: noteImageTestTimestamp}
 	if len(storageKey) > 0 {
 		row.StorageKey = storageKey[0]
 	}
@@ -282,22 +272,13 @@ func noteImageRowAt(id, noteID, contentType string, byteSize int64, width, heigh
 }
 
 func insertNoteImageTestRow(t *testing.T, ctx context.Context, db *sql.DB, row noteImageTestRow) {
-	t.Helper()
 	if err := insertNoteImageTestRowErr(ctx, db, row); err != nil {
 		t.Fatalf("insert note image %s: %v", row.ID, err)
 	}
 }
 
 func insertNoteImageTestRowErr(ctx context.Context, db *sql.DB, row noteImageTestRow) error {
-	createdAt := row.CreatedAt
-	if createdAt == 0 {
-		createdAt = noteImageTestTimestamp
-	}
-	updatedAt := row.UpdatedAt
-	if updatedAt == 0 {
-		updatedAt = createdAt
-	}
-	_, err := db.ExecContext(ctx, noteImageInsertSQL, row.ID, row.NoteID, row.StorageKey, row.ContentType, row.ByteSize, row.Width, row.Height, row.SHA256, row.Position, createdAt, updatedAt)
+	_, err := db.ExecContext(ctx, noteImageInsertSQL, row.ID, row.NoteID, row.StorageKey, row.ContentType, row.ByteSize, row.Width, row.Height, row.SHA256, row.Position, row.CreatedAt, row.UpdatedAt)
 	return err
 }
 
@@ -316,7 +297,6 @@ func insertNoteImageStorageClassTestRowErr(ctx context.Context, db *sql.DB, id, 
 }
 
 func assertNoteImages(t *testing.T, notes []note.Note, noteID string, want []note.Image) {
-	t.Helper()
 	for _, found := range notes {
 		if found.ID != noteID {
 			continue

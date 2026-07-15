@@ -22,6 +22,17 @@ type AuthorSummary = {
   display_name: string;
   id: string;
 };
+type NoteImageResponse = {
+  byte_size: number;
+  content_type: 'image/jpeg' | 'image/png';
+  created_at: number;
+  height: number;
+  id: string;
+  position: number;
+  updated_at: number;
+  url: string;
+  width: number;
+};
 
 type AuthSessionResponse = {
   expires_at: number;
@@ -39,6 +50,7 @@ type NoteResponse = {
   category_slug: string;
   created_at: number;
   id: string;
+  images: NoteImageResponse[];
   place_slug: string | null;
   title: string;
   updated_at: number;
@@ -72,16 +84,89 @@ const authSessionResponseKeys = ['expires_at', 'token', 'user'] as const;
 const authorSummaryKeys = ['display_name', 'id'] as const;
 const currentUserKeys = ['author', 'id', 'username'] as const;
 const listNotesResponseKeys = ['notes'] as const;
+const noteImageResponseKeys = [
+  'byte_size',
+  'content_type',
+  'created_at',
+  'height',
+  'id',
+  'position',
+  'updated_at',
+  'url',
+  'width',
+] as const;
 const noteResponseKeys = [
   'author',
   'body',
   'category_slug',
   'created_at',
   'id',
+  'images',
   'place_slug',
   'title',
   'updated_at',
 ] as const;
+
+test('validates required note image arrays', () => {
+  const textOnlyNote: NoteResponse = {
+    author: {
+      display_name: 'Author',
+      id: 'author-id',
+    },
+    body: 'Body',
+    category_slug: 'food',
+    created_at: 1782993600000,
+    id: 'note-id',
+    images: [],
+    place_slug: null,
+    title: 'Title',
+    updated_at: 1782993600000,
+  };
+
+  expect(parseNoteResponse(textOnlyNote)).toBe(textOnlyNote);
+  const image: NoteImageResponse = {
+    byte_size: 481234,
+    content_type: 'image/jpeg',
+    created_at: 1782993600000,
+    height: 900,
+    id: 'image-id',
+    position: 0,
+    updated_at: 1782993600000,
+    url: '/v1/media/images/image-id',
+    width: 1200,
+  };
+  const noteWithImage: NoteResponse = {
+    ...textOnlyNote,
+    images: [image],
+  };
+  expect(parseNoteResponse(noteWithImage)).toBe(noteWithImage);
+
+  const firstPositionOneNote: NoteResponse = {
+    ...noteWithImage,
+    images: [{ ...image, position: 1 }],
+  };
+  expect(() => parseNoteResponse(firstPositionOneNote)).toThrow(
+    'invalid note response',
+  );
+
+  const gapNote: NoteResponse = {
+    ...noteWithImage,
+    images: [image, { ...image, id: 'image-id-2', position: 2 }],
+  };
+  expect(() => parseNoteResponse(gapNote)).toThrow('invalid note response');
+
+  const negativeTimestampNote: NoteResponse = {
+    ...noteWithImage,
+    images: [{ ...image, created_at: -1, updated_at: -2 }],
+  };
+  expect(parseNoteResponse(negativeTimestampNote)).toBe(negativeTimestampNote);
+
+  const withoutImages: Record<string, unknown> = { ...textOnlyNote };
+  delete withoutImages.images;
+  expect(() => parseNoteResponse(withoutImages)).toThrow(
+    'invalid note response',
+  );
+});
 
 test('creates a note and reads it from the API-backed home feed', async ({
   page,
@@ -149,14 +234,20 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(publishedNote).toBeVisible();
   await expect(publishedNote).toContainText(body);
   await expect(
-    page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).first(),
+    page
+      .getByRole('button', { name: `Abrir perfil do autor: ${displayName}` })
+      .first(),
   ).toBeVisible();
   await expect(publishedNote).toContainText('São Paulo');
   const exploreURL = page.url();
-  await page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).click();
+  await page
+    .getByRole('button', { name: `Abrir perfil do autor: ${displayName}` })
+    .click();
   await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
   await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
-  await expect(page.getByText(`Nome de usuário: ${username}`, { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText(`Nome de usuário: ${username}`, { exact: true }),
+  ).toHaveCount(0);
   await expect(
     page.getByTestId('author-profile-header').getByRole('heading', {
       name: displayName,
@@ -179,12 +270,16 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(searchResult).toBeVisible();
   await expect(searchResult).toContainText(body);
   await expect(
-    page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).last(),
+    page
+      .getByRole('button', { name: `Abrir perfil do autor: ${displayName}` })
+      .last(),
   ).toBeVisible();
   await expect(searchResult).toContainText('São Paulo');
-  const searchAuthor = page.getByRole('button', {
-    name: `Abrir perfil do autor: ${displayName}`,
-  }).last();
+  const searchAuthor = page
+    .getByRole('button', {
+      name: `Abrir perfil do autor: ${displayName}`,
+    })
+    .last();
   await expect(searchAuthor).toBeVisible();
   await searchAuthor.click();
   await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
@@ -205,7 +300,10 @@ test('creates a note and reads it from the API-backed home feed', async ({
     page.getByTestId('screen-title').filter({ hasText: /^Nota$/ }),
   ).toBeVisible();
   const noteURL = page.url();
-  await page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).last().click();
+  await page
+    .getByRole('button', { name: `Abrir perfil do autor: ${displayName}` })
+    .last()
+    .click();
   await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
   await expect(
     page.getByTestId('author-profile-header').getByRole('heading', {
@@ -215,7 +313,9 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await page.goto(noteURL);
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   await expect(
-    page.getByRole('button', { name: `Abrir perfil do autor: ${displayName}` }).last(),
+    page
+      .getByRole('button', { name: `Abrir perfil do autor: ${displayName}` })
+      .last(),
   ).toBeVisible();
   await expect(page.getByLabel(`Texto da nota: ${body}`)).toBeVisible();
   await expect(page.getByLabel('Categoria da nota: Comida')).toBeVisible();
@@ -228,7 +328,9 @@ test('creates a note and reads it from the API-backed home feed', async ({
       name: displayName,
     }),
   ).toBeVisible({ timeout: 10000 });
-  await expect(profileRoot.getByTestId('author-profile-note-count')).toHaveText('1 Nota');
+  await expect(profileRoot.getByTestId('author-profile-note-count')).toHaveText(
+    '1 Nota',
+  );
   await expect(
     profileRoot.getByRole('button', { name: `Abrir nota: ${title}` }),
   ).toContainText(body);
@@ -236,7 +338,9 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(page.getByRole('button', { name: 'Sair' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Sair' }).click();
-  await expect(page.getByTestId('profile-signup-button')).toBeVisible({ timeout: 30000 });
+  await expect(page.getByTestId('profile-signup-button')).toBeVisible({
+    timeout: 30000,
+  });
 });
 
 test('shows auth validation reasons and clears stale login submit state', async ({
@@ -246,7 +350,9 @@ test('shows auth validation reasons and clears stale login submit state', async 
   const username = `valida-${timestamp}`;
 
   await page.goto('/profile');
-  await expect(page.getByText('Entre para publicar')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText('Entre para publicar')).toBeVisible({
+    timeout: 10000,
+  });
   await page.getByTestId('profile-signup-button').click();
   await expect(visibleScreenTitle(page, 'Criar conta')).toBeVisible();
 
@@ -350,7 +456,9 @@ test('shows auth validation reasons and clears stale login submit state', async 
   await page.getByTestId('login-submit-button').click();
 
   await page.getByTestId('profile-logout-button').click();
-  await expect(page.getByText('Entre para publicar')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText('Entre para publicar')).toBeVisible({
+    timeout: 10000,
+  });
   await page.getByTestId('profile-login-button').click();
   await expect(visibleScreenTitle(page, 'Entrar')).toBeVisible();
   await expect(page.getByTestId('login-username-input')).toBeVisible();
@@ -476,9 +584,7 @@ test('narrows the mobile search results by category and clears stale cards', asy
   ).toBeVisible();
   await expect(page.getByText(`2 notas para ${marker}`)).toBeVisible();
   await expect(
-    page.getByLabel(
-      `Resultado da busca: 2 notas para ${marker}. Mundo todo.`,
-    ),
+    page.getByLabel(`Resultado da busca: 2 notas para ${marker}. Mundo todo.`),
   ).toBeVisible();
 
   await page.getByRole('button', { exact: true, name: 'Comida' }).click();
@@ -638,14 +744,18 @@ test('opens a public author profile and appends paginated notes', async ({
   });
   const notes: NoteResponse[] = [];
   for (let index = 0; index < 21; index += 1) {
-    notes.push(await createNote(request, session.token, {
-      body: `Texto público ${timestamp} ${index}.`,
-      category_slug: index % 2 === 0 ? 'food' : 'travel',
-      place_slug: null,
-      title: `Nota pública ${timestamp} ${index}`,
-    }));
+    notes.push(
+      await createNote(request, session.token, {
+        body: `Texto público ${timestamp} ${index}.`,
+        category_slug: index % 2 === 0 ? 'food' : 'travel',
+        place_slug: null,
+        title: `Nota pública ${timestamp} ${index}`,
+      }),
+    );
   }
-  const authorResponse = await request.get(`${apiBaseURL}/v1/authors/${session.user.author.id}`);
+  const authorResponse = await request.get(
+    `${apiBaseURL}/v1/authors/${session.user.author.id}`,
+  );
   expect(authorResponse.ok()).toBeTruthy();
   const author = (await authorResponse.json()) as PublicAuthorResponse;
   expect(author).toEqual({
@@ -659,14 +769,20 @@ test('opens a public author profile and appends paginated notes', async ({
   await expect(
     profileHeader.getByRole('heading', { name: displayName }),
   ).toBeVisible();
-  await expect(page.getByTestId('author-profile-note-count')).toHaveText('21 Notas');
+  await expect(page.getByTestId('author-profile-note-count')).toHaveText(
+    '21 Notas',
+  );
   await expect(page.getByText(`Nota pública ${timestamp} 20`)).toBeVisible();
-  await expect(page.getByText(`Nome de usuário: ${username}`, { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText(`Nome de usuário: ${username}`, { exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
   await expect(
     page.getByLabel(`Autor da nota: ${displayName}`).first(),
   ).toBeVisible();
-  const firstPage = await request.get(`${apiBaseURL}/v1/authors/${author.id}/notes?limit=20`);
+  const firstPage = await request.get(
+    `${apiBaseURL}/v1/authors/${author.id}/notes?limit=20`,
+  );
   expect(firstPage.ok()).toBeTruthy();
   const firstPageBody = (await firstPage.json()) as AuthorNotesResponse;
   expect(firstPageBody.notes).toHaveLength(20);
@@ -681,7 +797,8 @@ test('opens a public author profile and appends paginated notes', async ({
   const scrollOwner = page.getByTestId('author-profile-scroll');
   await expect(scrollOwner).toBeVisible();
   const scrollBox = await scrollOwner.boundingBox();
-  if (scrollBox === null) throw new Error('author_profile_scroll_bounds_missing');
+  if (scrollBox === null)
+    throw new Error('author_profile_scroll_bounds_missing');
   await page.mouse.move(
     scrollBox.x + scrollBox.width / 2,
     scrollBox.y + scrollBox.height / 2,
@@ -691,15 +808,23 @@ test('opens a public author profile and appends paginated notes', async ({
   const cursorValue = firstPageBody.next_cursor;
   if (cursorValue === null) throw new Error('author_profile_cursor_missing');
   const cursor = encodeURIComponent(cursorValue);
-  await expect.poll(
-    () => profileRequests.filter((url) => url.includes(`cursor=${cursor}`)).length,
-  ).toBe(1);
+  await expect
+    .poll(
+      () =>
+        profileRequests.filter((url) => url.includes(`cursor=${cursor}`))
+          .length,
+    )
+    .toBe(1);
 
   await expect(page.getByText(`Nota pública ${timestamp} 0`)).toBeVisible();
-  const renderedTitles = await page.getByText(new RegExp(`^Nota pública ${timestamp} `)).allTextContents();
+  const renderedTitles = await page
+    .getByText(new RegExp(`^Nota pública ${timestamp} `))
+    .allTextContents();
   expect(renderedTitles).toHaveLength(21);
   expect(new Set(renderedTitles).size).toBe(renderedTitles.length);
-  expect(new Set(renderedTitles)).toEqual(new Set(notes.map((note) => note.title)));
+  expect(new Set(renderedTitles)).toEqual(
+    new Set(notes.map((note) => note.title)),
+  );
 });
 
 test('shows distinct authors when a second user signs in', async ({
@@ -760,16 +885,24 @@ test('shows distinct authors when a second user signs in', async ({
   await expect(firstCard).toContainText(firstDisplayName);
   await expect(secondCard).toContainText(secondDisplayName);
   await expect(
-    page.getByRole('button', { name: `Abrir perfil do autor: ${firstDisplayName}` }),
+    page.getByRole('button', {
+      name: `Abrir perfil do autor: ${firstDisplayName}`,
+    }),
   ).toHaveCount(1);
   await expect(
-    page.getByRole('button', { name: `Abrir perfil do autor: ${secondDisplayName}` }),
+    page.getByRole('button', {
+      name: `Abrir perfil do autor: ${secondDisplayName}`,
+    }),
   ).toHaveCount(1);
 
   await firstCard.click();
   await expect(page.getByRole('heading', { name: firstTitle })).toBeVisible();
   await expect(
-    page.getByRole('button', { name: `Abrir perfil do autor: ${firstDisplayName}` }).last(),
+    page
+      .getByRole('button', {
+        name: `Abrir perfil do autor: ${firstDisplayName}`,
+      })
+      .last(),
   ).toBeVisible();
 });
 
@@ -804,7 +937,9 @@ async function listNotes(
   options: { categorySlug: string },
 ): Promise<ListNotesResponse> {
   const response = await request.get(
-    apiURL(`/v1/notes?category_slug=${encodeURIComponent(options.categorySlug)}`),
+    apiURL(
+      `/v1/notes?category_slug=${encodeURIComponent(options.categorySlug)}`,
+    ),
   );
   expect(response.status()).toBe(200);
   return parseListNotesResponse(await response.json());
@@ -906,7 +1041,49 @@ function isNoteResponse(value: unknown): value is NoteResponse {
     typeof value.category_slug === 'string' &&
     (typeof value.place_slug === 'string' || value.place_slug === null) &&
     typeof value.created_at === 'number' &&
-    typeof value.updated_at === 'number'
+    typeof value.updated_at === 'number' &&
+    isNoteImagesResponse(value.images)
+  );
+}
+
+function isNoteImagesResponse(value: unknown): value is NoteImageResponse[] {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  for (const [index, image] of value.entries()) {
+    if (!isNoteImageResponse(image) || image.position !== index) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isNoteImageResponse(value: unknown): value is NoteImageResponse {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, noteImageResponseKeys) &&
+    typeof value.id === 'string' &&
+    typeof value.url === 'string' &&
+    value.url.length > 0 &&
+    (value.content_type === 'image/jpeg' ||
+      value.content_type === 'image/png') &&
+    typeof value.byte_size === 'number' &&
+    Number.isInteger(value.byte_size) &&
+    value.byte_size > 0 &&
+    typeof value.width === 'number' &&
+    Number.isInteger(value.width) &&
+    value.width > 0 &&
+    typeof value.height === 'number' &&
+    Number.isInteger(value.height) &&
+    value.height > 0 &&
+    typeof value.position === 'number' &&
+    Number.isInteger(value.position) &&
+    value.position >= 0 &&
+    typeof value.created_at === 'number' &&
+    Number.isInteger(value.created_at) &&
+    typeof value.updated_at === 'number' &&
+    Number.isInteger(value.updated_at)
   );
 }
 
@@ -938,8 +1115,7 @@ function isErrorResponse(value: unknown): value is ErrorResponse {
     isRecord(value) &&
     typeof value.code === 'string' &&
     (value.fields === undefined ||
-      (Array.isArray(value.fields) &&
-        value.fields.every(isValidationProblem)))
+      (Array.isArray(value.fields) && value.fields.every(isValidationProblem)))
   );
 }
 

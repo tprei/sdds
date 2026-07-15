@@ -1,8 +1,9 @@
 import createClient from 'openapi-fetch';
 
 import { apiBaseURL } from './config';
-import type { components, paths } from './generated/schema';
-import { APIRequestError, APIResponseError, parseNoteResponse } from './notes';
+import { authorNotesPageSchema, publicAuthorSchema } from './schema';
+import type { paths } from './generated/schema';
+import { APIRequestError, APIResponseError, mapNoteResponse } from './notes';
 import type { Note } from './notes';
 
 export type PublicAuthor = {
@@ -21,12 +22,6 @@ export type ListAuthorNotesInput = {
   limit?: number;
   cursor?: string;
 };
-
-type GeneratedSchemas = components['schemas'];
-type PublicAuthorResponse = GeneratedSchemas['PublicAuthor'];
-type AuthorNotesPageResponse = GeneratedSchemas['AuthorNotesPage'];
-
-const maxAuthorNotesCursorLength = 512;
 
 function apiClient() {
   return createClient<paths>({
@@ -58,13 +53,14 @@ export async function getPublicAuthor(authorID: string): Promise<PublicAuthor> {
   if (!response.ok) {
     throw new APIRequestError(response.status);
   }
-  if (!isPublicAuthorResponse(data)) {
+  const publicAuthorResponse = publicAuthorSchema.safeParse(data);
+  if (!publicAuthorResponse.success) {
     throw new APIResponseError();
   }
   return {
-    displayName: data.display_name,
-    id: data.id,
-    noteCount: data.note_count,
+    displayName: publicAuthorResponse.data.display_name,
+    id: publicAuthorResponse.data.id,
+    noteCount: publicAuthorResponse.data.note_count,
   };
 }
 
@@ -86,45 +82,12 @@ export async function listAuthorNotes(
   if (!response.ok) {
     throw new APIRequestError(response.status);
   }
-  if (!isAuthorNotesPageResponse(data)) {
+  const authorNotesPageResponse = authorNotesPageSchema.safeParse(data);
+  if (!authorNotesPageResponse.success) {
     throw new APIResponseError();
   }
   return {
-    nextCursor: data.next_cursor,
-    notes: data.notes.map(parseNoteResponse),
+    nextCursor: authorNotesPageResponse.data.next_cursor,
+    notes: authorNotesPageResponse.data.notes.map(mapNoteResponse),
   };
-}
-
-function isPublicAuthorResponse(value: unknown): value is PublicAuthorResponse {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    typeof value.display_name === 'string' &&
-    typeof value.note_count === 'number' &&
-    Number.isInteger(value.note_count) &&
-    value.note_count >= 0
-  );
-}
-
-function isAuthorNotesPageResponse(
-  value: unknown,
-): value is AuthorNotesPageResponse {
-  return (
-    isRecord(value) &&
-    Array.isArray(value.notes) &&
-    (value.next_cursor === null ||
-      isAuthorNotesCursor(value.next_cursor))
-  );
-}
-
-function isAuthorNotesCursor(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    value.length > 0 &&
-    value.length <= maxAuthorNotesCursorLength
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

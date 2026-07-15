@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -151,18 +153,170 @@ func TestRunServerListensAfterMediaReadiness(t *testing.T) {
 	}
 }
 
+func TestRunServerCleansExpiredUploadsBeforeListen(t *testing.T) {
+	cfg := testServerConfig(t)
+	seedExpiredUpload(t, cfg.databasePath)
+
+	var events []string
+	restoreMediaStoreFactory(t)
+	newMediaStore = func(context.Context, media.Config) (media.ReadinessChecker, error) {
+		return fakeMediaReadiness{
+			verify: func(ctx context.Context) error {
+				if _, ok := ctx.Deadline(); !ok {
+					t.Fatal("readiness context has no deadline")
+				}
+				events = append(events, "readiness")
+				return nil
+			},
+			delete: func(ctx context.Context, _ media.ObjectKey) error {
+				deadline, ok := ctx.Deadline()
+				if !ok {
+					t.Fatal("cleanup context has no deadline")
+				}
+				if remaining := time.Until(deadline); remaining <= 0 || remaining > startupReadinessTimeout {
+					t.Fatalf("cleanup deadline remaining = %s, want >0 and <= %s", remaining, startupReadinessTimeout)
+				}
+				events = append(events, "cleanup")
+				return nil
+			},
+		}, nil
+	}
+
+	restoreListen := listenAndServe
+	listenAndServe = func(*http.Server) error {
+		events = append(events, "listen")
+		return http.ErrServerClosed
+	}
+	t.Cleanup(func() { listenAndServe = restoreListen })
+
+	if err := runServer(context.Background(), cfg); err != nil {
+		t.Fatalf("run server: %v", err)
+	}
+	if diff := cmp.Diff([]string{"readiness", "cleanup", "listen"}, events); diff != "" {
+		t.Fatalf("startup order mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestRunServerCleanupFailurePreventsListenAndClosesDatabase(t *testing.T) {
+	cfg := testServerConfig(t)
+	seedExpiredUpload(t, cfg.databasePath)
+	cleanupErr := errors.New("cleanup failed")
+
+	restoreMediaStoreFactory(t)
+	newMediaStore = func(context.Context, media.Config) (media.ReadinessChecker, error) {
+		return fakeMediaReadiness{
+			verify: func(context.Context) error { return nil },
+			delete: func(context.Context, media.ObjectKey) error { return cleanupErr },
+		}, nil
+	}
+
+	listened := false
+	restoreListen := listenAndServe
+	listenAndServe = func(*http.Server) error {
+		listened = true
+		return http.ErrServerClosed
+	}
+	t.Cleanup(func() { listenAndServe = restoreListen })
+
+	closed := false
+	restoreClose := closeDatabase
+	closeDatabase = func(database *sql.DB) error {
+		closed = true
+		return database.Close()
+	}
+	t.Cleanup(func() { closeDatabase = restoreClose })
+
+	err := runServer(context.Background(), cfg)
+	if !errors.Is(err, cleanupErr) {
+		t.Fatalf("run server error = %v, want cleanup error", err)
+	}
+	if !errors.Is(err, media.ErrMediaStorageUnavailable) {
+		t.Fatalf("run server error = %v, want media storage unavailable", err)
+	}
+	if listened {
+		t.Fatal("server listened after cleanup failure")
+	}
+	if !closed {
+		t.Fatal("database was not closed after cleanup failure")
+	}
+}
+
 type fakeMediaReadiness struct {
 	verify func(context.Context) error
+	delete func(context.Context, media.ObjectKey) error
 }
 
 func (fake fakeMediaReadiness) VerifyReadiness(ctx context.Context) error {
 	return fake.verify(ctx)
 }
 
+func (fakeMediaReadiness) Put(context.Context, media.PutObject) error {
+	return nil
+}
+
+func (fakeMediaReadiness) Open(context.Context, media.ObjectKey) (media.Object, error) {
+	return media.Object{}, nil
+}
+
+func (fake fakeMediaReadiness) Delete(ctx context.Context, key media.ObjectKey) error {
+	if fake.delete == nil {
+		return nil
+	}
+	return fake.delete(ctx, key)
+}
+
 func restoreMediaStoreFactory(t *testing.T) {
 	t.Helper()
 	original := newMediaStore
 	t.Cleanup(func() { newMediaStore = original })
+}
+
+func seedExpiredUpload(t *testing.T, databasePath string) {
+	t.Helper()
+	ctx := context.Background()
+	db, err := sqlite.Open(databasePath)
+	if err != nil {
+		t.Fatalf("open cleanup database: %v", err)
+	}
+	if err := sqlite.ApplyMigrations(ctx, db); err != nil {
+		_ = db.Close()
+		t.Fatalf("apply cleanup migrations: %v", err)
+	}
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	const userID = "startup-cleanup-user"
+	if _, err := db.ExecContext(ctx, `INSERT INTO users (id, state, created_at, updated_at) VALUES (?, 'active', ?, ?)`, userID, now.UnixMilli(), now.UnixMilli()); err != nil {
+		_ = db.Close()
+		t.Fatalf("insert cleanup user: %v", err)
+	}
+	const uploadID = "123e4567-e89b-12d3-a456-426614174000"
+	store := sqlite.NewImageUploadStore(db)
+	_, err = store.BeginPending(ctx, media.PendingInput{
+		ID:                    uploadID,
+		UserID:                userID,
+		StorageKey:            media.ObjectKey("note-images/" + uploadID),
+		UploadRequestID:       "123e4567-e89b-12d3-a456-426614174001",
+		ContentType:           "image/jpeg",
+		ByteSize:              1,
+		Width:                 1,
+		Height:                1,
+		SHA256:                strings.Repeat("a", 64),
+		CreatedAt:             now.Add(-2 * time.Hour),
+		UpdatedAt:             now.Add(-2 * time.Hour),
+		WriteLeaseUntil:       now.Add(time.Minute),
+		ExpiresAt:             now.Add(time.Hour),
+		RequestRetentionUntil: now.Add(48 * time.Hour),
+	})
+	if err != nil {
+		_ = db.Close()
+		t.Fatalf("insert pending cleanup upload: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE image_uploads SET expires_at = ?, write_lease_until = NULL WHERE id = ?`, now.Add(-time.Second).UnixMilli(), uploadID); err != nil {
+		_ = db.Close()
+		t.Fatalf("expire cleanup upload: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close cleanup seed database: %v", err)
+	}
 }
 
 func testServerConfig(t *testing.T) config {

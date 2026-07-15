@@ -55,7 +55,7 @@ func TestGetNoteMapsOrderedImageMetadataToResponse(t *testing.T) {
 		{
 			Id:          "image-zero",
 			Url:         "/v1/media/images/image-zero",
-			ContentType: openapi.Imagejpeg,
+			ContentType: openapi.NoteImageContentTypeImagejpeg,
 			ByteSize:    481234,
 			Width:       1200,
 			Height:      900,

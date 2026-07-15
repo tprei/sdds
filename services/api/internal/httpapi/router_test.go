@@ -38,7 +38,7 @@ func newTestRouter(notes fakeNoteStore) http.Handler {
 				Author:  user.Author{ID: "author-id-thiago", UserID: "user-id-thiago", DisplayName: "Thiago"},
 			}, nil
 		},
-	}, DefaultAuthLimits(), fakeReadiness{})
+	}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Header.Set("Authorization", "Bearer current-token")
 		handler.ServeHTTP(w, r)
@@ -85,7 +85,7 @@ func TestReadinessDegradesAndRecovers(t *testing.T) {
 			}
 			return nil
 		},
-	})
+	}, fakeUploadPreparer{})
 
 	request := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	response := httptest.NewRecorder()
@@ -123,7 +123,7 @@ func TestReadinessRejectsSentinelMismatch(t *testing.T) {
 		check: func(context.Context) error {
 			return media.ErrObjectIntegrity
 		},
-	})
+	}, fakeUploadPreparer{})
 
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/readyz", nil))

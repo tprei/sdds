@@ -47,43 +47,86 @@ type ErrorCode = GeneratedSchemas['ErrorCode'];
 type ErrorResponse = GeneratedSchemas['ErrorResponse'];
 type ValidationField = GeneratedSchemas['ValidationField'];
 type ValidationProblemResponse = GeneratedSchemas['ValidationProblem'];
-type SchemaValueList<T extends string> = readonly T[];
-type ExhaustiveSchemaValueList<
-  T extends string,
-  K extends SchemaValueList<T>,
-> = Exclude<T, K[number]> extends never ? K : never;
 
-const errorCodes = schemaValueList<ErrorCode>()([
+export type AuthAPIErrorCode =
+  | 'internal_error'
+  | 'invalid_auth'
+  | 'invalid_json'
+  | 'rate_limited'
+  | 'request_too_large'
+  | 'unauthenticated'
+  | 'username_taken';
+export type AuthValidationField = 'display_name' | 'password' | 'username';
+export type AuthValidationProblemCode =
+  | 'required'
+  | 'too_short'
+  | 'too_long'
+  | 'unknown'
+  | 'invalid'
+  | 'taken';
+
+const errorCodes = [
   'internal_error',
   'invalid_auth',
   'invalid_json',
-  'invalid_note',
-  'invalid_search',
-  'not_found',
   'rate_limited',
   'request_too_large',
   'unauthenticated',
   'username_taken',
-]);
-const validationFields = schemaValueList<ValidationField>()([
-  'title',
-  'body',
-  'category_slug',
-  'place_slug',
-  'q',
-  'username',
-  'password',
+] as const satisfies readonly AuthAPIErrorCode[];
+const validationFields = [
   'display_name',
-  'limit',
-  'cursor',
-]);
-const validationProblemCodes = schemaValueList<
-  ValidationProblemResponse['code']
->()(['required', 'too_short', 'too_long', 'unknown', 'invalid', 'taken']);
+  'password',
+  'username',
+] as const satisfies readonly AuthValidationField[];
+const validationProblemCodes = [
+  'required',
+  'too_short',
+  'too_long',
+  'unknown',
+  'invalid',
+  'taken',
+] as const satisfies readonly AuthValidationProblemCode[];
 
-export type AuthAPIErrorCode = ErrorCode;
-export type AuthAPIErrorBody = ErrorResponse;
-export type AuthAPIErrorField = ValidationProblemResponse;
+type MissingAuthAPIErrorCodes = Exclude<
+  AuthAPIErrorCode,
+  (typeof errorCodes)[number]
+>;
+type MissingAuthValidationFields = Exclude<
+  AuthValidationField,
+  (typeof validationFields)[number]
+>;
+type MissingAuthValidationProblemCodes = Exclude<
+  AuthValidationProblemCode,
+  (typeof validationProblemCodes)[number]
+>;
+type IsNever<T> = [T] extends [never] ? true : false;
+function assertType<T extends true>(value: T): void {
+  void value;
+}
+assertType<IsNever<MissingAuthAPIErrorCodes>>(true);
+assertType<IsNever<MissingAuthValidationFields>>(true);
+assertType<IsNever<MissingAuthValidationProblemCodes>>(true);
+assertType<AuthAPIErrorCode extends ErrorCode ? true : false>(true);
+assertType<AuthValidationField extends ValidationField ? true : false>(true);
+assertType<
+  AuthValidationProblemCode extends ValidationProblemResponse['code']
+    ? true
+    : false
+>(true);
+
+export type AuthAPIErrorBody = {
+  code: AuthAPIErrorCode;
+  fields?: AuthAPIErrorField[];
+};
+export type AuthAPIErrorField = {
+  code: AuthValidationProblemCode;
+  field: AuthValidationField;
+};
+assertType<AuthAPIErrorBody extends ErrorResponse ? true : false>(true);
+assertType<AuthAPIErrorField extends ValidationProblemResponse ? true : false>(
+  true,
+);
 
 export class AuthAPIRequestError extends Error {
   readonly code: AuthAPIErrorCode | undefined;
@@ -92,7 +135,7 @@ export class AuthAPIRequestError extends Error {
 
   readonly status: number;
 
-  constructor(status: number, errorResponse: ErrorResponse | null = null) {
+  constructor(status: number, errorResponse: AuthAPIErrorBody | null = null) {
     super('auth_api_request_failed');
     this.code = errorResponse?.code;
     this.fields = errorResponse?.fields?.map((field) => ({
@@ -250,7 +293,7 @@ function parseAuthorSummary(value: AuthorSummaryResponse): AuthAuthor {
   };
 }
 
-function parseErrorResponse(value: unknown): ErrorResponse | null {
+function parseErrorResponse(value: unknown): AuthAPIErrorBody | null {
   if (!isErrorResponse(value)) {
     return null;
   }
@@ -299,7 +342,7 @@ function isAuthorSummaryResponse(
   );
 }
 
-function isErrorResponse(value: unknown): value is ErrorResponse {
+function isErrorResponse(value: unknown): value is AuthAPIErrorBody {
   return (
     isRecord(value) &&
     hasOwnKey(value, 'code') &&
@@ -312,7 +355,7 @@ function isErrorResponse(value: unknown): value is ErrorResponse {
 
 function isValidationProblemResponse(
   value: unknown,
-): value is ValidationProblemResponse {
+): value is AuthAPIErrorField {
   return (
     isRecord(value) &&
     isKnownValue(value.code, validationProblemCodes) &&
@@ -328,11 +371,6 @@ function hasOwnKey(value: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
-function schemaValueList<T extends string>() {
-  return <const K extends SchemaValueList<T>>(
-    values: ExhaustiveSchemaValueList<T, K>,
-  ) => values;
-}
 
 function isKnownValue<T extends string>(
   value: unknown,

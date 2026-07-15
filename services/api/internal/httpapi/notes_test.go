@@ -127,7 +127,7 @@ func TestListNotesTreatsBlankCategoryFilterAsUnfiltered(t *testing.T) {
 			t.Fatal("FindActiveCategory should not be called")
 			return note.Category{}, nil
 		},
-	}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{})
+	}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/notes?category_slug=+%09+", nil)
@@ -329,7 +329,7 @@ func TestSearchNotesTreatsBlankCategoryFilterAsUnfiltered(t *testing.T) {
 			t.Fatal("FindActiveCategory should not be called")
 			return note.Category{}, nil
 		},
-	}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{})
+	}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=cafe&category_slug=+%09+", nil)
@@ -755,7 +755,7 @@ func TestCreateNoteRejectsMissingSessionBeforeValidation(t *testing.T) {
 			createCalled = true
 			return note.Note{}, nil
 		},
-	}, fakeCatalog{}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{})
+	}, fakeCatalog{}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(`{`))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()

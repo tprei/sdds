@@ -62,7 +62,7 @@ func TestListCategoriesReturnsInternalError(t *testing.T) {
 		listCategories: func(context.Context) ([]note.Category, error) {
 			return nil, errors.New("catalog unavailable")
 		},
-	}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{})
+	}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/categories", nil)
 
@@ -79,7 +79,7 @@ func TestListPlacesReturnsInternalError(t *testing.T) {
 		listPlaces: func(context.Context) ([]note.Place, error) {
 			return nil, errors.New("catalog unavailable")
 		},
-	}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{})
+	}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/places", nil)
 

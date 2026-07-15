@@ -530,6 +530,9 @@ type ClientInterface interface {
 	// PrepareImageUploadWithBody request with any body
 	PrepareImageUploadWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetMediaImage request
+	GetMediaImage(ctx context.Context, imageId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListNotes request
 	ListNotes(ctx context.Context, params *ListNotesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -682,6 +685,18 @@ func (c *Client) ListCategories(ctx context.Context, reqEditors ...RequestEditor
 
 func (c *Client) PrepareImageUploadWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPrepareImageUploadRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetMediaImage(ctx context.Context, imageId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMediaImageRequest(c.Server, imageId)
 	if err != nil {
 		return nil, err
 	}
@@ -1115,6 +1130,40 @@ func NewPrepareImageUploadRequestWithBody(server string, contentType string, bod
 	return req, nil
 }
 
+// NewGetMediaImageRequest generates requests for GetMediaImage
+func NewGetMediaImageRequest(server string, imageId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "image_id", imageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/media/images/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListNotesRequest generates requests for ListNotes
 func NewListNotesRequest(server string, params *ListNotesParams) (*http.Request, error) {
 	var err error
@@ -1412,6 +1461,9 @@ type ClientWithResponsesInterface interface {
 
 	// PrepareImageUploadWithBodyWithResponse request with any body
 	PrepareImageUploadWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PrepareImageUploadHTTPResponse, error)
+
+	// GetMediaImageWithResponse request
+	GetMediaImageWithResponse(ctx context.Context, imageId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetMediaImageHTTPResponse, error)
 
 	// ListNotesWithResponse request
 	ListNotesWithResponse(ctx context.Context, params *ListNotesParams, reqEditors ...RequestEditorFn) (*ListNotesHTTPResponse, error)
@@ -1762,6 +1814,39 @@ func (r PrepareImageUploadHTTPResponse) ContentType() string {
 	return ""
 }
 
+type GetMediaImageHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+	JSON503      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMediaImageHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMediaImageHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMediaImageHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListNotesHTTPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2031,6 +2116,15 @@ func (c *ClientWithResponses) PrepareImageUploadWithBodyWithResponse(ctx context
 		return nil, err
 	}
 	return ParsePrepareImageUploadHTTPResponse(rsp)
+}
+
+// GetMediaImageWithResponse request returning *GetMediaImageHTTPResponse
+func (c *ClientWithResponses) GetMediaImageWithResponse(ctx context.Context, imageId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetMediaImageHTTPResponse, error) {
+	rsp, err := c.GetMediaImage(ctx, imageId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMediaImageHTTPResponse(rsp)
 }
 
 // ListNotesWithResponse request returning *ListNotesHTTPResponse
@@ -2543,6 +2637,53 @@ func ParsePrepareImageUploadHTTPResponse(rsp *http.Response) (*PrepareImageUploa
 			return nil, err
 		}
 		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetMediaImageHTTPResponse parses an HTTP response from a GetMediaImageWithResponse call
+func ParseGetMediaImageHTTPResponse(rsp *http.Response) (*GetMediaImageHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMediaImageHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse

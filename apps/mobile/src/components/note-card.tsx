@@ -2,6 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import type { Note } from '@/lib/api/notes';
 
+import { NoteMedia } from './note-media';
 import { styles } from './note-card.styles';
 
 type NoteCardProps = {
@@ -30,32 +31,43 @@ export function NoteCard({
     </View>
   );
 
-  const author = onPressAuthor === undefined ? (
-    <Text
-      accessibilityLabel={`Autor da nota: ${note.author.displayName}`}
-      style={styles.author}
-    >
-      {note.author.displayName}
-    </Text>
-  ) : (
-    <Pressable
-      accessibilityLabel={`Abrir perfil do autor: ${note.author.displayName}`}
-      accessibilityRole="button"
-      onPress={() => onPressAuthor(note.author.id)}
-      style={({ pressed }) => [
-        styles.authorControl,
-        pressed ? styles.authorPressed : null,
-      ]}
-    >
-      <Text style={styles.author}>{note.author.displayName}</Text>
-    </Pressable>
-  );
+  const author =
+    onPressAuthor === undefined ? (
+      <Text
+        accessibilityLabel={`Autor da nota: ${note.author.displayName}`}
+        style={styles.author}
+      >
+        {note.author.displayName}
+      </Text>
+    ) : (
+      <Pressable
+        accessibilityLabel={`Abrir perfil do autor: ${note.author.displayName}`}
+        accessibilityRole="button"
+        onPress={() => onPressAuthor(note.author.id)}
+        style={({ pressed }) => [
+          styles.authorControl,
+          pressed ? styles.authorPressed : null,
+        ]}
+      >
+        <Text style={styles.author}>{note.author.displayName}</Text>
+      </Pressable>
+    );
+
+  const noteAccessibilityLabel =
+    note.images.length > 0
+      ? `Abrir nota com imagem: ${note.title}`
+      : `Abrir nota: ${note.title}`;
 
   const noteContent = (
     <>
       {metadata}
       <Text style={styles.title}>{note.title}</Text>
       <Text style={styles.body}>{note.body}</Text>
+      <NoteMedia
+        accessible={onPress === undefined}
+        accessibilityLabel={`Imagem da nota: ${note.title}`}
+        images={note.images}
+      />
     </>
   );
 
@@ -73,7 +85,7 @@ export function NoteCard({
   if (onPressAuthor === undefined) {
     return (
       <Pressable
-        accessibilityLabel={`Abrir nota: ${note.title}`}
+        accessibilityLabel={noteAccessibilityLabel}
         accessibilityRole="button"
         onPress={onPress}
         style={({ pressed }) => [
@@ -90,7 +102,7 @@ export function NoteCard({
   return (
     <View style={styles.card}>
       <Pressable
-        accessibilityLabel={`Abrir nota: ${note.title}`}
+        accessibilityLabel={noteAccessibilityLabel}
         accessibilityRole="button"
         onPress={onPress}
         style={({ pressed }) => [

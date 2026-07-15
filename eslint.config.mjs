@@ -20,6 +20,7 @@ export default [
       '!packages/tokens/src/**/*.ts',
       'apps/mobile/.expo/**',
       'apps/mobile/src/lib/api/generated/**',
+      '**/node_modules/**',
     ],
   },
   ...expoConfig,

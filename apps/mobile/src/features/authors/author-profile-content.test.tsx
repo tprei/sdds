@@ -28,6 +28,7 @@ vi.mock('react-native', () => {
   }
 
   return {
+    Image: NativeView,
     Platform: { OS: 'ios' },
     Pressable: NativePressable,
     ScrollView: NativeView,
@@ -63,12 +64,12 @@ vi.mock('expo-router', async () => {
   };
 });
 
-
 const mocks = vi.hoisted(() => ({
   getPublicAuthor: vi.fn<(authorID: string) => Promise<PublicAuthor>>(),
-  listAuthorNotes: vi.fn<(
-    input: { authorID: string; cursor?: string },
-  ) => Promise<AuthorNotesPage>>(),
+  listAuthorNotes:
+    vi.fn<
+      (input: { authorID: string; cursor?: string }) => Promise<AuthorNotesPage>
+    >(),
   listCatalogs: vi.fn<() => Promise<Catalogs>>(),
 }));
 
@@ -116,7 +117,10 @@ describe('AuthorProfileContent', () => {
     let renderer: ReactTestRenderer;
     await act(async () => {
       renderer = create(
-        <AuthorProfileContent authorID="author-id" onPressNote={() => undefined} />,
+        <AuthorProfileContent
+          authorID="author-id"
+          onPressNote={() => undefined}
+        />,
       );
       await flushPromises();
     });
@@ -188,7 +192,10 @@ describe('AuthorProfileContent', () => {
     let renderer: ReactTestRenderer;
     await act(async () => {
       renderer = create(
-        <AuthorProfileContent authorID="author-id" onPressNote={() => undefined} />,
+        <AuthorProfileContent
+          authorID="author-id"
+          onPressNote={() => undefined}
+        />,
       );
       await flushPromises();
     });
@@ -197,7 +204,10 @@ describe('AuthorProfileContent', () => {
 
     await act(async () => {
       renderer!.update(
-        <AuthorProfileContent authorID="next-author" onPressNote={() => undefined} />,
+        <AuthorProfileContent
+          authorID="next-author"
+          onPressNote={() => undefined}
+        />,
       );
       await flushPromises();
     });
@@ -242,14 +252,20 @@ describe('AuthorProfileContent', () => {
     let renderer: ReactTestRenderer;
     await act(async () => {
       renderer = create(
-        <AuthorProfileContent authorID="author-id" onPressNote={() => undefined} />,
+        <AuthorProfileContent
+          authorID="author-id"
+          onPressNote={() => undefined}
+        />,
       );
       await flushPromises();
     });
 
     await act(async () => {
       renderer!.update(
-        <AuthorProfileContent authorID="next-author" onPressNote={() => undefined} />,
+        <AuthorProfileContent
+          authorID="next-author"
+          onPressNote={() => undefined}
+        />,
       );
       await flushPromises();
     });

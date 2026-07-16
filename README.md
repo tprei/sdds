@@ -7,7 +7,7 @@ The goal is to make a warm, sovereign, Brazil-first product that is easy to run,
 ## Product Principles
 
 - PT-BR first, informal, useful, and human.
-- Text-first MVP. Images, richer media, and advanced location can come later.
+- Text-first MVP with an optional image on a note. Storage and API reads support ordered images, while the current compose flow allows at most one JPEG or PNG.
 - Search is a core product surface, not an afterthought.
 - Sovereign by default: self-hosted core services, Brazilian context, and minimal dependency on rented platforms.
 - Small team friendly: simple tools, small PRs, strong CI, and human review.
@@ -16,14 +16,14 @@ The goal is to make a warm, sovereign, Brazil-first product that is easy to run,
 
 The first version should prove the loop:
 
-1. Write a note.
+1. Write an authenticated text-first note with an optional single JPEG or PNG.
 2. Browse recent and categorized notes.
 3. Search notes.
 4. Perform basic user actions around notes.
 
 Out of scope for the first version:
 
-- Image upload and processing.
+- Image transformation and processing, including resizing, recompression, thumbnails, EXIF stripping, and automated moderation.
 - Native push notifications.
 - GPS/location ranking.
 - Complex recommendation systems.
@@ -53,32 +53,32 @@ The local `design-system/` folder is ignored by Git. Production code should use 
 
 ### Frontend
 
-The mobile app uses Expo, React Native, and TypeScript. Expo gives us a fast path to Android and iOS while keeping most day-to-day code in reviewable TypeScript. We should keep the app boring: file-based routes, small screens, simple components, and no large state-management or UI-framework dependency until there is clear need.
+The mobile app uses Expo, React Native, and TypeScript. Expo gives us a fast path to Android and iOS while keeping most day-to-day code in reviewable TypeScript. The app uses file-based routes, small screens, simple components, and no large state-management or UI-framework dependency until there is a clear product need.
 
-The current mobile app is a five-tab shell: `Início`, `Buscar`, `Escrever`, `Salvos`, and `Perfil`. `Início` reads recent notes from the API, while the other tabs stay deliberately small until their product flows are added.
+The current mobile app is a five-tab shell: `Início`, `Buscar`, `Escrever`, `Salvos`, and `Perfil`. `Início` reads recent notes from the API, `Buscar` queries notes, and `Escrever` creates an authenticated text note with an optional single image. Note cards and detail views render the first image from the ordered image list. `Salvos` remains outside the implemented product loop.
 
 ### Backend
 
-The backend starts as a single Go service:
+The backend is a single Go service:
 
 - `net/http` for the HTTP foundation.
 - `chi` for routing and middleware.
-- SQLite for persistence.
-- SQLite FTS5 for MVP search.
+- SQLite for relational metadata and FTS5 search.
+- A private RustFS bucket for image bytes through the server-side S3 adapter.
 - SQL migrations checked into the repo.
 
-The API contract standard is OpenAPI-first over JSON/HTTP. Product endpoints describe the external contract in `openapi/openapi.yaml` and keep JSON on the wire. Mobile can then consume generated TypeScript types, or a thin generated client, while Go keeps hand-owned domain and persistence code behind the HTTP boundary.
+Mobile never receives RustFS credentials, bucket/object keys, or direct RustFS URLs. The API contract standard is OpenAPI-first over JSON/HTTP. Product endpoints describe the external contract in `openapi/openapi.yaml` and keep JSON on the wire. Mobile can consume generated TypeScript types, while Go keeps hand-owned domain and persistence code behind the HTTP boundary.
 
-Protobuf is not the default for this phase of the product. We should only introduce protobuf or gRPC when the product needs stricter multi-client or multi-service contracts badly enough to justify the extra workflow and review overhead.
+Protobuf is not the default for this phase of the product. Do not introduce protobuf or gRPC until the product needs stricter multi-client or multi-service contracts enough to justify the extra workflow and review overhead.
 
-No background worker is needed at first. Jobs such as image processing, notifications, search reindexing, or moderation queues can be added when the product actually needs them.
+No background worker is required by the current product loop. Image processing, notifications, search reindexing, and moderation queues remain future work rather than available behavior.
 
-The current API exposes operational endpoints:
+The API exposes these operational endpoints:
 
-- `GET /healthz` returns `204 No Content`.
-- `GET /readyz` returns `204 No Content`.
+- `GET /healthz` reports process liveness and returns `204 No Content`.
+- `GET /readyz` reports SQLite and media readiness. It returns `204 No Content` only when SQLite and the signed media readiness object are available, and returns `503` otherwise.
 
-It opens SQLite at `SDDS_DATABASE_PATH`, defaulting to `sdds.db`, and applies migrations at startup.
+Server startup requires the configured S3-compatible media endpoint and successful media readiness. There is no local-filesystem or media-unavailable fallback. The standalone `api migrate` command is deliberately independent from media configuration.
 
 Auth has process-local operational limits to protect the small VM from expensive password work. The signup and login request limits apply independently per remote source and per normalized username; the global limits are higher shared ceilings:
 
@@ -88,22 +88,23 @@ Auth has process-local operational limits to protect the small VM from expensive
 - `SDDS_AUTH_GLOBAL_LOGIN_REQUESTS_PER_MINUTE`, default `120`.
 - `SDDS_AUTH_HASH_CONCURRENCY`, default `2`.
 
-The first product endpoints are:
+The current product endpoints are:
 
-- `GET /v1/categories` returns the category catalog.
-- `GET /v1/places` returns the place catalog.
-- `POST /v1/auth/users` creates a username/password account and returns a bearer session.
-- `POST /v1/auth/sessions` exchanges username/password credentials for a bearer session.
-- `GET /v1/auth/session` returns the current bearer session.
-- `DELETE /v1/auth/session` revokes the current bearer session.
-- `GET /v1/notes` returns recent notes.
-- `POST /v1/notes` creates a note with `title`, `body`, `category_slug`, and optional `place_slug`; it requires a bearer session.
+- `GET /healthz` reports process liveness.
+- `GET /readyz` reports SQLite and media readiness.
+- `GET /v1/categories` and `GET /v1/places` return catalogs.
+- `POST /v1/auth/users`, `POST /v1/auth/sessions`, and `GET`/`DELETE /v1/auth/session` own account/session operations.
+- `GET /v1/authors/{author_id}` and `GET /v1/authors/{author_id}/notes` return a public author and that author’s paginated notes.
+- `GET /v1/notes` returns a bounded list of up to 50 recent/category-filtered notes; `GET /v1/notes/{note_id}` returns one note; `GET /v1/search/notes` searches notes.
+- `POST /v1/media/image-uploads` requires authentication and stages exactly one private JPEG or PNG with a stable `upload_request_id`; its receipt is not public media.
+- `POST /v1/notes` requires authentication, `title`, `body`, `category_slug`, and stable `client_request_id`; it accepts optional `place_slug` and zero or one ordered `image_upload_ids`, and atomically publishes the selected staged image with the note.
+- `GET /v1/media/images/{image_id}` publicly streams bytes only for an attached image through the stable API URL; it never redirects to or exposes RustFS.
 
 ### Data
 
-SQLite is the MVP database because it keeps development and deployment simple: one service, one database file, no separate database container, and no database administration burden.
+SQLite remains the metadata and search database and requires no database server. Image bytes live outside SQLite in a separate private RustFS volume. Metadata and bytes form one application lifecycle and must be backed up and restored together.
 
-The initial schema should stay portable enough that we can later migrate to Postgres if product needs justify it. Avoid SQLite-specific cleverness in core domain logic unless it buys a real product advantage.
+The schema stays portable enough that we can later migrate to Postgres if product needs justify it. Do not add SQLite-specific cleverness to core domain logic unless it buys a real product advantage.
 
 ### Search
 
@@ -113,31 +114,34 @@ Long-term social search will depend less on the engine and more on ranking signa
 
 ### Deployment
 
-The deployment target is a small VM managed with Docker Compose and Portainer. The first production shape should be:
+The deployment target is a small VM managed with Docker Compose and Portainer. The current production shape is:
 
 - Go API container.
 - Mounted SQLite volume.
+- Private single-node/single-disk RustFS with separate data and log volumes.
 - Caddy or another simple reverse proxy when public TLS is needed.
-- Regular encrypted backups of the SQLite database file.
+- Paired encrypted backups of SQLite and RustFS state.
 
-Scalability is not the first concern. Reviewability, operational simplicity, and product learning are.
+RustFS is a pinned beta SNSD dependency, not high availability, replication, erasure coding, or a backup system. Scalability is not the first concern; reviewability, operational simplicity, and product learning are.
 
 ## Development Values
 
-- Prefer obvious code over clever abstractions.
-- Prefer small PRs over heroic PRs.
-- Prefer behavior tests over coverage theater.
-- Prefer domain language over framework language.
-- Prefer self-hosted/simple infrastructure until the product proves it needs more.
+- DO choose obvious code over clever abstractions.
+- DO keep pull requests small instead of combining unrelated work.
+- DO write behavior tests instead of coverage theater.
+- DO use domain language instead of framework language.
+- DO use self-hosted/simple infrastructure until the product proves it needs more.
 
 ## Local Development
+
+### Prerequisites and install
 
 Required tools:
 
 - Go 1.26.
 - Node 24 or newer.
 - pnpm 11.5.2.
-- Docker, only when testing Compose.
+- Docker and Docker Compose for the full local runtime and slow boundary checks.
 
 Install JavaScript dependencies from the repo root:
 
@@ -145,66 +149,17 @@ Install JavaScript dependencies from the repo root:
 pnpm install
 ```
 
-Run the API:
+### Standalone migrations
 
-```sh
-pnpm dev:api
-```
-
-Apply migrations and exit:
+`api migrate` loads database configuration only; it does not require RustFS or media secrets:
 
 ```sh
 SDDS_DATABASE_PATH=/tmp/sdds.db go run ./services/api/cmd/api migrate
 ```
 
-Use a custom database path when needed:
+### Full local runtime through Compose
 
-```sh
-SDDS_DATABASE_PATH=/tmp/sdds.db pnpm dev:api
-```
-
-Check the health endpoint:
-
-```sh
-curl -i http://localhost:8080/healthz
-```
-
-Run the mobile app:
-
-```sh
-pnpm dev:mobile
-```
-
-By default, mobile API calls use `http://localhost:8080` on iOS/web and `http://10.0.2.2:8080` on Android emulator. Point Expo at another API host when needed:
-
-```sh
-EXPO_PUBLIC_SDDS_API_BASE_URL=http://localhost:8080 pnpm dev:mobile
-```
-
-Run the checks:
-
-```sh
-pnpm check
-```
-
-Useful focused checks:
-
-```sh
-pnpm lint
-pnpm test:api
-pnpm test:api:integration
-pnpm test:mobile
-pnpm test:synthetics
-pnpm openapi:lint
-pnpm openapi:check:ts
-pnpm openapi:check:go
-pnpm typecheck:tokens
-pnpm typecheck:mobile
-```
-
-Run the Compose stack (API + RustFS):
-
-Compose requires four secret files on the host. Set these path variables before starting it:
+Compose is the repository-default full API runtime. It provisions RustFS, the private bucket and API identity, the readiness sentinel, secrets, volumes, and startup ordering. Set these four secret-file paths before starting it:
 
 ```sh
 export SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE="$HOME/.config/sdds/rustfs-root-access"
@@ -220,27 +175,86 @@ docker compose -f infra/compose/compose.yaml up --build -d
 until curl --fail --silent http://127.0.0.1:8080/readyz >/dev/null; do sleep 1; done
 ```
 
-Compose publishes only the API port (`8080`, or `SDDS_HTTP_PORT`). RustFS stays private at `http://rustfs:9000` with its console disabled. Data uses separate `api-data`, `rustfs-data`, and `rustfs-logs` volumes. Back up `api-data` and `rustfs-data` together; restoring one without the other can leave data out of sync. RustFS is beta, not HA, and Compose is not a backup system.
+Compose publishes only the API port (`8080`, or `SDDS_HTTP_PORT`). RustFS stays private on the Compose network with its console disabled. Data uses separate `api-data`, `rustfs-data`, and `rustfs-logs` volumes. Back up `api-data` and `rustfs-data` together; restoring one without the other can leave metadata and bytes out of sync. RustFS is beta, and Compose is not a backup system.
 
-Validate migrations without starting dependencies or requiring media secrets:
-
-```sh
-docker compose -f infra/compose/compose.yaml run --build --rm --no-deps api migrate
-```
-
-Run the RustFS integration:
-
-```sh
-pnpm test:rustfs
-```
-
-The test creates temporary credentials and removes its Compose project and volumes when it exits.
-
-Stop the stack (destructive; removes `api-data`, `rustfs-data`, and `rustfs-logs`):
+Stop the stack only when discarding its state is intentional. This command is destructive and removes `api-data`, `rustfs-data`, and `rustfs-logs`:
 
 ```sh
 docker compose -f infra/compose/compose.yaml down --volumes
 ```
+
+### Advanced direct API process
+
+Use `pnpm dev:api` only against an already provisioned S3-compatible endpoint. The process requires all six media settings; it fails startup when configuration or media readiness is absent and MUST NOT fall back to local files:
+
+- `SDDS_MEDIA_S3_ENDPOINT`.
+- `SDDS_MEDIA_S3_REGION`.
+- `SDDS_MEDIA_S3_BUCKET`.
+- `SDDS_MEDIA_S3_PATH_STYLE`.
+- `SDDS_MEDIA_S3_ACCESS_KEY_FILE`.
+- `SDDS_MEDIA_S3_SECRET_KEY_FILE`.
+
+For example, with secret files already provisioned outside Git:
+
+```sh
+SDDS_DATABASE_PATH=/tmp/sdds.db \
+SDDS_MEDIA_S3_ENDPOINT=https://s3.internal.example \
+SDDS_MEDIA_S3_REGION=us-east-1 \
+SDDS_MEDIA_S3_BUCKET=sdds-media \
+SDDS_MEDIA_S3_PATH_STYLE=true \
+SDDS_MEDIA_S3_ACCESS_KEY_FILE="$HOME/.config/sdds/sdds-media-access" \
+SDDS_MEDIA_S3_SECRET_KEY_FILE="$HOME/.config/sdds/sdds-media-secret" \
+pnpm dev:api
+```
+
+### Mobile
+
+Run the mobile app against the API published by the Compose stack or another fully configured API runtime:
+
+```sh
+pnpm dev:mobile
+```
+
+By default, mobile API calls use `http://localhost:8080` on iOS/web and `http://10.0.2.2:8080` on Android emulator. Point Expo at another fully configured API host when needed:
+
+```sh
+EXPO_PUBLIC_SDDS_API_BASE_URL=http://localhost:8080 pnpm dev:mobile
+```
+
+### Fast checks
+
+`pnpm check` is the fast blocking repository gate. It does not start Docker or browsers and covers Go formatting/lint, OpenAPI lint, generated TypeScript/Go contract checks, TypeScript/mobile checks, API schema tests, mobile tests, and Go API tests:
+
+```sh
+pnpm check
+```
+
+### Focused and slow checks
+
+Run focused checks for the owning boundary:
+
+```sh
+pnpm lint
+pnpm test:api
+pnpm test:mobile
+pnpm openapi:lint
+pnpm openapi:check:ts
+pnpm openapi:check:go
+pnpm typecheck:tokens
+pnpm typecheck:mobile
+```
+
+Use the separate slow commands when their runtime boundary changes. Both require Docker with Docker Compose. The migration command needs no private secrets; `pnpm test:rustfs` generates temporary credentials. They do not represent a single combined lifecycle:
+
+```sh
+# Validate migrations without starting dependencies or requiring media secrets.
+docker compose -f infra/compose/compose.yaml run --build --rm --no-deps api migrate
+
+# Exercise object-store behavior with temporary credentials.
+pnpm test:rustfs
+```
+
+The RustFS integration creates temporary credentials and removes its Compose project and volumes when it exits.
 
 Run the API integration test against the Dockerized stack:
 
@@ -252,7 +266,7 @@ SDDS_API_BASE_URL=http://127.0.0.1:18080 pnpm test:api:integration
 docker compose -p sdds-api-integration -f infra/compose/compose.yaml down --volumes
 ```
 
-`pnpm test:api:integration` expects a live API and exercises public HTTP endpoints through the generated Go OpenAPI client. Keep it on the Compose path when checking runtime boundaries so it covers the built image, migrations, routing, SQLite persistence, and JSON contract together.
+`pnpm test:api:integration` expects a live API and exercises public HTTP endpoints through the generated Go OpenAPI client. Keep it on the Compose path so it covers the built image, migrations, readiness, routing, SQLite persistence, and JSON contract together.
 
 Run the browser-level synthetic against the Dockerized stack:
 
@@ -264,7 +278,7 @@ pnpm test:synthetics
 docker compose -p sdds-synthetics -f infra/compose/compose.yaml down --volumes
 ```
 
-`pnpm test:synthetics` starts Expo web on `http://localhost:19006` and points it at `http://127.0.0.1:18080`. Keep the API on the Compose path for this check so it exercises `services/api/Dockerfile`, `infra/compose/compose.yaml`, the real HTTP API, and the web client together.
+`pnpm test:synthetics` starts Expo web on `http://localhost:19006` and points it at `http://127.0.0.1:18080`. Keep the API on the Compose path so this check exercises `services/api/Dockerfile`, `infra/compose/compose.yaml`, the real HTTP API, and the web client together.
 
 ## References
 

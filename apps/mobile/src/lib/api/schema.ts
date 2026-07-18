@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { components } from './generated/schema';
 
 type GeneratedSchemas = components['schemas'];
+type ImageUploadReceiptResponse = GeneratedSchemas['ImageUploadReceipt'];
 type AuthSessionResponse = GeneratedSchemas['AuthSessionResponse'];
 type AuthorNotesPageResponse = GeneratedSchemas['AuthorNotesPage'];
 type AuthorSummaryResponse = GeneratedSchemas['AuthorSummary'];
@@ -23,9 +24,10 @@ type ValidationField = GeneratedSchemas['ValidationField'];
 type ValidationProblemResponse = GeneratedSchemas['ValidationProblem'];
 type ValidationProblemCode = ValidationProblemResponse['code'];
 
+const canonicalUUIDPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const categorySlugSchema = z.string() satisfies z.ZodType<CategorySlug>;
 const placeSlugSchema = z.string() satisfies z.ZodType<PlaceSlug>;
-
 export const authorSummarySchema = z.object({
   id: z.string(),
   display_name: z.string(),
@@ -123,6 +125,15 @@ export const currentSessionResponseSchema = z.object({
   user: currentUserSchema,
 }) satisfies z.ZodType<CurrentSessionResponse>;
 
+export const imageUploadReceiptSchema = z.object({
+  image_upload_id: z.string().regex(canonicalUUIDPattern),
+  content_type: z.enum(['image/jpeg', 'image/png']),
+  byte_size: z.number().int().positive().safe(),
+  width: z.number().int().positive().safe(),
+  height: z.number().int().positive().safe(),
+  expires_at: z.number().int().positive().safe(),
+}) satisfies z.ZodType<ImageUploadReceiptResponse>;
+
 export const errorCodeSchema = z.enum([
   'internal_error',
   'invalid_auth',
@@ -181,7 +192,7 @@ export const errorResponseSchema = z.object({
   fields: z.array(validationProblemSchema).optional(),
 }) satisfies z.ZodType<ErrorResponse>;
 
-type Exact<Expected, Actual> =
+export type Exact<Expected, Actual> =
   (<T>() => T extends Expected ? 1 : 2) extends <T>() => T extends Actual
     ? 1
     : 2
@@ -198,6 +209,9 @@ export type SchemaExactnessChecks = [
   Assert<Exact<PlaceSlug, z.output<typeof placeSlugSchema>>>,
   Assert<Exact<AuthorSummaryResponse, z.output<typeof authorSummarySchema>>>,
   Assert<Exact<NoteImageResponse, z.output<typeof noteImageSchema>>>,
+  Assert<
+    Exact<ImageUploadReceiptResponse, z.output<typeof imageUploadReceiptSchema>>
+  >,
   Assert<
     Exact<GeneratedSchemas['PublicAuthor'], z.output<typeof publicAuthorSchema>>
   >,

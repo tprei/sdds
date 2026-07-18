@@ -199,6 +199,7 @@ describe('ComposeScreen', () => {
       uuidSequence('request-1', 'upload-1', 'request-2'),
     );
     const renderer = await renderCompose(store);
+    fill(renderer, '  Título  ', '  Corpo  ');
 
     await press(renderer, 'compose-add-image');
     expect(mocks.launchImageLibraryAsync).toHaveBeenCalledWith({
@@ -239,6 +240,8 @@ describe('ComposeScreen', () => {
     expect(
       renderer.root.findByProps({ testID: 'compose-add-image' }),
     ).toBeDefined();
+    expect(input(renderer, 'Título da nota').props.value).toBe('  Título  ');
+    expect(input(renderer, 'Texto da nota').props.value).toBe('  Corpo  ');
     renderer.unmount();
   });
 

@@ -15,9 +15,11 @@ import type {
 
 const mocks = vi.hoisted(() => {
   class MockAPIRequestError extends Error {
+    readonly code: string | undefined;
     readonly status: number;
-    constructor(status: number) {
+    constructor(status: number, code?: string) {
       super('api_request_failed');
+      this.code = code;
       this.status = status;
     }
   }
@@ -39,16 +41,10 @@ const mocks = vi.hoisted(() => {
       user: { id: 'owner-1' },
     },
     createNote: vi.fn(),
-    createPreparedImageUploadCache: vi.fn(
-      (options: { uuid: () => string }) => ({
-        clear: vi.fn(),
-        uuid: options.uuid,
-      }),
-    ),
     launchImageLibraryAsync: vi.fn(),
     listCatalogs: vi.fn(),
     logout: vi.fn(),
-    prepareCachedImageUpload: vi.fn(),
+    prepareImageUpload: vi.fn(),
     router: { navigate: vi.fn(), push: vi.fn() },
   };
 });
@@ -89,8 +85,7 @@ vi.mock('expo-router', () => ({
 vi.mock('@/lib/api/catalogs', () => ({ listCatalogs: mocks.listCatalogs }));
 vi.mock('@/lib/api/image-uploads', () => ({
   ImageUploadRequestError: mocks.ImageUploadRequestError,
-  createPreparedImageUploadCache: mocks.createPreparedImageUploadCache,
-  prepareCachedImageUpload: mocks.prepareCachedImageUpload,
+  prepareImageUpload: mocks.prepareImageUpload,
 }));
 vi.mock('@/lib/api/notes', () => ({
   APIRequestError: mocks.APIRequestError,
@@ -187,7 +182,7 @@ beforeEach(() => {
     canceled: true,
     assets: null,
   });
-  mocks.prepareCachedImageUpload.mockResolvedValue(receipt);
+  mocks.prepareImageUpload.mockResolvedValue(receipt);
   mocks.createNote.mockResolvedValue(undefined);
   mocks.logout.mockResolvedValue(undefined);
 });
@@ -327,7 +322,7 @@ describe('ComposeScreen', () => {
 
   it('uploads before create and reuses unchanged IDs and receipts on retry', async () => {
     const events: string[] = [];
-    mocks.prepareCachedImageUpload.mockImplementation(async () => {
+    mocks.prepareImageUpload.mockImplementation(async () => {
       events.push('upload');
       return receipt;
     });
@@ -340,43 +335,41 @@ describe('ComposeScreen', () => {
         events.push('create');
       });
     const store = createComposeDraftStore(
-      uuidSequence('request-1', 'upload-1'),
+      uuidSequence('upload-1', 'request-1'),
     );
     const renderer = await renderCompose(store);
     await selectImage(renderer, asset);
     fill(renderer, 'Título', 'Corpo');
+    const selected = store.get('owner-1');
 
     await press(renderer, 'compose-submit');
     const failed = store.get('owner-1');
     expect(events).toEqual(['upload', 'create']);
     expect(failed?.image?.imageReceipt).toEqual(receipt);
-    expect(failed?.clientRequestId).toBeDefined();
-
-    await press(renderer, 'compose-replace-image');
-    expect(store.get('owner-1')).toEqual(failed);
 
     await press(renderer, 'compose-submit');
     expect(events).toEqual(['upload', 'create', 'create']);
-    expect(mocks.prepareCachedImageUpload).toHaveBeenCalledOnce();
-    expect(mocks.createNote.mock.calls[1]?.[0]).toMatchObject({
-      clientRequestId: mocks.createNote.mock.calls[0]?.[0].clientRequestId,
+    const firstUpload = mocks.prepareImageUpload.mock.calls[0]?.[2];
+    expect(firstUpload?.uploadRequestId).toBe(selected?.image?.uploadRequestId);
+    expect(mocks.createNote.mock.calls[0]?.[0]).toMatchObject({
+      clientRequestId: selected?.clientRequestId,
       imageUploadIds: [receipt.imageUploadId],
     });
     expect(store.get('owner-1')).toBeNull();
     expect(mocks.router.navigate).toHaveBeenCalledWith('/');
-    expect(
-      mocks.createPreparedImageUploadCache.mock.results[0]?.value.clear,
-    ).toHaveBeenCalled();
     renderer.unmount();
   });
 
   it('replaces a failed upload with the current asset and upload identity', async () => {
     const uploadRequestIDs: string[] = [];
-    mocks.prepareCachedImageUpload.mockImplementation(
-      async (cache: { uuid: () => string }) => {
-        const uploadRequestID = cache.uuid();
-        uploadRequestIDs.push(uploadRequestID);
-        return { ...receipt, imageUploadId: uploadRequestID };
+    mocks.prepareImageUpload.mockImplementation(
+      async (
+        _asset: ImageUploadAsset,
+        _token: string,
+        options: { uploadRequestId: string },
+      ) => {
+        uploadRequestIDs.push(options.uploadRequestId);
+        return { ...receipt, imageUploadId: options.uploadRequestId };
       },
     );
     mocks.createNote
@@ -440,17 +433,10 @@ describe('ComposeScreen', () => {
     store.setImageReceipt('owner-1', 'upload-initial', expiredReceipt);
     const renderer = await renderCompose(store);
 
-    let preparedUploadRequestID: string | undefined;
-    mocks.prepareCachedImageUpload.mockImplementationOnce(
-      async (cache: { uuid: () => string }) => {
-        preparedUploadRequestID = cache.uuid();
-        return receipt;
-      },
-    );
     await press(renderer, 'compose-submit');
 
-    expect(mocks.prepareCachedImageUpload).toHaveBeenCalledOnce();
-    expect(preparedUploadRequestID).toBe('upload-refreshed');
+    const prepared = mocks.prepareImageUpload.mock.calls[0]?.[2];
+    expect(prepared?.uploadRequestId).toBe('upload-refreshed');
     expect(mocks.createNote).toHaveBeenCalledOnce();
     expect(mocks.createNote.mock.calls[0]?.[0]).toMatchObject({
       clientRequestId: 'request-refreshed',
@@ -460,7 +446,7 @@ describe('ComposeScreen', () => {
     renderer.unmount();
   });
   it('rotates IDs after upload expiry and retries the preserved asset', async () => {
-    mocks.prepareCachedImageUpload
+    mocks.prepareImageUpload
       .mockRejectedValueOnce(
         new mocks.ImageUploadRequestError(409, 'upload_expired'),
       )
@@ -494,14 +480,12 @@ describe('ComposeScreen', () => {
       original?.image?.uploadRequestId,
     );
     expect(refreshed?.clientRequestId).not.toBe(original?.clientRequestId);
-    expect(
-      renderer.root.findByProps({ testID: 'compose-submit' }).props.disabled,
-    ).toBe(false);
 
     await press(renderer, 'compose-submit');
 
-    expect(mocks.prepareCachedImageUpload).toHaveBeenCalledTimes(2);
-    expect(mocks.createPreparedImageUploadCache).toHaveBeenCalledTimes(2);
+    expect(mocks.prepareImageUpload.mock.calls[1]?.[2].uploadRequestId).toBe(
+      refreshed?.image?.uploadRequestId,
+    );
     expect(mocks.createNote).toHaveBeenCalledOnce();
     expect(mocks.createNote.mock.calls[0]?.[0]).toMatchObject({
       clientRequestId: refreshed?.clientRequestId,
@@ -510,9 +494,77 @@ describe('ComposeScreen', () => {
     expect(store.get('owner-1')).toBeNull();
     renderer.unmount();
   });
-  it('releases the submission fence when an image receipt is stale', async () => {
+  it('rotates IDs after note association expiry and retries the preserved receipt', async () => {
+    mocks.createNote
+      .mockRejectedValueOnce(new mocks.APIRequestError(409, 'upload_expired'))
+      .mockResolvedValueOnce(undefined);
+    const store = createComposeDraftStore(
+      uuidSequence('request-1', 'upload-1'),
+    );
+    const renderer = await renderCompose(store);
+    await selectImage(renderer, asset);
+    fill(renderer, 'Título', 'Corpo');
+    const original = store.get('owner-1');
+    store.setImageReceipt(
+      'owner-1',
+      original?.image?.uploadRequestId ?? '',
+      receipt,
+    );
+
+    await press(renderer, 'compose-submit');
+
+    const refreshed = store.get('owner-1');
+    expect(refreshed?.image?.imageReceipt).toBeNull();
+    expect(refreshed?.image?.uploadRequestId).not.toBe(
+      original?.image?.uploadRequestId,
+    );
+    expect(refreshed?.clientRequestId).not.toBe(original?.clientRequestId);
+
+    await press(renderer, 'compose-submit');
+
+    const retryUpload = mocks.prepareImageUpload.mock.calls[0]?.[2];
+    const retryNote = mocks.createNote.mock.calls[1]?.[0];
+    expect(retryUpload?.uploadRequestId).toBe(
+      refreshed?.image?.uploadRequestId,
+    );
+    expect(retryNote?.clientRequestId).toBe(refreshed?.clientRequestId);
+    expect(mocks.createNote.mock.calls[1]?.[0]).toMatchObject({
+      imageUploadIds: [receipt.imageUploadId],
+    });
+  });
+  it('ignores stale note expiry after image replacement', async () => {
+    const pending = deferred<void>();
+    mocks.createNote.mockReturnValueOnce(pending.promise);
+    const store = createComposeDraftStore(
+      uuidSequence('request-1', 'upload-1'),
+    );
+    const renderer = await renderCompose(store);
+    await selectImage(renderer, asset);
+    fill(renderer, 'Título', 'Corpo');
+    store.setImageReceipt(
+      'owner-1',
+      store.get('owner-1')?.image?.uploadRequestId ?? '',
+      receipt,
+    );
+
+    act(() => {
+      void renderer.root
+        .findByProps({ testID: 'compose-submit' })
+        .props.onPress();
+    });
+    await settle();
+
+    const replacement = store.selectImage('owner-1', replacementAsset);
+    await act(async () => {
+      pending.reject(new mocks.APIRequestError(409, 'upload_expired'));
+      await settle();
+    });
+
+    expect(store.get('owner-1')).toEqual(replacement);
+  });
+  it('rejects a stale upload receipt after replacement', async () => {
     const pending = deferred<ImageUploadReceipt>();
-    mocks.prepareCachedImageUpload.mockReturnValueOnce(pending.promise);
+    mocks.prepareImageUpload.mockReturnValueOnce(pending.promise);
     const store = createComposeDraftStore(
       uuidSequence('request-1', 'upload-1'),
     );
@@ -526,19 +578,73 @@ describe('ComposeScreen', () => {
         .props.onPress();
     });
     await settle();
-    expect(mocks.prepareCachedImageUpload).toHaveBeenCalledOnce();
-
-    store.removeImage('owner-1');
+    const replacement = store.selectImage('owner-1', replacementAsset);
     await act(async () => {
       pending.resolve(receipt);
       await settle();
     });
 
     expect(mocks.createNote).not.toHaveBeenCalled();
+    const current = store.get('owner-1');
+    expect(current?.image).toMatchObject({
+      imageReceipt: null,
+      uploadRequestId: replacement?.image?.uploadRequestId,
+    });
     expect(
       renderer.root.findByProps({ testID: 'compose-submit' }).props.disabled,
     ).toBe(false);
     renderer.unmount();
+  });
+  it('preserves selected image state across same-owner reauthentication', async () => {
+    const store = createComposeDraftStore(
+      uuidSequence('request-1', 'upload-1'),
+    );
+    mocks.prepareImageUpload.mockRejectedValueOnce(
+      new mocks.ImageUploadRequestError(401),
+    );
+    const renderer = await renderCompose(store);
+    await selectImage(renderer, asset);
+    fill(renderer, 'Título', 'Corpo');
+    const selected = store.get('owner-1');
+
+    await press(renderer, 'compose-submit');
+
+    await reauthenticate(renderer, store);
+    expect(store.get('owner-1')).toEqual(selected);
+
+    await press(renderer, 'compose-submit');
+    expect(mocks.prepareImageUpload.mock.calls[1]?.[2].uploadRequestId).toBe(
+      selected?.image?.uploadRequestId,
+    );
+    expect(mocks.createNote.mock.calls[0]?.[0]).toMatchObject({
+      clientRequestId: selected?.clientRequestId,
+      imageUploadIds: [receipt.imageUploadId],
+    });
+  });
+
+  it('preserves a ready image receipt across same-owner reauthentication', async () => {
+    const store = createComposeDraftStore(
+      uuidSequence('request-1', 'upload-1'),
+    );
+    mocks.createNote
+      .mockRejectedValueOnce(new mocks.APIRequestError(401))
+      .mockResolvedValueOnce(undefined);
+    const renderer = await renderCompose(store);
+    await selectImage(renderer, asset);
+    fill(renderer, 'Título', 'Corpo');
+
+    await press(renderer, 'compose-submit');
+    const ready = store.get('owner-1');
+    expect(ready?.image?.imageReceipt).toEqual(receipt);
+
+    await reauthenticate(renderer, store);
+
+    await press(renderer, 'compose-submit');
+    expect(mocks.prepareImageUpload).toHaveBeenCalledOnce();
+    expect(mocks.createNote.mock.calls[1]?.[0]).toMatchObject({
+      clientRequestId: ready?.clientRequestId,
+      imageUploadIds: [receipt.imageUploadId],
+    });
   });
 
   it('restores owners, ignores stale picker work, and preserves auth failures', async () => {
@@ -654,6 +760,21 @@ async function selectImage(
   await press(renderer, 'compose-add-image');
 }
 
+async function reauthenticate(
+  renderer: ReactTestRenderer,
+  store: ComposeDraftStore,
+): Promise<void> {
+  mocks.authState.status = 'anonymous';
+  act(() => {
+    renderer.update(<ComposeScreen draftStore={store} />);
+  });
+  mocks.authState.status = 'authenticated';
+  mocks.authState.token = 'reauthenticated-token';
+  await act(async () => {
+    renderer.update(<ComposeScreen draftStore={store} />);
+    await settle();
+  });
+}
 function fill(renderer: ReactTestRenderer, title: string, body: string): void {
   act(() => {
     input(renderer, 'Título da nota').props.onChangeText(title);

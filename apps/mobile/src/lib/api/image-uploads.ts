@@ -1,4 +1,3 @@
-import { randomUUID } from 'expo-crypto';
 import { File as ExpoFile } from 'expo-file-system';
 import type { ImagePickerAsset } from 'expo-image-picker';
 
@@ -31,26 +30,7 @@ export type PrepareImageUploadOptions = {
   maxDelayMs?: number;
   signal?: AbortSignal;
   sleep?: (delayMs: number, signal: AbortSignal | undefined) => Promise<void>;
-  uploadRequestId?: string;
-  uuid?: () => string;
-};
-
-export type PreparedImageUpload = {
-  asset: ImageUploadAsset;
-  assetKey: string;
-  imageReceipt: ImageUploadReceipt | null;
   uploadRequestId: string;
-};
-
-export type PreparedImageUploadCache = {
-  clear(): void;
-  get(): PreparedImageUpload | null;
-  prepare(asset: ImageUploadAsset): PreparedImageUpload;
-  setReceipt(
-    receipt: ImageUploadReceipt,
-    uploadRequestId: string,
-    asset: ImageUploadAsset,
-  ): PreparedImageUpload | null;
 };
 
 const defaultMaxAttempts = 3;
@@ -81,14 +61,14 @@ export class ImageUploadResponseError extends Error {
 export async function prepareImageUpload(
   asset: ImageUploadAsset,
   token: string,
-  options: PrepareImageUploadOptions = {},
+  options: PrepareImageUploadOptions,
 ): Promise<ImageUploadReceipt> {
   throwIfAborted(options.signal);
   if (token.trim() === '') {
     throw new ImageUploadRequestError(401);
   }
 
-  const uploadRequestId = resolveUploadRequestId(options);
+  const uploadRequestId = canonicalUploadRequestId(options.uploadRequestId);
   const file = asset.file ?? new ExpoFile(asset.uri);
   const filename = asset.fileName ?? file.name;
   const headers = new Headers({ Authorization: `Bearer ${token}` });
@@ -136,95 +116,11 @@ export async function prepareImageUpload(
   throw new ImageUploadRequestError(503);
 }
 
-export function createPreparedImageUploadCache(
-  options: {
-    uuid?: () => string;
-  } = {},
-): PreparedImageUploadCache {
-  let current: PreparedImageUpload | null = null;
-  const uuid = options.uuid ?? randomUUID;
-
-  return {
-    clear() {
-      current = null;
-    },
-    get() {
-      return current;
-    },
-    prepare(asset) {
-      const nextAssetKey = imageUploadAssetKey(asset);
-      if (
-        current?.assetKey === nextAssetKey &&
-        current.asset.file === asset.file
-      ) {
-        return current;
-      }
-
-      current = {
-        asset,
-        assetKey: nextAssetKey,
-        imageReceipt: null,
-        uploadRequestId: canonicalUploadRequestId(uuid()),
-      };
-      return current;
-    },
-    setReceipt(receipt, uploadRequestId, asset) {
-      if (
-        current === null ||
-        current.uploadRequestId !== uploadRequestId ||
-        current.asset.file !== asset.file ||
-        current.assetKey !== imageUploadAssetKey(asset)
-      ) {
-        return current;
-      }
-
-      current = { ...current, imageReceipt: receipt };
-      return current;
-    },
-  };
-}
-
-export async function prepareCachedImageUpload(
-  cache: PreparedImageUploadCache,
-  asset: ImageUploadAsset,
-  token: string,
-  options: Omit<PrepareImageUploadOptions, 'uploadRequestId'> = {},
-): Promise<ImageUploadReceipt> {
-  const prepared = cache.prepare(asset);
-  if (prepared.imageReceipt !== null) {
-    return prepared.imageReceipt;
-  }
-
-  const receipt = await prepareImageUpload(asset, token, {
-    ...options,
-    uploadRequestId: prepared.uploadRequestId,
-  });
-  cache.setReceipt(receipt, prepared.uploadRequestId, asset);
-  return receipt;
-}
-
-function resolveUploadRequestId(options: PrepareImageUploadOptions): string {
-  return canonicalUploadRequestId(
-    options.uploadRequestId ?? (options.uuid ?? randomUUID)(),
-  );
-}
-
 function canonicalUploadRequestId(value: string): string {
   if (!canonicalUUIDPattern.test(value)) {
     throw new ImageUploadInputError('upload_request_id_invalid');
   }
   return value.toLowerCase();
-}
-
-function imageUploadAssetKey(asset: ImageUploadAsset): string {
-  return [
-    asset.uri,
-    asset.fileName ?? '',
-    asset.fileSize ?? '',
-    asset.height,
-    asset.mimeType ?? '',
-    asset.width,
-  ].join('\u0000');
 }
 
 function boundedPositiveInteger(value: number | undefined, fallback: number) {

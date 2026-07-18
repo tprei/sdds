@@ -2,11 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import appConfig from '../../../app.json';
 import {
-  createPreparedImageUploadCache,
   ImageUploadInputError,
   ImageUploadRequestError,
   ImageUploadResponseError,
-  prepareCachedImageUpload,
   prepareImageUpload,
 } from './image-uploads';
 import type { ImageUploadAsset, ImageUploadReceipt } from './image-uploads';
@@ -15,10 +13,6 @@ vi.mock('react-native', () => ({
   Platform: {
     OS: 'ios',
   },
-}));
-
-vi.mock('expo-crypto', () => ({
-  randomUUID: () => '018ff5b8-0000-7000-8000-000000000001',
 }));
 
 vi.mock('expo-file-system', () => ({
@@ -34,7 +28,7 @@ vi.mock('expo-file-system', () => ({
 
 const uploadRequestID = '018ff5b8-0000-7000-8000-000000000010';
 const imageUploadID = '018ff5b8-0000-7000-8000-000000000011';
-const replacementUploadRequestID = '018ff5b8-0000-7000-8000-000000000012';
+
 const uppercaseUploadRequestID = uploadRequestID.toUpperCase();
 const uppercaseImageUploadID = imageUploadID.toUpperCase();
 const exampleToken = 'session-token';
@@ -45,10 +39,6 @@ const imageAsset: ImageUploadAsset = {
   mimeType: 'image/jpeg',
   uri: 'file:///photos/photo.jpg',
   width: 1200,
-};
-const replacementAsset: ImageUploadAsset = {
-  ...imageAsset,
-  file: new File(['image bytes'], 'photo.jpg', { type: 'image/jpeg' }),
 };
 
 const receipt: ImageUploadReceipt = {
@@ -110,9 +100,11 @@ describe('image upload API client', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(prepareImageUpload(imageAsset, '  ')).rejects.toMatchObject(
-      new ImageUploadRequestError(401),
-    );
+    await expect(
+      prepareImageUpload(imageAsset, '  ', {
+        uploadRequestId: uploadRequestID,
+      }),
+    ).rejects.toMatchObject(new ImageUploadRequestError(401));
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -126,6 +118,7 @@ describe('image upload API client', () => {
     await expect(
       prepareImageUpload(imageAsset, exampleToken, {
         signal: controller.signal,
+        uploadRequestId: uploadRequestID,
       }),
     ).rejects.toBe(reason);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -147,6 +140,7 @@ describe('image upload API client', () => {
       prepareImageUpload(imageAsset, exampleToken, {
         signal: controller.signal,
         sleep,
+        uploadRequestId: uploadRequestID,
       }),
     ).rejects.toBe(reason);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -170,6 +164,7 @@ describe('image upload API client', () => {
       const upload = prepareImageUpload(imageAsset, exampleToken, {
         maxAttempts: 2,
         signal: controller.signal,
+        uploadRequestId: uploadRequestID,
       });
       await vi.advanceTimersByTimeAsync(0);
       expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -202,6 +197,7 @@ describe('image upload API client', () => {
       prepareImageUpload(imageAsset, exampleToken, {
         maxAttempts: 3,
         signal: controller.signal,
+        uploadRequestId: uploadRequestID,
       }),
     ).rejects.toBe(reason);
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -322,47 +318,6 @@ describe('image upload API client', () => {
         uploadRequestId: uploadRequestID,
       }),
     ).rejects.toBeInstanceOf(ImageUploadResponseError);
-  });
-});
-
-describe('prepared image upload cache', () => {
-  it('reuses unchanged receipts and request IDs, then invalidates on replace/remove', async () => {
-    const ids = [uploadRequestID, replacementUploadRequestID];
-    const cache = createPreparedImageUploadCache({
-      uuid: () => ids.shift() ?? replacementUploadRequestID,
-    });
-    const calls: Request[] = [];
-    stubFetch(async (request) => {
-      calls.push(request);
-      return jsonResponse(apiReceipt(), 201);
-    });
-
-    await expect(
-      prepareCachedImageUpload(cache, imageAsset, exampleToken),
-    ).resolves.toEqual(receipt);
-    await expect(
-      prepareCachedImageUpload(cache, imageAsset, exampleToken),
-    ).resolves.toEqual(receipt);
-    expect(calls).toHaveLength(1);
-    expect(cache.get()).toMatchObject({
-      imageReceipt: receipt,
-      uploadRequestId: uploadRequestID,
-    });
-    expect(
-      cache.setReceipt(receipt, replacementUploadRequestID, imageAsset),
-    ).toMatchObject({ imageReceipt: receipt });
-
-    const replaced = cache.prepare(replacementAsset);
-    expect(replaced.imageReceipt).toBeNull();
-    expect(replaced.uploadRequestId).toBe(replacementUploadRequestID);
-    expect(
-      cache.setReceipt(receipt, uploadRequestID, imageAsset),
-    ).toMatchObject({
-      uploadRequestId: replacementUploadRequestID,
-      imageReceipt: null,
-    });
-    cache.clear();
-    expect(cache.get()).toBeNull();
   });
 });
 

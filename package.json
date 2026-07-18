@@ -21,6 +21,7 @@
     "test:api": "go test ./services/api/...",
     "test:api:integration": "go test -count=1 -tags=integration ./tests/integration",
     "test:rustfs": "infra/compose/test-rustfs.sh",
+    "test:rustfs:api-runtime-boundaries": "go test -count=1 -tags=integration -run '^TestAPIRuntimeBoundaries$' ./tests/integration",
     "test:mobile": "pnpm --filter @sdds/mobile test",
     "test:synthetics": "playwright test",
     "typecheck:mobile": "pnpm --filter @sdds/mobile typecheck",

@@ -4,7 +4,17 @@ umask 077
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd); COMPOSE_FILE=$ROOT/infra/compose/compose.yaml
 PROJECT=sdds-rustfs-$(date +%s)-$$; TMP=; API_URL=
-cleanup() { status=$?; trap - EXIT INT TERM; [ -z "$PROJECT" ] || docker compose -f "$COMPOSE_FILE" -p "$PROJECT" down --rmi local --volumes --remove-orphans >/dev/null 2>&1 || :; [ -z "$TMP" ] || rm -rf "$TMP"; exit "$status"; }
+cleanup() {
+  status=$?
+  trap - EXIT INT TERM
+  if [ "$status" -ne 0 ] && [ -n "$PROJECT" ]; then
+    compose ps >&2 || :
+    compose logs --no-color --tail=80 api rustfs rustfs-init rustfs-permissions >&2 || :
+  fi
+  [ -z "$PROJECT" ] || docker compose -f "$COMPOSE_FILE" -p "$PROJECT" down --rmi local --volumes --remove-orphans >/dev/null 2>&1 || :
+  [ -z "$TMP" ] || rm -rf "$TMP"
+  exit "$status"
+}
 trap cleanup EXIT INT TERM
 die() { printf '%s\n' "$1" >&2; exit 1; }
 compose() { docker compose -f "$COMPOSE_FILE" -p "$PROJECT" "$@"; }
@@ -66,21 +76,13 @@ expect_drift sentinel-v1 'readiness sentinel metadata drift' drift_sentinel
 expect_drift anonymous-v1 'anonymous bucket policy is configured' drift_anonymous
 expect_drift attachment-v1 'API user attachment drift' drift_attachment
 
-printf 'rustfs-persistence-marker-v1\n' >"$TMP/marker"; printf 'sdds-media-ready-v1\n' >"$TMP/sentinel"
-marker_hash=$(sha256 "$TMP/marker"); sentinel_hash=$(sha256 "$TMP/sentinel")
+printf 'sdds-media-ready-v1\n' >"$TMP/sentinel"
+sentinel_hash=$(sha256 "$TMP/sentinel")
 check_object() { key=$1; source=$2; remote=$3; local=$4; expected=$5; media_aws s3api get-object --bucket sdds-media --key "$key" "$remote" >/dev/null; cmp -s "$source" "$local" || die "$key payload drift"; [ "$(sha256 "$local")" = "$expected" ] || die "$key hash drift"; }
-media_aws s3api put-object --bucket sdds-media --key note-images/persist-marker --body /tmp/sdds-test/marker >/dev/null
-check_object note-images/persist-marker "$TMP/marker" /tmp/sdds-test/marker-before "$TMP/marker-before" "$marker_hash"
 check_object system/readiness "$TMP/sentinel" /tmp/sdds-test/sentinel-before "$TMP/sentinel-before" "$sentinel_hash"
-
-client_request_id=018ff5b8-0000-7000-8000-000000000012; username=rustfs$(date +%s)$$; password=rustfs-integration-password
-session=$(printf '{"username":"%s","password":"%s","display_name":"RustFS integration"}' "$username" "$password" | curl --silent --show-error --fail --max-time 10 -H 'Content-Type: application/json' --data-binary @- "$API_URL/v1/auth/users")
-token=$(printf '%s' "$session" | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
-note=$(printf '{"title":"RustFS persistence marker","body":"Compose volume marker","category_slug":"food","client_request_id":"%s"}' "$client_request_id" | curl --silent --show-error --fail --max-time 10 -H 'Content-Type: application/json' -H "Authorization: Bearer $token" --data-binary @- "$API_URL/v1/notes")
-note_id=$(printf '%s' "$note" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
-compose up --force-recreate -d api rustfs >/dev/null; wait_for_api
-check_object note-images/persist-marker "$TMP/marker" /tmp/sdds-test/marker-after "$TMP/marker-after" "$marker_hash"
+export SDDS_API_BASE_URL="$API_URL" SDDS_RUSTFS_COMPOSE_FILE="$COMPOSE_FILE" SDDS_RUSTFS_COMPOSE_PROJECT="$PROJECT"
+pnpm test:rustfs:api-runtime-boundaries
 check_object system/readiness "$TMP/sentinel" /tmp/sdds-test/sentinel-after "$TMP/sentinel-after" "$sentinel_hash"
-curl --silent --show-error --fail --max-time 10 "$API_URL/v1/notes/$note_id" | python3 -c 'import json,sys; value=json.load(sys.stdin); raise SystemExit(value.get("id") != sys.argv[1] or value.get("title") != "RustFS persistence marker")' "$note_id"
+compose run --rm --no-deps rustfs-init >/dev/null
 compose run --build --rm --no-deps api migrate >/dev/null
 printf '%s\n' 'rustfs integration verified'

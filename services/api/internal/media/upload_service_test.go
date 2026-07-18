@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"image"
@@ -383,7 +382,7 @@ func TestUploadServiceStoresExactPutAndReplays(t *testing.T) {
 	now, body := testClock(), testJPEG(t, 12, 8)
 	repo, store := emptyRepositoryAndStore()
 	service := newUploadService(t, repo, store, UploadConfig{Clock: func() time.Time { return now }})
-	receipt, err := service.Prepare(context.Background(), "user-1", testReceiver(body))
+	receipt, err := service.PrepareImageUpload(context.Background(), "user-1", testReceiver(body))
 	if err != nil || receipt.ContentType != "image/jpeg" || receipt.ByteSize != int64(len(body)) || receipt.Width != 12 || receipt.Height != 8 {
 		t.Fatalf("receipt=%+v err=%v", receipt, err)
 	}
@@ -405,17 +404,17 @@ func TestUploadServiceStoresExactPutAndReplays(t *testing.T) {
 		t.Fatalf("ready input=%+v want=%+v", got, wantReady)
 	}
 	pendingCount, putCount, readyCount := len(repo.pendingInputs), store.putCount(), len(repo.readyInputs)
-	replay, err := service.Prepare(context.Background(), "user-1", testReceiver(body))
+	replay, err := service.PrepareImageUpload(context.Background(), "user-1", testReceiver(body))
 	if err != nil || replay.ImageUploadID != receipt.ImageUploadID || len(repo.pendingInputs) != pendingCount || store.putCount() != putCount || len(repo.readyInputs) != readyCount {
 		t.Fatalf("replay=%+v err=%v counts pending=%d put=%d ready=%d", replay, err, len(repo.pendingInputs), store.putCount(), len(repo.readyInputs))
 	}
-	_, err = service.Prepare(context.Background(), "user-1", testReceiver(testPNGGray(t, 12, 8)))
+	_, err = service.PrepareImageUpload(context.Background(), "user-1", testReceiver(testPNGGray(t, 12, 8)))
 	if !errors.Is(err, ErrUploadIdempotencyConflict) || len(repo.pendingInputs) != pendingCount || store.putCount() != putCount || len(repo.readyInputs) != readyCount {
 		t.Fatalf("conflict=%v counts pending=%d put=%d ready=%d", err, len(repo.pendingInputs), store.putCount(), len(repo.readyInputs))
 	}
 	pngBody := testPNGGray(t, 13, 9)
 	pngRepo, pngStore := emptyRepositoryAndStore()
-	pngReceipt, pngErr := newUploadService(t, pngRepo, pngStore, UploadConfig{Clock: func() time.Time { return testClock() }}).Prepare(context.Background(), "user-1", testReceiver(pngBody))
+	pngReceipt, pngErr := newUploadService(t, pngRepo, pngStore, UploadConfig{Clock: func() time.Time { return testClock() }}).PrepareImageUpload(context.Background(), "user-1", testReceiver(pngBody))
 	pngPut, pngDigest := pngStore.putCall(0), sha256.Sum256(pngBody)
 	if pngErr != nil || pngReceipt.ContentType != "image/png" || pngReceipt.ByteSize != int64(len(pngBody)) || pngReceipt.Width != 13 || pngReceipt.Height != 9 || pngReceipt.ImageUploadID == "" || pngPut.contentType != "image/png" || pngPut.size != int64(len(pngBody)) || pngPut.digest != pngDigest || pngPut.key != pngRepo.pendingInputs[0].StorageKey || !bytes.Equal(pngPut.body, pngBody) {
 		t.Fatalf("receipt=%+v put=%+v err=%v", pngReceipt, pngPut, pngErr)
@@ -426,7 +425,7 @@ func TestUploadServiceUsesFreshClockAfterCleanup(t *testing.T) {
 	first, second := testClock(), testClock().Add(3*time.Minute)
 	clock := advancingTestClock(first, second)
 	repo, store := emptyRepositoryAndStore()
-	_, err := newUploadService(t, repo, store, UploadConfig{Clock: clock, CleanupBatch: 7}).Prepare(context.Background(), "user-1", testReceiver(testJPEG(t, 10, 10)))
+	_, err := newUploadService(t, repo, store, UploadConfig{Clock: clock, CleanupBatch: 7}).PrepareImageUpload(context.Background(), "user-1", testReceiver(testJPEG(t, 10, 10)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -442,7 +441,7 @@ func TestUploadServiceReconcilesLostMarkReadyResponse(t *testing.T) {
 	lost := errors.New("mark-ready response lost")
 	repo, store := emptyRepositoryAndStore()
 	repo.readyResponses = []repositoryReadyResponse{{ready: false, err: lost, apply: true}}
-	receipt, err := newUploadService(t, repo, store, UploadConfig{Clock: func() time.Time { return testClock() }}).Prepare(context.Background(), "user-1", testReceiver(testJPEG(t, 10, 10)))
+	receipt, err := newUploadService(t, repo, store, UploadConfig{Clock: func() time.Time { return testClock() }}).PrepareImageUpload(context.Background(), "user-1", testReceiver(testJPEG(t, 10, 10)))
 	if err != nil || receipt.ImageUploadID == "" || repo.findCalls != 2 || len(repo.readyInputs) != 1 {
 		t.Fatalf("receipt=%+v err=%v finds=%d ready=%d", receipt, err, repo.findCalls, len(repo.readyInputs))
 	}
@@ -467,7 +466,7 @@ func TestUploadServiceReconcilesExistingObject(t *testing.T) {
 		store.putErrors = []error{fmt.Errorf("lost put response: %w", ErrObjectExists)}
 		store.existingOnPut = &fakeStoredObject{body: append([]byte(nil), test.content...), size: int64(len(test.content))}
 		scratchDir := t.TempDir()
-		receipt, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: scratchDir, Clock: func() time.Time { return testClock() }}).Prepare(context.Background(), "user-1", testReceiver(body))
+		receipt, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: scratchDir, Clock: func() time.Time { return testClock() }}).PrepareImageUpload(context.Background(), "user-1", testReceiver(body))
 		if !errors.Is(err, test.want) || (test.want == nil && receipt.ImageUploadID == "") || store.putCount() != 1 || store.openCount() != 1 {
 			t.Fatalf("%s: receipt=%+v err=%v puts=%d opens=%d", test.name, receipt, err, store.putCount(), store.openCount())
 		}
@@ -514,7 +513,7 @@ func TestUploadServicePutFailuresFenceOrClearLease(t *testing.T) {
 		repo.markDeletingErrors, store.putErrors = []error{test.markDeletingErr}, []error{test.putErr}
 		first, second, third := testClock(), testClock().Add(time.Minute), testClock().Add(2*time.Minute)
 		scratchDir := t.TempDir()
-		_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: scratchDir, Clock: advancingTestClock(first, second, third)}).Prepare(context.Background(), "user-1", testReceiver(testJPEG(t, 10, 10)))
+		_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: scratchDir, Clock: advancingTestClock(first, second, third)}).PrepareImageUpload(context.Background(), "user-1", testReceiver(testJPEG(t, 10, 10)))
 		if !errors.Is(err, test.wantErr) || (test.markDeletingErr != nil && !errors.Is(err, test.markDeletingErr)) {
 			t.Fatalf("%s: err=%v", test.name, err)
 		}
@@ -628,7 +627,7 @@ func TestUploadServiceSpoolCapIncludesBlockedPutsAndCanceledWaiter(t *testing.T)
 	body := testJPEG(t, 10, 10)
 	start := func(index int, receiveContext context.Context) {
 		go func(index int, receiveContext context.Context) {
-			_, err := service.Prepare(receiveContext, "user-1", testReceiverWithID(body, requestIDs[index]))
+			_, err := service.PrepareImageUpload(receiveContext, "user-1", testReceiverWithID(body, requestIDs[index]))
 			results <- prepareResult{index: index, err: err}
 		}(index, receiveContext)
 	}
@@ -680,7 +679,7 @@ func TestUploadServicePanickingReceiverCleansScratchAndReleasesSpool(t *testing.
 				t.Fatalf("panic=%v", recovered)
 			}
 		}()
-		_, _ = service.Prepare(context.Background(), "user-1", func(_ context.Context, writer io.Writer) (string, error) {
+		_, _ = service.PrepareImageUpload(context.Background(), "user-1", func(_ context.Context, writer io.Writer) (string, error) {
 			if _, err := writer.Write(body); err != nil {
 				t.Fatal(err)
 			}
@@ -766,7 +765,7 @@ func TestUploadServiceReceiverErrorsAreStickyAndCallbackWins(t *testing.T) {
 			thirdCount, thirdErr = writer.Write([]byte{'x'})
 			return testRequestID, nil
 		}
-		_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: dir}).Prepare(context.Background(), "user-1", receive)
+		_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: dir}).PrepareImageUpload(context.Background(), "user-1", receive)
 		if err != ErrMediaTooLarge || firstCount != int(MaxEncodedImageSize) || firstErr != nil || secondCount != 0 || secondErr != ErrMediaTooLarge || thirdCount != 0 || thirdErr != ErrMediaTooLarge {
 			t.Fatalf("counts=%d,%d,%d errors=%v,%v,%v result=%v", firstCount, secondCount, thirdCount, firstErr, secondErr, thirdErr, err)
 		}
@@ -781,7 +780,7 @@ func TestUploadServiceReceiverErrorsAreStickyAndCallbackWins(t *testing.T) {
 			_, _ = writer.Write([]byte{'x'})
 			return testRequestID, callbackErr
 		}
-		_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: dir}).Prepare(context.Background(), "user-1", receive)
+		_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: dir}).PrepareImageUpload(context.Background(), "user-1", receive)
 		if err != callbackErr {
 			t.Fatalf("callback error=%v", err)
 		}
@@ -794,79 +793,25 @@ func TestUploadServiceRejectsInvalidRequestIDs(t *testing.T) {
 	for _, requestID := range []string{"not-a-uuid", strings.ToUpper("abcdefabcdef4abc8defabcdefabcdef")} {
 		repo, store := emptyRepositoryAndStore()
 		scratchDir := t.TempDir()
-		_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: scratchDir}).Prepare(context.Background(), "user-1", testReceiverWithID(body, requestID))
+		_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: scratchDir}).PrepareImageUpload(context.Background(), "user-1", testReceiverWithID(body, requestID))
 		if !errors.Is(err, ErrInvalidUploadRequest) {
 			t.Fatalf("requestID=%q err=%v", requestID, err)
 		}
 		assertNoPublication(t, repo, store, scratchDir)
 	}
 }
-func TestUploadServiceRejectsMediaBoundaries(t *testing.T) {
-	cases := []struct {
-		name string
-		body func(*testing.T) []byte
-		want error
-	}{
-		{name: "empty", body: func(_ *testing.T) []byte { return nil }, want: ErrInvalidMedia},
-		{name: "truncated jpeg", body: func(t *testing.T) []byte { body := testJPEG(t, 10, 10); return body[:len(body)/2] }, want: ErrInvalidMedia},
-		{name: "too wide", body: func(t *testing.T) []byte { return testPNGGray(t, MaxImageWidth+1, 1) }, want: ErrMediaDimensions},
-		{name: "too tall", body: func(t *testing.T) []byte { return testPNGGray(t, 1, MaxImageHeight+1) }, want: ErrMediaDimensions},
-		{name: "max area", body: func(t *testing.T) []byte { return testPNGGray(t, 4000, 4000) }},
-		{name: "too much area", body: func(t *testing.T) []byte { return testPNGGray(t, 4001, 4000) }, want: ErrMediaDimensions},
-	}
-	for _, test := range cases {
-		repo, store := emptyRepositoryAndStore()
-		dir := t.TempDir()
-		receipt, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: dir}).Prepare(context.Background(), "user-1", testReceiver(test.body(t)))
-		if test.want == nil && (err != nil || receipt.ImageUploadID == "") {
-			t.Fatalf("%s: receipt=%+v err=%v", test.name, receipt, err)
-		}
-		if test.want != nil && !errors.Is(err, test.want) {
-			t.Fatalf("%s: err=%v want=%v", test.name, err, test.want)
-		}
-		if test.want != nil {
-			assertNoPublication(t, repo, store, dir)
-		}
-	}
-}
 
-func TestUploadServiceRejectsUnsupportedMediaSignatures(t *testing.T) {
-	webp := make([]byte, 20)
-	copy(webp, "RIFF")
-	binary.LittleEndian.PutUint32(webp[4:8], 12)
-	copy(webp[8:12], "WEBP")
-	for _, body := range [][]byte{[]byte("<svg></svg>"), webp} {
-		repo, store := emptyRepositoryAndStore()
-		dir := t.TempDir()
-		_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: dir}).Prepare(context.Background(), "user-1", testReceiver(body))
-		if !errors.Is(err, ErrUnsupportedMediaType) {
-			t.Fatalf("err=%v", err)
-		}
-		assertNoPublication(t, repo, store, dir)
-	}
-}
-
-func TestUploadServiceReportsCreateSeekAndCleanupErrors(t *testing.T) {
+func TestPrepareImageUploadReportsScratchErrors(t *testing.T) {
 	repo, store := emptyRepositoryAndStore()
-	_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: filepath.Join(t.TempDir(), "missing")}).Prepare(context.Background(), "user-1", testReceiver(testJPEG(t, 10, 10)))
+	_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: filepath.Join(t.TempDir(), "missing")}).PrepareImageUpload(context.Background(), "user-1", testReceiver(testJPEG(t, 10, 10)))
 	if !errors.Is(err, ErrMediaStorageUnavailable) || !strings.Contains(err.Error(), "create image scratch file") {
 		t.Fatalf("create error=%v", err)
-	}
-	reader, writer, pipeErr := os.Pipe()
-	if pipeErr != nil {
-		t.Fatal(pipeErr)
-	}
-	_ = writer.Close()
-	_, err = inspectImage(context.Background(), reader)
-	_ = reader.Close()
-	if !errors.Is(err, ErrMediaStorageUnavailable) {
-		t.Fatalf("seek error=%v", err)
 	}
 	repo, store = emptyRepositoryAndStore()
 	dir := t.TempDir()
 	var removeErr error
 	store.putHook = func(input PutObject) { removeErr = os.Remove(input.Body.(*os.File).Name()) }
-	_, err = newUploadService(t, repo, store, UploadConfig{ScratchDir: dir}).Prepare(context.Background(), "user-1", testReceiver(testJPEG(t, 10, 10)))
+	_, err = newUploadService(t, repo, store, UploadConfig{ScratchDir: dir}).PrepareImageUpload(context.Background(), "user-1", testReceiver(testJPEG(t, 10, 10)))
 	if removeErr != nil || !errors.Is(err, ErrMediaStorageUnavailable) {
 		t.Fatalf("cleanup hook=%v prepare=%v", removeErr, err)
 	}

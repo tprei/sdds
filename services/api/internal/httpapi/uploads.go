@@ -19,7 +19,7 @@ import (
 const uploadReadTimeout = 60 * time.Second
 
 type uploadPreparer interface {
-	Prepare(context.Context, string, media.UploadReceiver) (media.UploadReceipt, error)
+	PrepareImageUpload(context.Context, string, media.UploadReceiver) (media.UploadReceipt, error)
 }
 
 type imageUploadParseError struct {
@@ -61,7 +61,7 @@ func (handler server) PrepareImageUpload(w http.ResponseWriter, r *http.Request)
 		}
 		return requestID, nil
 	}
-	receipt, err := handler.uploadService.Prepare(r.Context(), string(current.User.ID), receive)
+	receipt, err := handler.uploadService.PrepareImageUpload(r.Context(), string(current.User.ID), receive)
 	if err != nil {
 		var parseErr *imageUploadParseError
 		if errors.As(err, &parseErr) {

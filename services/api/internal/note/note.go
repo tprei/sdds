@@ -11,7 +11,6 @@ import (
 
 var (
 	ErrNoteNotFound           = errors.New("note not found")
-	ErrIdempotencyConflict    = errors.New("note create request conflict")
 	ErrImageUploadUnavailable = errors.New("image upload unavailable")
 	ErrImageUploadExpired     = errors.New("image upload expired")
 )

@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/tprei/sdds/services/api/internal/httpapi"
 	"github.com/tprei/sdds/services/api/internal/media"
+	"github.com/tprei/sdds/services/api/internal/s3store"
 	"github.com/tprei/sdds/services/api/internal/sqlite"
 )
 
@@ -42,7 +43,7 @@ func TestRunWithArgsAppliesMigrations(t *testing.T) {
 	ctx := context.Background()
 	databasePath := filepath.Join(t.TempDir(), "sdds.db")
 
-	if err := runWithArgs(ctx, config{databasePath: databasePath}, []string{"migrate"}); err != nil {
+	if err := runWithArgs(ctx, config{databasePath: databasePath}, s3store.Config{}, []string{"migrate"}); err != nil {
 		t.Fatalf("run migrate command: %v", err)
 	}
 
@@ -65,19 +66,56 @@ func TestRunWithArgsAppliesMigrations(t *testing.T) {
 	}
 }
 
-func TestRunMigrateDoesNotLoadMediaConfig(t *testing.T) {
+func TestRunMigrateDoesNotLoadS3Config(t *testing.T) {
 	clearConfigEnv(t)
 	t.Setenv("SDDS_DATABASE_PATH", filepath.Join(t.TempDir(), "sdds.db"))
 	originalArgs := os.Args
 	os.Args = []string{"api", commandMigrate}
 	t.Cleanup(func() { os.Args = originalArgs })
+	restoreS3ConfigLoader(t)
+	loaded := false
+	loadS3Config = func() (s3store.Config, error) {
+		loaded = true
+		return s3store.Config{}, errors.New("S3 config loader called")
+	}
 	if err := run(); err != nil {
 		t.Fatalf("run migrate command without media secrets: %v", err)
+	}
+	if loaded {
+		t.Fatal("migrate loaded S3 config")
+	}
+}
+
+func TestRunLoadsS3ConfigForServer(t *testing.T) {
+	clearConfigEnv(t)
+	t.Setenv("SDDS_DATABASE_PATH", filepath.Join(t.TempDir(), "sdds.db"))
+	originalArgs := os.Args
+	os.Args = []string{"api"}
+	t.Cleanup(func() { os.Args = originalArgs })
+	restoreS3ConfigLoader(t)
+	loaded := false
+	loadS3Config = func() (s3store.Config, error) {
+		loaded = true
+		return s3store.Config{}, nil
+	}
+	restoreMediaStoreFactory(t)
+	newMediaStore = func(context.Context, s3store.Config) (readyObjectStore, error) {
+		return fakeMediaReadiness{verify: func(context.Context) error { return nil }}, nil
+	}
+	restoreListen := listenAndServe
+	listenAndServe = func(*http.Server) error { return http.ErrServerClosed }
+	t.Cleanup(func() { listenAndServe = restoreListen })
+
+	if err := run(); err != nil {
+		t.Fatalf("run server: %v", err)
+	}
+	if !loaded {
+		t.Fatal("server did not load S3 config")
 	}
 }
 
 func TestRunWithArgsRejectsUnknownCommand(t *testing.T) {
-	err := runWithArgs(context.Background(), config{}, []string{"unknown"})
+	err := runWithArgs(context.Background(), config{}, s3store.Config{}, []string{"unknown"})
 	if err == nil {
 		t.Fatal("unknown command error is nil")
 	}
@@ -99,7 +137,7 @@ func TestRunServerRequiresMediaReadiness(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			restoreMediaStoreFactory(t)
-			newMediaStore = func(context.Context, media.Config) (media.ReadinessChecker, error) {
+			newMediaStore = func(context.Context, s3store.Config) (readyObjectStore, error) {
 				return fakeMediaReadiness{verify: func(context.Context) error { return test.err }}, nil
 			}
 			listened := false
@@ -110,7 +148,7 @@ func TestRunServerRequiresMediaReadiness(t *testing.T) {
 			}
 			t.Cleanup(func() { listenAndServe = restoreListen })
 
-			err := runServer(context.Background(), testServerConfig(t))
+			err := runServer(context.Background(), testServerConfig(t), s3store.Config{})
 			if !errors.Is(err, test.err) {
 				t.Fatalf("run server error = %v, want %v", err, test.err)
 			}
@@ -124,7 +162,7 @@ func TestRunServerRequiresMediaReadiness(t *testing.T) {
 func TestRunServerListensAfterMediaReadiness(t *testing.T) {
 	restoreMediaStoreFactory(t)
 	verified := false
-	newMediaStore = func(context.Context, media.Config) (media.ReadinessChecker, error) {
+	newMediaStore = func(context.Context, s3store.Config) (readyObjectStore, error) {
 		return fakeMediaReadiness{verify: func(ctx context.Context) error {
 			if _, ok := ctx.Deadline(); !ok {
 				t.Fatal("startup readiness context has no deadline")
@@ -145,7 +183,7 @@ func TestRunServerListensAfterMediaReadiness(t *testing.T) {
 	}
 	t.Cleanup(func() { listenAndServe = restoreListen })
 
-	if err := runServer(context.Background(), testServerConfig(t)); err != nil {
+	if err := runServer(context.Background(), testServerConfig(t), s3store.Config{}); err != nil {
 		t.Fatalf("run server: %v", err)
 	}
 	if !listened {
@@ -159,7 +197,7 @@ func TestRunServerCleansExpiredUploadsBeforeListen(t *testing.T) {
 
 	var events []string
 	restoreMediaStoreFactory(t)
-	newMediaStore = func(context.Context, media.Config) (media.ReadinessChecker, error) {
+	newMediaStore = func(context.Context, s3store.Config) (readyObjectStore, error) {
 		return fakeMediaReadiness{
 			verify: func(ctx context.Context) error {
 				if _, ok := ctx.Deadline(); !ok {
@@ -189,7 +227,7 @@ func TestRunServerCleansExpiredUploadsBeforeListen(t *testing.T) {
 	}
 	t.Cleanup(func() { listenAndServe = restoreListen })
 
-	if err := runServer(context.Background(), cfg); err != nil {
+	if err := runServer(context.Background(), cfg, s3store.Config{}); err != nil {
 		t.Fatalf("run server: %v", err)
 	}
 	if diff := cmp.Diff([]string{"readiness", "cleanup", "listen"}, events); diff != "" {
@@ -203,7 +241,7 @@ func TestRunServerCleanupFailurePreventsListenAndClosesDatabase(t *testing.T) {
 	cleanupErr := errors.New("cleanup failed")
 
 	restoreMediaStoreFactory(t)
-	newMediaStore = func(context.Context, media.Config) (media.ReadinessChecker, error) {
+	newMediaStore = func(context.Context, s3store.Config) (readyObjectStore, error) {
 		return fakeMediaReadiness{
 			verify: func(context.Context) error { return nil },
 			delete: func(context.Context, media.ObjectKey) error { return cleanupErr },
@@ -226,7 +264,7 @@ func TestRunServerCleanupFailurePreventsListenAndClosesDatabase(t *testing.T) {
 	}
 	t.Cleanup(func() { closeDatabase = restoreClose })
 
-	err := runServer(context.Background(), cfg)
+	err := runServer(context.Background(), cfg, s3store.Config{})
 	if !errors.Is(err, cleanupErr) {
 		t.Fatalf("run server error = %v, want cleanup error", err)
 	}
@@ -247,20 +285,23 @@ type fakeMediaReadiness struct {
 }
 
 func (fake fakeMediaReadiness) VerifyReadiness(ctx context.Context) error {
+	if fake.verify == nil {
+		return errors.New("unexpected media readiness")
+	}
 	return fake.verify(ctx)
 }
 
 func (fakeMediaReadiness) Put(context.Context, media.PutObject) error {
-	return nil
+	return errors.New("unexpected media Put")
 }
 
 func (fakeMediaReadiness) Open(context.Context, media.ObjectKey) (media.Object, error) {
-	return media.Object{}, nil
+	return media.Object{}, errors.New("unexpected media Open")
 }
 
 func (fake fakeMediaReadiness) Delete(ctx context.Context, key media.ObjectKey) error {
 	if fake.delete == nil {
-		return nil
+		return errors.New("unexpected media Delete")
 	}
 	return fake.delete(ctx, key)
 }
@@ -269,6 +310,12 @@ func restoreMediaStoreFactory(t *testing.T) {
 	t.Helper()
 	original := newMediaStore
 	t.Cleanup(func() { newMediaStore = original })
+}
+
+func restoreS3ConfigLoader(t *testing.T) {
+	t.Helper()
+	original := loadS3Config
+	t.Cleanup(func() { loadS3Config = original })
 }
 
 func seedExpiredUpload(t *testing.T, databasePath string) {

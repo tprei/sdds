@@ -32,6 +32,3 @@ type ObjectStore interface {
 	Open(context.Context, ObjectKey) (Object, error)
 	Delete(context.Context, ObjectKey) error
 }
-type ReadinessChecker interface {
-	VerifyReadiness(context.Context) error
-}

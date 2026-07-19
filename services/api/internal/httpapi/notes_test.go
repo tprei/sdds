@@ -116,7 +116,7 @@ func TestListNotesFiltersByCategory(t *testing.T) {
 }
 
 func TestListNotesTreatsBlankCategoryFilterAsUnfiltered(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newRouterForTest(fakeNoteStore{
 		listNotes: func(_ context.Context, input note.ListInput) ([]note.Note, error) {
 			if input.CategorySlug != "" {
 				t.Fatalf("category slug = %q, want empty", input.CategorySlug)
@@ -318,7 +318,7 @@ func TestSearchNotesFiltersByCategory(t *testing.T) {
 }
 
 func TestSearchNotesTreatsBlankCategoryFilterAsUnfiltered(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newRouterForTest(fakeNoteStore{
 		searchNotes: func(_ context.Context, input note.SearchInput) ([]note.Note, error) {
 			if input.CategorySlug != "" {
 				t.Fatalf("category slug = %q, want empty", input.CategorySlug)
@@ -751,7 +751,7 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 
 func TestCreateNoteRejectsMissingSessionBeforeValidation(t *testing.T) {
 	createCalled := false
-	router := NewRouter(fakeNoteStore{
+	router := newRouterForTest(fakeNoteStore{
 		createNote: func(_ context.Context, _ note.CreateInput) (note.Note, error) {
 			createCalled = true
 			return note.Note{}, nil

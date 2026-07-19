@@ -28,7 +28,7 @@ func (handler server) ListNotes(w http.ResponseWriter, r *http.Request, params o
 		return
 	}
 
-	notes, err := handler.notes.ListRecentNotes(r.Context(), input)
+	notes, err := handler.notes.store.ListRecentNotes(r.Context(), input)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
@@ -38,7 +38,7 @@ func (handler server) ListNotes(w http.ResponseWriter, r *http.Request, params o
 }
 
 func (handler server) GetNote(w http.ResponseWriter, r *http.Request, noteID string) {
-	found, err := handler.notes.FindNote(r.Context(), noteID)
+	found, err := handler.notes.store.FindNote(r.Context(), noteID)
 	if errors.Is(err, note.ErrNoteNotFound) {
 		writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
 		return
@@ -78,7 +78,7 @@ func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	created, err := handler.notes.CreateNote(r.Context(), input)
+	created, err := handler.notes.store.CreateNote(r.Context(), input)
 	if err != nil {
 		var catalogValidationErr *note.CatalogValidationError
 		if errors.As(err, &catalogValidationErr) {
@@ -119,7 +119,7 @@ func (handler server) SearchNotes(w http.ResponseWriter, r *http.Request, params
 		return
 	}
 
-	notes, err := handler.notes.SearchNotes(r.Context(), input)
+	notes, err := handler.notes.store.SearchNotes(r.Context(), input)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
@@ -175,7 +175,7 @@ func (handler server) validateCategoryFilter(ctx context.Context, slug note.Cate
 		return nil, nil
 	}
 
-	if _, err := handler.catalog.FindActiveCategory(ctx, slug); errors.Is(err, note.ErrCategoryNotFound) {
+	if _, err := handler.notes.catalog.FindActiveCategory(ctx, slug); errors.Is(err, note.ErrCategoryNotFound) {
 		return []note.ValidationProblem{{Field: "category_slug", Message: "unknown"}}, nil
 	} else if err != nil {
 		return nil, err

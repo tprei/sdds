@@ -8,7 +8,7 @@ import (
 )
 
 func (handler server) ListCategories(w http.ResponseWriter, r *http.Request) {
-	categories, err := handler.catalog.ListCategories(r.Context())
+	categories, err := handler.notes.catalog.ListCategories(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
@@ -18,7 +18,7 @@ func (handler server) ListCategories(w http.ResponseWriter, r *http.Request) {
 }
 
 func (handler server) ListPlaces(w http.ResponseWriter, r *http.Request) {
-	places, err := handler.catalog.ListPlaces(r.Context())
+	places, err := handler.notes.catalog.ListPlaces(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return

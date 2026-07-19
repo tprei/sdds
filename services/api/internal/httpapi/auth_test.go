@@ -19,7 +19,7 @@ import (
 func TestCreateAuthUserReturnsSession(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	hasher := authTestPasswordHasher()
-	router := newRouter(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
+	router := newRouterWithAuthSeamsForTest(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
 		createPasswordUser: func(_ context.Context, input user.CreatePasswordUserInput) (user.CurrentSession, error) {
 			if input.Username != "thiago" {
 				t.Fatalf("username = %q, want thiago", input.Username)
@@ -141,7 +141,7 @@ func TestCreateAuthSessionReturnsSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hash password: %v", err)
 	}
-	router := newRouter(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
+	router := newRouterWithAuthSeamsForTest(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
 		findPasswordLogin: func(_ context.Context, normalizedUsername string) (user.PasswordLogin, error) {
 			if normalizedUsername != "thiago" {
 				t.Fatalf("normalized username = %q, want thiago", normalizedUsername)
@@ -306,7 +306,7 @@ func TestCreateAuthSessionVerifiesPasswordBeforeRejectingCredentials(t *testing.
 			login := tt.login
 			login.SecretHash = secretHash
 			hasher := &recordingPasswordHasher{delegate: authTestPasswordHasher()}
-			router := newRouter(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
+			router := newRouterWithAuthSeamsForTest(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
 				findPasswordLogin: func(context.Context, string) (user.PasswordLogin, error) {
 					return login, tt.err
 				},
@@ -346,7 +346,7 @@ func TestCreateAuthSessionVerifiesPasswordBeforeRejectingCredentials(t *testing.
 func TestGetAuthSessionReturnsCurrentSession(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	tokenHash := user.HashSessionToken("current-token")
-	router := newRouter(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
+	router := newRouterWithAuthSeamsForTest(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
 		findCurrentSession: func(_ context.Context, gotTokenHash string, gotNow time.Time) (user.CurrentSession, error) {
 			if gotTokenHash != tokenHash {
 				t.Fatalf("token hash = %q, want %q", gotTokenHash, tokenHash)
@@ -451,7 +451,7 @@ func TestAuthBoundaryRejectsUnauthenticatedSessions(t *testing.T) {
 func TestDeleteAuthSessionRevokesCurrentSession(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	current := authCurrentSession("thiago", "Thiago", user.HashSessionToken("current-token"), now.Add(user.SessionLifetime))
-	router := newRouter(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
+	router := newRouterWithAuthSeamsForTest(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
 		findCurrentSession: func(context.Context, string, time.Time) (user.CurrentSession, error) {
 			return current, nil
 		},
@@ -562,7 +562,7 @@ func TestAuthPreflightAllowsAuthorizationAndDelete(t *testing.T) {
 func newAuthTestRouter(t *testing.T, users fakeUserStore) http.Handler {
 	t.Helper()
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
-	return newRouter(fakeNoteStore{}, fakeCatalog{}, users, authTestPasswordHasher(), authTestCredentialProbeHash(t), func() (string, error) {
+	return newRouterWithAuthSeamsForTest(fakeNoteStore{}, fakeCatalog{}, users, authTestPasswordHasher(), authTestCredentialProbeHash(t), func() (string, error) {
 		return "test-token", nil
 	}, func() time.Time { return now }, authTestLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
 }

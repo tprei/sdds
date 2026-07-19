@@ -26,7 +26,7 @@ const (
 )
 
 func TestGetAuthorReturnsPublicProfileWithoutAuthentication(t *testing.T) {
-	router := NewRouter(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
+	router := newRouterForTest(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
 		findPublicAuthor: func(_ context.Context, authorID author.AuthorID) (author.PublicAuthor, error) {
 			if authorID != exampleAuthorID {
 				t.Fatalf("author id = %q, want %q", authorID, exampleAuthorID)
@@ -59,7 +59,7 @@ func TestGetAuthorReturnsPublicProfileWithoutAuthentication(t *testing.T) {
 }
 
 func TestGetAuthorReturnsNotFound(t *testing.T) {
-	router := NewRouter(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
+	router := newRouterForTest(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 			return author.PublicAuthor{}, author.ErrAuthorNotFound
 		},
@@ -78,7 +78,7 @@ func TestGetAuthorReturnsNotFound(t *testing.T) {
 
 func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 	createdAt := time.UnixMilli(exampleAuthorCreatedMS).UTC()
-	router := NewRouter(fakeNoteStore{
+	router := newRouterForTest(fakeNoteStore{
 		listAuthorNotes: func(_ context.Context, input note.AuthorNotesInput) (note.AuthorNotesPage, error) {
 			if input.AuthorID != exampleAuthorID {
 				t.Fatalf("author id = %q, want %q", input.AuthorID, exampleAuthorID)
@@ -150,7 +150,7 @@ func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 func TestListAuthorNotesReturnsCursorForLongLegacyID(t *testing.T) {
 	createdAt := time.UnixMilli(exampleAuthorCreatedMS).UTC()
 	longID := strings.Repeat("😀", 100)
-	router := NewRouter(fakeNoteStore{
+	router := newRouterForTest(fakeNoteStore{
 		listAuthorNotes: func(context.Context, note.AuthorNotesInput) (note.AuthorNotesPage, error) {
 			return note.AuthorNotesPage{
 				Notes:   []note.AuthorNote{authorHTTPAuthorNote(longID, createdAt, exampleCursorPageKey)},
@@ -194,7 +194,7 @@ func TestListAuthorNotesPassesExplicitLimitAndCursor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode cursor: %v", err)
 	}
-	router := NewRouter(fakeNoteStore{
+	router := newRouterForTest(fakeNoteStore{
 		listAuthorNotes: func(_ context.Context, input note.AuthorNotesInput) (note.AuthorNotesPage, error) {
 			if input.Limit != 2 {
 				t.Fatalf("limit = %d, want 2", input.Limit)
@@ -284,7 +284,7 @@ func TestListAuthorNotesRejectsInvalidParametersBeforeAuthorLookup(t *testing.T)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := NewRouter(fakeNoteStore{
+			router := newRouterForTest(fakeNoteStore{
 				listAuthorNotes: func(context.Context, note.AuthorNotesInput) (note.AuthorNotesPage, error) {
 					t.Fatal("ListAuthorNotes should not be called")
 					return note.AuthorNotesPage{}, nil
@@ -317,7 +317,7 @@ func TestListAuthorNotesRejectsInvalidParametersBeforeAuthorLookup(t *testing.T)
 }
 
 func TestListAuthorNotesReturnsNotFoundForUnknownAuthor(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newRouterForTest(fakeNoteStore{
 		listAuthorNotes: func(context.Context, note.AuthorNotesInput) (note.AuthorNotesPage, error) {
 			t.Fatal("ListAuthorNotes should not be called")
 			return note.AuthorNotesPage{}, nil
@@ -340,7 +340,7 @@ func TestListAuthorNotesReturnsNotFoundForUnknownAuthor(t *testing.T) {
 }
 
 func TestListAuthorNotesReturnsInternalError(t *testing.T) {
-	router := NewRouter(fakeNoteStore{
+	router := newRouterForTest(fakeNoteStore{
 		listAuthorNotes: func(context.Context, note.AuthorNotesInput) (note.AuthorNotesPage, error) {
 			return note.AuthorNotesPage{}, errors.New("database unavailable")
 		},

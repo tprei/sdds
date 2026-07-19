@@ -63,6 +63,44 @@ func TestGetMediaImageStreamsExactBytesAndHeaders(t *testing.T) {
 	}
 }
 
+func TestGetMediaImageRejectsInvalidAttachedResponseBeforeHeaders(t *testing.T) {
+	tests := []struct {
+		name    string
+		image   media.AttachedImage
+		hasBody bool
+	}{
+		{name: "nil body", image: media.AttachedImage{ContentType: "image/jpeg", Size: 1}},
+		{name: "zero size", image: media.AttachedImage{ContentType: "image/jpeg"}, hasBody: true},
+		{name: "size over maximum", image: media.AttachedImage{ContentType: "image/jpeg", Size: media.MaxEncodedImageSize + 1}, hasBody: true},
+		{name: "unsupported content type", image: media.AttachedImage{ContentType: "image/gif", Size: 1}, hasBody: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dir := t.TempDir()
+			body := &trackingReadCloser{Reader: bytes.NewReader([]byte("image"))}
+			image := test.image
+			if test.hasBody {
+				image.Body = body
+			}
+			response := httptest.NewRecorder()
+			serveImageDirectInDir(response, fakeAttachedImageReader{open: func(context.Context, string) (media.AttachedImage, error) {
+				return image, nil
+			}}, dir)
+
+			assertImageIntegrityFailure(t, response)
+			if test.hasBody && !body.isClosed() {
+				t.Fatal("invalid attached-image body was not closed")
+			}
+			assertScratchEmpty(t, dir)
+			for _, header := range []string{"Content-Length", "Cache-Control", "ETag", "X-Content-Type-Options", "Content-Disposition"} {
+				if got := response.Header().Get(header); got != "" {
+					t.Fatalf("%s = %q, want no success header", header, got)
+				}
+			}
+		})
+	}
+}
+
 func TestGetMediaImageMapsReaderErrors(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -328,13 +366,13 @@ func TestGetMediaImageWriteDeadlineReleasesReadSlotAndScratch(t *testing.T) {
 	body := newCloseSignalReader(bytes.NewReader(payload))
 	serverConn, clientConn := net.Pipe()
 	listener := &singleConnListener{conn: serverConn, closeCh: make(chan struct{})}
-	handler := server{
-		imageReader: fakeAttachedImageReader{open: func(context.Context, string) (media.AttachedImage, error) {
+	handler := server{media: mediaHandlers{
+		attachedImages: fakeAttachedImageReader{open: func(context.Context, string) (media.AttachedImage, error) {
 			return media.AttachedImage{Body: body, ContentType: "image/jpeg", Size: int64(len(payload)), SHA256: digest}, nil
 		}},
-		imageReadScratchDir:       dir,
-		imageResponseWriteTimeout: 20 * time.Millisecond,
-	}
+		scratchDir:           dir,
+		responseWriteTimeout: 20 * time.Millisecond,
+	}}
 	handlerDone := make(chan struct{})
 	httpServer := &http.Server{Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		handler.GetMediaImage(writer, request, openapi_types.UUID(uuid.MustParse(testImageID)))
@@ -387,7 +425,7 @@ func TestGetMediaImageWriteDeadlineReleasesReadSlotAndScratch(t *testing.T) {
 }
 
 func publicImageRouter(reader media.AttachedImageReader) http.Handler {
-	return NewRouter(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, reader)
+	return newRouterForTest(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, reader)
 }
 
 type fakeAttachedImageReader struct {
@@ -470,7 +508,7 @@ func serveImageDirectInDirWithContext(writer http.ResponseWriter, reader media.A
 }
 
 func serveImageDirectInDirWithContextAndTimeout(writer http.ResponseWriter, reader media.AttachedImageReader, dir string, ctx context.Context, timeout time.Duration) {
-	handler := server{imageReader: reader, imageReadScratchDir: dir, imageResponseWriteTimeout: timeout}
+	handler := server{media: mediaHandlers{attachedImages: reader, scratchDir: dir, responseWriteTimeout: timeout}}
 	request := httptest.NewRequest(http.MethodGet, "/v1/media/images/"+testImageID, nil).WithContext(ctx)
 	handler.GetMediaImage(writer, request, openapi_types.UUID(uuid.MustParse(testImageID)))
 }

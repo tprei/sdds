@@ -21,11 +21,11 @@ type authorNotesCursorPayload struct {
 }
 
 func (handler server) GetAuthor(w http.ResponseWriter, r *http.Request, authorID string) {
-	if handler.publicAuthors == nil {
+	if handler.auth.publicAuthors == nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}
-	profile, err := handler.publicAuthors.FindPublicAuthor(r.Context(), author.AuthorID(authorID))
+	profile, err := handler.auth.publicAuthors.FindPublicAuthor(r.Context(), author.AuthorID(authorID))
 	if errors.Is(err, author.ErrAuthorNotFound) {
 		writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
 		return
@@ -39,7 +39,7 @@ func (handler server) GetAuthor(w http.ResponseWriter, r *http.Request, authorID
 }
 
 func (handler server) ListAuthorNotes(w http.ResponseWriter, r *http.Request, authorID string, params openapi.ListAuthorNotesParams) {
-	if handler.publicAuthors == nil || handler.authorNotes == nil {
+	if handler.auth.publicAuthors == nil || handler.notes.authorNotes == nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}
@@ -51,7 +51,7 @@ func (handler server) ListAuthorNotes(w http.ResponseWriter, r *http.Request, au
 		return
 	}
 
-	if _, err := handler.publicAuthors.FindPublicAuthor(r.Context(), author.AuthorID(authorID)); errors.Is(err, author.ErrAuthorNotFound) {
+	if _, err := handler.auth.publicAuthors.FindPublicAuthor(r.Context(), author.AuthorID(authorID)); errors.Is(err, author.ErrAuthorNotFound) {
 		writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
 		return
 	} else if err != nil {
@@ -59,7 +59,7 @@ func (handler server) ListAuthorNotes(w http.ResponseWriter, r *http.Request, au
 		return
 	}
 
-	page, err := handler.authorNotes.ListAuthorNotes(r.Context(), input)
+	page, err := handler.notes.authorNotes.ListAuthorNotes(r.Context(), input)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return

@@ -10,13 +10,6 @@ import (
 	"github.com/tprei/sdds/services/api/internal/openapi"
 )
 
-const (
-	createAuthSessionGeneratedOperationID  = "CreateAuthSession"
-	createAuthUserGeneratedOperationID     = "CreateAuthUser"
-	createNoteGeneratedOperationID         = "CreateNote"
-	prepareImageUploadGeneratedOperationID = "PrepareImageUpload"
-)
-
 func openAPIRequestValidator() func(http.Handler) http.Handler {
 	spec, err := openapi.GetSpec()
 	if err != nil {
@@ -46,22 +39,29 @@ func openAPIRequestValidator() func(http.Handler) http.Handler {
 				return
 			}
 
-			if maxBytes, ok := requestBodyLimitForOperation(route.Operation.OperationID); ok {
-				r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+			policy, hasPolicy := requestValidationPolicyForOperation(route.Operation.OperationID)
+			if hasPolicy && policy.maxBodyBytes > 0 && r.Body != nil {
+				r.Body = http.MaxBytesReader(w, r.Body, policy.maxBodyBytes)
 			}
 
 			requestOptions := options
-			validationRequest := r
-			if route.Operation.OperationID == prepareImageUploadGeneratedOperationID {
+			validationRoute := route
+			if hasPolicy && policy.excludeRequestBody {
+				// The application multipart parser is the sole consumer of this bounded body.
+				// Kin-openapi security validation also buffers it, despite ExcludeRequestBody.
+				// Auth middleware already verified this route, so never consume, buffer, or substitute it here.
 				requestOptions.ExcludeRequestBody = true
-				validationRequest = r.Clone(r.Context())
-				validationRequest.Body = http.NoBody
-				validationRequest.ContentLength = 0
+				operation := *route.Operation
+				security := openapi3.SecurityRequirements{}
+				operation.Security = &security
+				routeCopy := *route
+				routeCopy.Operation = &operation
+				validationRoute = &routeCopy
 			}
 			err = openapi3filter.ValidateRequest(r.Context(), &openapi3filter.RequestValidationInput{
-				Request:    validationRequest,
+				Request:    r,
 				PathParams: pathParams,
-				Route:      route,
+				Route:      validationRoute,
 				Options:    &requestOptions,
 			})
 			if err != nil {
@@ -81,13 +81,13 @@ func writeOpenAPIRequestValidationError(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	if isTooManyCreateNoteImages(err) {
-		writeError(w, http.StatusConflict, openapi.ErrorResponse{Code: openapi.ErrorCodeTooManyImages})
+		writeTooManyCreateNoteImages(w)
 		return
 	}
 
 	var requestError *openapi3filter.RequestError
 	if errors.As(err, &requestError) && requestError.Parameter != nil {
-		if response, ok := generatedInvalidAuthorNotesParamError(r.URL.Path, requestError.Parameter.Name); ok {
+		if response, ok := generatedOpenAPIParameterError(r.URL.Path, requestError.Parameter.Name); ok {
 			writeError(w, http.StatusBadRequest, response)
 			return
 		}
@@ -95,30 +95,41 @@ func writeOpenAPIRequestValidationError(w http.ResponseWriter, r *http.Request, 
 
 	writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidJSON})
 }
-func isTooManyCreateNoteImages(err error) bool {
-	var requestError *openapi3filter.RequestError
-	if !errors.As(err, &requestError) || requestError.Input == nil ||
-		requestError.Input.Route == nil || requestError.Input.Route.Operation == nil ||
-		requestError.Input.Route.Operation.OperationID != createNoteGeneratedOperationID {
-		return false
+
+func writeGeneratedOpenAPIError(w http.ResponseWriter, r *http.Request, err error) {
+	var invalidParamError *openapi.InvalidParamFormatError
+	if errors.As(err, &invalidParamError) {
+		if response, ok := generatedOpenAPIParameterError(r.URL.Path, invalidParamError.ParamName); ok {
+			writeError(w, http.StatusBadRequest, response)
+			return
+		}
 	}
-	var schemaError *openapi3.SchemaError
-	if !errors.As(err, &schemaError) || schemaError.SchemaField != "maxItems" {
-		return false
-	}
-	path := schemaError.JSONPointer()
-	return len(path) == 1 && path[0] == "image_upload_ids"
+	writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidJSON})
 }
 
-func requestBodyLimitForOperation(operationID string) (int64, bool) {
-	switch operationID {
-	case createAuthSessionGeneratedOperationID, createAuthUserGeneratedOperationID:
-		return maxAuthRequestBytes, true
-	case createNoteGeneratedOperationID:
-		return maxCreateNoteRequestBytes, true
-	default:
-		return 0, false
+type requestValidationPolicy struct {
+	maxBodyBytes       int64
+	excludeRequestBody bool
+}
+
+func requestValidationPolicyForOperation(operationID string) (requestValidationPolicy, bool) {
+	if policy, ok := authRequestValidationPolicy(operationID); ok {
+		return policy, true
 	}
+	if policy, ok := noteRequestValidationPolicy(operationID); ok {
+		return policy, true
+	}
+	return mediaRequestValidationPolicy(operationID)
+}
+
+func generatedOpenAPIParameterError(path string, paramName string) (openapi.ErrorResponse, bool) {
+	if response, ok := generatedInvalidAuthorNotesParamError(path, paramName); ok {
+		return response, true
+	}
+	if response, ok := generatedInvalidNoteParamError(path, paramName); ok {
+		return response, true
+	}
+	return generatedInvalidMediaParamError(path, paramName)
 }
 
 func requestHasBody(r *http.Request) bool {

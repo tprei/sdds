@@ -25,24 +25,24 @@ func (handler server) CreateAuthUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, authValidationErrorResponse(openapi.ErrorCodeInvalidAuth, problems))
 		return
 	}
-	if !handler.authRateLimiters.allowSignup(r, input.Username) {
+	if !handler.auth.rateLimiters.allowSignup(r, input.Username) {
 		writeRateLimited(w)
 		return
 	}
 
-	secretHash, err := handler.passwordHasher.Hash(input.Password)
+	secretHash, err := handler.auth.passwordHasher.Hash(input.Password)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}
-	token, err := handler.newSessionToken()
+	token, err := handler.auth.newSessionToken()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}
 
-	expiresAt := handler.clock().Add(user.SessionLifetime)
-	current, err := handler.users.CreatePasswordUser(r.Context(), user.CreatePasswordUserInput{
+	expiresAt := handler.auth.clock().Add(user.SessionLifetime)
+	current, err := handler.auth.users.CreatePasswordUser(r.Context(), user.CreatePasswordUserInput{
 		Username:    input.Username,
 		DisplayName: input.DisplayName,
 		SecretHash:  secretHash,
@@ -75,12 +75,12 @@ func (handler server) CreateAuthSession(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, authValidationErrorResponse(openapi.ErrorCodeInvalidAuth, problems))
 		return
 	}
-	if !handler.authRateLimiters.allowLogin(r, input.Username) {
+	if !handler.auth.rateLimiters.allowLogin(r, input.Username) {
 		writeRateLimited(w)
 		return
 	}
 
-	login, err := handler.users.FindPasswordLogin(r.Context(), input.Username)
+	login, err := handler.auth.users.FindPasswordLogin(r.Context(), input.Username)
 	if errors.Is(err, user.ErrInvalidCredentials) {
 		handler.writeInvalidCredentialsAfterVerification(w, input.Password)
 		return
@@ -94,7 +94,7 @@ func (handler server) CreateAuthSession(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	verified, err := handler.passwordHasher.Verify(input.Password, login.SecretHash)
+	verified, err := handler.auth.passwordHasher.Verify(input.Password, login.SecretHash)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
@@ -104,13 +104,13 @@ func (handler server) CreateAuthSession(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	token, err := handler.newSessionToken()
+	token, err := handler.auth.newSessionToken()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}
-	expiresAt := handler.clock().Add(user.SessionLifetime)
-	current, err := handler.users.CreateSession(r.Context(), user.CreateSessionInput{
+	expiresAt := handler.auth.clock().Add(user.SessionLifetime)
+	current, err := handler.auth.users.CreateSession(r.Context(), user.CreateSessionInput{
 		UserID:    login.User.ID,
 		TokenHash: user.HashSessionToken(token),
 		ExpiresAt: expiresAt,
@@ -144,7 +144,7 @@ func (handler server) DeleteAuthSession(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := handler.users.RevokeSession(r.Context(), current.Session.ID, handler.clock()); err != nil {
+	if err := handler.auth.users.RevokeSession(r.Context(), current.Session.ID, handler.auth.clock()); err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}
@@ -176,7 +176,7 @@ func writeInvalidCredentials(w http.ResponseWriter) {
 }
 
 func (handler server) writeInvalidCredentialsAfterVerification(w http.ResponseWriter, password string) {
-	if _, err := handler.passwordHasher.Verify(password, handler.invalidCredentialHash); err != nil {
+	if _, err := handler.auth.passwordHasher.Verify(password, handler.auth.invalidCredentialHash); err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}

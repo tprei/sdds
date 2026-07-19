@@ -2,9 +2,7 @@ package httpapi
 
 import (
 	"context"
-	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -15,32 +13,71 @@ import (
 	"github.com/tprei/sdds/services/api/internal/user"
 )
 
-type noteStores interface {
+type NoteStores interface {
 	note.Store
 	note.AuthorNoteStore
 }
 
-type userStores interface {
+type UserStores interface {
 	user.Store
 	author.PublicAuthorStore
 }
 
+type ImageUploadPreparer interface {
+	PrepareImageUpload(context.Context, string, media.UploadReceiver) (media.UploadReceipt, error)
+}
+
+type NotesDependencies struct {
+	Stores  NoteStores
+	Catalog note.Catalog
+}
+
+type AuthDependencies struct {
+	Users  UserStores
+	Limits AuthLimits
+}
+
+type MediaDependencies struct {
+	ImageUploads   ImageUploadPreparer
+	AttachedImages media.AttachedImageReader
+}
+
+type SystemDependencies struct {
+	Readiness ReadinessChecker
+}
+
+type noteHandlers struct {
+	store       note.Store
+	authorNotes note.AuthorNoteStore
+	catalog     note.Catalog
+}
+
+type authHandlers struct {
+	users                 user.Store
+	publicAuthors         author.PublicAuthorStore
+	passwordHasher        passwordHasher
+	invalidCredentialHash string
+	rateLimiters          authRateLimiters
+	newSessionToken       func() (string, error)
+	clock                 func() time.Time
+}
+
+type mediaHandlers struct {
+	imageUploads         ImageUploadPreparer
+	attachedImages       media.AttachedImageReader
+	scratchDir           string
+	responseWriteTimeout time.Duration
+}
+
+type systemHandlers struct {
+	readiness ReadinessChecker
+}
+
 type server struct {
-	notes                     note.Store
-	catalog                   note.Catalog
-	users                     user.Store
-	publicAuthors             author.PublicAuthorStore
-	authorNotes               note.AuthorNoteStore
-	uploadService             uploadPreparer
-	imageReader               media.AttachedImageReader
-	imageReadScratchDir       string
-	imageResponseWriteTimeout time.Duration
-	passwordHasher            passwordHasher
-	invalidCredentialHash     string
-	authRateLimiters          authRateLimiters
-	newSessionToken           func() (string, error)
-	clock                     func() time.Time
-	readiness                 ReadinessChecker
+	notes  noteHandlers
+	auth   authHandlers
+	media  mediaHandlers
+	system systemHandlers
 }
 
 var _ openapi.ServerInterface = server{}
@@ -72,51 +109,36 @@ func DefaultAuthLimits() AuthLimits {
 	}
 }
 
-func NewRouter(notes noteStores, catalog note.Catalog, users userStores, authLimits AuthLimits, readiness ReadinessChecker, uploadService uploadPreparer, imageReader media.AttachedImageReader) http.Handler {
-	hasher := newBoundedPasswordHasher(user.NewPasswordHasher(), authLimits.PasswordHashConcurrency)
-	return newRouter(notes, catalog, users, hasher, mustInvalidCredentialHash(hasher), user.NewSessionToken, time.Now, authLimits, readiness, uploadService, imageReader)
+func NewRouter(notes NotesDependencies, auth AuthDependencies, media MediaDependencies, system SystemDependencies) http.Handler {
+	hasher := newBoundedPasswordHasher(user.NewPasswordHasher(), auth.Limits.PasswordHashConcurrency)
+	return newRouter(
+		noteHandlers{store: notes.Stores, authorNotes: notes.Stores, catalog: notes.Catalog},
+		authHandlers{
+			users:                 auth.Users,
+			publicAuthors:         auth.Users,
+			passwordHasher:        hasher,
+			invalidCredentialHash: mustInvalidCredentialHash(hasher),
+			rateLimiters:          newAuthRateLimiters(auth.Limits, time.Now),
+			newSessionToken:       user.NewSessionToken,
+			clock:                 time.Now,
+		},
+		mediaHandlers{imageUploads: media.ImageUploads, attachedImages: media.AttachedImages},
+		systemHandlers{readiness: system.Readiness},
+	)
 }
 
-func newRouter(
-	notes noteStores,
-	catalog note.Catalog,
-	users userStores,
-	passwordHasher passwordHasher,
-	invalidCredentialHash string,
-	newSessionToken func() (string, error),
-	clock func() time.Time,
-	authLimits AuthLimits,
-	readiness ReadinessChecker,
-	uploadService uploadPreparer,
-	imageReader media.AttachedImageReader,
-) http.Handler {
-	if uploadService == nil {
+func newRouter(notes noteHandlers, auth authHandlers, media mediaHandlers, system systemHandlers) http.Handler {
+	if media.imageUploads == nil {
 		panic("upload service is required")
 	}
-	if imageReader == nil {
+	if media.attachedImages == nil {
 		panic("image reader is required")
 	}
 	router := chi.NewRouter()
 	router.Use(localBrowserCORS)
 	validateOpenAPIRequest := openAPIRequestValidator()
-	requireCurrentSession := requireAuth(users, clock)
-
-	authRateLimiters := newAuthRateLimiters(authLimits, clock)
-	handler := server{
-		notes:                 notes,
-		catalog:               catalog,
-		users:                 users,
-		publicAuthors:         users,
-		authorNotes:           notes,
-		passwordHasher:        passwordHasher,
-		invalidCredentialHash: invalidCredentialHash,
-		authRateLimiters:      authRateLimiters,
-		newSessionToken:       newSessionToken,
-		clock:                 clock,
-		readiness:             readiness,
-		uploadService:         uploadService,
-		imageReader:           imageReader,
-	}
+	requireCurrentSession := requireAuth(auth.users, auth.clock)
+	handler := server{notes: notes, auth: auth, media: media, system: system}
 	wrapper := openapi.ServerInterfaceWrapper{
 		Handler:          handler,
 		ErrorHandlerFunc: writeGeneratedOpenAPIError,
@@ -163,49 +185,6 @@ func mustInvalidCredentialHash(hasher passwordHasher) string {
 	return hash
 }
 
-func writeGeneratedOpenAPIError(w http.ResponseWriter, r *http.Request, err error) {
-	var invalidParamError *openapi.InvalidParamFormatError
-	if errors.As(err, &invalidParamError) {
-		if response, ok := generatedInvalidAuthorNotesParamError(r.URL.Path, invalidParamError.ParamName); ok {
-			writeError(w, http.StatusBadRequest, response)
-			return
-		}
-		if code, ok := generatedInvalidParamErrorCode(r.URL.Path, invalidParamError.ParamName); ok {
-			writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: code})
-			return
-		}
-	}
-
-	writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidJSON})
-}
-
-func generatedInvalidAuthorNotesParamError(path string, paramName string) (openapi.ErrorResponse, bool) {
-	if !strings.HasPrefix(path, "/v1/authors/") || !strings.HasSuffix(path, "/notes") {
-		return openapi.ErrorResponse{}, false
-	}
-	if paramName != "limit" && paramName != "cursor" {
-		return openapi.ErrorResponse{}, false
-	}
-	fields := []openapi.ValidationProblem{{
-		Field: openapi.ValidationField(paramName),
-		Code:  openapi.ValidationProblemCodeInvalid,
-	}}
-	return openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidNote, Fields: &fields}, true
-}
-
-func generatedInvalidParamErrorCode(path string, paramName string) (openapi.ErrorCode, bool) {
-	switch {
-	case path == "/v1/search/notes" && (paramName == "q" || paramName == "category_slug"):
-		return openapi.ErrorCodeInvalidSearch, true
-	case path == "/v1/notes" && paramName == "category_slug":
-		return openapi.ErrorCodeInvalidNote, true
-	case strings.HasPrefix(path, "/v1/media/images/") && paramName == "image_id":
-		return openapi.ErrorCodeInvalidMedia, true
-	default:
-		return "", false
-	}
-}
-
 func noContent(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -219,7 +198,7 @@ const readinessCheckTimeout = 2 * time.Second
 func (handler server) GetReadiness(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), readinessCheckTimeout)
 	defer cancel()
-	if handler.readiness == nil || handler.readiness.Check(ctx) != nil {
+	if handler.system.readiness == nil || handler.system.readiness.Check(ctx) != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}

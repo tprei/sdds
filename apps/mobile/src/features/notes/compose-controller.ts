@@ -45,6 +45,11 @@ type Submission = {
   abortController: AbortController; clientRequestID: string; uploadRequestID: string | null;
 };
 
+type CatalogIntent = {
+  activation: number; focus: number;
+};
+type CatalogCompletion = CatalogIntent & { catalogs: Catalogs | null };
+
 const unsupportedImageMessage = 'Essa imagem não é compatível. Escolha uma imagem JPEG ou PNG.';
 const pickerFailureMessage = 'Não deu pra selecionar a imagem agora. Tente de novo em instantes.';
 const expiredImageMessage = 'A imagem expirou. Tente publicar de novo.';
@@ -59,13 +64,17 @@ export function createComposeController(
   const initial = draftStore.get(ownerID);
   const listeners = new Set<(state: ComposeControllerState) => void>();
   let active = false;
-  let catalogRequest = 0;
+  let activationGeneration = 0;
+  let catalogGeneration = 0;
   let catalogState: ComposeCatalogState = { status: 'loading' };
   let currentRequestID = initial?.clientRequestId ?? null;
   let fields = fieldsFor(initial);
   let focused = false;
+  let pickerGeneration = 0;
+  let pendingCatalog: CatalogCompletion | null = null;
   let submission: Submission | null = null;
   let submitState: ComposeSubmitState = { status: 'idle' };
+  let hasPublished = false;
   let token = input.token;
   let unsubscribe: (() => void) | null = null;
   let state = snapshot();
@@ -88,13 +97,17 @@ export function createComposeController(
     }
   }
 
+  function setDraftRequestID(next: string | null): void {
+    currentRequestID = next;
+  }
+
   function applyDraft(draft: ComposeDraft | null): void {
-    currentRequestID = draft?.clientRequestId ?? null;
+    setDraftRequestID(draft?.clientRequestId ?? null);
     fields = fieldsFor(draft);
   }
 
   function applyImageDraft(draft: ComposeDraft | null): void {
-    currentRequestID = draft?.clientRequestId ?? null;
+    setDraftRequestID(draft?.clientRequestId ?? null);
     fields = { ...fields, image: draft?.image ?? null };
   }
 
@@ -102,11 +115,61 @@ export function createComposeController(
     return active && submission === null;
   }
 
-  function updateFields(next: ComposeDraftFields): void {
+  function ownsCatalog(intent: CatalogIntent): boolean {
+    return active &&
+      activationGeneration === intent.activation &&
+      focused &&
+      catalogGeneration === intent.focus;
+  }
+
+  function updateFields(next: ComposeDraftFields, shouldPublish = true): void {
     if (!editable()) return;
+    hasPublished = false;
     fields = next;
-    currentRequestID = draftStore.update(ownerID, next)?.clientRequestId ?? null;
+    setDraftRequestID(draftStore.update(ownerID, next)?.clientRequestId ?? null);
+    if (shouldPublish) publish();
+  }
+  function reconcileCatalog(catalog: NoteCatalog): void {
+    const current = draftStore.get(ownerID);
+    const categorySlug = resolveSelectedCategorySlug(
+      catalog,
+      current?.categorySlug ?? fields.categorySlug,
+    );
+    const placeSlug = resolveSelectedPlaceSlug(
+      catalog,
+      current?.placeSlug ?? fields.placeSlug,
+    );
+    if (current === null) {
+      if (!hasPublished) {
+        updateFields({ ...fields, categorySlug, placeSlug }, false);
+      }
+    } else if (
+      categorySlug !== current.categorySlug ||
+      placeSlug !== current.placeSlug
+    ) {
+      updateFields({ ...fields, categorySlug, placeSlug }, false);
+    }
+    catalogState = categorySlug === null
+      ? { status: 'error' }
+      : { status: 'ready', catalog };
+  }
+
+
+  function completeCatalog(completion: CatalogCompletion): boolean {
+    if (!ownsCatalog(completion)) return false;
+    if (submission !== null) {
+      pendingCatalog = completion;
+      return false;
+    }
+    pendingCatalog = null;
+    if (completion.catalogs === null) {
+      catalogState = { status: 'error' };
+      publish();
+      return true;
+    }
+    reconcileCatalog(buildNoteCatalog(completion.catalogs));
     publish();
+    return true;
   }
 
   function currentSubmission(context: Submission): boolean {
@@ -120,6 +183,9 @@ export function createComposeController(
     if (submission !== context) return;
     submission = null;
     submitState = next;
+    const pending = pendingCatalog;
+    pendingCatalog = null;
+    if (pending !== null && completeCatalog(pending)) return;
     if (active) publish();
   }
 
@@ -132,8 +198,16 @@ export function createComposeController(
 
   function publicationCompleted(): void {
     submission = null;
+    pickerGeneration += 1;
     applyDraft(null);
+    hasPublished = true;
     submitState = { status: 'success' };
+    const pending = pendingCatalog;
+    pendingCatalog = null;
+    if (pending !== null && completeCatalog(pending)) {
+      ports.onPublished();
+      return;
+    }
     publish();
     ports.onPublished();
   }
@@ -141,6 +215,7 @@ export function createComposeController(
   function activate(): void {
     if (active) return;
     active = true;
+    activationGeneration += 1;
     unsubscribe = draftStore.subscribe(ownerID, (requestID) => {
       if (active && requestID === currentRequestID) publicationCompleted();
     });
@@ -160,14 +235,19 @@ export function createComposeController(
     submission.abortController.abort();
     submission = null;
     submitState = { status: 'idle' };
+    const pending = pendingCatalog;
+    pendingCatalog = null;
+    if (pending !== null && completeCatalog(pending)) return;
     if (active) publish();
   }
 
   function deactivate(): void {
     if (!active) return;
+    pendingCatalog = null;
     active = false;
     focused = false;
-    catalogRequest += 1;
+    catalogGeneration += 1;
+    pickerGeneration += 1;
     cancel();
     unsubscribe?.();
     unsubscribe = null;
@@ -176,40 +256,32 @@ export function createComposeController(
   function focus(): void {
     if (!active) return;
     focused = true;
-    const request = ++catalogRequest;
+    const intent: CatalogIntent = {
+      activation: activationGeneration,
+      focus: ++catalogGeneration,
+    };
+    pendingCatalog = null;
     catalogState = { status: 'loading' };
     publish();
-    void Promise.resolve()
-      .then(() => ports.loadCatalogs())
-      .then((catalogs) => {
-        if (!active || !focused || request !== catalogRequest) return;
-        const catalog = buildNoteCatalog(catalogs);
-        const categorySlug = resolveSelectedCategorySlug(catalog, fields.categorySlug);
-        if (categorySlug === null) {
-          if (submission === null) updateFields({ ...fields, categorySlug });
-          catalogState = { status: 'error' };
-        } else {
-          if (submission === null) {
-            updateFields({
-              ...fields,
-              categorySlug,
-              placeSlug: resolveSelectedPlaceSlug(catalog, fields.placeSlug),
-            });
-          }
-          catalogState = { status: 'ready', catalog };
-        }
-        publish();
-      })
-      .catch(() => {
-        if (!active || !focused || request !== catalogRequest) return;
-        catalogState = { status: 'error' };
-        publish();
-      });
+    try {
+      void ports.loadCatalogs().then(
+        (catalogs) => {
+          completeCatalog({ ...intent, catalogs });
+        },
+        () => {
+          completeCatalog({ ...intent, catalogs: null });
+        },
+      );
+    } catch {
+      completeCatalog({ ...intent, catalogs: null });
+    }
   }
 
   function blur(): void {
     focused = false;
-    catalogRequest += 1;
+    catalogGeneration += 1;
+    pendingCatalog = null;
+    hasPublished = false;
     if (active && submitState.status === 'success') {
       submitState = { status: 'idle' };
       publish();
@@ -218,9 +290,17 @@ export function createComposeController(
 
   async function pickImage(): Promise<void> {
     if (!editable()) return;
+    const activation = activationGeneration;
+    const picker = ++pickerGeneration;
     try {
       const result = await ports.pickImage();
-      if (!editable() || result.canceled) return;
+      if (
+        !active ||
+        activationGeneration !== activation ||
+        pickerGeneration !== picker ||
+        submission !== null ||
+        result.canceled
+      ) return;
       const asset = result.assets?.[0];
       if (asset === undefined) return;
       if (!isSupportedComposeImageMimeType(asset.mimeType)) {
@@ -234,7 +314,13 @@ export function createComposeController(
       submitState = { status: 'idle' };
       publish();
     } catch (error: unknown) {
-      if (!editable() || isAbortError(error)) return;
+      if (
+        !active ||
+        activationGeneration !== activation ||
+        pickerGeneration !== picker ||
+        submission !== null ||
+        isAbortError(error)
+      ) return;
       submitState = { status: 'error', message: pickerFailureMessage };
       publish();
     }
@@ -242,6 +328,7 @@ export function createComposeController(
 
   function removeImage(): void {
     if (!editable()) return;
+    pickerGeneration += 1;
     applyImageDraft(draftStore.removeImage(ownerID));
     publish();
   }
@@ -256,7 +343,7 @@ export function createComposeController(
       ...fields, body: evaluation.body, title: evaluation.title,
     });
     if (draft === null || draft.categorySlug === null) return;
-    currentRequestID = draft.clientRequestId;
+    setDraftRequestID(draft.clientRequestId);
     const receipt = draft.image?.imageReceipt;
     if (draft.image !== null && receipt?.expiresAt !== undefined && receipt.expiresAt <= Date.now()) {
       draft = draftStore.refreshImageUpload(ownerID, draft.image.uploadRequestId);
@@ -270,8 +357,16 @@ export function createComposeController(
     submission = context;
     submitState = { status: 'submitting' };
     publish();
+    if (!currentSubmission(context)) {
+      settleStale(context);
+      return;
+    }
     try {
       draft = await uploadImage(context, draft);
+      if (!currentSubmission(context)) {
+        settleStale(context);
+        return;
+      }
       if (draft === null || draft.categorySlug === null) return;
       const uploadedReceipt = draft.image?.imageReceipt;
       if (draft.image !== null && uploadedReceipt === null) {
@@ -317,6 +412,10 @@ export function createComposeController(
     }
     applyImageDraft(updated);
     publish();
+    if (!currentSubmission(context)) {
+      settleStale(context);
+      return null;
+    }
     return updated;
   }
 

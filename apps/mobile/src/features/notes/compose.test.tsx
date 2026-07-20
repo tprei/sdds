@@ -668,8 +668,8 @@ describe('ComposeScreen', () => {
     mocks.authState.user = { id: 'owner-1' };
     await act(async () => {
       renderer.update(<ComposeScreen draftStore={store} />);
-      await settle();
     });
+    await waitForCatalogReady(renderer);
     expect(input(renderer, 'Título da nota').props.value).toBe('Rascunho');
 
     const pending = deferred<{ canceled: false; assets: [ImageUploadAsset] }>();
@@ -737,8 +737,8 @@ async function renderCompose(
   let renderer!: ReactTestRenderer;
   await act(async () => {
     renderer = create(<ComposeScreen draftStore={store} />);
-    await settle();
   });
+  await waitForCatalogReady(renderer);
   return renderer;
 }
 
@@ -746,6 +746,9 @@ async function press(
   renderer: ReactTestRenderer,
   testID: string,
 ): Promise<void> {
+  if (testID === 'compose-submit') {
+    await waitForSubmitEnabled(renderer);
+  }
   await act(async () => {
     await renderer.root.findByProps({ testID }).props.onPress();
     await settle();
@@ -775,14 +778,40 @@ async function reauthenticate(
   mocks.authState.token = 'reauthenticated-token';
   await act(async () => {
     renderer.update(<ComposeScreen draftStore={store} />);
-    await settle();
   });
+  await waitForCatalogReady(renderer);
 }
 function fill(renderer: ReactTestRenderer, title: string, body: string): void {
   act(() => {
     input(renderer, 'Título da nota').props.onChangeText(title);
     input(renderer, 'Texto da nota').props.onChangeText(body);
   });
+}
+
+async function waitForSubmitEnabled(
+  renderer: ReactTestRenderer,
+): Promise<void> {
+  await waitForCatalogReady(renderer);
+  expect(
+    renderer.root.findByProps({ testID: 'compose-submit' }).props.disabled,
+  ).toBe(false);
+}
+
+async function waitForCatalogReady(
+  renderer: ReactTestRenderer,
+): Promise<void> {
+  const catalogLoad = mocks.listCatalogs.mock.results[
+    mocks.listCatalogs.mock.results.length - 1
+  ]?.value;
+  if (catalogLoad === undefined) {
+    throw new Error('compose_catalog_load_missing');
+  }
+  await act(async () => {
+    await catalogLoad;
+  });
+  expect(
+    renderer.root.findAllByProps({ accessibilityRole: 'button' }),
+  ).not.toHaveLength(0);
 }
 
 function input(renderer: ReactTestRenderer, label: string) {

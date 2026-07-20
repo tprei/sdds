@@ -25,7 +25,7 @@ const testUploadRequestID = "c6bf4f8d-3a5a-4c98-bf3f-5ddf8ecb87f6"
 
 func TestPrepareImageUploadAuthenticatesBeforeReadingBody(t *testing.T) {
 	body := &countingReader{Reader: strings.NewReader("not-read")}
-	router := NewRouter(fakeNoteStore{},
+	router := newRouterForTest(fakeNoteStore{},
 		fakeCatalog{},
 		fakeUserStore{findCurrentSession: func(context.Context, string, time.Time) (user.CurrentSession, error) {
 			return user.CurrentSession{}, user.ErrSessionNotFound
@@ -49,10 +49,15 @@ func TestPrepareImageUploadAuthenticatesBeforeReadingBody(t *testing.T) {
 
 func TestPrepareImageUploadExcludesGenericBodyValidation(t *testing.T) {
 	fileBytes := []byte("image bytes are validated by the application service")
+	var reader *countingReader
+	var source *bytes.Reader
 	var got []byte
 	service := fakeUploadPreparer{prepareImageUpload: func(ctx context.Context, userID string, receive media.UploadReceiver) (media.UploadReceipt, error) {
 		if userID != "upload-user" {
 			t.Fatalf("user ID = %q, want upload-user", userID)
+		}
+		if reader.reads != 0 {
+			t.Fatalf("body reads before receive = %d, want 0", reader.reads)
 		}
 		var buffer bytes.Buffer
 		requestID, err := receive(ctx, &buffer)
@@ -61,6 +66,9 @@ func TestPrepareImageUploadExcludesGenericBodyValidation(t *testing.T) {
 		}
 		if requestID != testUploadRequestID {
 			t.Fatalf("request ID = %q, want %q", requestID, testUploadRequestID)
+		}
+		if source.Len() != 0 {
+			t.Fatalf("parser left %d body bytes unread", source.Len())
 		}
 		got = buffer.Bytes()
 		return media.UploadReceipt{
@@ -74,7 +82,12 @@ func TestPrepareImageUploadExcludesGenericBodyValidation(t *testing.T) {
 	}}
 	router := authenticatedUploadRouter(service)
 	body, contentType := multipartBody(t, fileBytes, false)
-	request := httptest.NewRequest(http.MethodPost, "/v1/media/image-uploads", body)
+	source = bytes.NewReader(body.Bytes())
+	reader = &countingReader{Reader: source}
+	request := httptest.NewRequest(http.MethodPost, "/v1/media/image-uploads", reader)
+	if request.Body != reader {
+		t.Fatal("handler did not receive the tracking multipart stream")
+	}
 	request.Header.Set("Content-Type", contentType)
 	response := httptest.NewRecorder()
 
@@ -99,17 +112,25 @@ func TestPrepareImageUploadMapsRetryableErrors(t *testing.T) {
 	tests := []struct {
 		name       string
 		err        error
+		receive    func(context.Context, media.UploadReceiver) error
 		status     int
 		code       openapi.ErrorCode
 		retryAfter string
+		field      openapi.ValidationField
 	}{
 		{name: "in progress", err: media.ErrUploadInProgress, status: http.StatusConflict, code: openapi.ErrorCodeUploadInProgress, retryAfter: "120"},
 		{name: "quota", err: media.ErrUploadQuotaExceeded, status: http.StatusTooManyRequests, code: openapi.ErrorCodeMediaStagingQuotaExceeded, retryAfter: "60"},
 		{name: "storage", err: media.ErrMediaStorageUnavailable, status: http.StatusServiceUnavailable, code: openapi.ErrorCodeMediaStorageUnavailable, retryAfter: "5"},
-		{name: "invalid request", err: media.ErrInvalidUploadRequest, status: http.StatusBadRequest, code: openapi.ErrorCodeInvalidMedia},
-		{name: "invalid media", err: media.ErrInvalidMedia, status: http.StatusBadRequest, code: openapi.ErrorCodeInvalidMedia},
-		{name: "unsupported media", err: media.ErrUnsupportedMediaType, status: http.StatusUnsupportedMediaType, code: openapi.ErrorCodeUnsupportedMediaType},
-		{name: "media too large", err: media.ErrMediaTooLarge, status: http.StatusRequestEntityTooLarge, code: openapi.ErrorCodeRequestTooLarge},
+		{name: "invalid request", err: media.ErrInvalidUploadRequest, status: http.StatusBadRequest, code: openapi.ErrorCodeInvalidMedia, field: openapi.ValidationFieldUploadRequestID},
+		{name: "invalid media", err: media.ErrInvalidMedia, status: http.StatusBadRequest, code: openapi.ErrorCodeInvalidMedia, field: openapi.ValidationFieldFile},
+		{name: "invalid dimensions", err: media.ErrMediaDimensions, status: http.StatusBadRequest, code: openapi.ErrorCodeInvalidMedia, field: openapi.ValidationFieldFile},
+		{name: "unsupported media", err: media.ErrUnsupportedMediaType, status: http.StatusUnsupportedMediaType, code: openapi.ErrorCodeUnsupportedMediaType, field: openapi.ValidationFieldFile},
+		{name: "service media too large", err: media.ErrMediaTooLarge, status: http.StatusRequestEntityTooLarge, code: openapi.ErrorCodeRequestTooLarge, field: openapi.ValidationFieldFile},
+		{name: "parser media too large", receive: func(ctx context.Context, receive media.UploadReceiver) error {
+			_, err := receive(ctx, mediaTooLargeWriter{})
+			return err
+		}, status: http.StatusRequestEntityTooLarge, code: openapi.ErrorCodeRequestTooLarge},
+		{name: "direct nil destination", receive: func(ctx context.Context, receive media.UploadReceiver) error { _, err := receive(ctx, nil); return err }, status: http.StatusBadRequest, code: openapi.ErrorCodeInvalidMedia},
 		{name: "idempotency conflict", err: media.ErrUploadIdempotencyConflict, status: http.StatusConflict, code: openapi.ErrorCodeIdempotencyConflict},
 		{name: "expired", err: media.ErrUploadExpired, status: http.StatusConflict, code: openapi.ErrorCodeUploadExpired},
 		{name: "integrity", err: media.ErrMediaIntegrity, status: http.StatusConflict, code: openapi.ErrorCodeMediaIntegrityError},
@@ -118,6 +139,9 @@ func TestPrepareImageUploadMapsRetryableErrors(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			service := fakeUploadPreparer{prepareImageUpload: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
+				if test.receive != nil {
+					return media.UploadReceipt{}, test.receive(ctx, receive)
+				}
 				_, receiveErr := receive(ctx, io.Discard)
 				if receiveErr != nil {
 					return media.UploadReceipt{}, receiveErr
@@ -138,14 +162,14 @@ func TestPrepareImageUploadMapsRetryableErrors(t *testing.T) {
 			if response.Header().Get("Retry-After") != test.retryAfter {
 				t.Fatalf("Retry-After = %q, want %q", response.Header().Get("Retry-After"), test.retryAfter)
 			}
-			assertErrorCode(t, response, test.code)
+			assertErrorCode(t, response, test.code, test.field)
 			requireOpenAPIResponse(t, request, response)
 		})
 	}
 }
 
-func authenticatedUploadRouter(service uploadPreparer) http.Handler {
-	handler := NewRouter(fakeNoteStore{},
+func authenticatedUploadRouter(service ImageUploadPreparer) http.Handler {
+	handler := newRouterForTest(fakeNoteStore{},
 		fakeCatalog{},
 		fakeUserStore{findCurrentSession: func(_ context.Context, tokenHash string, _ time.Time) (user.CurrentSession, error) {
 			if tokenHash != user.HashSessionToken("current-token") {
@@ -171,6 +195,12 @@ func (reader *countingReader) Read(p []byte) (int, error) {
 	reader.reads++
 	return reader.Reader.Read(p)
 }
+
+func (reader *countingReader) Close() error { return nil }
+
+type mediaTooLargeWriter struct{}
+
+func (mediaTooLargeWriter) Write([]byte) (int, error) { return 0, media.ErrMediaTooLarge }
 
 func multipartBody(t *testing.T, fileBytes []byte, requestIDFirst bool) (*bytes.Buffer, string) {
 	t.Helper()
@@ -228,7 +258,7 @@ func multipartBodyWith(t *testing.T, write func(*multipart.Writer) error) (*byte
 	return body, writer.FormDataContentType()
 }
 
-func assertErrorCode(t *testing.T, response *httptest.ResponseRecorder, want openapi.ErrorCode) {
+func assertErrorCode(t *testing.T, response *httptest.ResponseRecorder, want openapi.ErrorCode, wantField ...openapi.ValidationField) {
 	t.Helper()
 	var body openapi.ErrorResponse
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
@@ -236,6 +266,13 @@ func assertErrorCode(t *testing.T, response *httptest.ResponseRecorder, want ope
 	}
 	if body.Code != want {
 		t.Fatalf("error code = %q, want %q", body.Code, want)
+	}
+	if len(wantField) > 0 && wantField[0] != "" {
+		requireValidationProblems(t, body.Fields, []openapi.ValidationProblem{{Field: wantField[0], Code: openapi.ValidationProblemCodeInvalid}})
+		return
+	}
+	if body.Fields != nil {
+		t.Fatalf("validation fields = %#v, want nil", *body.Fields)
 	}
 }
 func TestPrepareImageUploadRejectsInvalidMultipart(t *testing.T) {
@@ -245,12 +282,17 @@ func TestPrepareImageUploadRejectsInvalidMultipart(t *testing.T) {
 	tests := []struct {
 		name        string
 		write       func(*multipart.Writer) error
+		contentType string
 		trim        int
 		noFileBytes bool
+		field       openapi.ValidationField
 	}{
 		{name: "unknown", write: func(writer *multipart.Writer) error {
 			return writer.WriteField("extra", "value")
 		}},
+		{name: "wrong Content-Type", write: validBody, contentType: "application/json"},
+		{name: "missing boundary", write: validBody, contentType: "multipart/form-data"},
+		{name: "empty boundary", write: validBody, contentType: `multipart/form-data; boundary=""`},
 		{name: "duplicate request ID", write: func(writer *multipart.Writer) error {
 			if err := writer.WriteField("upload_request_id", testUploadRequestID); err != nil {
 				return err
@@ -295,19 +337,19 @@ func TestPrepareImageUploadRejectsInvalidMultipart(t *testing.T) {
 		}},
 		{name: "invalid request ID", write: func(writer *multipart.Writer) error {
 			return writeUploadParts(writer, "not-a-uuid", "photo.jpg", true, []byte("image"))
-		}},
+		}, noFileBytes: true, field: openapi.ValidationFieldUploadRequestID},
 		{name: "raw32 request ID", write: func(writer *multipart.Writer) error {
 			return writeUploadParts(writer, strings.ReplaceAll(testUploadRequestID, "-", ""), "photo.jpg", true, []byte("image"))
-		}, noFileBytes: true},
+		}, noFileBytes: true, field: openapi.ValidationFieldUploadRequestID},
 		{name: "braced request ID", write: func(writer *multipart.Writer) error {
 			return writeUploadParts(writer, "{"+testUploadRequestID+"}", "photo.jpg", true, []byte("image"))
-		}, noFileBytes: true},
+		}, noFileBytes: true, field: openapi.ValidationFieldUploadRequestID},
 		{name: "uppercase request ID", write: func(writer *multipart.Writer) error {
 			return writeUploadParts(writer, strings.ToUpper(testUploadRequestID), "photo.jpg", true, []byte("image"))
-		}, noFileBytes: true},
+		}, noFileBytes: true, field: openapi.ValidationFieldUploadRequestID},
 		{name: "request ID over 128 bytes", write: func(writer *multipart.Writer) error {
 			return writeUploadParts(writer, strings.Repeat("a", 129), "photo.jpg", true, []byte("image"))
-		}},
+		}, noFileBytes: true, field: openapi.ValidationFieldUploadRequestID},
 		{name: "truncated", write: validBody, trim: 20},
 	}
 	for _, test := range tests {
@@ -324,6 +366,7 @@ func TestPrepareImageUploadRejectsInvalidMultipart(t *testing.T) {
 			}}
 			router := authenticatedUploadRouter(service)
 			body, contentType := multipartBodyWith(t, test.write)
+			contentType = [...]string{contentType, test.contentType}[min(1, len(test.contentType))]
 			if test.trim > 0 {
 				bodyBytes := body.Bytes()
 				body = bytes.NewBuffer(bodyBytes[:len(bodyBytes)-test.trim])
@@ -337,12 +380,12 @@ func TestPrepareImageUploadRejectsInvalidMultipart(t *testing.T) {
 			if response.Code != http.StatusBadRequest {
 				t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
 			}
-			assertErrorCode(t, response, openapi.ErrorCodeInvalidMedia)
+			assertErrorCode(t, response, openapi.ErrorCodeInvalidMedia, test.field)
 			requireOpenAPIResponse(t, request, response)
 			if published {
 				t.Fatal("upload was published for invalid multipart")
 			}
-			if test.noFileBytes && received.Len() != 0 {
+			if (test.noFileBytes || test.contentType != "") && received.Len() != 0 {
 				t.Fatalf("received file bytes = %d, want 0", received.Len())
 			}
 		})
@@ -452,7 +495,7 @@ func TestPrepareImageUploadClosesBodyOnCancellation(t *testing.T) {
 		_, err := receive(ctx, io.Discard)
 		return media.UploadReceipt{}, err
 	}}
-	handler := server{uploadService: service}
+	handler := server{media: mediaHandlers{imageUploads: service}}
 	sessionContext := context.WithValue(ctx, currentSessionContextKey{}, user.CurrentSession{User: user.User{ID: "upload-user", State: user.UserStateActive}})
 	request := httptest.NewRequest(http.MethodPost, "/v1/media/image-uploads", nil).WithContext(sessionContext)
 	request.Body = body

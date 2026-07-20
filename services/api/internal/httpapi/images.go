@@ -51,7 +51,6 @@ type imageSpoolWriter struct {
 func (handler server) GetMediaImage(w http.ResponseWriter, r *http.Request, imageID openapi_types.UUID) {
 	parsedID := uuid.UUID(imageID)
 	canonicalID := parsedID.String()
-
 	releaseReadSlot, err := acquireImageReadSlot(r.Context())
 	if err != nil {
 		writeMediaImageError(w, err)
@@ -59,45 +58,53 @@ func (handler server) GetMediaImage(w http.ResponseWriter, r *http.Request, imag
 	}
 	defer releaseReadSlot()
 
-	image, err := handler.imageReader.OpenAttached(r.Context(), canonicalID)
+	image, err := handler.media.attachedImages.OpenAttached(r.Context(), canonicalID)
 	if err != nil {
 		writeMediaImageError(w, err)
 		return
 	}
-	if image.Body == nil || image.Size <= 0 || image.Size > media.MaxEncodedImageSize || !validImageContentType(image.ContentType) {
-		closeAttachedImage(image.Body)
-		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeMediaIntegrityError})
+	if err := validateAttachedImageResponse(image); err != nil {
+		writeMediaImageError(w, err)
 		return
 	}
+	if err := handler.writeVerifiedImageResponse(w, r.Context(), canonicalID, image); err != nil {
+		writeMediaImageError(w, err)
+	}
+}
 
-	body, stopBodyWatch := watchImageBody(r.Context(), image.Body)
+func validateAttachedImageResponse(image media.AttachedImage) error {
+	if image.Body != nil && image.Size > 0 && image.Size <= media.MaxEncodedImageSize &&
+		(image.ContentType == "image/jpeg" || image.ContentType == "image/png") {
+		return nil
+	}
+	closeAttachedImage(image.Body)
+	return media.ErrMediaIntegrity
+}
+
+func (handler server) writeVerifiedImageResponse(w http.ResponseWriter, ctx context.Context, imageID string, image media.AttachedImage) error {
+	body, stopBodyWatch := watchImageBody(ctx, image.Body)
 	defer stopBodyWatch()
-
-	spool, err := newImageSpool(handler.imageReadScratchDir)
+	spool, err := newImageSpool(handler.media.scratchDir)
 	if err != nil {
 		stopBodyWatch()
-		writeMediaImageError(w, err)
-		return
+		return err
 	}
 	defer func() {
 		if cleanupErr := spool.CloseRemove(); cleanupErr != nil {
-			slog.Error("attached image scratch cleanup failed", "image_id", canonicalID)
+			slog.Error("attached image scratch cleanup failed", "image_id", imageID)
 		}
 	}()
-
-	verifyErr := spoolAndVerifyImage(r.Context(), body, spool, image.Size, image.SHA256)
-	stopBodyWatch()
-	if verifyErr != nil {
+	if err := spoolAndVerifyImage(ctx, body, spool, image.Size, image.SHA256); err != nil {
+		stopBodyWatch()
 		switch {
-		case errors.Is(verifyErr, media.ErrMediaIntegrity):
-			slog.Error("attached image stream failed", "image_id", canonicalID)
-		case errors.Is(verifyErr, media.ErrMediaStorageUnavailable):
-			slog.Error("attached image stream unavailable", "image_id", canonicalID)
+		case errors.Is(err, media.ErrMediaIntegrity):
+			slog.Error("attached image stream failed", "image_id", imageID)
+		case errors.Is(err, media.ErrMediaStorageUnavailable):
+			slog.Error("attached image stream unavailable", "image_id", imageID)
 		}
-		writeMediaImageError(w, verifyErr)
-		return
+		return err
 	}
-
+	stopBodyWatch()
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(handler.imageWriteTimeout()))
 	digest := hex.EncodeToString(image.SHA256[:])
 	w.Header().Set("Content-Type", image.ContentType)
@@ -107,10 +114,10 @@ func (handler server) GetMediaImage(w http.ResponseWriter, r *http.Request, imag
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Disposition", "inline")
 	w.WriteHeader(http.StatusOK)
-
 	if _, err := io.CopyN(w, spool.file, image.Size); err != nil {
-		slog.Error("attached image response failed", "image_id", canonicalID)
+		slog.Error("attached image response failed", "image_id", imageID)
 	}
+	return nil
 }
 
 func newImageSpool(dir string) (*imageSpool, error) {
@@ -139,8 +146,8 @@ func acquireImageReadSlot(ctx context.Context) (func(), error) {
 }
 
 func (handler server) imageWriteTimeout() time.Duration {
-	if handler.imageResponseWriteTimeout > 0 {
-		return handler.imageResponseWriteTimeout
+	if handler.media.responseWriteTimeout > 0 {
+		return handler.media.responseWriteTimeout
 	}
 	return imageResponseWriteTimeout
 }
@@ -233,10 +240,6 @@ func writeMediaImageError(w http.ResponseWriter, err error) {
 	default:
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 	}
-}
-
-func validImageContentType(contentType string) bool {
-	return contentType == "image/jpeg" || contentType == "image/png"
 }
 
 func closeAttachedImage(body io.ReadCloser) {

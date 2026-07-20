@@ -38,8 +38,79 @@ func (fake fakeReadiness) Check(ctx context.Context) error {
 	return fake.check(ctx)
 }
 
+func newRouterForTest(
+	notes NoteStores,
+	catalog note.Catalog,
+	users UserStores,
+	authLimits AuthLimits,
+	readiness ReadinessChecker,
+	uploadService ImageUploadPreparer,
+	imageReader media.AttachedImageReader,
+) http.Handler {
+	return NewRouter(
+		NotesDependencies{Stores: notes, Catalog: catalog},
+		AuthDependencies{Users: users, Limits: authLimits},
+		MediaDependencies{ImageUploads: uploadService, AttachedImages: imageReader},
+		SystemDependencies{Readiness: readiness},
+	)
+}
+
+func newRouterWithAuthSeamsForTest(
+	notes NoteStores,
+	catalog note.Catalog,
+	users UserStores,
+	passwordHasher passwordHasher,
+	invalidCredentialHash string,
+	newSessionToken func() (string, error),
+	clock func() time.Time,
+	authLimits AuthLimits,
+	readiness ReadinessChecker,
+	uploadService ImageUploadPreparer,
+	imageReader media.AttachedImageReader,
+) http.Handler {
+	return newRouter(
+		noteHandlers{store: notes, authorNotes: notes, catalog: catalog},
+		authHandlers{
+			users:                 users,
+			publicAuthors:         users,
+			passwordHasher:        passwordHasher,
+			invalidCredentialHash: invalidCredentialHash,
+			rateLimiters:          newAuthRateLimiters(authLimits, clock),
+			newSessionToken:       newSessionToken,
+			clock:                 clock,
+		},
+		mediaHandlers{imageUploads: uploadService, attachedImages: imageReader},
+		systemHandlers{readiness: readiness},
+	)
+}
+
+func TestNewRouterRequiresMediaDependencies(t *testing.T) {
+	tests := []struct {
+		name  string
+		media MediaDependencies
+	}{
+		{name: "image upload preparer", media: MediaDependencies{AttachedImages: fakeAttachedImageReader{}}},
+		{name: "attached image reader", media: MediaDependencies{ImageUploads: fakeUploadPreparer{}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("NewRouter did not panic")
+				}
+			}()
+			NewRouter(
+				NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
+				AuthDependencies{Users: fakeUserStore{}, Limits: DefaultAuthLimits()},
+				test.media,
+				SystemDependencies{Readiness: fakeReadiness{}},
+			)
+		})
+	}
+}
+
 func newTestRouter(notes fakeNoteStore) http.Handler {
-	handler := NewRouter(notes, fakeCatalog{}, fakeUserStore{
+	handler := newRouterForTest(notes, fakeCatalog{}, fakeUserStore{
 		findCurrentSession: func(_ context.Context, tokenHash string, _ time.Time) (user.CurrentSession, error) {
 			if tokenHash != user.HashSessionToken("current-token") {
 				return user.CurrentSession{}, user.ErrSessionNotFound
@@ -87,7 +158,7 @@ func TestHealthRoutesReturnNoContent(t *testing.T) {
 
 func TestReadinessDegradesAndRecovers(t *testing.T) {
 	available := true
-	router := NewRouter(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{
+	router := newRouterForTest(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{
 		check: func(ctx context.Context) error {
 			if _, ok := ctx.Deadline(); !ok {
 				t.Fatal("readiness context has no deadline")
@@ -132,7 +203,7 @@ func TestReadinessDegradesAndRecovers(t *testing.T) {
 }
 
 func TestReadinessRejectsSentinelMismatch(t *testing.T) {
-	router := NewRouter(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{
+	router := newRouterForTest(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{
 		check: func(context.Context) error {
 			return media.ErrObjectIntegrity
 		},

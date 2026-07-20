@@ -150,7 +150,12 @@ func runServer(ctx context.Context, config config) (err error) {
 	}
 	cleanupCancel()
 	readiness := runtimeReadiness{database: db, media: store}
-	server := newServer(config, httpapi.NewRouter(noteStore, catalogStore, userStore, config.authLimits, readiness, uploadService, imageReader))
+	server := newServer(config, httpapi.NewRouter(
+		httpapi.NotesDependencies{Stores: noteStore, Catalog: catalogStore},
+		httpapi.AuthDependencies{Users: userStore, Limits: config.authLimits},
+		httpapi.MediaDependencies{ImageUploads: uploadService, AttachedImages: imageReader},
+		httpapi.SystemDependencies{Readiness: readiness},
+	))
 
 	slog.Info("api listening", "addr", config.httpAddr)
 	if err := listenAndServe(server); err != nil && !errors.Is(err, http.ErrServerClosed) {

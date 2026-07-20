@@ -384,7 +384,7 @@ func newAuthRateLimitTestRouter(
 	clock func() time.Time,
 ) http.Handler {
 	t.Helper()
-	return newRouter(fakeNoteStore{}, fakeCatalog{}, users, authTestPasswordHasher(), authTestCredentialProbeHash(t), func() (string, error) {
+	return newRouterWithAuthSeamsForTest(fakeNoteStore{}, fakeCatalog{}, users, authTestPasswordHasher(), authTestCredentialProbeHash(t), func() (string, error) {
 		return "rate-limit-token", nil
 	}, clock, limits, fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
 }

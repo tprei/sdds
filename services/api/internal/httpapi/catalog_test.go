@@ -58,7 +58,7 @@ func TestListPlacesReturnsCatalogRows(t *testing.T) {
 }
 
 func TestListCategoriesReturnsInternalError(t *testing.T) {
-	router := NewRouter(fakeNoteStore{}, fakeCatalog{
+	router := newRouterForTest(fakeNoteStore{}, fakeCatalog{
 		listCategories: func(context.Context) ([]note.Category, error) {
 			return nil, errors.New("catalog unavailable")
 		},
@@ -75,7 +75,7 @@ func TestListCategoriesReturnsInternalError(t *testing.T) {
 }
 
 func TestListPlacesReturnsInternalError(t *testing.T) {
-	router := NewRouter(fakeNoteStore{}, fakeCatalog{
+	router := newRouterForTest(fakeNoteStore{}, fakeCatalog{
 		listPlaces: func(context.Context) ([]note.Place, error) {
 			return nil, errors.New("catalog unavailable")
 		},

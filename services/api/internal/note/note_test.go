@@ -1,6 +1,7 @@
 package note
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -74,5 +75,87 @@ func TestValidateCreateInputTreatsTrimmedEmptyCategoryAsRequired(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, problems); diff != "" {
 		t.Fatalf("validation problems mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestValidateCreateInputClientRequestIDAndImages(t *testing.T) {
+	validInput := func() CreateInput {
+		return CreateInput{
+			Title:           "Café bom",
+			Body:            "Funciona.",
+			CategorySlug:    "food",
+			ClientRequestID: "client-request",
+		}
+	}
+	tests := []struct {
+		name   string
+		mutate func(*CreateInput)
+		want   []ValidationProblem
+	}{
+		{
+			name: "client request id empty",
+			mutate: func(input *CreateInput) {
+				input.ClientRequestID = ""
+			},
+			want: []ValidationProblem{{Field: "client_request_id", Message: "required"}},
+		},
+		{
+			name: "client request id max length",
+			mutate: func(input *CreateInput) {
+				input.ClientRequestID = strings.Repeat("a", ClientRequestIDMaxLength)
+			},
+			want: []ValidationProblem{},
+		},
+		{
+			name: "client request id over max length",
+			mutate: func(input *CreateInput) {
+				input.ClientRequestID = strings.Repeat("a", ClientRequestIDMaxLength+1)
+			},
+			want: []ValidationProblem{{Field: "client_request_id", Message: "too_long"}},
+		},
+		{name: "zero images", want: []ValidationProblem{}},
+		{
+			name: "one image",
+			mutate: func(input *CreateInput) {
+				input.ImageUploadIDs = []string{"upload-1"}
+			},
+			want: []ValidationProblem{},
+		},
+		{
+			name: "two images",
+			mutate: func(input *CreateInput) {
+				input.ImageUploadIDs = []string{"upload-1", "upload-2"}
+			},
+			want: []ValidationProblem{{Field: "image_upload_ids", Message: "too_long"}},
+		},
+		{
+			name: "empty image id",
+			mutate: func(input *CreateInput) {
+				input.ImageUploadIDs = []string{""}
+			},
+			want: []ValidationProblem{{Field: "image_upload_ids", Message: "invalid"}},
+		},
+		{
+			name: "duplicate image id",
+			mutate: func(input *CreateInput) {
+				input.ImageUploadIDs = []string{"upload-1", "upload-1"}
+			},
+			want: []ValidationProblem{
+				{Field: "image_upload_ids", Message: "too_long"},
+				{Field: "image_upload_ids", Message: "invalid"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := validInput()
+			if tt.mutate != nil {
+				tt.mutate(&input)
+			}
+			if diff := cmp.Diff(tt.want, ValidateCreateInput(input)); diff != "" {
+				t.Fatalf("validation problems mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }

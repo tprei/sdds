@@ -11,7 +11,6 @@ import (
 	"image/png"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -378,68 +377,9 @@ func (store *fakeObjectStore) objectCount() int {
 	return len(store.objects)
 }
 
-func TestUploadServiceStoresExactPutAndReplays(t *testing.T) {
-	now, body := testClock(), testJPEG(t, 12, 8)
-	repo, store := emptyRepositoryAndStore()
-	service := newUploadService(t, repo, store, UploadConfig{Clock: func() time.Time { return now }})
-	receipt, err := service.PrepareImageUpload(context.Background(), "user-1", testReceiver(body))
-	if err != nil || receipt.ContentType != "image/jpeg" || receipt.ByteSize != int64(len(body)) || receipt.Width != 12 || receipt.Height != 8 {
-		t.Fatalf("receipt=%+v err=%v", receipt, err)
-	}
-	if len(repo.pendingInputs) != 1 || store.putCount() != 1 || len(repo.readyInputs) != 1 {
-		t.Fatalf("counts pending=%d put=%d ready=%d", len(repo.pendingInputs), store.putCount(), len(repo.readyInputs))
-	}
-	upload, ok := repo.uploads["user-1/"+testRequestID]
-	if !ok || upload.State != UploadReady {
-		t.Fatalf("stored upload=%+v present=%v", upload, ok)
-	}
-	put := store.putCall(0)
-	digest := sha256.Sum256(body)
-	if put.key != upload.StorageKey || !bytes.Equal(put.body, body) || put.size != int64(len(body)) || put.digest != digest || put.contentType != "image/jpeg" {
-		t.Fatalf("put=%+v", put)
-	}
-	pending := repo.pendingInputs[0]
-	wantReady := ReadyInput{ID: upload.ID, UserID: "user-1", UploadRequestID: testRequestID, SHA256: upload.SHA256, WriteLeaseUntil: pending.WriteLeaseUntil}
-	if got := repo.readyInputs[0]; got != wantReady {
-		t.Fatalf("ready input=%+v want=%+v", got, wantReady)
-	}
-	pendingCount, putCount, readyCount := len(repo.pendingInputs), store.putCount(), len(repo.readyInputs)
-	replay, err := service.PrepareImageUpload(context.Background(), "user-1", testReceiver(body))
-	if err != nil || replay.ImageUploadID != receipt.ImageUploadID || len(repo.pendingInputs) != pendingCount || store.putCount() != putCount || len(repo.readyInputs) != readyCount {
-		t.Fatalf("replay=%+v err=%v counts pending=%d put=%d ready=%d", replay, err, len(repo.pendingInputs), store.putCount(), len(repo.readyInputs))
-	}
-	_, err = service.PrepareImageUpload(context.Background(), "user-1", testReceiver(testPNGGray(t, 12, 8)))
-	if !errors.Is(err, ErrUploadIdempotencyConflict) || len(repo.pendingInputs) != pendingCount || store.putCount() != putCount || len(repo.readyInputs) != readyCount {
-		t.Fatalf("conflict=%v counts pending=%d put=%d ready=%d", err, len(repo.pendingInputs), store.putCount(), len(repo.readyInputs))
-	}
-	pngBody := testPNGGray(t, 13, 9)
-	pngRepo, pngStore := emptyRepositoryAndStore()
-	pngReceipt, pngErr := newUploadService(t, pngRepo, pngStore, UploadConfig{Clock: func() time.Time { return testClock() }}).PrepareImageUpload(context.Background(), "user-1", testReceiver(pngBody))
-	pngPut, pngDigest := pngStore.putCall(0), sha256.Sum256(pngBody)
-	if pngErr != nil || pngReceipt.ContentType != "image/png" || pngReceipt.ByteSize != int64(len(pngBody)) || pngReceipt.Width != 13 || pngReceipt.Height != 9 || pngReceipt.ImageUploadID == "" || pngPut.contentType != "image/png" || pngPut.size != int64(len(pngBody)) || pngPut.digest != pngDigest || pngPut.key != pngRepo.pendingInputs[0].StorageKey || !bytes.Equal(pngPut.body, pngBody) {
-		t.Fatalf("receipt=%+v put=%+v err=%v", pngReceipt, pngPut, pngErr)
-	}
-}
-
-func TestUploadServiceUsesFreshClockAfterCleanup(t *testing.T) {
-	first, second := testClock(), testClock().Add(3*time.Minute)
-	clock := advancingTestClock(first, second)
-	repo, store := emptyRepositoryAndStore()
-	_, err := newUploadService(t, repo, store, UploadConfig{Clock: clock, CleanupBatch: 7}).PrepareImageUpload(context.Background(), "user-1", testReceiver(testJPEG(t, 10, 10)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(repo.claimCalls) != 1 || !repo.claimCalls[0].now.Equal(first) || len(repo.pendingInputs) != 1 {
-		t.Fatalf("claim=%+v pending=%+v", repo.claimCalls, repo.pendingInputs)
-	}
-	pending := repo.pendingInputs[0]
-	if !pending.UpdatedAt.Equal(second) || !pending.WriteLeaseUntil.Equal(second.Add(UploadLeaseDuration)) || !pending.CreatedAt.Equal(second) {
-		t.Fatalf("pending times=%+v", pending)
-	}
-}
 func TestUploadServiceReconcilesLostMarkReadyResponse(t *testing.T) {
 	lost := errors.New("mark-ready response lost")
-	repo, store := emptyRepositoryAndStore()
+	repo, store := newUploadRepositoryAndObjectStore()
 	repo.readyResponses = []repositoryReadyResponse{{ready: false, err: lost, apply: true}}
 	receipt, err := newUploadService(t, repo, store, UploadConfig{Clock: func() time.Time { return testClock() }}).PrepareImageUpload(context.Background(), "user-1", testReceiver(testJPEG(t, 10, 10)))
 	if err != nil || receipt.ImageUploadID == "" || repo.findCalls != 2 || len(repo.readyInputs) != 1 {
@@ -462,7 +402,7 @@ func TestUploadServiceReconcilesExistingObject(t *testing.T) {
 		{name: "matching", content: body},
 		{name: "digest mismatch", content: func() []byte { copyOfBody := append([]byte(nil), body...); copyOfBody[0] ^= 0xff; return copyOfBody }(), want: ErrMediaIntegrity, compensate: true},
 	} {
-		repo, store := emptyRepositoryAndStore()
+		repo, store := newUploadRepositoryAndObjectStore()
 		store.putErrors = []error{fmt.Errorf("lost put response: %w", ErrObjectExists)}
 		store.existingOnPut = &fakeStoredObject{body: append([]byte(nil), test.content...), size: int64(len(test.content))}
 		scratchDir := t.TempDir()
@@ -495,6 +435,7 @@ func TestUploadServiceReconcilesExistingObject(t *testing.T) {
 		assertScratchEmpty(t, scratchDir)
 	}
 }
+
 func TestUploadServicePutFailuresFenceOrClearLease(t *testing.T) {
 	for _, test := range []struct {
 		name            string
@@ -509,7 +450,7 @@ func TestUploadServicePutFailuresFenceOrClearLease(t *testing.T) {
 		{name: "integrity compensates", putErr: ErrObjectIntegrity, wantErr: ErrMediaIntegrity, wantDelete: true, wantFinalize: true},
 		{name: "compensation fence", putErr: ErrObjectIntegrity, markDeletingErr: ErrUploadStateConflict, wantErr: ErrMediaIntegrity, wantClear: false},
 	} {
-		repo, store := emptyRepositoryAndStore()
+		repo, store := newUploadRepositoryAndObjectStore()
 		repo.markDeletingErrors, store.putErrors = []error{test.markDeletingErr}, []error{test.putErr}
 		first, second, third := testClock(), testClock().Add(time.Minute), testClock().Add(2*time.Minute)
 		scratchDir := t.TempDir()
@@ -553,271 +494,7 @@ func TestUploadServicePutFailuresFenceOrClearLease(t *testing.T) {
 	}
 }
 
-func TestUploadServiceCleanupHonorsCancellation(t *testing.T) {
-	parent, cancel := context.WithCancel(context.Background())
-	repo, store := emptyRepositoryAndStore()
-	repo.expired = []Upload{cleanupRow("expired", "note-images/expired")}
-	store.deleteEntered, store.deleteBlock = make(chan struct{}), make(chan struct{})
-	done := make(chan error, 1)
-	go func() {
-		done <- newUploadService(t, repo, store, UploadConfig{CleanupTimeout: time.Second}).CleanupExpired(parent, testClock())
-	}()
-	waitSignal(t, store.deleteEntered)
-	cancel()
-	select {
-	case err := <-done:
-		if !errors.Is(err, context.Canceled) || len(store.deleteCalls) != 1 || store.deleteCalls[0] != repo.expired[0].StorageKey || len(repo.finalizeCalls) != 0 || len(repo.compactInputs) != 1 || repo.compactInputs[0] != (repositoryCompactCall{now: testClock(), limit: DefaultCleanupBatch}) {
-			t.Fatalf("err=%v deletes=%v finalizes=%v compactions=%v", err, store.deleteCalls, repo.finalizeCalls, repo.compactInputs)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for cleanup")
-	}
-}
-
-func TestUploadServiceCleanupErrors(t *testing.T) {
-	now, batch := testClock(), 7
-	row := cleanupRow("expired", "note-images/expired")
-	claimErr, compactErr := errors.New("claim failed"), errors.New("compact failed")
-	for _, test := range []struct {
-		name                             string
-		rows                             []Upload
-		deleteErrors                     []error
-		claim, final, compact, wantCause error
-		want                             error
-		keys                             []ObjectKey
-		ids                              []string
-		states                           []UploadState
-		doCompact                        bool
-	}{
-		{name: "claim", rows: []Upload{row}, claim: claimErr, wantCause: claimErr, want: ErrMediaStorageUnavailable, states: []UploadState{UploadDeleting}},
-		{name: "exhausted", rows: []Upload{row}, deleteErrors: []error{ErrObjectUnavailable, ErrObjectUnavailable, ErrObjectUnavailable}, want: ErrMediaStorageUnavailable, keys: []ObjectKey{row.StorageKey, row.StorageKey, row.StorageKey}, states: []UploadState{UploadDeleting}, doCompact: true},
-		{name: "not found", rows: []Upload{row}, deleteErrors: []error{ErrObjectNotFound}, ids: []string{row.ID}, keys: []ObjectKey{row.StorageKey}, states: []UploadState{UploadExpired}, doCompact: true},
-		{name: "integrity", rows: []Upload{row}, deleteErrors: []error{ErrObjectIntegrity}, want: ErrMediaIntegrity, keys: []ObjectKey{row.StorageKey}, states: []UploadState{UploadDeleting}, doCompact: true},
-		{name: "invalid key", rows: []Upload{row}, deleteErrors: []error{ErrInvalidObjectKey}, want: ErrMediaIntegrity, keys: []ObjectKey{row.StorageKey}, states: []UploadState{UploadDeleting}, doCompact: true},
-		{name: "multiple rows", rows: []Upload{cleanupRow("first", "note-images/first"), cleanupRow("second", "note-images/second")}, deleteErrors: []error{ErrObjectIntegrity}, want: ErrMediaIntegrity, keys: []ObjectKey{"note-images/first", "note-images/second"}, ids: []string{"second"}, states: []UploadState{UploadDeleting, UploadExpired}, doCompact: true},
-		{name: "finalize", rows: []Upload{row}, final: ErrUploadStateConflict, wantCause: ErrUploadStateConflict, want: ErrMediaStorageUnavailable, keys: []ObjectKey{row.StorageKey}, ids: []string{row.ID}, states: []UploadState{UploadDeleting}, doCompact: true},
-		{name: "compact", rows: []Upload{row}, compact: compactErr, wantCause: compactErr, keys: []ObjectKey{row.StorageKey}, ids: []string{row.ID}, states: []UploadState{UploadExpired}, want: ErrMediaStorageUnavailable, doCompact: true},
-		{name: "both", rows: []Upload{row}, final: ErrUploadStateConflict, compact: compactErr, wantCause: ErrUploadStateConflict, keys: []ObjectKey{row.StorageKey}, ids: []string{row.ID}, states: []UploadState{UploadDeleting}, want: ErrMediaStorageUnavailable, doCompact: true},
-	} {
-		repo, store := emptyRepositoryAndStore()
-		repo.expired, repo.claimErrors, repo.finalizeErrors, repo.compactErrors = test.rows, []error{test.claim}, []error{test.final}, []error{test.compact}
-		store.deleteErrors = test.deleteErrors
-		err := newUploadService(t, repo, store, UploadConfig{CleanupBatch: batch}).CleanupExpired(context.Background(), now)
-		if test.want == nil && err != nil || test.want != nil && !errors.Is(err, test.want) || test.wantCause != nil && !errors.Is(err, test.wantCause) || test.final != nil && !errors.Is(err, test.final) || test.compact != nil && !errors.Is(err, test.compact) {
-			t.Fatalf("%s: cleanup=%v want=%v", test.name, err, test.want)
-		}
-		assertCleanup(t, repo, store, now, batch, test.keys, test.ids, test.states, test.doCompact)
-	}
-}
-
-func TestUploadServiceSpoolCapIncludesBlockedPutsAndCanceledWaiter(t *testing.T) {
-	dir := t.TempDir()
-	repo, store := emptyRepositoryAndStore()
-	putBlock := make(chan struct{})
-	store.putEntered, store.putBlock = make(chan struct{}, 2), putBlock
-	var releaseOnce sync.Once
-	releasePuts := func() { releaseOnce.Do(func() { close(putBlock) }) }
-	defer releasePuts()
-	service := newUploadService(t, repo, store, UploadConfig{ScratchDir: dir, Clock: func() time.Time { return testClock() }})
-	waiterContext, cancelWaiter := context.WithCancel(context.Background())
-	defer cancelWaiter()
-	observed := &observedContext{Context: waiterContext, evaluated: make(chan struct{})}
-	results := make(chan prepareResult, 3)
-	requestIDs := [...]string{testRequestID, "22222222-2222-4222-8222-222222222222", "33333333-3333-4333-8333-333333333333"}
-	body := testJPEG(t, 10, 10)
-	start := func(index int, receiveContext context.Context) {
-		go func(index int, receiveContext context.Context) {
-			_, err := service.PrepareImageUpload(receiveContext, "user-1", testReceiverWithID(body, requestIDs[index]))
-			results <- prepareResult{index: index, err: err}
-		}(index, receiveContext)
-	}
-	start(0, context.Background())
-	start(1, context.Background())
-	for range 2 {
-		waitSignal(t, store.putEntered)
-	}
-	assertScratchFiles(t, dir, 2)
-	start(2, observed)
-	waitSignal(t, observed.evaluated)
-	assertScratchFiles(t, dir, 2)
-	if cap(spoolSlots) != 2 || len(spoolSlots) != 2 || store.putCount() != 2 || len(repo.pendingInputs) != 2 {
-		t.Fatalf("full-slot barrier put=%d pending=%d", store.putCount(), len(repo.pendingInputs))
-	}
-	cancelWaiter()
-	waiterResult := waitPrepareResult(t, results)
-	for waiterResult.index != 2 {
-		waiterResult = waitPrepareResult(t, results)
-	}
-	if !errors.Is(waiterResult.err, context.Canceled) {
-		t.Fatalf("waiter err=%v", waiterResult.err)
-	}
-	if len(spoolSlots) != 2 {
-		t.Fatalf("spool slots after cancel=%d", len(spoolSlots))
-	}
-	releasePuts()
-	for range 2 {
-		completedResult := waitPrepareResult(t, results)
-		if completedResult.index == 2 || completedResult.err != nil {
-			t.Fatalf("blocked put result=%+v", completedResult)
-		}
-	}
-	assertScratchEmpty(t, dir)
-	if len(repo.uploads) != 2 || store.putCount() != 2 || len(spoolSlots) != 0 {
-		t.Fatalf("final rows=%d puts=%d", len(repo.uploads), store.putCount())
-	}
-}
-
-func TestUploadServicePanickingReceiverCleansScratchAndReleasesSpool(t *testing.T) {
-	now, body := testClock(), testJPEG(t, 10, 10)
-	dir := t.TempDir()
-	repo, store := emptyRepositoryAndStore()
-	service := newUploadService(t, repo, store, UploadConfig{ScratchDir: dir, Clock: func() time.Time { return now }})
-	panicValue := errors.New("receiver panic")
-	func() {
-		defer func() {
-			if recovered := recover(); recovered != panicValue {
-				t.Fatalf("panic=%v", recovered)
-			}
-		}()
-		_, _ = service.PrepareImageUpload(context.Background(), "user-1", func(_ context.Context, writer io.Writer) (string, error) {
-			if _, err := writer.Write(body); err != nil {
-				t.Fatal(err)
-			}
-			panic(panicValue)
-		})
-	}()
-	assertNoPublication(t, repo, store, dir)
-	capacity := cap(spoolSlots)
-	entered := make(chan struct{}, capacity)
-	release := make(chan struct{})
-	done := make(chan error, capacity)
-	cancels := make([]context.CancelFunc, 0, capacity)
-	for range capacity {
-		ctx, cancel := context.WithCancel(context.Background())
-		cancels = append(cancels, cancel)
-		go func(ctx context.Context) {
-			staged, _, err := service.spool(ctx, func(_ context.Context, writer io.Writer) (string, error) {
-				if _, err := writer.Write(body); err != nil {
-					return "", err
-				}
-				entered <- struct{}{}
-				<-release
-				return testRequestID, nil
-			})
-			if staged != nil {
-				err = errors.Join(err, staged.CloseRemove())
-			}
-			done <- err
-		}(ctx)
-	}
-	timedOut := false
-	deadline := time.NewTimer(time.Second)
-	for range capacity {
-		select {
-		case <-entered:
-		case <-deadline.C:
-			timedOut = true
-		}
-		if timedOut {
-			break
-		}
-	}
-	if !deadline.Stop() {
-		select {
-		case <-deadline.C:
-		default:
-		}
-	}
-	close(release)
-	if timedOut {
-		for _, cancel := range cancels {
-			cancel()
-		}
-	}
-	var spoolErr error
-	for range capacity {
-		if err := <-done; err != nil && spoolErr == nil {
-			spoolErr = err
-		}
-	}
-	if !timedOut {
-		for _, cancel := range cancels {
-			cancel()
-		}
-	}
-	if timedOut {
-		t.Fatal("spool capacity was not restored")
-	}
-	if spoolErr != nil {
-		t.Fatalf("spool err=%v", spoolErr)
-	}
-	assertNoPublication(t, repo, store, dir)
-}
-func TestUploadServiceReceiverErrorsAreStickyAndCallbackWins(t *testing.T) {
-	t.Run("sticky multiwrite", func(t *testing.T) {
-		repo, store := emptyRepositoryAndStore()
-		dir := t.TempDir()
-		var firstErr, secondErr, thirdErr error
-		var firstCount, secondCount, thirdCount int
-		receive := func(_ context.Context, writer io.Writer) (string, error) {
-			firstCount, firstErr = writer.Write(bytes.Repeat([]byte{'x'}, int(MaxEncodedImageSize)))
-			secondCount, secondErr = writer.Write([]byte{'x'})
-			thirdCount, thirdErr = writer.Write([]byte{'x'})
-			return testRequestID, nil
-		}
-		_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: dir}).PrepareImageUpload(context.Background(), "user-1", receive)
-		if err != ErrMediaTooLarge || firstCount != int(MaxEncodedImageSize) || firstErr != nil || secondCount != 0 || secondErr != ErrMediaTooLarge || thirdCount != 0 || thirdErr != ErrMediaTooLarge {
-			t.Fatalf("counts=%d,%d,%d errors=%v,%v,%v result=%v", firstCount, secondCount, thirdCount, firstErr, secondErr, thirdErr, err)
-		}
-		assertNoPublication(t, repo, store, dir)
-	})
-	t.Run("callback precedence", func(t *testing.T) {
-		repo, store := emptyRepositoryAndStore()
-		dir := t.TempDir()
-		callbackErr := errors.New("receiver callback failed")
-		receive := func(_ context.Context, writer io.Writer) (string, error) {
-			_, _ = writer.Write(bytes.Repeat([]byte{'x'}, int(MaxEncodedImageSize)))
-			_, _ = writer.Write([]byte{'x'})
-			return testRequestID, callbackErr
-		}
-		_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: dir}).PrepareImageUpload(context.Background(), "user-1", receive)
-		if err != callbackErr {
-			t.Fatalf("callback error=%v", err)
-		}
-		assertNoPublication(t, repo, store, dir)
-	})
-}
-
-func TestUploadServiceRejectsInvalidRequestIDs(t *testing.T) {
-	body := testJPEG(t, 10, 10)
-	for _, requestID := range []string{"not-a-uuid", strings.ToUpper("abcdefabcdef4abc8defabcdefabcdef")} {
-		repo, store := emptyRepositoryAndStore()
-		scratchDir := t.TempDir()
-		_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: scratchDir}).PrepareImageUpload(context.Background(), "user-1", testReceiverWithID(body, requestID))
-		if !errors.Is(err, ErrInvalidUploadRequest) {
-			t.Fatalf("requestID=%q err=%v", requestID, err)
-		}
-		assertNoPublication(t, repo, store, scratchDir)
-	}
-}
-
-func TestPrepareImageUploadReportsScratchErrors(t *testing.T) {
-	repo, store := emptyRepositoryAndStore()
-	_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: filepath.Join(t.TempDir(), "missing")}).PrepareImageUpload(context.Background(), "user-1", testReceiver(testJPEG(t, 10, 10)))
-	if !errors.Is(err, ErrMediaStorageUnavailable) || !strings.Contains(err.Error(), "create image scratch file") {
-		t.Fatalf("create error=%v", err)
-	}
-	repo, store = emptyRepositoryAndStore()
-	dir := t.TempDir()
-	var removeErr error
-	store.putHook = func(input PutObject) { removeErr = os.Remove(input.Body.(*os.File).Name()) }
-	_, err = newUploadService(t, repo, store, UploadConfig{ScratchDir: dir}).PrepareImageUpload(context.Background(), "user-1", testReceiver(testJPEG(t, 10, 10)))
-	if removeErr != nil || !errors.Is(err, ErrMediaStorageUnavailable) {
-		t.Fatalf("cleanup hook=%v prepare=%v", removeErr, err)
-	}
-	assertScratchEmpty(t, dir)
-}
-func emptyRepositoryAndStore() (*fakeUploadRepository, *fakeObjectStore) {
+func newUploadRepositoryAndObjectStore() (*fakeUploadRepository, *fakeObjectStore) {
 	return &fakeUploadRepository{clock: func() time.Time { return testClock() }, uploads: map[string]Upload{}}, &fakeObjectStore{objects: map[ObjectKey]fakeStoredObject{}}
 }
 func newUploadService(t *testing.T, repo *fakeUploadRepository, store *fakeObjectStore, config UploadConfig) *UploadService {

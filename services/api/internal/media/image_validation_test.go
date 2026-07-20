@@ -22,7 +22,7 @@ func TestPrepareImageUploadRejectsMediaBoundaries(t *testing.T) {
 		{name: "too much area", body: func(t *testing.T) []byte { return testPNGGray(t, 4001, 4000) }, want: ErrMediaDimensions},
 	}
 	for _, test := range cases {
-		repo, store := emptyRepositoryAndStore()
+		repo, store := newUploadRepositoryAndObjectStore()
 		dir := t.TempDir()
 		receipt, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: dir}).PrepareImageUpload(context.Background(), "user-1", testReceiver(test.body(t)))
 		if test.want == nil && (err != nil || receipt.ImageUploadID == "") {
@@ -43,7 +43,7 @@ func TestPrepareImageUploadRejectsUnsupportedMediaSignatures(t *testing.T) {
 	binary.LittleEndian.PutUint32(webp[4:8], 12)
 	copy(webp[8:12], "WEBP")
 	for _, body := range [][]byte{[]byte("<svg></svg>"), webp} {
-		repo, store := emptyRepositoryAndStore()
+		repo, store := newUploadRepositoryAndObjectStore()
 		dir := t.TempDir()
 		_, err := newUploadService(t, repo, store, UploadConfig{ScratchDir: dir}).PrepareImageUpload(context.Background(), "user-1", testReceiver(body))
 		if !errors.Is(err, ErrUnsupportedMediaType) {

@@ -1,30 +1,16 @@
 package media
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
-	"hash"
-	"image"
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
 	"io"
-	"os"
 	"strings"
 	"sync"
 	"time"
-)
-
-var (
-	spoolSlots = make(chan struct{}, 2)
-	decodeSlot = make(chan struct{}, 1)
 )
 
 // UploadConfig configures upload staging, timing, and cleanup.
@@ -41,7 +27,7 @@ type UploadConfig struct {
 	CleanupBatch int
 }
 
-// UploadService coordinates image staging and persistence. It owns temporary staged bodies during Prepare; callers retain ownership of its repository and object-store dependencies.
+// UploadService coordinates image staging and persistence. It owns temporary staged bodies during PrepareImageUpload; callers retain ownership of its repository and object-store dependencies.
 type UploadService struct {
 	repository UploadRepository
 	store      ObjectStore
@@ -50,30 +36,6 @@ type UploadService struct {
 
 // UploadReceiver writes one complete image body to writer and returns its canonical lowercase UUID request ID. Retries must write the same body and return the same ID.
 type UploadReceiver func(context.Context, io.Writer) (uploadRequestID string, err error)
-type boundedFileWriter struct {
-	ctx    context.Context
-	file   *os.File
-	hasher hash.Hash
-	size   int64
-	err    error
-}
-type stagedFile struct {
-	file    *os.File
-	sha256  string
-	release func()
-	once    sync.Once
-}
-type contextFileReader struct {
-	ctx  context.Context
-	file io.Reader
-}
-type imageMetadata struct {
-	ContentType string
-	ByteSize    int64
-	Width       int
-	Height      int
-	SHA256      string
-}
 
 func NewUploadService(repository UploadRepository, store ObjectStore, config UploadConfig) (*UploadService, error) {
 	if repository == nil {
@@ -96,7 +58,7 @@ func NewUploadService(repository UploadRepository, store ObjectStore, config Upl
 	}
 	return &UploadService{repository: repository, store: store, config: config}, nil
 }
-func (service *UploadService) Prepare(ctx context.Context, userID string, receive UploadReceiver) (receipt UploadReceipt, err error) {
+func (service *UploadService) PrepareImageUpload(ctx context.Context, userID string, receive UploadReceiver) (receipt UploadReceipt, err error) {
 	ctx = nonNilContext(ctx)
 	if err := ctx.Err(); err != nil {
 		return UploadReceipt{}, err
@@ -148,22 +110,7 @@ func (service *UploadService) Prepare(ctx context.Context, userID string, receiv
 		return UploadReceipt{}, err
 	}
 	now = service.now()
-	pending := PendingInput{ID: existing.ID, UserID: userID, StorageKey: existing.StorageKey, UploadRequestID: requestID, ContentType: metadata.ContentType, ByteSize: metadata.ByteSize, Width: metadata.Width, Height: metadata.Height, SHA256: metadata.SHA256, CreatedAt: existing.CreatedAt, UpdatedAt: now, WriteLeaseUntil: now.Add(UploadLeaseDuration), ExpiresAt: existing.ExpiresAt, RequestRetentionUntil: existing.RequestRetentionUntil}
-	if pending.ID == "" {
-		pending.ID = uuid.NewString()
-	}
-	if pending.StorageKey == "" {
-		pending.StorageKey = ObjectKey("note-images/" + pending.ID)
-	}
-	if pending.CreatedAt.IsZero() {
-		pending.CreatedAt = now
-	}
-	if pending.ExpiresAt.IsZero() {
-		pending.ExpiresAt = pending.CreatedAt.Add(UploadTTL)
-	}
-	if pending.RequestRetentionUntil.IsZero() {
-		pending.RequestRetentionUntil = pending.CreatedAt.Add(UploadRequestRetention)
-	}
+	pending := newPendingInput(existing, userID, requestID, metadata, now)
 	claimed, err := service.repository.BeginPending(ctx, pending)
 	if err != nil {
 		return UploadReceipt{}, service.mapBeginError(err)
@@ -181,6 +128,30 @@ func (service *UploadService) Prepare(ctx context.Context, userID string, receiv
 	if claimed.State != UploadPending {
 		return UploadReceipt{}, ErrUploadInProgress
 	}
+	return service.publishPending(ctx, staged, claimed, userID, requestID, metadata)
+}
+
+func newPendingInput(existing Upload, userID, requestID string, metadata imageMetadata, now time.Time) PendingInput {
+	pending := PendingInput{ID: existing.ID, UserID: userID, StorageKey: existing.StorageKey, UploadRequestID: requestID, ContentType: metadata.ContentType, ByteSize: metadata.ByteSize, Width: metadata.Width, Height: metadata.Height, SHA256: metadata.SHA256, CreatedAt: existing.CreatedAt, UpdatedAt: now, WriteLeaseUntil: now.Add(UploadLeaseDuration), ExpiresAt: existing.ExpiresAt, RequestRetentionUntil: existing.RequestRetentionUntil}
+	if pending.ID == "" {
+		pending.ID = uuid.NewString()
+	}
+	if pending.StorageKey == "" {
+		pending.StorageKey = ObjectKey("note-images/" + pending.ID)
+	}
+	if pending.CreatedAt.IsZero() {
+		pending.CreatedAt = now
+	}
+	if pending.ExpiresAt.IsZero() {
+		pending.ExpiresAt = pending.CreatedAt.Add(UploadTTL)
+	}
+	if pending.RequestRetentionUntil.IsZero() {
+		pending.RequestRetentionUntil = pending.CreatedAt.Add(UploadRequestRetention)
+	}
+	return pending
+}
+
+func (service *UploadService) publishPending(ctx context.Context, staged *stagedFile, claimed Upload, userID, requestID string, metadata imageMetadata) (UploadReceipt, error) {
 	var digest [32]byte
 	decoded, err := hex.DecodeString(metadata.SHA256)
 	if err != nil || len(decoded) != len(digest) {
@@ -435,284 +406,6 @@ func (service *UploadService) verifyObject(ctx context.Context, key ObjectKey, m
 }
 func (service *UploadService) boundedBackground() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), service.config.OperationTimeout)
-}
-func (service *UploadService) spool(ctx context.Context, receive UploadReceiver) (staged *stagedFile, id string, err error) {
-	ctx = nonNilContext(ctx)
-	if err := ctx.Err(); err != nil {
-		return nil, "", err
-	}
-	select {
-	case spoolSlots <- struct{}{}:
-	case <-ctx.Done():
-		return nil, "", ctx.Err()
-	}
-	acquired := true
-	release := func() {
-		if acquired {
-			acquired = false
-			<-spoolSlots
-		}
-	}
-	handedOff := false
-	defer func() {
-		if !handedOff {
-			release()
-		}
-	}()
-	file, err := os.CreateTemp(service.config.ScratchDir, "sdds-image-upload-")
-	if err != nil {
-		return nil, "", errors.Join(ErrMediaStorageUnavailable, fmt.Errorf("create image scratch file: %w", err))
-	}
-	staged = &stagedFile{file: file, release: release}
-	defer func() {
-		if !handedOff {
-			if cleanupErr := staged.CloseRemove(); cleanupErr != nil {
-				err = errors.Join(err, ErrMediaStorageUnavailable, cleanupErr)
-			}
-			staged = nil
-		}
-	}()
-	writer := &boundedFileWriter{ctx: ctx, file: file, hasher: sha256.New()}
-	id, err = receive(ctx, writer)
-	if err != nil {
-		return staged, "", err
-	}
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		return staged, "", ctxErr
-	}
-	if writer.err != nil {
-		return staged, "", writer.err
-	}
-	if writer.size == 0 {
-		return staged, "", ErrInvalidMedia
-	}
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return staged, "", errors.Join(ErrMediaStorageUnavailable, fmt.Errorf("rewind image scratch file: %w", err))
-	}
-	staged.sha256 = hex.EncodeToString(writer.hasher.Sum(nil))
-	handedOff = true
-	return staged, id, nil
-}
-func (writer *boundedFileWriter) Write(buffer []byte) (int, error) {
-	if writer.err != nil {
-		return 0, writer.err
-	}
-	if err := writer.ctx.Err(); err != nil {
-		writer.err = err
-		return 0, err
-	}
-	if len(buffer) == 0 {
-		return 0, nil
-	}
-	remaining := MaxEncodedImageSize - writer.size
-	if remaining <= 0 {
-		writer.err = ErrMediaTooLarge
-		return 0, writer.err
-	}
-	writeBuffer := buffer
-	oversize := int64(len(buffer)) > remaining
-	if oversize {
-		writeBuffer = buffer[:remaining]
-	}
-	count, err := writer.file.Write(writeBuffer)
-	if count > 0 {
-		_, _ = writer.hasher.Write(writeBuffer[:count])
-		writer.size += int64(count)
-	}
-	if err == nil && count == len(writeBuffer) {
-		if oversize {
-			writer.err = ErrMediaTooLarge
-			return count, writer.err
-		}
-		if err := writer.ctx.Err(); err != nil {
-			writer.err = err
-			return count, err
-		}
-		return count, nil
-	}
-	if err == nil {
-		err = io.ErrShortWrite
-	}
-	writer.err = errors.Join(ErrMediaStorageUnavailable, err)
-	return count, writer.err
-}
-func (file *stagedFile) CloseRemove() error {
-	err := errors.Join(file.file.Close(), os.Remove(file.file.Name()))
-	file.once.Do(file.release)
-	return err
-}
-func contextObjectReader(ctx context.Context, body io.ReadCloser, closeBody func() error) (io.Reader, func()) {
-	ctx = nonNilContext(ctx)
-	stopCh, doneCh := make(chan struct{}), make(chan struct{})
-	go func() {
-		defer close(doneCh)
-		select {
-		case <-ctx.Done():
-			_ = closeBody()
-		case <-stopCh:
-		}
-	}()
-	stop := func() {
-		close(stopCh)
-		<-doneCh
-	}
-	return contextFileReader{ctx: ctx, file: body}, stop
-}
-func (reader contextFileReader) Read(buffer []byte) (int, error) {
-	if err := reader.ctx.Err(); err != nil {
-		return 0, err
-	}
-	count, err := reader.file.Read(buffer)
-	if ctxErr := reader.ctx.Err(); ctxErr != nil {
-		return count, ctxErr
-	}
-	return count, err
-}
-func inspectImage(ctx context.Context, file *os.File) (imageMetadata, error) {
-	ctx = nonNilContext(ctx)
-	if err := ctx.Err(); err != nil {
-		return imageMetadata{}, err
-	}
-	info, err := file.Stat()
-	if err != nil {
-		return imageMetadata{}, errors.Join(ErrMediaStorageUnavailable, fmt.Errorf("stat image scratch file: %w", err))
-	}
-	size := info.Size()
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return imageMetadata{}, errors.Join(ErrMediaStorageUnavailable, fmt.Errorf("rewind image for config: %w", err))
-	}
-	prefix := make([]byte, 512)
-	reader := contextFileReader{ctx: ctx, file: file}
-	prefixSize, prefixErr := reader.Read(prefix)
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		return imageMetadata{}, ctxErr
-	}
-	if prefixErr != nil && !errors.Is(prefixErr, io.EOF) {
-		return imageMetadata{}, errors.Join(ErrMediaStorageUnavailable, fmt.Errorf("read image signature: %w", prefixErr))
-	}
-	if unsupported, classifyErr := unsupportedFormat(ctx, file, prefix[:prefixSize], size); classifyErr != nil {
-		return imageMetadata{}, classifyErr
-	} else if unsupported {
-		return imageMetadata{}, ErrUnsupportedMediaType
-	}
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return imageMetadata{}, errors.Join(ErrMediaStorageUnavailable, fmt.Errorf("rewind image signature: %w", err))
-	}
-	config, format, err := image.DecodeConfig(contextFileReader{ctx: ctx, file: file})
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		return imageMetadata{}, ctxErr
-	}
-	if err != nil {
-		return imageMetadata{}, errors.Join(ErrInvalidMedia, err)
-	}
-	contentType := imageContentType(format)
-	if contentType == "" {
-		return imageMetadata{}, ErrUnsupportedMediaType
-	}
-	if config.Width <= 0 || config.Height <= 0 || config.Width > MaxImageWidth || config.Height > MaxImageHeight || int64(config.Width)*int64(config.Height) > MaxImageArea {
-		return imageMetadata{}, ErrMediaDimensions
-	}
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return imageMetadata{}, errors.Join(ErrMediaStorageUnavailable, fmt.Errorf("rewind image for decode: %w", err))
-	}
-	if err := ctx.Err(); err != nil {
-		return imageMetadata{}, err
-	}
-	select {
-	case decodeSlot <- struct{}{}:
-	case <-ctx.Done():
-		return imageMetadata{}, ctx.Err()
-	}
-	defer func() { <-decodeSlot }()
-	if err := ctx.Err(); err != nil {
-		return imageMetadata{}, err
-	}
-	_, decodedFormat, decodeErr := image.Decode(contextFileReader{ctx: ctx, file: file})
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		return imageMetadata{}, ctxErr
-	}
-	if decodeErr != nil {
-		return imageMetadata{}, errors.Join(ErrInvalidMedia, decodeErr)
-	}
-	if imageContentType(decodedFormat) != contentType {
-		return imageMetadata{}, ErrInvalidMedia
-	}
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return imageMetadata{}, errors.Join(ErrMediaStorageUnavailable, fmt.Errorf("rewind image after decode: %w", err))
-	}
-	return imageMetadata{ContentType: contentType, ByteSize: size, Width: config.Width, Height: config.Height}, nil
-}
-func unsupportedFormat(ctx context.Context, file *os.File, prefix []byte, size int64) (bool, error) {
-	trimmed := bytes.TrimSpace(bytes.TrimPrefix(prefix, []byte{0xef, 0xbb, 0xbf}))
-	if len(trimmed) > 0 && trimmed[0] == '<' {
-		if _, err := file.Seek(0, io.SeekStart); err != nil {
-			return false, errors.Join(ErrMediaStorageUnavailable, err)
-		}
-		reader := contextFileReader{ctx: ctx, file: file}
-		decoder := xml.NewDecoder(reader)
-		seenRoot, svg := false, false
-		for {
-			token, err := decoder.Token()
-			if errors.Is(err, io.EOF) {
-				return seenRoot && svg, nil
-			}
-			if err != nil {
-				if ctxErr := ctx.Err(); ctxErr != nil {
-					return false, ctxErr
-				}
-				return false, errors.Join(ErrInvalidMedia, err)
-			}
-			if start, ok := token.(xml.StartElement); ok && !seenRoot {
-				seenRoot = true
-				svg = strings.EqualFold(start.Name.Local, "svg")
-			}
-		}
-	}
-	if len(prefix) >= 20 && string(prefix[:4]) == "RIFF" && string(prefix[8:12]) == "WEBP" {
-		riffSize, chunkSize := binary.LittleEndian.Uint32(prefix[4:8]), binary.LittleEndian.Uint32(prefix[16:20])
-		if riffSize >= 12 && int64(riffSize)+8 <= size && int64(chunkSize)+20 <= size {
-			return true, nil
-		}
-	}
-	if len(prefix) >= 26 && string(prefix[:2]) == "BM" {
-		headerSize := binary.LittleEndian.Uint32(prefix[2:6])
-		offset := binary.LittleEndian.Uint32(prefix[10:14])
-		dibSize := binary.LittleEndian.Uint32(prefix[14:18])
-		if headerSize >= 26 && int64(headerSize) <= size && offset >= 26 && int64(offset) <= size && dibSize >= 12 {
-			return true, nil
-		}
-	}
-	if len(prefix) >= 8 && (string(prefix[:4]) == "II\x2a\x00" || string(prefix[:4]) == "MM\x00\x2a") {
-		var offset uint32
-		if prefix[0] == 'I' {
-			offset = binary.LittleEndian.Uint32(prefix[4:8])
-		} else {
-			offset = binary.BigEndian.Uint32(prefix[4:8])
-		}
-		if offset >= 8 && int64(offset) < size {
-			return true, nil
-		}
-	}
-	if len(prefix) >= 12 && string(prefix[4:8]) == "ftyp" {
-		brand := string(prefix[8:12])
-		if brand == "heic" || brand == "heix" || brand == "hevc" || brand == "hevx" || brand == "avif" || brand == "avis" {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-func imageContentType(format string) string {
-	switch strings.ToLower(format) {
-	case "jpeg", "jpg":
-		return "image/jpeg"
-	case "png":
-		return "image/png"
-	default:
-		return ""
-	}
-}
-func sameMetadata(upload Upload, metadata imageMetadata) bool {
-	return upload.ContentType == metadata.ContentType && upload.ByteSize == metadata.ByteSize && upload.Width == metadata.Width && upload.Height == metadata.Height && strings.EqualFold(upload.SHA256, metadata.SHA256)
 }
 func receiptFromUpload(upload Upload) UploadReceipt {
 	return UploadReceipt{ImageUploadID: upload.ID, ContentType: upload.ContentType, ByteSize: upload.ByteSize, Width: upload.Width, Height: upload.Height, ExpiresAt: upload.ExpiresAt}

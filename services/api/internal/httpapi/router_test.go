@@ -17,14 +17,14 @@ import (
 )
 
 type fakeUploadPreparer struct {
-	prepare func(context.Context, string, media.UploadReceiver) (media.UploadReceipt, error)
+	prepareImageUpload func(context.Context, string, media.UploadReceiver) (media.UploadReceipt, error)
 }
 
-func (fake fakeUploadPreparer) Prepare(ctx context.Context, userID string, receive media.UploadReceiver) (media.UploadReceipt, error) {
-	if fake.prepare == nil {
+func (fake fakeUploadPreparer) PrepareImageUpload(ctx context.Context, userID string, receive media.UploadReceiver) (media.UploadReceipt, error) {
+	if fake.prepareImageUpload == nil {
 		return media.UploadReceipt{}, errors.New("upload service not implemented")
 	}
-	return fake.prepare(ctx, userID, receive)
+	return fake.prepareImageUpload(ctx, userID, receive)
 }
 
 type fakeReadiness struct {

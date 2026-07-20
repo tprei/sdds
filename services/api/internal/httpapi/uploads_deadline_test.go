@@ -17,7 +17,7 @@ import (
 func TestPrepareImageUploadOverridesServerReadTimeout(t *testing.T) {
 	body, contentType := multipartBody(t, []byte("x"), true)
 	server := &http.Server{
-		Handler: authenticatedUploadRouter(fakeUploadPreparer{prepare: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
+		Handler: authenticatedUploadRouter(fakeUploadPreparer{prepareImageUpload: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
 			_, err := receive(ctx, io.Discard)
 			return media.UploadReceipt{ImageUploadID: "4d8c7a48-443e-4f52-a3e7-45cbcf5d6a19", ContentType: "image/jpeg", ByteSize: 1, Width: 1, Height: 1, ExpiresAt: time.Now().Add(time.Hour)}, err
 		}}),

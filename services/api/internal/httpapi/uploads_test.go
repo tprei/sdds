@@ -50,7 +50,7 @@ func TestPrepareImageUploadAuthenticatesBeforeReadingBody(t *testing.T) {
 func TestPrepareImageUploadExcludesGenericBodyValidation(t *testing.T) {
 	fileBytes := []byte("image bytes are validated by the application service")
 	var got []byte
-	service := fakeUploadPreparer{prepare: func(ctx context.Context, userID string, receive media.UploadReceiver) (media.UploadReceipt, error) {
+	service := fakeUploadPreparer{prepareImageUpload: func(ctx context.Context, userID string, receive media.UploadReceiver) (media.UploadReceipt, error) {
 		if userID != "upload-user" {
 			t.Fatalf("user ID = %q, want upload-user", userID)
 		}
@@ -117,7 +117,7 @@ func TestPrepareImageUploadMapsRetryableErrors(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			service := fakeUploadPreparer{prepare: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
+			service := fakeUploadPreparer{prepareImageUpload: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
 				_, receiveErr := receive(ctx, io.Discard)
 				if receiveErr != nil {
 					return media.UploadReceipt{}, receiveErr
@@ -314,7 +314,7 @@ func TestPrepareImageUploadRejectsInvalidMultipart(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			published := false
 			var received bytes.Buffer
-			service := fakeUploadPreparer{prepare: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
+			service := fakeUploadPreparer{prepareImageUpload: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
 				_, err := receive(ctx, &received)
 				if err != nil {
 					return media.UploadReceipt{}, err
@@ -364,7 +364,7 @@ func TestPrepareImageUploadRejectsTrailingPartBeforePublication(t *testing.T) {
 		return writer.WriteField("trailing", "invalid")
 	})
 	published := false
-	service := fakeUploadPreparer{prepare: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
+	service := fakeUploadPreparer{prepareImageUpload: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
 		_, err := receive(ctx, io.Discard)
 		if err != nil {
 			return media.UploadReceipt{}, err
@@ -391,7 +391,7 @@ func TestPrepareImageUploadRejectsTrailingPartBeforePublication(t *testing.T) {
 
 func TestPrepareImageUploadRejectsOuterBodyLimit(t *testing.T) {
 	body, contentType := multipartBody(t, bytes.Repeat([]byte("x"), int(media.MaxMultipartBodySize)), false)
-	service := fakeUploadPreparer{prepare: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
+	service := fakeUploadPreparer{prepareImageUpload: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
 		_, err := receive(ctx, io.Discard)
 		return media.UploadReceipt{}, err
 	}}
@@ -410,7 +410,7 @@ func TestPrepareImageUploadRejectsOuterBodyLimit(t *testing.T) {
 }
 
 func TestPrepareImageUploadResponseMatchesOpenAPIShape(t *testing.T) {
-	service := fakeUploadPreparer{prepare: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
+	service := fakeUploadPreparer{prepareImageUpload: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
 		if _, err := receive(ctx, io.Discard); err != nil {
 			return media.UploadReceipt{}, err
 		}
@@ -447,7 +447,7 @@ func TestPrepareImageUploadClosesBodyOnCancellation(t *testing.T) {
 	defer cancel()
 	body := &blockingUploadBody{closed: make(chan struct{})}
 	started := make(chan struct{})
-	service := fakeUploadPreparer{prepare: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
+	service := fakeUploadPreparer{prepareImageUpload: func(ctx context.Context, _ string, receive media.UploadReceiver) (media.UploadReceipt, error) {
 		close(started)
 		_, err := receive(ctx, io.Discard)
 		return media.UploadReceipt{}, err

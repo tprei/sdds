@@ -45,23 +45,21 @@ export const noteImageSchema = z.object({
   width: z.number().int().positive(),
   height: z.number().int().positive(),
   position: z.number().int().nonnegative(),
-  created_at: z.number().int().nonnegative(),
-  updated_at: z.number().int().nonnegative(),
+  created_at: z.number().int(),
+  updated_at: z.number().int(),
 }) satisfies z.ZodType<NoteImageResponse>;
 
 const noteImagesSchema = z
   .array(noteImageSchema)
   .superRefine((images, context) => {
-    let previousPosition = -1;
     for (const [index, image] of images.entries()) {
-      if (image.position <= previousPosition) {
+      if (image.position !== index) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'image positions must be strictly increasing',
+          message: 'image positions must match zero-based request order',
           path: [index, 'position'],
         });
       }
-      previousPosition = image.position;
     }
   });
 

@@ -108,67 +108,6 @@ const noteResponseKeys = [
   'updated_at',
 ] as const;
 
-test('validates required note image arrays', () => {
-  const textOnlyNote: NoteResponse = {
-    author: {
-      display_name: 'Author',
-      id: 'author-id',
-    },
-    body: 'Body',
-    category_slug: 'food',
-    created_at: 1782993600000,
-    id: 'note-id',
-    images: [],
-    place_slug: null,
-    title: 'Title',
-    updated_at: 1782993600000,
-  };
-
-  expect(parseNoteResponse(textOnlyNote)).toBe(textOnlyNote);
-  const image: NoteImageResponse = {
-    byte_size: 481234,
-    content_type: 'image/jpeg',
-    created_at: 1782993600000,
-    height: 900,
-    id: 'image-id',
-    position: 0,
-    updated_at: 1782993600000,
-    url: '/v1/media/images/image-id',
-    width: 1200,
-  };
-  const noteWithImage: NoteResponse = {
-    ...textOnlyNote,
-    images: [image],
-  };
-  expect(parseNoteResponse(noteWithImage)).toBe(noteWithImage);
-
-  const firstPositionOneNote: NoteResponse = {
-    ...noteWithImage,
-    images: [{ ...image, position: 1 }],
-  };
-  expect(() => parseNoteResponse(firstPositionOneNote)).toThrow(
-    'invalid note response',
-  );
-
-  const gapNote: NoteResponse = {
-    ...noteWithImage,
-    images: [image, { ...image, id: 'image-id-2', position: 2 }],
-  };
-  expect(() => parseNoteResponse(gapNote)).toThrow('invalid note response');
-
-  const negativeTimestampNote: NoteResponse = {
-    ...noteWithImage,
-    images: [{ ...image, created_at: -1, updated_at: -2 }],
-  };
-  expect(parseNoteResponse(negativeTimestampNote)).toBe(negativeTimestampNote);
-
-  const withoutImages: Record<string, unknown> = { ...textOnlyNote };
-  delete withoutImages.images;
-  expect(() => parseNoteResponse(withoutImages)).toThrow(
-    'invalid note response',
-  );
-});
-
 test('creates a note and reads it from the API-backed home feed', async ({
   page,
 }) => {

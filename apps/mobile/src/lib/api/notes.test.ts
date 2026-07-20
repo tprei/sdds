@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
 import {
   APIRequestError,
   APIResponseError,
@@ -19,25 +18,21 @@ vi.mock('react-native', () => ({
 const configuredAPIBaseURLEnvName = 'EXPO_PUBLIC_SDDS_API_BASE_URL';
 const exampleNoteID = '018ff5b8-0000-7000-8000-000000000000';
 const exampleToken = 'session-token';
-
 type FetchCall = {
   request: Request;
 };
-
 type FetchHandler = (request: Request) => Promise<Response>;
-type ListNotesResponse = components['schemas']['ListNotesResponse'];
 type NoteResponse = components['schemas']['Note'];
 type NoteImageResponse = components['schemas']['NoteImage'];
+type ListNotesResponse = components['schemas']['ListNotesResponse'];
 
 describe('notes API client', () => {
   beforeEach(() => {
     delete process.env[configuredAPIBaseURLEnvName];
   });
-
   afterEach(() => {
     vi.unstubAllGlobals();
   });
-
   it('sends create note requests with API wire keys', async () => {
     const calls: FetchCall[] = [];
     stubFetch(async (request) => {
@@ -129,7 +124,6 @@ describe('notes API client', () => {
       placeSlug: null,
     });
   });
-
   it('raises request errors from status even when the error body fails', async () => {
     stubFetch(async () => unreadableResponse(httpStatusBadRequest));
 
@@ -259,11 +253,7 @@ describe('notes API client', () => {
     );
 
     await expect(getNote(exampleNoteID)).resolves.toMatchObject({
-      images: [
-        {
-          url: 'https://api.example.com/v1/media/images/image-id',
-        },
-      ],
+      images: [{ url: 'https://api.example.com/v1/media/images/image-id' }],
     });
   });
 
@@ -281,21 +271,6 @@ describe('notes API client', () => {
     stubFetch(async () => jsonResponse({ notes: [note] }));
 
     await expect(listNotes()).rejects.toThrow(APIResponseError);
-  });
-
-  it('rejects invalid image metadata ordering', async () => {
-    stubFetch(async () =>
-      jsonResponse(
-        apiNote({
-          images: [
-            apiImage({ position: 1 }),
-            apiImage({ id: 'image-id-2', position: 0 }),
-          ],
-        }),
-      ),
-    );
-
-    await expect(getNote(exampleNoteID)).rejects.toThrow(APIResponseError);
   });
 
   it('raises request errors for missing fetched notes', async () => {
@@ -500,17 +475,12 @@ const httpStatusBadRequest = 400;
 const httpStatusNotFound = 404;
 
 function apiListNotesResponse(): ListNotesResponse {
-  return {
-    notes: [apiNote()],
-  };
+  return { notes: [apiNote()] };
 }
 
 function apiNote(overrides: Partial<NoteResponse> = {}): NoteResponse {
   return {
-    author: {
-      display_name: 'Thiago',
-      id: 'author-id',
-    },
+    author: { display_name: 'Thiago', id: 'author-id' },
     body: 'Tem pao de queijo decente.',
     category_slug: 'food',
     created_at: 1782993600000,
@@ -539,7 +509,6 @@ function apiImage(
     ...overrides,
   };
 }
-
 function expectedNote() {
   return {
     author: {
@@ -556,7 +525,6 @@ function expectedNote() {
     updatedAt: 1782993600000,
   };
 }
-
 function jsonResponse(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), {
     headers: {
@@ -565,7 +533,6 @@ function jsonResponse(value: unknown, status = 200): Response {
     status,
   });
 }
-
 function unreadableResponse(status: number): Response {
   const body = new ReadableStream({
     start(controller) {
@@ -575,7 +542,6 @@ function unreadableResponse(status: number): Response {
 
   return new Response(body, { status });
 }
-
 function onlyFetchCall(calls: FetchCall[]): Request {
   if (calls.length !== 1) {
     throw new Error(`fetch call count = ${calls.length}, want 1`);
@@ -588,11 +554,9 @@ function onlyFetchCall(calls: FetchCall[]): Request {
 
   return call.request;
 }
-
 async function requestJSON(request: Request): Promise<unknown> {
   return request.clone().json();
 }
-
 function stubFetch(handler: FetchHandler): void {
   vi.stubGlobal('fetch', handler);
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/tprei/sdds/services/api/internal/httpapi"
+	"github.com/tprei/sdds/services/api/internal/media"
 	"github.com/tprei/sdds/services/api/internal/sqlite"
 )
 
@@ -18,7 +19,41 @@ const (
 	commandMigrate          = "migrate"
 	serverReadHeaderTimeout = 5 * time.Second
 	serverReadTimeout       = 15 * time.Second
+	startupReadinessTimeout = 5 * time.Second
 )
+
+type databaseReadiness interface {
+	PingContext(context.Context) error
+}
+
+type runtimeReadiness struct {
+	database databaseReadiness
+	media    media.ReadinessChecker
+}
+
+func (readiness runtimeReadiness) Check(ctx context.Context) error {
+	if readiness.database == nil {
+		return errors.New("database readiness is unavailable")
+	}
+	if err := readiness.database.PingContext(ctx); err != nil {
+		return fmt.Errorf("database readiness: %w", err)
+	}
+	if readiness.media == nil {
+		return errors.New("media readiness is unavailable")
+	}
+	if err := readiness.media.VerifyReadiness(ctx); err != nil {
+		return fmt.Errorf("media readiness: %w", err)
+	}
+	return nil
+}
+
+var newMediaStore = func(ctx context.Context, config media.Config) (media.ReadinessChecker, error) {
+	return media.NewS3Store(ctx, config)
+}
+
+var listenAndServe = func(server *http.Server) error {
+	return server.ListenAndServe()
+}
 
 func main() {
 	if err := run(); err != nil {
@@ -32,7 +67,11 @@ func run() error {
 	if len(args) > 0 && (len(args) != 1 || args[0] != commandMigrate) {
 		return runWithArgs(context.Background(), config{}, args)
 	}
-	cfg, err := loadConfig()
+	load := loadServerConfig
+	if len(args) == 1 {
+		load = loadConfig
+	}
+	cfg, err := load()
 	if err != nil {
 		return err
 	}
@@ -65,6 +104,9 @@ func runMigrations(ctx context.Context, config config) (err error) {
 }
 
 func runServer(ctx context.Context, config config) (err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	db, err := openMigratedDatabase(ctx, config)
 	if err != nil {
 		return err
@@ -75,13 +117,24 @@ func runServer(ctx context.Context, config config) (err error) {
 		}
 	}()
 
+	store, err := newMediaStore(ctx, config.media)
+	if err != nil {
+		return fmt.Errorf("create media store: %w", err)
+	}
+	readinessCtx, cancel := context.WithTimeout(ctx, startupReadinessTimeout)
+	defer cancel()
+	if err := store.VerifyReadiness(readinessCtx); err != nil {
+		return fmt.Errorf("verify media readiness: %w", err)
+	}
+
 	noteStore := sqlite.NewNoteStore(db)
 	catalogStore := sqlite.NewCatalogStore(db)
 	userStore := sqlite.NewUserStore(db)
-	server := newServer(config, httpapi.NewRouter(noteStore, catalogStore, userStore, config.authLimits))
+	readiness := runtimeReadiness{database: db, media: store}
+	server := newServer(config, httpapi.NewRouter(noteStore, catalogStore, userStore, config.authLimits, readiness))
 
 	slog.Info("api listening", "addr", config.httpAddr)
-	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if err := listenAndServe(server); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 

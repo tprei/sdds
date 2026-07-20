@@ -45,6 +45,22 @@ jobs:
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Provision Compose secrets
+        run: |
+          umask 077
+          dir="$RUNNER_TEMP/sdds-compose-synthetics"; install -d -m 700 "$dir"
+          openssl rand -hex 10 >"$dir/rustfs-root-access"
+          openssl rand -hex 20 >"$dir/rustfs-root-secret"
+          openssl rand -hex 10 >"$dir/sdds-media-access"
+          openssl rand -hex 20 >"$dir/sdds-media-secret"
+          chmod 444 "$dir"/rustfs-root-access "$dir"/rustfs-root-secret "$dir"/sdds-media-access "$dir"/sdds-media-secret
+          {
+            printf 'SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE=%s\n' "$dir/rustfs-root-access"
+            printf 'SDDS_COMPOSE_RUSTFS_ROOT_SECRET_KEY_FILE=%s\n' "$dir/rustfs-root-secret"
+            printf 'SDDS_COMPOSE_SDDS_MEDIA_ACCESS_KEY_FILE=%s\n' "$dir/sdds-media-access"
+            printf 'SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE=%s\n' "$dir/sdds-media-secret"
+          } >>"$GITHUB_ENV"
+
       - name: Reset API state
         run: docker compose -p sdds-synthetics -f infra/compose/compose.yaml down -v
 
@@ -64,6 +80,17 @@ jobs:
 
       - name: Run synthetics
         run: pnpm test:synthetics
+      - name: Capture RustFS logs
+        if: failure()
+        run: docker compose -p sdds-synthetics -f infra/compose/compose.yaml logs --no-color rustfs
+
+      - name: Capture RustFS init logs
+        if: failure()
+        run: docker compose -p sdds-synthetics -f infra/compose/compose.yaml logs --no-color rustfs-init
+
+      - name: Capture API logs
+        if: failure()
+        run: docker compose -p sdds-synthetics -f infra/compose/compose.yaml logs --no-color api
 
       - name: Upload Playwright report
         if: ${{ failure() || cancelled() }}
@@ -84,3 +111,7 @@ jobs:
       - name: Stop API
         if: always()
         run: docker compose -p sdds-synthetics -f infra/compose/compose.yaml down -v
+
+      - name: Remove Compose secrets
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/sdds-compose-synthetics"

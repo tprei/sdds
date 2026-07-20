@@ -20,6 +20,7 @@
     "prepare": "husky",
     "test:api": "go test ./services/api/...",
     "test:api:integration": "go test -count=1 -tags=integration ./tests/integration",
+    "test:rustfs": "infra/compose/test-rustfs.sh",
     "test:mobile": "pnpm --filter @sdds/mobile test",
     "test:synthetics": "playwright test",
     "typecheck:mobile": "pnpm --filter @sdds/mobile typecheck",

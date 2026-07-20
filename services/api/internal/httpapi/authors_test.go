@@ -33,7 +33,7 @@ func TestGetAuthorReturnsPublicProfileWithoutAuthentication(t *testing.T) {
 			}
 			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 27}, nil
 		},
-	}, DefaultAuthLimits())
+	}, DefaultAuthLimits(), fakeReadiness{})
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/authors/"+string(exampleAuthorID), nil)
@@ -63,7 +63,7 @@ func TestGetAuthorReturnsNotFound(t *testing.T) {
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 			return author.PublicAuthor{}, author.ErrAuthorNotFound
 		},
-	}, DefaultAuthLimits())
+	}, DefaultAuthLimits(), fakeReadiness{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/authors/missing-author", nil)
 
@@ -95,7 +95,7 @@ func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 2}, nil
 		},
-	}, DefaultAuthLimits())
+	}, DefaultAuthLimits(), fakeReadiness{})
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/authors/"+string(exampleAuthorID)+"/notes", nil)
@@ -161,7 +161,7 @@ func TestListAuthorNotesReturnsCursorForLongLegacyID(t *testing.T) {
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 2}, nil
 		},
-	}, DefaultAuthLimits())
+	}, DefaultAuthLimits(), fakeReadiness{})
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/authors/"+string(exampleAuthorID)+"/notes", nil)
@@ -211,7 +211,7 @@ func TestListAuthorNotesPassesExplicitLimitAndCursor(t *testing.T) {
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 0}, nil
 		},
-	}, DefaultAuthLimits())
+	}, DefaultAuthLimits(), fakeReadiness{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/authors/"+string(exampleAuthorID)+"/notes?limit=2&cursor="+encoded, nil)
 
@@ -294,7 +294,7 @@ func TestListAuthorNotesRejectsInvalidParametersBeforeAuthorLookup(t *testing.T)
 					t.Fatal("FindPublicAuthor should not be called")
 					return author.PublicAuthor{}, nil
 				},
-			}, DefaultAuthLimits())
+			}, DefaultAuthLimits(), fakeReadiness{})
 			response := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodGet, "/v1/authors/"+string(exampleAuthorID)+"/notes?"+tt.query, nil)
 
@@ -326,7 +326,7 @@ func TestListAuthorNotesReturnsNotFoundForUnknownAuthor(t *testing.T) {
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 			return author.PublicAuthor{}, author.ErrAuthorNotFound
 		},
-	}, DefaultAuthLimits())
+	}, DefaultAuthLimits(), fakeReadiness{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/authors/missing-author/notes", nil)
 
@@ -348,7 +348,7 @@ func TestListAuthorNotesReturnsInternalError(t *testing.T) {
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 1}, nil
 		},
-	}, DefaultAuthLimits())
+	}, DefaultAuthLimits(), fakeReadiness{})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/authors/"+string(exampleAuthorID)+"/notes", nil)
 

@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"github.com/tprei/sdds/services/api/internal/media"
 	"strings"
@@ -10,9 +9,15 @@ import (
 	"time"
 )
 
+type imageUploadAttempt struct {
+	upload media.Upload
+	err    error
+}
+
 func TestImageUploadMigrationCreatesTableIndexesAndConstraints(t *testing.T) {
-	ctx := context.Background()
-	db := openMigratedDatabase(t, ctx)
+	fixture := newImageUploadStoreFixture(t, time.UnixMilli(1_000), "upload-user")
+	ctx := fixture.ctx
+	db := fixture.db
 	for _, name := range []string{"image_uploads", "image_uploads_cleanup_idx", "image_uploads_user_idx"} {
 		kind := "table"
 		if strings.HasSuffix(name, "idx") {
@@ -26,27 +31,46 @@ func TestImageUploadMigrationCreatesTableIndexesAndConstraints(t *testing.T) {
 			t.Fatalf("%s count = %d, want 1", name, count)
 		}
 	}
-	insertImageUploadTestUser(t, db, "upload-user")
 	valid := imageUploadInput(time.UnixMilli(1_000), "upload-1", "request-1", "upload-user", 10)
 	insertImageUploadRow(t, db, valid, string(media.UploadPending), "", nil)
+	duplicate := imageUploadInput(time.UnixMilli(1_000), "upload-2", "request-2", "upload-user", 10)
+	insertImageUploadRow(t, db, duplicate, string(media.UploadPending), "", nil)
+	insertImageUploadTestNote(t, db, "constraint-note", "upload-user")
 	for name, statement := range map[string]string{
-		"invalid state":        `UPDATE image_uploads SET state = 'unknown' WHERE id = 'upload-1'`,
-		"invalid content type": `UPDATE image_uploads SET content_type = 'text/plain' WHERE id = 'upload-1'`,
-		"invalid digest":       `UPDATE image_uploads SET sha256 = 'BAD' WHERE id = 'upload-1'`,
-		"note on non-consumed": `UPDATE image_uploads SET state = 'ready', consumed_note_id = 'missing-note' WHERE id = 'upload-1'`,
+		"invalid state":             `UPDATE image_uploads SET state = 'unknown' WHERE id = 'upload-1'`,
+		"invalid content type":      `UPDATE image_uploads SET content_type = 'text/plain' WHERE id = 'upload-1'`,
+		"invalid digest":            `UPDATE image_uploads SET sha256 = 'BAD' WHERE id = 'upload-1'`,
+		"note on non-consumed":      `UPDATE image_uploads SET state = 'ready', consumed_note_id = 'constraint-note' WHERE id = 'upload-1'`,
+		"duplicate storage key":     `UPDATE image_uploads SET storage_key = 'note-images/upload-1' WHERE id = 'upload-2'`,
+		"duplicate owner request":   `UPDATE image_uploads SET upload_request_id = 'request-1' WHERE id = 'upload-2'`,
+		"non-positive bytes":        `UPDATE image_uploads SET byte_size = 0 WHERE id = 'upload-1'`,
+		"non-positive width":        `UPDATE image_uploads SET width = 0 WHERE id = 'upload-1'`,
+		"non-positive height":       `UPDATE image_uploads SET height = 0 WHERE id = 'upload-1'`,
+		"invalid created timestamp": `UPDATE image_uploads SET created_at = 'invalid' WHERE id = 'upload-1'`,
+		"invalid updated timestamp": `UPDATE image_uploads SET updated_at = 'invalid' WHERE id = 'upload-1'`,
+		"lease at updated":          `UPDATE image_uploads SET write_lease_until = updated_at WHERE id = 'upload-1'`,
+		"expiry at creation":        `UPDATE image_uploads SET expires_at = created_at WHERE id = 'upload-1'`,
+		"retention at expiry":       `UPDATE image_uploads SET request_retention_until = expires_at WHERE id = 'upload-1'`,
+		"empty request":             `UPDATE image_uploads SET upload_request_id = '' WHERE id = 'upload-1'`,
+		"overlong request":          `UPDATE image_uploads SET upload_request_id = printf('%129s', '') WHERE id = 'upload-1'`,
+		"unknown user":              `UPDATE image_uploads SET user_id = 'missing-user' WHERE id = 'upload-1'`,
 	} {
 		if _, err := db.ExecContext(ctx, statement); err == nil {
 			t.Fatalf("%s constraint error = nil", name)
 		}
 	}
+	if _, err := db.ExecContext(ctx, `UPDATE image_uploads SET state = 'consumed', consumed_note_id = NULL WHERE id = 'upload-1'`); err != nil {
+		t.Fatalf("consumed row with null note error = %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE image_uploads SET state = 'pending' WHERE id = 'upload-1'`); err != nil {
+		t.Fatalf("restore non-consumed row error = %v", err)
+	}
 }
 func TestImageUploadStoreReplayLeaseAndConditionalReady(t *testing.T) {
-	ctx := context.Background()
-	db := openMigratedDatabase(t, ctx)
-	insertImageUploadTestUser(t, db, "upload-user")
-	now := time.UnixMilli(1_000_000).UTC()
-	clock := now
-	store := newImageUploadStore(db, func() time.Time { return clock })
+	fixture := newImageUploadStoreFixture(t, time.UnixMilli(1_000_000).UTC(), "upload-user")
+	ctx := fixture.ctx
+	now := fixture.now
+	store := fixture.store
 	input := imageUploadInput(now, "upload-1", "request-1", "upload-user", 100)
 	created, err := store.BeginPending(ctx, input)
 	if err != nil {
@@ -73,14 +97,14 @@ func TestImageUploadStoreReplayLeaseAndConditionalReady(t *testing.T) {
 	if _, err := store.BeginPending(ctx, past); !errors.Is(err, media.ErrInvalidUploadRequest) {
 		t.Fatalf("past lease error = %v", err)
 	}
-	clock = clock.Add(media.UploadLeaseDuration + time.Second)
+	fixture.now = fixture.now.Add(media.UploadLeaseDuration + time.Second)
 	retry := input
-	retry.WriteLeaseUntil = clock.Add(media.UploadLeaseDuration)
+	retry.WriteLeaseUntil = fixture.now.Add(media.UploadLeaseDuration)
 	reclaimed, err := store.BeginPending(ctx, retry)
 	if err != nil {
 		t.Fatalf("reclaim pending: %v", err)
 	}
-	if reclaimed.ID != created.ID || reclaimed.StorageKey != created.StorageKey || !reclaimed.WriteLeaseUntil.After(clock) {
+	if reclaimed.ID != created.ID || reclaimed.StorageKey != created.StorageKey || !reclaimed.WriteLeaseUntil.After(fixture.now) {
 		t.Fatalf("reclaimed upload = %#v", reclaimed)
 	}
 	readyInput := media.ReadyInput{ID: reclaimed.ID, UserID: reclaimed.UserID, UploadRequestID: reclaimed.UploadRequestID, SHA256: reclaimed.SHA256, WriteLeaseUntil: reclaimed.WriteLeaseUntil}
@@ -104,12 +128,11 @@ func TestImageUploadStoreReplayLeaseAndConditionalReady(t *testing.T) {
 	}
 }
 func TestImageUploadStoreQuotaBoundaries(t *testing.T) {
-	ctx := context.Background()
-	db := openMigratedDatabase(t, ctx)
-	insertImageUploadTestUser(t, db, "quota-user")
-	insertImageUploadTestUser(t, db, "bytes-user")
-	now := time.UnixMilli(2_000_000).UTC()
-	store := newImageUploadStore(db, func() time.Time { return now })
+	fixture := newImageUploadStoreFixture(t, time.UnixMilli(2_000_000).UTC(), "quota-user", "bytes-user")
+	ctx := fixture.ctx
+	db := fixture.db
+	now := fixture.now
+	store := fixture.store
 	for index := 0; index < media.MaxLiveUploads; index++ {
 		input := imageUploadInput(now, "count-"+string(rune('a'+index)), "count-request-"+string(rune('a'+index)), "quota-user", 1)
 		if _, err := store.BeginPending(ctx, input); err != nil {
@@ -139,11 +162,11 @@ func TestImageUploadStoreQuotaBoundaries(t *testing.T) {
 }
 
 func TestImageUploadStoreQuotaCountsUsableRows(t *testing.T) {
-	ctx := context.Background()
-	db := openMigratedDatabase(t, ctx)
-	insertImageUploadTestUser(t, db, "quota-user")
-	now := time.UnixMilli(4_000_000).UTC()
-	store := newImageUploadStore(db, func() time.Time { return now })
+	fixture := newImageUploadStoreFixture(t, time.UnixMilli(4_000_000).UTC(), "quota-user")
+	ctx := fixture.ctx
+	db := fixture.db
+	now := fixture.now
+	store := fixture.store
 
 	rows := []struct {
 		id        string
@@ -196,13 +219,13 @@ func TestImageUploadStoreQuotaCountsUsableRows(t *testing.T) {
 	}
 }
 func TestImageUploadStoreCleanupClaimFinalizeAndRetention(t *testing.T) {
-	ctx := context.Background()
-	db := openMigratedDatabase(t, ctx)
-	insertImageUploadTestUser(t, db, "cleanup-user")
+	fixture := newImageUploadStoreFixture(t, time.UnixMilli(3_000_000).UTC(), "cleanup-user")
+	ctx := fixture.ctx
+	db := fixture.db
+	now := fixture.now
 	if _, err := db.Exec(`INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, "cleanup-note", "cleanup-user", "Cleanup note", "body", "food", "sao-paulo", 0, 0); err != nil {
 		t.Fatalf("insert cleanup note: %v", err)
 	}
-	now := time.UnixMilli(3_000_000).UTC()
 	insertImageUploadRow(t, db, imageUploadInput(now.Add(-2*time.Hour), "expired-pending", "cleanup-request-1", "cleanup-user", 10), string(media.UploadPending), "", nil)
 	insertImageUploadRow(t, db, imageUploadInput(now.Add(-time.Hour), "expired-ready", "cleanup-request-2", "cleanup-user", 11), string(media.UploadReady), "", nil)
 	insertImageUploadRow(t, db, imageUploadInput(now.Add(-time.Hour), "expired-consumed", "cleanup-request-3", "cleanup-user", 12), string(media.UploadConsumed), "cleanup-note", nil)
@@ -213,7 +236,7 @@ func TestImageUploadStoreCleanupClaimFinalizeAndRetention(t *testing.T) {
 	if _, err := db.Exec(`UPDATE image_uploads SET expires_at = ? WHERE id IN ('expired-pending', 'expired-ready', 'expired-consumed')`, now.Add(-time.Minute).UnixMilli()); err != nil {
 		t.Fatalf("age cleanup rows: %v", err)
 	}
-	store := newImageUploadStore(db, func() time.Time { return now })
+	store := fixture.store
 	claimed, err := store.ClaimExpired(ctx, now, 1)
 	if err != nil {
 		t.Fatalf("claim expired: %v", err)
@@ -265,40 +288,83 @@ func TestImageUploadStoreCleanupClaimFinalizeAndRetention(t *testing.T) {
 		t.Fatalf("consumed row should compact after retention: %v", err)
 	}
 }
-func imageUploadInput(now time.Time, id, requestID, userID string, size int64) media.PendingInput {
-	return media.PendingInput{
-		ID:                    id,
-		UserID:                userID,
-		StorageKey:            media.ObjectKey("note-images/" + id),
-		UploadRequestID:       requestID,
-		ContentType:           "image/jpeg",
-		ByteSize:              size,
-		Width:                 100,
-		Height:                100,
-		SHA256:                strings.Repeat("a", 64),
-		CreatedAt:             now,
-		UpdatedAt:             now,
-		WriteLeaseUntil:       now.Add(media.UploadLeaseDuration),
-		ExpiresAt:             now.Add(media.UploadTTL),
-		RequestRetentionUntil: now.Add(media.UploadRequestRetention),
-	}
-}
-func insertImageUploadTestUser(t *testing.T, db *sql.DB, id string) {
-	if _, err := db.Exec(`INSERT INTO users (id, state, created_at, updated_at) VALUES (?, 'active', 0, 0)`, id); err != nil {
-		t.Fatalf("insert upload user: %v", err)
-	}
-}
-func insertImageUploadRow(t *testing.T, db *sql.DB, input media.PendingInput, state, consumedNoteID string, leaseUntil *time.Time) {
-	var lease any
-	if leaseUntil != nil {
-		lease = leaseUntil.UnixMilli()
-	}
-	if _, err := db.Exec(`
-		INSERT INTO image_uploads (id, user_id, storage_key, upload_request_id, state, consumed_note_id, content_type, byte_size, width, height, sha256, created_at, updated_at, write_lease_until, expires_at, request_retention_until)
-		VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		input.ID, input.UserID, input.StorageKey, input.UploadRequestID, state, consumedNoteID,
-		input.ContentType, input.ByteSize, input.Width, input.Height, input.SHA256,
-		input.CreatedAt.UnixMilli(), input.UpdatedAt.UnixMilli(), lease, input.ExpiresAt.UnixMilli(), input.RequestRetentionUntil.UnixMilli()); err != nil {
-		t.Fatalf("insert image upload row: %v", err)
-	}
+func TestImageUploadStoreConcurrentClaimsPreserveAtomicLimits(t *testing.T) {
+	t.Run("identical request", func(t *testing.T) {
+		now := time.UnixMilli(5_000_000).UTC()
+		fixture := newImageUploadStoreFixture(t, now, "concurrent-user")
+		inputs := []media.PendingInput{imageUploadInput(now, "concurrent-a", "concurrent-request", "concurrent-user", 10), imageUploadInput(now, "concurrent-b", "concurrent-request", "concurrent-user", 10)}
+		start := make(chan struct{})
+		results := make(chan imageUploadAttempt, len(inputs))
+		for _, input := range inputs {
+			input := input
+			go func() {
+				<-start
+				upload, err := fixture.store.BeginPending(fixture.ctx, input)
+				results <- imageUploadAttempt{upload: upload, err: err}
+			}()
+		}
+		close(start)
+		var (
+			inProgress int
+			winner     media.Upload
+		)
+		for range inputs {
+			result := <-results
+			switch {
+			case result.err == nil:
+				winner = result.upload
+			case errors.Is(result.err, media.ErrUploadInProgress):
+				inProgress++
+			default:
+				t.Fatalf("concurrent identical request error = %v", result.err)
+			}
+		}
+		if inProgress != 1 {
+			t.Fatalf("concurrent identical request in-progress outcomes = %d", inProgress)
+		}
+		found, err := fixture.store.FindByUserRequest(fixture.ctx, "concurrent-user", "concurrent-request")
+		if err != nil {
+			t.Fatalf("find concurrent winner: %v", err)
+		}
+		if found.ID != winner.ID || found.StorageKey != winner.StorageKey {
+			t.Fatalf("persisted winner ID/key = %q/%q, want %q/%q", found.ID, found.StorageKey, winner.ID, winner.StorageKey)
+		}
+	})
+	t.Run("quota limit", func(t *testing.T) {
+		now := time.UnixMilli(6_000_000).UTC()
+		fixture := newImageUploadStoreFixture(t, now, "quota-concurrent-user")
+		for index := range media.MaxLiveUploads - 1 {
+			id := "quota-seed-" + string(rune('a'+index))
+			insertImageUploadRow(t, fixture.db, imageUploadInput(now, id, id+"-request", "quota-concurrent-user", 1), string(media.UploadPending), "", nil)
+		}
+		inputs := []media.PendingInput{imageUploadInput(now, "quota-attempt-a", "quota-request-a", "quota-concurrent-user", 1), imageUploadInput(now, "quota-attempt-b", "quota-request-b", "quota-concurrent-user", 1)}
+		start := make(chan struct{})
+		results := make(chan error, len(inputs))
+		for _, input := range inputs {
+			input := input
+			go func() {
+				<-start
+				_, err := fixture.store.BeginPending(fixture.ctx, input)
+				results <- err
+			}()
+		}
+		close(start)
+		var quotaExceeded int
+		for range inputs {
+			switch err := <-results; {
+			case err == nil:
+			case errors.Is(err, media.ErrUploadQuotaExceeded):
+				quotaExceeded++
+			default:
+				t.Fatalf("concurrent quota error = %v", err)
+			}
+		}
+		if quotaExceeded != 1 {
+			t.Fatalf("concurrent quota outcomes = %d quota exceeded", quotaExceeded)
+		}
+		quota, err := fixture.store.QuotaSnapshot(fixture.ctx, "quota-concurrent-user", now)
+		if err != nil || quota.UserCount != media.MaxLiveUploads {
+			t.Fatalf("concurrent quota = %#v, %v; want user count %d", quota, err, media.MaxLiveUploads)
+		}
+	})
 }

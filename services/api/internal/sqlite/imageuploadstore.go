@@ -10,48 +10,12 @@ import (
 )
 
 const (
-	imageUploadColumns = `
-		id,
-		user_id,
-		storage_key,
-		upload_request_id,
-		state,
-		consumed_note_id,
-		content_type,
-		byte_size,
-		width,
-		height,
-		sha256,
-		created_at,
-		updated_at,
-		write_lease_until,
-		expires_at,
-		request_retention_until`
-	findImageUploadByUserRequestSQL = `SELECT` + imageUploadColumns + `
-		FROM image_uploads
-		WHERE user_id = ? AND upload_request_id = ?`
-	findImageUploadByIDSQL = `SELECT` + imageUploadColumns + `
-		FROM image_uploads
-		WHERE id = ?`
 	insertImageUploadSQL = `
 		INSERT INTO image_uploads (
 			id, user_id, storage_key, upload_request_id, state, consumed_note_id,
 			content_type, byte_size, width, height, sha256, created_at, updated_at,
 			write_lease_until, expires_at, request_retention_until
 		) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	liveImageUploadQuotaSQL = `
-		SELECT
-			COALESCE(SUM(CASE WHEN user_id = ? THEN 1 ELSE 0 END), 0),
-			COALESCE(SUM(byte_size), 0)
-		FROM image_uploads
-		WHERE state IN ('pending', 'ready', 'deleting')
-			AND (state = 'deleting' OR expires_at > ?)`
-	claimImageUploadSQL = `
-		UPDATE image_uploads
-		SET state = 'deleting', write_lease_until = ?, updated_at = ?
-		WHERE id = ? AND (
-			(state IN ('pending', 'ready') AND expires_at <= ?) OR
-			(state = 'deleting' AND (write_lease_until IS NULL OR write_lease_until <= ?)))`
 	markImageUploadReadySQL = `
 		UPDATE image_uploads
 		SET state = 'ready', write_lease_until = NULL, updated_at = ?
@@ -67,10 +31,7 @@ const (
 		SET state = 'deleting', write_lease_until = NULL, updated_at = ?
 		WHERE id = ? AND user_id = ? AND upload_request_id = ? AND sha256 = ?
 			AND state = 'pending' AND write_lease_until = ? AND write_lease_until > ?`
-	finalizeImageUploadSQL = `
-		UPDATE image_uploads
-		SET state = 'expired', write_lease_until = NULL, updated_at = ?
-		WHERE id = ? AND state = 'deleting'`
+	reclaimPendingImageUploadSQL = `UPDATE image_uploads SET write_lease_until = ?, updated_at = ? WHERE id = ? AND state = 'pending' AND (write_lease_until IS NULL OR write_lease_until <= ?)`
 )
 
 // ImageUploadStore persists private staged-upload lifecycle metadata.
@@ -86,9 +47,6 @@ func NewImageUploadStore(db *sql.DB) *ImageUploadStore {
 }
 func newImageUploadStore(db *sql.DB, clock func() time.Time) *ImageUploadStore {
 	return &ImageUploadStore{db: db, clock: clock}
-}
-func (store *ImageUploadStore) FindByUserRequest(ctx context.Context, userID, requestID string) (media.Upload, error) {
-	return store.findUpload(ctx, store.db.QueryRowContext(ctx, findImageUploadByUserRequestSQL, userID, requestID))
 }
 func (store *ImageUploadStore) BeginPending(ctx context.Context, input media.PendingInput) (upload media.Upload, err error) {
 	now := normalizeTime(store.clock())
@@ -156,9 +114,7 @@ func (store *ImageUploadStore) claimExistingPending(ctx context.Context, tx *sql
 		if !leaseUntil.After(now) {
 			leaseUntil = now.Add(media.UploadLeaseDuration)
 		}
-		result, err := tx.ExecContext(
-			ctx,
-			`UPDATE image_uploads SET write_lease_until = ?, updated_at = ? WHERE id = ? AND state = 'pending' AND (write_lease_until IS NULL OR write_lease_until <= ?)`,
+		result, err := tx.ExecContext(ctx, reclaimPendingImageUploadSQL,
 			unixMillis(leaseUntil),
 			unixMillis(now),
 			current.ID,
@@ -248,233 +204,6 @@ func (store *ImageUploadStore) updateLease(ctx context.Context, query string, in
 		return fmt.Errorf("%s: %w", operation, media.ErrUploadStateConflict)
 	}
 	return nil
-}
-func (store *ImageUploadStore) ClaimExpired(ctx context.Context, now time.Time, limit int) (uploads []media.Upload, err error) {
-	if limit <= 0 {
-		return []media.Upload{}, nil
-	}
-	if now.IsZero() {
-		now = store.clock()
-	}
-	now = normalizeTime(now)
-	leaseUntil := normalizeTime(now.Add(media.UploadLeaseDuration))
-	tx, err := store.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("begin image upload cleanup claim: %w", err)
-	}
-	defer func() {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && err == nil {
-			err = fmt.Errorf("rollback image upload cleanup claim: %w", rollbackErr)
-		}
-	}()
-	rows, err := tx.QueryContext(ctx, `
-		SELECT id FROM image_uploads
-		WHERE (state IN ('pending', 'ready') AND expires_at <= ?)
-		   OR (state = 'deleting' AND (write_lease_until IS NULL OR write_lease_until <= ?))
-		ORDER BY CASE WHEN state = 'deleting' THEN updated_at ELSE expires_at END, id LIMIT ?`,
-		unixMillis(now), unixMillis(now), limit)
-	if err != nil {
-		return nil, fmt.Errorf("select expired image uploads: %w", err)
-	}
-	ids := make([]string, 0, limit)
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			_ = rows.Close()
-			return nil, fmt.Errorf("scan expired image upload: %w", err)
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Err(); err != nil {
-		_ = rows.Close()
-		return nil, fmt.Errorf("read expired image uploads: %w", err)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, fmt.Errorf("close expired image uploads: %w", err)
-	}
-	uploads = make([]media.Upload, 0, len(ids))
-	for _, id := range ids {
-		result, err := tx.ExecContext(ctx, claimImageUploadSQL,
-			unixMillis(leaseUntil), unixMillis(now), id, unixMillis(now), unixMillis(now))
-		if err != nil {
-			return nil, fmt.Errorf("claim expired image upload: %w", err)
-		}
-		claimed, err := result.RowsAffected()
-		if err != nil {
-			return nil, fmt.Errorf("read claimed image upload count: %w", err)
-		}
-		if claimed != 1 {
-			continue
-		}
-		upload, err := store.findUpload(ctx, tx.QueryRowContext(ctx, findImageUploadByIDSQL, id))
-		if err != nil {
-			return nil, fmt.Errorf("load claimed image upload: %w", err)
-		}
-		uploads = append(uploads, upload)
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("commit image upload cleanup claim: %w", err)
-	}
-	return uploads, nil
-}
-func (store *ImageUploadStore) FinalizeExpired(ctx context.Context, id string, now time.Time) error {
-	now = normalizeTime(now)
-	tx, err := store.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin image upload cleanup finalize: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	result, err := tx.ExecContext(ctx, finalizeImageUploadSQL, unixMillis(now), id)
-	if err != nil {
-		return fmt.Errorf("finalize expired image upload: %w", err)
-	}
-	updated, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("read finalized image upload count: %w", err)
-	}
-	if updated == 0 {
-		var state media.UploadState
-		err := tx.QueryRowContext(ctx, `SELECT state FROM image_uploads WHERE id = ?`, id).Scan(&state)
-		if errors.Is(err, sql.ErrNoRows) {
-			return media.ErrUploadNotFound
-		}
-		if err != nil {
-			return fmt.Errorf("check image upload cleanup state: %w", err)
-		}
-		if state == media.UploadExpired {
-			if err := tx.Commit(); err != nil {
-				return fmt.Errorf("commit idempotent image upload cleanup: %w", err)
-			}
-			return nil
-		}
-		return fmt.Errorf("image upload %s is in state %q", id, state)
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit image upload cleanup finalize: %w", err)
-	}
-	return nil
-}
-func (store *ImageUploadStore) QuotaSnapshot(ctx context.Context, userID string, now time.Time) (media.Quota, error) {
-	now = normalizeTime(now)
-	var quota media.Quota
-	if err := store.db.QueryRowContext(ctx, liveImageUploadQuotaSQL, userID, unixMillis(now)).Scan(&quota.UserCount, &quota.GlobalBytes); err != nil {
-		return media.Quota{}, fmt.Errorf("read image upload quota: %w", err)
-	}
-	return quota, nil
-}
-func (store *ImageUploadStore) CompactExpired(ctx context.Context, now time.Time, limit int) (int64, error) {
-	if limit <= 0 {
-		return 0, nil
-	}
-	if now.IsZero() {
-		now = store.clock()
-	}
-	now = normalizeTime(now)
-	tx, err := store.db.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, fmt.Errorf("begin image upload retention compaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	rows, err := tx.QueryContext(ctx, `
-		SELECT id FROM image_uploads
-		WHERE state IN ('consumed', 'expired') AND request_retention_until <= ?
-		ORDER BY request_retention_until ASC, id ASC LIMIT ?`, unixMillis(now), limit)
-	if err != nil {
-		return 0, fmt.Errorf("select retained image uploads: %w", err)
-	}
-	ids := make([]string, 0, limit)
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			_ = rows.Close()
-			return 0, fmt.Errorf("scan retained image upload: %w", err)
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Err(); err != nil {
-		_ = rows.Close()
-		return 0, fmt.Errorf("read retained image uploads: %w", err)
-	}
-	if err := rows.Close(); err != nil {
-		return 0, fmt.Errorf("close retained image uploads: %w", err)
-	}
-	var removed int64
-	for _, id := range ids {
-		result, err := tx.ExecContext(ctx, `
-			DELETE FROM image_uploads
-			WHERE id = ? AND state IN ('consumed', 'expired') AND request_retention_until <= ?`,
-			id, unixMillis(now))
-		if err != nil {
-			return 0, fmt.Errorf("compact expired image upload: %w", err)
-		}
-		count, err := result.RowsAffected()
-		if err != nil {
-			return 0, fmt.Errorf("read compacted image upload count: %w", err)
-		}
-		removed += count
-	}
-	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("commit image upload retention compaction: %w", err)
-	}
-	return removed, nil
-}
-func (store *ImageUploadStore) enforceUploadQuota(ctx context.Context, tx *sql.Tx, userID string, byteSize int64, now time.Time) error {
-	now = normalizeTime(now)
-	var quota media.Quota
-	if err := tx.QueryRowContext(ctx, liveImageUploadQuotaSQL, userID, unixMillis(now)).Scan(&quota.UserCount, &quota.GlobalBytes); err != nil {
-		return fmt.Errorf("read image upload quota before insert: %w", err)
-	}
-	if quota.UserCount >= media.MaxLiveUploads || quota.GlobalBytes > media.MaxLiveBytes-byteSize {
-		return media.ErrUploadQuotaExceeded
-	}
-	return nil
-}
-func (store *ImageUploadStore) findUpload(ctx context.Context, row interface{ Scan(...any) error }) (media.Upload, error) {
-	var (
-		upload                media.Upload
-		storageKey            string
-		state                 string
-		consumedNoteID        sql.NullString
-		createdAt             int64
-		updatedAt             int64
-		writeLeaseUntil       sql.NullInt64
-		expiresAt             int64
-		requestRetentionUntil int64
-	)
-	if err := row.Scan(
-		&upload.ID,
-		&upload.UserID,
-		&storageKey,
-		&upload.UploadRequestID,
-		&state,
-		&consumedNoteID,
-		&upload.ContentType,
-		&upload.ByteSize,
-		&upload.Width,
-		&upload.Height,
-		&upload.SHA256,
-		&createdAt,
-		&updatedAt,
-		&writeLeaseUntil,
-		&expiresAt,
-		&requestRetentionUntil,
-	); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return media.Upload{}, media.ErrUploadNotFound
-		}
-		return media.Upload{}, err
-	}
-	upload.StorageKey = media.ObjectKey(storageKey)
-	upload.State = media.UploadState(state)
-	upload.ConsumedNoteID = consumedNoteID.String
-	upload.CreatedAt = timeFromUnixMillis(createdAt)
-	upload.UpdatedAt = timeFromUnixMillis(updatedAt)
-	if writeLeaseUntil.Valid {
-		upload.WriteLeaseUntil = timeFromUnixMillis(writeLeaseUntil.Int64)
-	}
-	upload.ExpiresAt = timeFromUnixMillis(expiresAt)
-	upload.RequestRetentionUntil = timeFromUnixMillis(requestRetentionUntil)
-	return upload, nil
 }
 func normalizePendingInput(input media.PendingInput, now time.Time) (media.PendingInput, error) {
 	now = normalizeTime(now)

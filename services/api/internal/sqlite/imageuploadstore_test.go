@@ -368,3 +368,102 @@ func TestImageUploadStoreConcurrentClaimsPreserveAtomicLimits(t *testing.T) {
 		}
 	})
 }
+
+func TestImageUploadStoreConcurrentReclaimKeepsSingleLease(t *testing.T) {
+	now := time.UnixMilli(7_000_000).UTC()
+	fixture := newImageUploadStoreFixture(t, now, "reclaim-user")
+	input := imageUploadInput(now.Add(-2*time.Millisecond), "reclaim-pending", "reclaim-request", "reclaim-user", 10)
+	expiredLease := now.Add(-time.Millisecond)
+	insertImageUploadRow(t, fixture.db, input, string(media.UploadPending), "", &expiredLease)
+
+	inputs := []media.PendingInput{input, input}
+	start := make(chan struct{})
+	results := make(chan imageUploadAttempt, len(inputs))
+	for _, input := range inputs {
+		input := input
+		go func() {
+			<-start
+			upload, err := fixture.store.BeginPending(fixture.ctx, input)
+			results <- imageUploadAttempt{upload: upload, err: err}
+		}()
+	}
+	close(start)
+
+	var (
+		inProgress int
+		winner     media.Upload
+	)
+	for range inputs {
+		result := <-results
+		switch {
+		case result.err == nil:
+			winner = result.upload
+		case errors.Is(result.err, media.ErrUploadInProgress):
+			inProgress++
+		default:
+			t.Fatalf("concurrent reclaim error = %v", result.err)
+		}
+	}
+	if inProgress != 1 {
+		t.Fatalf("concurrent reclaim in-progress outcomes = %d", inProgress)
+	}
+
+	found, err := fixture.store.FindByUserRequest(fixture.ctx, input.UserID, input.UploadRequestID)
+	if err != nil {
+		t.Fatalf("find reclaimed upload: %v", err)
+	}
+	if found.ID != winner.ID || found.State != media.UploadPending || !found.WriteLeaseUntil.Equal(winner.WriteLeaseUntil) {
+		t.Fatalf("reclaimed upload = %#v, winner = %#v", found, winner)
+	}
+}
+
+func TestImageUploadStoreConcurrentCleanupClaimKeepsSingleLease(t *testing.T) {
+	now := time.UnixMilli(8_000_000).UTC()
+	fixture := newImageUploadStoreFixture(t, now, "cleanup-claim-user")
+	expired := imageUploadInput(now.Add(-media.UploadTTL-time.Millisecond), "cleanup-claim", "cleanup-claim-request", "cleanup-claim-user", 10)
+	insertImageUploadRow(t, fixture.db, expired, string(media.UploadPending), "", nil)
+
+	type claimAttempt struct {
+		uploads []media.Upload
+		err     error
+	}
+	const attempts = 2
+	start := make(chan struct{})
+	results := make(chan claimAttempt, attempts)
+	for range attempts {
+		go func() {
+			<-start
+			uploads, err := fixture.store.ClaimExpired(fixture.ctx, now, 1)
+			results <- claimAttempt{uploads: uploads, err: err}
+		}()
+	}
+	close(start)
+
+	var winner media.Upload
+	claims := 0
+	for range attempts {
+		result := <-results
+		if result.err != nil {
+			t.Fatalf("concurrent cleanup claim: %v", result.err)
+		}
+		switch len(result.uploads) {
+		case 0:
+		case 1:
+			claims++
+			winner = result.uploads[0]
+		default:
+			t.Fatalf("cleanup claim count = %d, want at most one", len(result.uploads))
+		}
+	}
+	if claims != 1 {
+		t.Fatalf("concurrent cleanup claim outcomes = %d", claims)
+	}
+
+	found, err := fixture.store.FindByUserRequest(fixture.ctx, expired.UserID, expired.UploadRequestID)
+	if err != nil {
+		t.Fatalf("find cleanup claim: %v", err)
+	}
+	if found.ID != winner.ID || found.State != media.UploadDeleting || !found.WriteLeaseUntil.After(now) {
+		t.Fatalf("cleanup claimed upload = %#v, winner = %#v", found, winner)
+	}
+}

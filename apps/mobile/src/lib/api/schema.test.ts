@@ -74,7 +74,6 @@ const validationProblemCodes = [
   'taken',
 ] satisfies readonly ValidationProblemCode[];
 
-
 function makeAuthorSummary(): AuthorSummaryResponse {
   return {
     display_name: 'Ada Lovelace',
@@ -97,14 +96,16 @@ function makeNote(): NoteResponse {
     category_slug: 'engineering',
     created_at: 1700000000000,
     id: 'note-1',
+    images: [],
     place_slug: null,
     title: 'A note',
     updated_at: 1700000001000,
   };
 }
 
-function makeAuthorNotesPage(nextCursor: string | null = 'next-cursor'):
-  AuthorNotesPageResponse {
+function makeAuthorNotesPage(
+  nextCursor: string | null = 'next-cursor',
+): AuthorNotesPageResponse {
   return {
     next_cursor: nextCursor,
     notes: [makeNote()],
@@ -179,8 +180,16 @@ function makeErrorResponse(): ErrorResponse {
 }
 
 const validSchemaCases = [
-  { name: 'author summary', schema: authorSummarySchema, value: makeAuthorSummary() },
-  { name: 'public author', schema: publicAuthorSchema, value: makePublicAuthor() },
+  {
+    name: 'author summary',
+    schema: authorSummarySchema,
+    value: makeAuthorSummary(),
+  },
+  {
+    name: 'public author',
+    schema: publicAuthorSchema,
+    value: makePublicAuthor(),
+  },
   { name: 'note', schema: noteSchema, value: makeNote() },
   {
     name: 'author notes page',
@@ -192,7 +201,11 @@ const validSchemaCases = [
     schema: catalogCategorySchema,
     value: makeCatalogCategory(),
   },
-  { name: 'catalog place', schema: catalogPlaceSchema, value: makeCatalogPlace() },
+  {
+    name: 'catalog place',
+    schema: catalogPlaceSchema,
+    value: makeCatalogPlace(),
+  },
   {
     name: 'list notes response',
     schema: listNotesResponseSchema,
@@ -232,14 +245,17 @@ const validSchemaCases = [
 ] as const;
 
 describe('API response schemas', () => {
-  it.each(validSchemaCases)('accepts a generated-shaped $name', ({ schema, value }) => {
-    const parsed = schema.safeParse(value);
+  it.each(validSchemaCases)(
+    'accepts a generated-shaped $name',
+    ({ schema, value }) => {
+      const parsed = schema.safeParse(value);
 
-    expect(parsed.success).toBe(true);
-    if (parsed.success) {
-      expect(parsed.data).toEqual(value);
-    }
-  });
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data).toEqual(value);
+      }
+    },
+  );
 
   it('accepts an error response without optional validation fields', () => {
     const parsed = errorResponseSchema.safeParse({ code: 'not_found' });
@@ -613,28 +629,38 @@ describe('API response schemas', () => {
     }
   });
 
-  it.each(validationFields)('accepts generated validation field %s', (field) => {
-    const parsed = validationFieldSchema.safeParse(field);
+  it.each(validationFields)(
+    'accepts generated validation field %s',
+    (field) => {
+      const parsed = validationFieldSchema.safeParse(field);
 
-    expect(parsed.success).toBe(true);
-    if (parsed.success) {
-      expect(parsed.data).toBe(field);
-    }
-  });
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data).toBe(field);
+      }
+    },
+  );
 
-  it.each(validationProblemCodes)('accepts generated validation problem code %s', (code) => {
-    const value = { code, field: 'title' as const };
-    const parsed = validationProblemSchema.safeParse(value);
+  it.each(validationProblemCodes)(
+    'accepts generated validation problem code %s',
+    (code) => {
+      const value = { code, field: 'title' as const };
+      const parsed = validationProblemSchema.safeParse(value);
 
-    expect(parsed.success).toBe(true);
-    if (parsed.success) {
-      expect(parsed.data).toEqual(value);
-    }
-  });
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data).toEqual(value);
+      }
+    },
+  );
 
   it.each([
     { name: 'error code', schema: errorCodeSchema, value: 'unknown_error' },
-    { name: 'validation field', schema: validationFieldSchema, value: 'unknown_field' },
+    {
+      name: 'validation field',
+      schema: validationFieldSchema,
+      value: 'unknown_field',
+    },
     {
       name: 'validation problem code',
       schema: validationProblemSchema,

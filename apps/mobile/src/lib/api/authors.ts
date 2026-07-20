@@ -3,11 +3,7 @@ import createClient from 'openapi-fetch';
 import { apiBaseURL } from './config';
 import { authorNotesPageSchema, publicAuthorSchema } from './schema';
 import type { paths } from './generated/schema';
-import {
-  APIRequestError,
-  APIResponseError,
-  mapNoteResponse,
-} from './notes';
+import { APIRequestError, APIResponseError, mapNoteResponse } from './notes';
 import type { Note } from './notes';
 
 export type PublicAuthor = {
@@ -95,4 +91,3 @@ export async function listAuthorNotes(
     notes: authorNotesPageResponse.data.notes.map(mapNoteResponse),
   };
 }
-

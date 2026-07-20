@@ -130,4 +130,3 @@ function parseCatalogPlace(value: CatalogPlaceResponse): CatalogPlace {
     slug: value.slug,
   };
 }
-

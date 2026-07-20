@@ -296,6 +296,25 @@ export interface components {
         ListPlacesResponse: {
             places: components["schemas"]["CatalogPlace"][];
         };
+        NoteImage: {
+            id: string;
+            /** Format: uri-reference */
+            url: string;
+            /** @enum {string} */
+            content_type: "image/jpeg" | "image/png";
+            /** Format: int64 */
+            byte_size: number;
+            /** Format: int32 */
+            width: number;
+            /** Format: int32 */
+            height: number;
+            /** Format: int32 */
+            position: number;
+            /** Format: int64 */
+            created_at: number;
+            /** Format: int64 */
+            updated_at: number;
+        };
         Note: {
             id: string;
             title: string;
@@ -313,6 +332,7 @@ export interface components {
              * @description Unix timestamp in milliseconds.
              */
             updated_at: number;
+            images: components["schemas"]["NoteImage"][];
         };
         /** @enum {string} */
         ValidationField: "title" | "body" | "category_slug" | "place_slug" | "q" | "username" | "password" | "display_name" | "limit" | "cursor";

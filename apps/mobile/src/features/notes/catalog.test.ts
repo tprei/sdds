@@ -85,6 +85,7 @@ function apiNote(): Note {
     categorySlug: 'food',
     createdAt: 1782993600000,
     id: 'note-1',
+    images: [],
     placeSlug: 'sao-paulo',
     title: 'Café bom',
     updatedAt: 1782993600000,

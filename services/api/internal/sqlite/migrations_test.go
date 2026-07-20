@@ -24,6 +24,7 @@ func TestApplyMigrationsCreatesInitialSchema(t *testing.T) {
 		"authors",
 		"user_login_identities",
 		"sessions",
+		"note_images",
 	}
 	for _, table := range tables {
 		t.Run(table, func(t *testing.T) {
@@ -657,6 +658,109 @@ func TestApplyMigrationsCreatesEmptySearchIndex(t *testing.T) {
 	if len(found) != 0 {
 		t.Fatalf("search note count = %d, want 0", len(found))
 	}
+}
+
+func TestNoteImagesMigrationPreservesExistingTextOnlyNotes(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close database: %v", err)
+		}
+	})
+	applyMigrationFiles(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs", "000004_note_places", "000005_users_authors_sessions")
+
+	if _, err := db.ExecContext(
+		ctx,
+		`
+			INSERT INTO notes (id, title, body, category_slug, place_slug, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`,
+		"existing-text-note",
+		"Text-only note",
+		"Survives image migration.",
+		"food",
+		"sao-paulo",
+		int64(1782993600000),
+		int64(1782993600000),
+	); err != nil {
+		t.Fatalf("insert existing text-only note: %v", err)
+	}
+
+	applyMigrationFiles(t, ctx, db, "000006_note_ownership", "000007_author_notes_index", "000008_note_cursor_invariants")
+
+	if err := ApplyMigrations(ctx, db); err != nil {
+		t.Fatalf("apply remaining migrations: %v", err)
+	}
+
+	var imageRows int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM note_images WHERE note_id = ?`, "existing-text-note").Scan(&imageRows); err != nil {
+		t.Fatalf("query migrated note images: %v", err)
+	}
+	if imageRows != 0 {
+		t.Fatalf("migrated text-only note image rows = %d, want 0", imageRows)
+	}
+
+	store := NewNoteStore(db)
+	assertEmptyImages := func(label string, found note.Note) {
+		t.Helper()
+		if found.ID != "existing-text-note" {
+			t.Fatalf("%s note id = %q, want existing-text-note", label, found.ID)
+		}
+		if found.Images == nil || len(found.Images) != 0 {
+			t.Fatalf("%s note images = %#v, want non-nil empty", label, found.Images)
+		}
+	}
+	reads := []struct {
+		name string
+		read func() ([]note.Note, error)
+	}{
+		{
+			name: "recent",
+			read: func() ([]note.Note, error) {
+				return store.ListRecentNotes(ctx, note.ListInput{Limit: 10})
+			},
+		},
+		{
+			name: "search",
+			read: func() ([]note.Note, error) {
+				return store.SearchNotes(ctx, note.SearchInput{Query: "survives", Limit: 10})
+			},
+		},
+	}
+	for _, test := range reads {
+		t.Run(test.name, func(t *testing.T) {
+			found, err := test.read()
+			if err != nil {
+				t.Fatalf("read migrated note: %v", err)
+			}
+			if len(found) != 1 {
+				t.Fatalf("read migrated note count = %d, want 1", len(found))
+			}
+			assertEmptyImages(test.name, found[0])
+		})
+	}
+
+	found, err := store.FindNote(ctx, "existing-text-note")
+	if err != nil {
+		t.Fatalf("find migrated note: %v", err)
+	}
+	assertEmptyImages("detail", found)
+
+	authorPage, err := store.ListAuthorNotes(ctx, note.AuthorNotesInput{
+		AuthorID: systemNoteOwnerAuthorID,
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("list migrated author notes: %v", err)
+	}
+	if len(authorPage.Notes) != 1 {
+		t.Fatalf("migrated author note count = %d, want 1", len(authorPage.Notes))
+	}
+	assertEmptyImages("author", authorPage.Notes[0].Note)
 }
 
 func applyMigrationFiles(t *testing.T, ctx context.Context, db *sql.DB, versions ...string) {

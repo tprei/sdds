@@ -201,7 +201,11 @@ func (store *NoteStore) CreateNote(ctx context.Context, input note.CreateInput) 
 func (store *NoteStore) FindNote(ctx context.Context, id string) (note.Note, error) {
 	found, err := scanNoteRow(store.db.QueryRowContext(ctx, findNoteSQL, id))
 	if err == nil {
-		return found, nil
+		notes := []note.Note{found}
+		if err := store.hydrateNoteImages(ctx, notes); err != nil {
+			return note.Note{}, fmt.Errorf("hydrate note images: %w", err)
+		}
+		return notes[0], nil
 	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return note.Note{}, note.ErrNoteNotFound
@@ -242,6 +246,12 @@ func (store *NoteStore) ListRecentNotes(ctx context.Context, input note.ListInpu
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("read recent notes: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close recent notes rows: %w", err)
+	}
+	if err := store.hydrateNoteImages(ctx, notes); err != nil {
+		return nil, fmt.Errorf("hydrate recent note images: %w", err)
 	}
 
 	return notes, nil
@@ -285,6 +295,12 @@ func (store *NoteStore) SearchNotes(ctx context.Context, input note.SearchInput)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("read search notes: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close search notes rows: %w", err)
+	}
+	if err := store.hydrateNoteImages(ctx, notes); err != nil {
+		return nil, fmt.Errorf("hydrate search note images: %w", err)
 	}
 
 	return notes, nil
@@ -332,6 +348,7 @@ func scanNoteRow(row *sql.Row) (note.Note, error) {
 
 func scanNoteValues(scan func(dest ...any) error) (note.Note, error) {
 	var found note.Note
+	found.Images = make([]note.Image, 0)
 	var userID string
 	var categorySlug string
 	var placeSlug sql.NullString

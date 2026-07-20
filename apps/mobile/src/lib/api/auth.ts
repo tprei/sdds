@@ -121,9 +121,8 @@ export async function createAuthSession(
 export async function getAuthSession(
   token: string,
 ): Promise<CurrentAuthSession> {
-  const { data, error, response } = await apiClient(token).GET(
-    '/v1/auth/session',
-  );
+  const { data, error, response } =
+    await apiClient(token).GET('/v1/auth/session');
   if (!response.ok) {
     throw new AuthAPIRequestError(response.status, parseErrorResponse(error));
   }
@@ -229,4 +228,3 @@ function parseErrorResponse(value: unknown): ErrorResponse | null {
 
   return errorResponse.data;
 }
-

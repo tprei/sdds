@@ -27,6 +27,7 @@ type FetchCall = {
 type FetchHandler = (request: Request) => Promise<Response>;
 type ListNotesResponse = components['schemas']['ListNotesResponse'];
 type NoteResponse = components['schemas']['Note'];
+type NoteImageResponse = components['schemas']['NoteImage'];
 
 describe('notes API client', () => {
   beforeEach(() => {
@@ -110,6 +111,7 @@ describe('notes API client', () => {
       categorySlug: 'food',
       createdAt: 1782993600000,
       id: exampleNoteID,
+      images: [],
       placeSlug: 'sao-paulo',
       title: 'Cafe bom',
       updatedAt: 1782993600000,
@@ -200,6 +202,95 @@ describe('notes API client', () => {
     const note = await getNote(exampleNoteID);
 
     expect(note).toEqual(expectedNote());
+  });
+
+  it('resolves root-relative image URLs and preserves absolute URLs', async () => {
+    stubFetch(async () =>
+      jsonResponse(
+        apiNote({
+          images: [
+            apiImage(),
+            apiImage({
+              id: 'image-id-2',
+              position: 1,
+              url: 'https://cdn.example.com/image-id-2.png',
+            }),
+          ],
+        }),
+      ),
+    );
+
+    await expect(getNote(exampleNoteID)).resolves.toMatchObject({
+      images: [
+        {
+          byteSize: 481234,
+          contentType: 'image/jpeg',
+          createdAt: 1782993600000,
+          height: 900,
+          id: 'image-id',
+          position: 0,
+          updatedAt: 1782993600000,
+          url: 'http://localhost:8080/v1/media/images/image-id',
+          width: 1200,
+        },
+        {
+          id: 'image-id-2',
+          position: 1,
+          url: 'https://cdn.example.com/image-id-2.png',
+        },
+      ],
+    });
+  });
+
+  it('resolves root-relative image URLs against a configured API base', async () => {
+    process.env[configuredAPIBaseURLEnvName] =
+      'https://api.example.com/mobile/';
+    stubFetch(async () =>
+      jsonResponse(
+        apiNote({
+          images: [apiImage({ url: '/v1/media/images/image-id' })],
+        }),
+      ),
+    );
+
+    await expect(getNote(exampleNoteID)).resolves.toMatchObject({
+      images: [
+        {
+          url: 'https://api.example.com/v1/media/images/image-id',
+        },
+      ],
+    });
+  });
+
+  it('rejects malformed image URLs', async () => {
+    stubFetch(async () =>
+      jsonResponse(apiNote({ images: [apiImage({ url: 'http://[::1' })] })),
+    );
+
+    await expect(getNote(exampleNoteID)).rejects.toThrow(APIResponseError);
+  });
+
+  it('rejects note responses without required images', async () => {
+    const note: Record<string, unknown> = { ...apiNote() };
+    delete note.images;
+    stubFetch(async () => jsonResponse({ notes: [note] }));
+
+    await expect(listNotes()).rejects.toThrow(APIResponseError);
+  });
+
+  it('rejects invalid image metadata ordering', async () => {
+    stubFetch(async () =>
+      jsonResponse(
+        apiNote({
+          images: [
+            apiImage({ position: 1 }),
+            apiImage({ id: 'image-id-2', position: 0 }),
+          ],
+        }),
+      ),
+    );
+
+    await expect(getNote(exampleNoteID)).rejects.toThrow(APIResponseError);
   });
 
   it('raises request errors for missing fetched notes', async () => {
@@ -419,9 +510,27 @@ function apiNote(overrides: Partial<NoteResponse> = {}): NoteResponse {
     category_slug: 'food',
     created_at: 1782993600000,
     id: exampleNoteID,
+    images: [],
     place_slug: 'sao-paulo',
     title: 'Cafe bom',
     updated_at: 1782993600000,
+    ...overrides,
+  };
+}
+
+function apiImage(
+  overrides: Partial<NoteImageResponse> = {},
+): NoteImageResponse {
+  return {
+    byte_size: 481234,
+    content_type: 'image/jpeg',
+    created_at: 1782993600000,
+    height: 900,
+    id: 'image-id',
+    position: 0,
+    updated_at: 1782993600000,
+    url: '/v1/media/images/image-id',
+    width: 1200,
     ...overrides,
   };
 }
@@ -436,6 +545,7 @@ function expectedNote() {
     categorySlug: 'food',
     createdAt: 1782993600000,
     id: exampleNoteID,
+    images: [],
     placeSlug: 'sao-paulo',
     title: 'Cafe bom',
     updatedAt: 1782993600000,

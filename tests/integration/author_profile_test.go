@@ -235,7 +235,11 @@ func requireAuthorNotesWirePayload(t *testing.T, body []byte) {
 		if !ok {
 			t.Fatalf("note = %T, want object", value)
 		}
-		requireWireKeys(t, noteObject, "id", "title", "body", "category_slug", "place_slug", "author", "created_at", "updated_at")
+		requireWireKeys(t, noteObject, "id", "title", "body", "category_slug", "place_slug", "author", "images", "created_at", "updated_at")
+		images, ok := noteObject["images"].([]any)
+		if !ok || len(images) != 0 {
+			t.Fatalf("note images = %#v, want empty array", noteObject["images"])
+		}
 		authorObject, ok := noteObject["author"].(map[string]any)
 		if !ok {
 			t.Fatalf("author = %T, want object", noteObject["author"])

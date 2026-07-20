@@ -289,6 +289,7 @@ function note(id: string, title: string): Note {
     categorySlug: 'food',
     createdAt: 1782993600000,
     id,
+    images: [],
     placeSlug: null,
     title,
     updatedAt: 1782993600000,

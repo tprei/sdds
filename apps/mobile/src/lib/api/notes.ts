@@ -10,9 +10,22 @@ export type Note = {
   categorySlug: string;
   createdAt: number;
   id: string;
+  images: NoteImage[];
   placeSlug: string | null;
   title: string;
   updatedAt: number;
+};
+
+export type NoteImage = {
+  byteSize: number;
+  contentType: NoteImageResponse['content_type'];
+  createdAt: number;
+  height: number;
+  id: string;
+  position: number;
+  updatedAt: number;
+  url: string;
+  width: number;
 };
 
 export type NoteAuthor = {
@@ -40,6 +53,7 @@ type GeneratedSchemas = components['schemas'];
 type AuthorSummaryResponse = GeneratedSchemas['AuthorSummary'];
 type CreateNoteRequest = GeneratedSchemas['CreateNoteRequest'];
 type NoteResponse = GeneratedSchemas['Note'];
+type NoteImageResponse = GeneratedSchemas['NoteImage'];
 
 export class APIRequestError extends Error {
   readonly status: number;
@@ -197,6 +211,7 @@ export function mapNoteResponse(value: NoteResponse): Note {
     categorySlug: value.category_slug,
     createdAt: value.created_at,
     id: value.id,
+    images: value.images.map(parseNoteImage),
     placeSlug: value.place_slug,
     title: value.title,
     updatedAt: value.updated_at,
@@ -210,3 +225,36 @@ function parseAuthorSummary(value: AuthorSummaryResponse): NoteAuthor {
   };
 }
 
+function parseNoteImage(value: NoteImageResponse): NoteImage {
+  return {
+    byteSize: value.byte_size,
+    contentType: value.content_type,
+    createdAt: value.created_at,
+    height: value.height,
+    id: value.id,
+    position: value.position,
+    updatedAt: value.updated_at,
+    url: resolveNoteImageURL(value.url),
+    width: value.width,
+  };
+}
+
+function resolveNoteImageURL(value: string): string {
+  try {
+    if (isAbsoluteURL(value)) {
+      return value;
+    }
+    return new URL(value, apiBaseURL()).toString();
+  } catch {
+    throw new APIResponseError();
+  }
+}
+
+function isAbsoluteURL(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}

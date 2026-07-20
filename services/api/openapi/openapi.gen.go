@@ -251,10 +251,12 @@ type CategorySlug = string
 
 // CreateNoteRequest defines model for CreateNoteRequest.
 type CreateNoteRequest struct {
-	Body         string       `json:"body"`
-	CategorySlug CategorySlug `json:"category_slug"`
-	PlaceSlug    *PlaceSlug   `json:"place_slug,omitempty"`
-	Title        string       `json:"title"`
+	Body            string       `json:"body"`
+	CategorySlug    CategorySlug `json:"category_slug"`
+	ClientRequestId string       `json:"client_request_id"`
+	ImageUploadIds  *[]string    `json:"image_upload_ids,omitempty"`
+	PlaceSlug       *PlaceSlug   `json:"place_slug,omitempty"`
+	Title           string       `json:"title"`
 }
 
 // CreateSessionRequest defines model for CreateSessionRequest.
@@ -1798,8 +1800,10 @@ type CreateNoteHTTPResponse struct {
 	JSON201      *Note
 	JSON400      *ErrorResponse
 	JSON401      *ErrorResponse
+	JSON409      *ErrorResponse
 	JSON413      *ErrorResponse
 	JSON500      *ErrorResponse
+	JSON503      *ErrorResponse
 }
 
 // Status returns HTTPResponse.Status
@@ -2634,6 +2638,13 @@ func ParseCreateNoteHTTPResponse(rsp *http.Response) (*CreateNoteHTTPResponse, e
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2647,6 +2658,13 @@ func ParseCreateNoteHTTPResponse(rsp *http.Response) (*CreateNoteHTTPResponse, e
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

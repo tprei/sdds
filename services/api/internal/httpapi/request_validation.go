@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers/legacy"
 	"github.com/tprei/sdds/services/api/internal/openapi"
@@ -79,6 +80,10 @@ func writeOpenAPIRequestValidationError(w http.ResponseWriter, r *http.Request, 
 		writeError(w, http.StatusRequestEntityTooLarge, openapi.ErrorResponse{Code: openapi.ErrorCodeRequestTooLarge})
 		return
 	}
+	if isTooManyCreateNoteImages(err) {
+		writeError(w, http.StatusConflict, openapi.ErrorResponse{Code: openapi.ErrorCodeTooManyImages})
+		return
+	}
 
 	var requestError *openapi3filter.RequestError
 	if errors.As(err, &requestError) && requestError.Parameter != nil {
@@ -89,6 +94,20 @@ func writeOpenAPIRequestValidationError(w http.ResponseWriter, r *http.Request, 
 	}
 
 	writeError(w, http.StatusBadRequest, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidJSON})
+}
+func isTooManyCreateNoteImages(err error) bool {
+	var requestError *openapi3filter.RequestError
+	if !errors.As(err, &requestError) || requestError.Input == nil ||
+		requestError.Input.Route == nil || requestError.Input.Route.Operation == nil ||
+		requestError.Input.Route.Operation.OperationID != createNoteGeneratedOperationID {
+		return false
+	}
+	var schemaError *openapi3.SchemaError
+	if !errors.As(err, &schemaError) || schemaError.SchemaField != "maxItems" {
+		return false
+	}
+	path := schemaError.JSONPointer()
+	return len(path) == 1 && path[0] == "image_upload_ids"
 }
 
 func requestBodyLimitForOperation(operationID string) (int64, bool) {

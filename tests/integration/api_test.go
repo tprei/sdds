@@ -74,18 +74,20 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 
 	selectedPlace := "sao-paulo"
 	request := openapi.CreateNoteJSONRequestBody{
-		Title:        "Café bom",
-		Body:         "Tem pao de queijo decente e balcao simpatico.",
-		CategorySlug: "food",
-		PlaceSlug:    &selectedPlace,
+		Title:           "Café bom",
+		Body:            "Tem pao de queijo decente e balcao simpatico.",
+		CategorySlug:    "food",
+		ClientRequestId: "integration-created-note",
+		PlaceSlug:       &selectedPlace,
 	}
 	created := createNote(t, client, request)
 	requireCreatedNote(t, created, request)
 
 	requestWithoutPlace := openapi.CreateNoteJSONRequestBody{
-		Title:        "Dica sem lugar",
-		Body:         "Serve para qualquer lugar mundial.",
-		CategorySlug: "travel",
+		Title:           "Dica sem lugar",
+		Body:            "Serve para qualquer lugar mundial.",
+		CategorySlug:    "travel",
+		ClientRequestId: "integration-note-without-place",
 	}
 	createdWithoutPlace := createNote(t, client, requestWithoutPlace)
 	requireCreatedNote(t, createdWithoutPlace, requestWithoutPlace)
@@ -165,83 +167,94 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	}
 
 	accentRequest := openapi.CreateNoteJSONRequestBody{
-		Title:        "Pão ftsaccent48",
-		Body:         "Massa boa.",
-		CategorySlug: "food",
+		Title:           "Pão ftsaccent48",
+		Body:            "Massa boa.",
+		CategorySlug:    "food",
+		ClientRequestId: "integration-accent-note",
 	}
 	accentNote := createNote(t, client, accentRequest)
 	accentResults := searchNotes(t, client, "pao ftsaccent48")
 	requireOnlySearchNoteIDs(t, accentResults, []string{accentNote.Id})
 
 	strictBothRequest := openapi.CreateNoteJSONRequestBody{
-		Title:        "strictcafe48 strictpao48",
-		Body:         "Encontro certo.",
-		CategorySlug: "food",
+		Title:           "strictcafe48 strictpao48",
+		Body:            "Encontro certo.",
+		CategorySlug:    "food",
+		ClientRequestId: "integration-strict-both",
 	}
 	strictBothNote := createNote(t, client, strictBothRequest)
 	createNote(t, client, openapi.CreateNoteJSONRequestBody{
-		Title:        "strictcafe48",
-		Body:         "Falta o segundo termo.",
-		CategorySlug: "food",
+		Title:           "strictcafe48",
+		Body:            "Falta o segundo termo.",
+		CategorySlug:    "food",
+		ClientRequestId: "integration-strict-cafe",
 	})
 	createNote(t, client, openapi.CreateNoteJSONRequestBody{
-		Title:        "strictpao48",
-		Body:         "Falta o primeiro termo.",
-		CategorySlug: "food",
+		Title:           "strictpao48",
+		Body:            "Falta o primeiro termo.",
+		CategorySlug:    "food",
+		ClientRequestId: "integration-strict-pao",
 	})
 	strictResults := searchNotes(t, client, "strictcafe48 strictpao48")
 	requireOnlySearchNoteIDs(t, strictResults, []string{strictBothNote.Id})
 
 	titleRankRequest := openapi.CreateNoteJSONRequestBody{
-		Title:        "rankbolo48 roteiro enorme com muitas palavras extras para alongar o titulo e reduzir relevancia sem peso",
-		Body:         "Nota mais antiga.",
-		CategorySlug: "food",
+		Title:           "rankbolo48 roteiro enorme com muitas palavras extras para alongar o titulo e reduzir relevancia sem peso",
+		Body:            "Nota mais antiga.",
+		CategorySlug:    "food",
+		ClientRequestId: "integration-title-rank",
 	}
 	titleRankNote := createNote(t, client, titleRankRequest)
 	bodyRankRequest := openapi.CreateNoteJSONRequestBody{
-		Title:        "Bolo curto",
-		Body:         "rankbolo48.",
-		CategorySlug: "food",
+		Title:           "Bolo curto",
+		Body:            "rankbolo48.",
+		CategorySlug:    "food",
+		ClientRequestId: "integration-body-rank",
 	}
 	bodyRankNote := createNote(t, client, bodyRankRequest)
 	rankedResults := searchNotes(t, client, "rankbolo48")
 	requireOnlySearchNoteIDs(t, rankedResults, []string{titleRankNote.Id, bodyRankNote.Id})
 
 	categoryFoodRequest := openapi.CreateNoteJSONRequestBody{
-		Title:        "catbusca48 comida",
-		Body:         "Filtro de categoria.",
-		CategorySlug: "food",
+		Title:           "catbusca48 comida",
+		Body:            "Filtro de categoria.",
+		CategorySlug:    "food",
+		ClientRequestId: "integration-category-food",
 	}
 	categoryFoodNote := createNote(t, client, categoryFoodRequest)
 	createNote(t, client, openapi.CreateNoteJSONRequestBody{
-		Title:        "catbusca48 viagem",
-		Body:         "Mesmo termo fora da categoria.",
-		CategorySlug: "travel",
+		Title:           "catbusca48 viagem",
+		Body:            "Mesmo termo fora da categoria.",
+		CategorySlug:    "travel",
+		ClientRequestId: "integration-category-travel",
 	})
 	categoryResults := searchNotesByCategory(t, client, "catbusca48", "food")
 	requireOnlySearchNoteIDs(t, categoryResults, []string{categoryFoodNote.Id})
 
 	globalPlace := "sao-paulo"
 	globalWithPlaceRequest := openapi.CreateNoteJSONRequestBody{
-		Title:        "globalbusca48 com lugar",
-		Body:         "Aparece na busca global.",
-		CategorySlug: "travel",
-		PlaceSlug:    &globalPlace,
+		Title:           "globalbusca48 com lugar",
+		Body:            "Aparece na busca global.",
+		CategorySlug:    "travel",
+		ClientRequestId: "integration-global-with-place",
+		PlaceSlug:       &globalPlace,
 	}
 	globalWithPlaceNote := createNote(t, client, globalWithPlaceRequest)
 	globalWithoutPlaceRequest := openapi.CreateNoteJSONRequestBody{
-		Title:        "globalbusca48 sem lugar",
-		Body:         "Tambem aparece na busca global.",
-		CategorySlug: "travel",
+		Title:           "globalbusca48 sem lugar",
+		Body:            "Tambem aparece na busca global.",
+		CategorySlug:    "travel",
+		ClientRequestId: "integration-global-without-place",
 	}
 	globalWithoutPlaceNote := createNote(t, client, globalWithoutPlaceRequest)
 	globalResults := searchNotes(t, client, "globalbusca48")
 	requireSearchNoteIDs(t, globalResults, []string{globalWithPlaceNote.Id, globalWithoutPlaceNote.Id})
 
 	punctuationRequest := openapi.CreateNoteJSONRequestBody{
-		Title:        "pontoseguro48",
-		Body:         "Pontuacao nao muda a busca.",
-		CategorySlug: "food",
+		Title:           "pontoseguro48",
+		Body:            "Pontuacao nao muda a busca.",
+		CategorySlug:    "food",
+		ClientRequestId: "integration-punctuation",
 	}
 	punctuationNote := createNote(t, client, punctuationRequest)
 	punctuationResults := searchNotes(t, client, "pontoseguro48 ***")

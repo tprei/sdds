@@ -9,7 +9,12 @@ import (
 	"github.com/tprei/sdds/services/api/internal/user"
 )
 
-var ErrNoteNotFound = errors.New("note not found")
+var (
+	ErrNoteNotFound           = errors.New("note not found")
+	ErrIdempotencyConflict    = errors.New("note create request conflict")
+	ErrImageUploadUnavailable = errors.New("image upload unavailable")
+	ErrImageUploadExpired     = errors.New("image upload expired")
+)
 
 type Image struct {
 	ID          string
@@ -41,11 +46,13 @@ type AuthorSummary struct {
 }
 
 type CreateInput struct {
-	UserID       user.UserID
-	Title        string
-	Body         string
-	CategorySlug CategorySlug
-	PlaceSlug    PlaceSlug
+	UserID          user.UserID
+	Title           string
+	Body            string
+	CategorySlug    CategorySlug
+	PlaceSlug       PlaceSlug
+	ClientRequestID string
+	ImageUploadIDs  []string
 }
 
 type Store interface {

@@ -108,12 +108,10 @@ func TestNoteStoreHydratesOrderedImagesForEveryReadPath(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	store := newTestNoteStore(db, func() time.Time { return now })
 
-	created, err := store.CreateNote(ctx, note.CreateInput{
-		Title:        "Imagem de comida",
+	created, err := store.CreateNote(ctx, testCreateInput(note.CreateInput{Title: "Imagem de comida",
 		Body:         "Um lugar com fotos.",
 		CategorySlug: note.CategorySlugFood,
-		PlaceSlug:    note.PlaceSlugSaoPaulo,
-	})
+		PlaceSlug:    note.PlaceSlugSaoPaulo}))
 	if err != nil {
 		t.Fatalf("create note: %v", err)
 	}
@@ -182,12 +180,10 @@ func TestNoteStoreHydratesOrderedImagesForEveryReadPath(t *testing.T) {
 		t.Fatalf("author note images mismatch (-want +got):\n%s", diff)
 	}
 
-	textOnly, err := store.CreateNote(ctx, note.CreateInput{
-		Title:        "Nota sem imagem",
+	textOnly, err := store.CreateNote(ctx, testCreateInput(note.CreateInput{Title: "Nota sem imagem",
 		Body:         "Sem mídia.",
 		CategorySlug: note.CategorySlugFood,
-		PlaceSlug:    note.PlaceSlugSaoPaulo,
-	})
+		PlaceSlug:    note.PlaceSlugSaoPaulo}))
 	if err != nil {
 		t.Fatalf("create text-only note: %v", err)
 	}

@@ -13,9 +13,12 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
+	"net/url"
 	"os"
+	"os/exec"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -82,6 +85,208 @@ func requireMediaAPIRuntimeBoundaries(t *testing.T, publicClient *openapi.Client
 	firstImage := getPublicMediaImage(t, publicClient, receipt)
 	secondImage := getPublicMediaImage(t, publicClient, receipt)
 	requireStableMediaResponse(t, firstImage, secondImage, fixture)
+	requireMediaLifecycleIfConfigured(t, publicClient, created, receipt, firstImage, fixture)
+}
+
+type mediaLifecycleConfig struct {
+	composeFile string
+	project     string
+	httpPort    string
+}
+
+const mediaLifecycleCommandTimeout = 135 * time.Second
+
+func requireMediaLifecycleIfConfigured(t *testing.T, publicClient *openapi.ClientWithResponses, wantNote openapi.Note, receipt openapi.ImageUploadReceipt, firstImage openapi.GetMediaImageHTTPResponse, fixture []byte) {
+	t.Helper()
+
+	config, enabled := mediaLifecycleConfigFromEnv(t)
+	if !enabled {
+		return
+	}
+	t.Cleanup(func() { cleanupMediaLifecycle(t, config) })
+	restartMediaLifecycle(t, config, publicClient)
+	requireStableMediaNote(t, publicClient, wantNote, receipt)
+	restartedImage := getPublicMediaImage(t, publicClient, receipt)
+	requireStableMediaResponse(t, firstImage, restartedImage, fixture)
+	requireMediaStorageUnavailable(t, config, publicClient, receipt)
+	recoverMediaLifecycle(t, config, publicClient)
+	requireStableMediaNote(t, publicClient, wantNote, receipt)
+	recoveredImage := getPublicMediaImage(t, publicClient, receipt)
+	requireStableMediaResponse(t, firstImage, recoveredImage, fixture)
+}
+
+func mediaLifecycleConfigFromEnv(t *testing.T) (mediaLifecycleConfig, bool) {
+	t.Helper()
+
+	config := mediaLifecycleConfig{
+		composeFile: os.Getenv("SDDS_RUSTFS_COMPOSE_FILE"),
+		project:     os.Getenv("SDDS_RUSTFS_COMPOSE_PROJECT"),
+	}
+	if config.composeFile == "" && config.project == "" {
+		return mediaLifecycleConfig{}, false
+	}
+	if config.composeFile == "" || config.project == "" {
+		t.Fatal("RustFS lifecycle requires SDDS_RUSTFS_COMPOSE_FILE and SDDS_RUSTFS_COMPOSE_PROJECT")
+	}
+	apiURL, err := url.Parse(apiBaseURL())
+	if err != nil || apiURL.Port() == "" {
+		t.Fatalf("RustFS lifecycle requires an API URL with a port, got %q", apiBaseURL())
+	}
+	config.httpPort = apiURL.Port()
+	return config, true
+}
+
+func restartMediaLifecycle(t *testing.T, config mediaLifecycleConfig, publicClient *openapi.ClientWithResponses) {
+	t.Helper()
+
+	requireMediaCompose(t, config, "up", "-d", "--wait", "--force-recreate", "--no-deps", "api", "rustfs")
+	waitForReadiness(t, publicClient)
+}
+
+func recoverMediaLifecycle(t *testing.T, config mediaLifecycleConfig, publicClient *openapi.ClientWithResponses) {
+	t.Helper()
+
+	requireMediaCompose(t, config, "up", "-d", "--wait", "--force-recreate", "--no-deps", "rustfs")
+	requireMediaCompose(t, config, "run", "--rm", "--no-deps", "rustfs-init")
+	waitForReadiness(t, publicClient)
+}
+
+func cleanupMediaLifecycle(t *testing.T, config mediaLifecycleConfig) {
+	t.Helper()
+
+	output, err := runMediaCompose(config, "up", "-d", "--wait", "--force-recreate", "--no-deps", "rustfs", "api")
+	if err != nil {
+		t.Errorf("RustFS lifecycle cleanup failed: %v\n%s", err, output)
+	}
+}
+
+func requireMediaStorageUnavailable(t *testing.T, config mediaLifecycleConfig, publicClient *openapi.ClientWithResponses, receipt openapi.ImageUploadReceipt) {
+	t.Helper()
+
+	requireMediaCompose(t, config, "stop", "rustfs")
+	healthContext, cancelHealth := mediaLifecycleRequestContext()
+	health, err := publicClient.GetHealthWithResponse(healthContext)
+	cancelHealth()
+	if err != nil {
+		t.Fatalf("GET /healthz during RustFS outage: %v", err)
+	}
+	requireStatus(t, "GET /healthz during RustFS outage", health.StatusCode(), http.StatusNoContent, health.Body)
+	readinessContext, cancelReadiness := mediaLifecycleRequestContext()
+	readiness, err := publicClient.GetReadinessWithResponse(readinessContext)
+	cancelReadiness()
+	if err != nil {
+		t.Fatalf("GET /readyz during RustFS outage: %v", err)
+	}
+	requireStatus(t, "GET /readyz during RustFS outage", readiness.StatusCode(), http.StatusServiceUnavailable, readiness.Body)
+	mediaContext, cancelMedia := mediaLifecycleRequestContext()
+	response, err := publicClient.GetMediaImageWithResponse(mediaContext, receipt.ImageUploadId)
+	cancelMedia()
+	if err != nil {
+		t.Fatalf("GET media during RustFS outage: %v", err)
+	}
+	requireStatus(t, "GET /v1/media/images/{image_id} during RustFS outage", response.StatusCode(), http.StatusServiceUnavailable, response.Body)
+	if response.JSON503 == nil || response.JSON503.Code != openapi.ErrorCodeMediaStorageUnavailable {
+		t.Fatalf("outage media error code = %#v, want %s", response.JSON503, openapi.ErrorCodeMediaStorageUnavailable)
+	}
+	if response.HTTPResponse == nil {
+		t.Fatal("outage media response has nil HTTP response")
+	}
+	if got := response.HTTPResponse.Header.Get("Retry-After"); got != "5" {
+		t.Fatalf("outage Retry-After = %q, want %q", got, "5")
+	}
+}
+
+func mediaLifecycleRequestContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), httpClientTimeout)
+}
+
+type mediaLifecycleNote struct {
+	Id           string
+	Title        string
+	Body         string
+	CategorySlug openapi.CategorySlug
+	PlaceSlug    *openapi.PlaceSlug
+	Author       openapi.AuthorSummary
+	Images       []openapi.NoteImage
+	CreatedAt    int64
+	UpdatedAt    int64
+}
+
+func durableMediaNote(note openapi.Note) mediaLifecycleNote {
+	return mediaLifecycleNote{
+		Id:           note.Id,
+		Title:        note.Title,
+		Body:         note.Body,
+		CategorySlug: note.CategorySlug,
+		PlaceSlug:    note.PlaceSlug,
+		Author:       note.Author,
+		Images:       note.Images,
+		CreatedAt:    note.CreatedAt,
+		UpdatedAt:    note.UpdatedAt,
+	}
+}
+
+func requireStableMediaNote(t *testing.T, publicClient *openapi.ClientWithResponses, wantNote openapi.Note, receipt openapi.ImageUploadReceipt) {
+	t.Helper()
+
+	got := getMediaLifecycleNote(t, publicClient, wantNote.Id)
+	requireSingleImageMetadata(t, got, receipt)
+	wantDurable := durableMediaNote(wantNote)
+	gotDurable := durableMediaNote(got)
+	if !reflect.DeepEqual(wantDurable, gotDurable) {
+		t.Fatalf("lifecycle note differs (-before +after):\nbefore=%#v\nafter=%#v", wantDurable, gotDurable)
+	}
+}
+
+func getMediaLifecycleNote(t *testing.T, publicClient *openapi.ClientWithResponses, noteID string) openapi.Note {
+	t.Helper()
+
+	ctx, cancel := mediaLifecycleRequestContext()
+	response, err := publicClient.GetNoteWithResponse(ctx, noteID)
+	cancel()
+	if err != nil {
+		t.Fatalf("GET /v1/notes/{note_id} during RustFS lifecycle: %v", err)
+	}
+	requireStatus(t, "GET /v1/notes/{note_id} during RustFS lifecycle", response.StatusCode(), http.StatusOK, response.Body)
+	if response.JSON200 == nil {
+		t.Fatal("GET /v1/notes/{note_id} during RustFS lifecycle returned 200 without JSON body")
+	}
+	return *response.JSON200
+}
+
+func requireMediaCompose(t *testing.T, config mediaLifecycleConfig, args ...string) {
+	t.Helper()
+
+	output, err := runMediaCompose(config, args...)
+	if err != nil {
+		t.Fatalf("docker compose %s: %v\n%s", strings.Join(args, " "), err, output)
+	}
+}
+
+func runMediaCompose(config mediaLifecycleConfig, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), mediaLifecycleCommandTimeout)
+	defer cancel()
+
+	commandArgs := []string{"compose", "--file", config.composeFile, "--project-name", config.project}
+	commandArgs = append(commandArgs, args...)
+	var output bytes.Buffer
+	command := exec.CommandContext(ctx, "docker", commandArgs...)
+	command.Env = mediaLifecycleEnvironment(config.httpPort)
+	command.Stdout = &output
+	command.Stderr = &output
+	err := command.Run()
+	return output.String(), err
+}
+
+func mediaLifecycleEnvironment(httpPort string) []string {
+	environment := os.Environ()
+	for index, value := range environment {
+		if strings.HasPrefix(value, "SDDS_HTTP_PORT=") {
+			environment[index] = "SDDS_HTTP_PORT=" + httpPort
+			return environment
+		}
+	}
+	return append(environment, "SDDS_HTTP_PORT="+httpPort)
 }
 
 func loadMediaFixture(t *testing.T) []byte {
@@ -239,7 +444,9 @@ func findNoteByID(t *testing.T, notes openapi.ListNotesResponse, id string) open
 func getPublicMediaImage(t *testing.T, publicClient *openapi.ClientWithResponses, receipt openapi.ImageUploadReceipt) openapi.GetMediaImageHTTPResponse {
 	t.Helper()
 
-	response, err := publicClient.GetMediaImageWithResponse(context.Background(), receipt.ImageUploadId)
+	ctx, cancel := mediaLifecycleRequestContext()
+	response, err := publicClient.GetMediaImageWithResponse(ctx, receipt.ImageUploadId)
+	cancel()
 	if err != nil {
 		t.Fatalf("GET /v1/media/images/{image_id}: %v", err)
 	}

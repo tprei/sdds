@@ -1,6 +1,10 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import {
+  launchImageLibraryAsync,
+  UIImagePickerPreferredAssetRepresentationMode,
+} from 'expo-image-picker';
 
 import {
   EmptyStateCard,
@@ -8,11 +12,14 @@ import {
   FoundationScreen,
   FoundationTextInput,
 } from '@/components/foundation-screen';
-import { useComposeController } from '@/features/notes/use-compose-controller';
+import { createComposeController } from '@/features/notes/compose-controller';
 import {
   composeDraftStore,
   type ComposeDraftStore,
 } from '@/features/notes/compose-draft';
+import { listCatalogs } from '@/lib/api/catalogs';
+import { prepareImageUpload } from '@/lib/api/image-uploads';
+import { createNote } from '@/lib/api/notes';
 import { useAuth } from '@/lib/auth/auth-provider';
 
 import { styles } from '@/features/notes/compose-screen.styles';
@@ -79,11 +86,68 @@ function AuthenticatedComposeScreen({
 }: AuthenticatedComposeScreenProps) {
   const router = useRouter();
   const onPublished = useCallback(() => router.navigate('/'), [router]);
-  const controller = useComposeController({ draftStore, onPublished, onSessionExpired: logout, ownerID, token });
+  const controller = useMemo(
+    () =>
+      createComposeController({
+        draftStore,
+        ownerID,
+        ports: {
+          createNote,
+          loadCatalogs: listCatalogs,
+          onPublished,
+          onSessionExpired: logout,
+          pickImage: () =>
+            launchImageLibraryAsync({
+              allowsEditing: false,
+              allowsMultipleSelection: false,
+              mediaTypes: ['images'],
+              preferredAssetRepresentationMode:
+                UIImagePickerPreferredAssetRepresentationMode.Compatible,
+              selectionLimit: 1,
+            }),
+          prepareImageUpload,
+        },
+        token: '',
+      }),
+    [draftStore, logout, onPublished, ownerID],
+  );
+  useEffect(() => {
+    controller.setSessionToken(token);
+  }, [controller, token]);
+  useEffect(() => {
+    controller.activate();
+    return () => controller.deactivate();
+  }, [controller]);
+  useFocusEffect(
+    useCallback(() => {
+      controller.focus();
+      return () => controller.blur();
+    }, [controller]),
+  );
+  const state = useSyncExternalStore(
+    controller.subscribe,
+    controller.getState,
+    controller.getState,
+  );
   const {
-    body, canSubmit, catalogState, categorySlug, image, isSubmitting,
-    pickImage, placeSlug, removeImage, selectCategorySlug, selectPlaceSlug,
-    submit: handleSubmit, submitState, title, updateBody, updateTitle,
+    body,
+    canSubmit,
+    catalogState,
+    image,
+    isSubmitting,
+    submitState,
+    title,
+    categorySlug,
+    placeSlug,
+  } = state;
+  const {
+    pickImage,
+    removeImage,
+    selectCategorySlug,
+    selectPlaceSlug,
+    submit: handleSubmit,
+    updateBody,
+    updateTitle,
   } = controller;
 
   return (

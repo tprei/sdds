@@ -22,9 +22,79 @@ tags:
   - name: Notes
     description: Text-first recommendation notes.
 paths:
+  /v1/media/images/{image_id}:
+    get:
+      operationId: GetMediaImage
+      summary: Serve an attached image
+      security: []
+      parameters:
+        - name: image_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The requested image bytes.
+          headers:
+            Content-Length:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+            Content-Disposition:
+              schema:
+                type: string
+            ETag:
+              schema:
+                type: string
+            X-Content-Type-Options:
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: The image ID is not a canonical UUID.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The image is not attached to a note.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The attached image failed integrity checks.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Media storage is temporarily unavailable.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /v1/media/image-uploads:
     post:
-      operationId: prepareImageUpload
+      operationId: PrepareImageUpload
       summary: Stage one private image upload
       security:
         - bearerAuth: []

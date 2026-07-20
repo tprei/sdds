@@ -3,14 +3,16 @@ package httpapi
 import (
 	"context"
 	"errors"
-	"github.com/go-chi/chi/v5"
-	"github.com/tprei/sdds/services/api/internal/author"
-	"github.com/tprei/sdds/services/api/internal/note"
-	"github.com/tprei/sdds/services/api/internal/openapi"
-	"github.com/tprei/sdds/services/api/internal/user"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/tprei/sdds/services/api/internal/author"
+	"github.com/tprei/sdds/services/api/internal/media"
+	"github.com/tprei/sdds/services/api/internal/note"
+	"github.com/tprei/sdds/services/api/internal/openapi"
+	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 type noteStores interface {
@@ -24,18 +26,21 @@ type userStores interface {
 }
 
 type server struct {
-	notes                 note.Store
-	catalog               note.Catalog
-	users                 user.Store
-	publicAuthors         author.PublicAuthorStore
-	authorNotes           note.AuthorNoteStore
-	uploadService         uploadPreparer
-	passwordHasher        passwordHasher
-	invalidCredentialHash string
-	authRateLimiters      authRateLimiters
-	newSessionToken       func() (string, error)
-	clock                 func() time.Time
-	readiness             ReadinessChecker
+	notes                     note.Store
+	catalog                   note.Catalog
+	users                     user.Store
+	publicAuthors             author.PublicAuthorStore
+	authorNotes               note.AuthorNoteStore
+	uploadService             uploadPreparer
+	imageReader               media.AttachedImageReader
+	imageReadScratchDir       string
+	imageResponseWriteTimeout time.Duration
+	passwordHasher            passwordHasher
+	invalidCredentialHash     string
+	authRateLimiters          authRateLimiters
+	newSessionToken           func() (string, error)
+	clock                     func() time.Time
+	readiness                 ReadinessChecker
 }
 
 var _ openapi.ServerInterface = server{}
@@ -67,9 +72,9 @@ func DefaultAuthLimits() AuthLimits {
 	}
 }
 
-func NewRouter(notes noteStores, catalog note.Catalog, users userStores, authLimits AuthLimits, readiness ReadinessChecker, uploadService uploadPreparer) http.Handler {
+func NewRouter(notes noteStores, catalog note.Catalog, users userStores, authLimits AuthLimits, readiness ReadinessChecker, uploadService uploadPreparer, imageReader media.AttachedImageReader) http.Handler {
 	hasher := newBoundedPasswordHasher(user.NewPasswordHasher(), authLimits.PasswordHashConcurrency)
-	return newRouter(notes, catalog, users, hasher, mustInvalidCredentialHash(hasher), user.NewSessionToken, time.Now, authLimits, readiness, uploadService)
+	return newRouter(notes, catalog, users, hasher, mustInvalidCredentialHash(hasher), user.NewSessionToken, time.Now, authLimits, readiness, uploadService, imageReader)
 }
 
 func newRouter(
@@ -83,9 +88,13 @@ func newRouter(
 	authLimits AuthLimits,
 	readiness ReadinessChecker,
 	uploadService uploadPreparer,
+	imageReader media.AttachedImageReader,
 ) http.Handler {
 	if uploadService == nil {
 		panic("upload service is required")
+	}
+	if imageReader == nil {
+		panic("image reader is required")
 	}
 	router := chi.NewRouter()
 	router.Use(localBrowserCORS)
@@ -106,6 +115,7 @@ func newRouter(
 		clock:                 clock,
 		readiness:             readiness,
 		uploadService:         uploadService,
+		imageReader:           imageReader,
 	}
 	wrapper := openapi.ServerInterfaceWrapper{
 		Handler:          handler,
@@ -122,6 +132,7 @@ func newRouter(
 			router.Get("/notes", wrapper.ListNotes)
 			router.Get("/authors/{author_id}", wrapper.GetAuthor)
 			router.Get("/authors/{author_id}/notes", wrapper.ListAuthorNotes)
+			router.Get("/media/images/{image_id}", wrapper.GetMediaImage)
 			router.Get("/notes/{note_id}", wrapper.GetNote)
 			router.Get("/search/notes", wrapper.SearchNotes)
 			router.Post("/auth/users", wrapper.CreateAuthUser)
@@ -188,6 +199,8 @@ func generatedInvalidParamErrorCode(path string, paramName string) (openapi.Erro
 		return openapi.ErrorCodeInvalidSearch, true
 	case path == "/v1/notes" && paramName == "category_slug":
 		return openapi.ErrorCodeInvalidNote, true
+	case strings.HasPrefix(path, "/v1/media/images/") && paramName == "image_id":
+		return openapi.ErrorCodeInvalidMedia, true
 	default:
 		return "", false
 	}

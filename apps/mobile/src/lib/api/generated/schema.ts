@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/v1/media/images/{image_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Serve an attached image */
+        get: operations["GetMediaImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/media/image-uploads": {
         parameters: {
             query?: never;
@@ -14,7 +31,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Stage one private image upload */
-        post: operations["prepareImageUpload"];
+        post: operations["PrepareImageUpload"];
         delete?: never;
         options?: never;
         head?: never;
@@ -389,7 +406,72 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    prepareImageUpload: {
+    GetMediaImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The requested image bytes. */
+            200: {
+                headers: {
+                    "Content-Length"?: string;
+                    "Cache-Control"?: string;
+                    "Content-Disposition"?: string;
+                    ETag?: string;
+                    "X-Content-Type-Options"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                };
+            };
+            /** @description The image ID is not a canonical UUID. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The image is not attached to a note. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The attached image failed integrity checks. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Media storage is temporarily unavailable. */
+            503: {
+                headers: {
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PrepareImageUpload: {
         parameters: {
             query?: never;
             header?: never;

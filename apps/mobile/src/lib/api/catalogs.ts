@@ -1,6 +1,7 @@
 import createClient from 'openapi-fetch';
 
 import { apiBaseURL } from './config';
+import { APIRequestError, parseAPIRequestError } from './request-error';
 import {
   listCategoriesResponseSchema,
   listPlacesResponseSchema,
@@ -30,15 +31,6 @@ type GeneratedSchemas = components['schemas'];
 type CatalogCategoryResponse = GeneratedSchemas['CatalogCategory'];
 type CatalogPlaceResponse = GeneratedSchemas['CatalogPlace'];
 
-export class CatalogAPIRequestError extends Error {
-  readonly status: number;
-
-  constructor(status: number) {
-    super('catalog_api_request_failed');
-    this.status = status;
-  }
-}
-
 export class CatalogAPIResponseError extends Error {
   constructor() {
     super('catalog_api_response_invalid');
@@ -55,19 +47,13 @@ export async function listCatalogs(): Promise<Catalogs> {
 }
 
 export async function listCategories(): Promise<CatalogCategory[]> {
-  const { data, response } = await apiClient().GET('/v1/categories');
-  if (!response.ok) {
-    throw new CatalogAPIRequestError(response.status);
-  }
+  const { data } = await apiClient().GET('/v1/categories');
 
   return parseListCategoriesResponse(data);
 }
 
 export async function listPlaces(): Promise<CatalogPlace[]> {
-  const { data, response } = await apiClient().GET('/v1/places');
-  if (!response.ok) {
-    throw new CatalogAPIRequestError(response.status);
-  }
+  const { data } = await apiClient().GET('/v1/places');
 
   return parseListPlacesResponse(data);
 }
@@ -85,14 +71,8 @@ async function apiFetch(request: Request): Promise<Response> {
     return response;
   }
 
-  const headers = new Headers(response.headers);
-  headers.delete('content-length');
-  headers.delete('transfer-encoding');
-  return new Response(null, {
-    headers,
-    status: response.status,
-    statusText: response.statusText,
-  });
+  const error = await parseAPIRequestError(response);
+  throw new APIRequestError(error.status, error.body, error.retryAfter);
 }
 
 function parseListCategoriesResponse(value: unknown): CatalogCategory[] {

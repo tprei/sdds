@@ -4,11 +4,11 @@ import type { ImagePickerAsset } from 'expo-image-picker';
 
 import { apiBaseURL } from './config';
 import type { components } from './generated/schema';
+import { imageUploadReceiptSchema } from './schema';
+import { APIRequestError, parseAPIRequestError } from './request-error';
+import type { APIErrorResponse } from './request-error';
 
 type GeneratedSchemas = components['schemas'];
-type GeneratedErrorCode = GeneratedSchemas['ErrorCode'];
-type GeneratedErrorResponse = GeneratedSchemas['ErrorResponse'];
-type GeneratedValidationProblem = GeneratedSchemas['ValidationProblem'];
 type TimeoutHandle = Parameters<typeof clearTimeout>[0];
 type GeneratedReceipt = GeneratedSchemas['ImageUploadReceipt'];
 
@@ -25,8 +25,6 @@ export type ImageUploadReceipt = {
   imageUploadId: GeneratedReceipt['image_upload_id'];
   width: GeneratedReceipt['width'];
 };
-
-export type ImageUploadErrorBody = GeneratedErrorResponse;
 
 export type PrepareImageUploadOptions = {
   maxAttempts?: number;
@@ -61,74 +59,16 @@ const defaultRetryDelayMs = 250;
 const canonicalUUIDPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const errorCodes = [
-  'internal_error',
-  'invalid_auth',
-  'invalid_json',
-  'invalid_note',
-  'invalid_search',
-  'not_found',
-  'rate_limited',
-  'request_too_large',
-  'unauthenticated',
-  'username_taken',
-  'invalid_media',
-  'unsupported_media_type',
-  'idempotency_conflict',
-  'upload_in_progress',
-  'upload_expired',
-  'media_staging_quota_exceeded',
-  'media_storage_unavailable',
-  'media_integrity_error',
-  'too_many_images',
-] as const satisfies readonly GeneratedErrorCode[];
-
-const validationProblemCodes = [
-  'required',
-  'too_short',
-  'too_long',
-  'unknown',
-  'invalid',
-  'taken',
-] as const satisfies readonly GeneratedValidationProblem['code'][];
-
-const validationFields = [
-  'title',
-  'body',
-  'category_slug',
-  'place_slug',
-  'q',
-  'username',
-  'password',
-  'display_name',
-  'limit',
-  'cursor',
-  'client_request_id',
-  'upload_request_id',
-  'image_upload_ids',
-  'file',
-] as const satisfies readonly GeneratedValidationProblem['field'][];
-
 export class ImageUploadInputError extends Error {}
 
-export class ImageUploadRequestError extends Error {
-  readonly body: ImageUploadErrorBody | null;
-  readonly code: GeneratedErrorCode | undefined;
-  readonly fields: readonly GeneratedValidationProblem[] | undefined;
-  readonly retryAfter: number | undefined;
-  readonly status: number;
-
+export class ImageUploadRequestError extends APIRequestError {
   constructor(
     status: number,
-    body: ImageUploadErrorBody | null = null,
+    body: APIErrorResponse | null = null,
     retryAfter?: number,
   ) {
-    super('image_upload_request_failed');
-    this.body = body;
-    this.code = body?.code;
-    this.fields = body?.fields;
-    this.retryAfter = retryAfter;
-    this.status = status;
+    super(status, body, retryAfter);
+    this.message = 'image_upload_request_failed';
   }
 }
 
@@ -179,12 +119,12 @@ export async function prepareImageUpload(
       return parseImageUploadReceipt(await readJSON(response));
     }
 
-    const body = await readErrorResponse(response);
+    const sharedError = await parseAPIRequestError(response);
     throwIfAborted(options.signal);
     const requestError = new ImageUploadRequestError(
-      response.status,
-      body,
-      parseRetryAfter(response.headers.get('Retry-After')),
+      sharedError.status,
+      sharedError.body,
+      sharedError.retryAfter,
     );
     if (!isRetryableImageUploadError(requestError) || attempt >= maxAttempts) {
       throw requestError;
@@ -314,19 +254,11 @@ function retryDelay(
   return Math.min(delayMs, maxDelayMs);
 }
 
-function parseRetryAfter(value: string | null): number | undefined {
-  if (value === null || !/^\d+$/.test(value)) {
-    return undefined;
-  }
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : undefined;
-}
-
 async function readJSON(response: Response): Promise<unknown> {
   try {
     return await response.json();
   } catch (error: unknown) {
-    if (isRecord(error) && error.name === 'AbortError') {
+    if (error instanceof Error && error.name === 'AbortError') {
       throw error;
     }
     if (error instanceof Error) {
@@ -336,91 +268,20 @@ async function readJSON(response: Response): Promise<unknown> {
   }
 }
 
-async function readErrorResponse(
-  response: Response,
-): Promise<ImageUploadErrorBody | null> {
-  let value: unknown;
-  try {
-    value = await response.json();
-  } catch (error: unknown) {
-    if (isRecord(error) && error.name === 'AbortError') {
-      throw error;
-    }
-    if (!(error instanceof Error)) {
-      throw error;
-    }
-    return null;
-  }
-
-  return isErrorResponse(value) ? value : null;
-}
-
 function parseImageUploadReceipt(value: unknown): ImageUploadReceipt {
-  if (
-    !isRecord(value) ||
-    !isCanonicalUUID(value.image_upload_id) ||
-    !isKnownValue(value.content_type, ['image/jpeg', 'image/png'] as const) ||
-    !isPositiveInteger(value.byte_size) ||
-    !isPositiveInteger(value.width) ||
-    !isPositiveInteger(value.height) ||
-    !isPositiveInteger(value.expires_at)
-  ) {
+  const parsed = imageUploadReceiptSchema.safeParse(value);
+  if (!parsed.success) {
     throw new ImageUploadResponseError();
   }
 
   return {
-    byteSize: value.byte_size,
-    contentType: value.content_type,
-    expiresAt: value.expires_at,
-    height: value.height,
-    imageUploadId: value.image_upload_id.toLowerCase(),
-    width: value.width,
+    byteSize: parsed.data.byte_size,
+    contentType: parsed.data.content_type,
+    expiresAt: parsed.data.expires_at,
+    height: parsed.data.height,
+    imageUploadId: parsed.data.image_upload_id.toLowerCase(),
+    width: parsed.data.width,
   };
-}
-
-function isErrorResponse(value: unknown): value is ImageUploadErrorBody {
-  return (
-    isRecord(value) &&
-    isKnownValue(value.code, errorCodes) &&
-    (!hasOwnKey(value, 'fields') ||
-      (Array.isArray(value.fields) && value.fields.every(isValidationProblem)))
-  );
-}
-
-function isValidationProblem(
-  value: unknown,
-): value is GeneratedValidationProblem {
-  return (
-    isRecord(value) &&
-    isKnownValue(value.code, validationProblemCodes) &&
-    isKnownValue(value.field, validationFields)
-  );
-}
-
-function isCanonicalUUID(value: unknown): value is string {
-  return typeof value === 'string' && canonicalUUIDPattern.test(value);
-}
-
-function isPositiveInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1;
-}
-
-function isKnownValue<T extends string>(
-  value: unknown,
-  knownValues: readonly T[],
-): value is T {
-  return (
-    typeof value === 'string' &&
-    knownValues.some((knownValue) => knownValue === value)
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function hasOwnKey(value: Record<string, unknown>, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(value, key);
 }
 
 function throwIfAborted(signal: AbortSignal | undefined): void {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { APIRequestError } from './request-error';
 import {
-  CatalogAPIRequestError,
   CatalogAPIResponseError,
   listCatalogs,
   listCategories,
@@ -124,12 +124,12 @@ describe('catalogs API client', () => {
     stubFetch(async () =>
       jsonResponse({ code: 'internal_error' }, httpStatusInternalServerError),
     );
-
     await expect(listCategories()).rejects.toMatchObject(
-      new CatalogAPIRequestError(httpStatusInternalServerError),
+      new APIRequestError(httpStatusInternalServerError, {
+        code: 'internal_error',
+      }),
     );
   });
-
   it('rejects invalid category response shapes', async () => {
     stubFetch(async () =>
       jsonResponse({

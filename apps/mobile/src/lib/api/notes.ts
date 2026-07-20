@@ -1,7 +1,12 @@
 import createClient from 'openapi-fetch';
 
 import { apiBaseURL } from './config';
+import {
+  APIRequestError as SharedAPIRequestError,
+  parseAPIRequestError,
+} from './request-error';
 import { listNotesResponseSchema, noteSchema } from './schema';
+import type { APIErrorResponse } from './request-error';
 import type { components, paths } from './generated/schema';
 
 export type Note = {
@@ -57,12 +62,13 @@ type CreateNoteRequest = GeneratedSchemas['CreateNoteRequest'];
 type NoteResponse = GeneratedSchemas['Note'];
 type NoteImageResponse = GeneratedSchemas['NoteImage'];
 
-export class APIRequestError extends Error {
-  readonly status: number;
-
-  constructor(status: number) {
-    super('api_request_failed');
-    this.status = status;
+export class APIRequestError extends SharedAPIRequestError {
+  constructor(
+    status: number,
+    body: APIErrorResponse | null = null,
+    retryAfter?: number,
+  ) {
+    super(status, body, retryAfter);
   }
 }
 
@@ -74,43 +80,34 @@ export class APIResponseError extends Error {
 
 export async function listNotes(input: ListNotesInput = {}): Promise<Note[]> {
   const query = noteListQuery(input);
-  const { data, response } = await apiClient().GET('/v1/notes', {
+  const { data } = await apiClient().GET('/v1/notes', {
     params: {
       query,
     },
   });
-  if (!response.ok) {
-    throw new APIRequestError(response.status);
-  }
 
   return parseListNotesResponse(data);
 }
 
 export async function getNote(id: string): Promise<Note> {
-  const { data, response } = await apiClient().GET('/v1/notes/{note_id}', {
+  const { data } = await apiClient().GET('/v1/notes/{note_id}', {
     params: {
       path: {
         note_id: id,
       },
     },
   });
-  if (!response.ok) {
-    throw new APIRequestError(response.status);
-  }
 
   return parseNoteResponse(data);
 }
 
 export async function searchNotes(input: SearchNotesInput): Promise<Note[]> {
   const query = noteSearchQuery(input);
-  const { data, response } = await apiClient().GET('/v1/search/notes', {
+  const { data } = await apiClient().GET('/v1/search/notes', {
     params: {
       query,
     },
   });
-  if (!response.ok) {
-    throw new APIRequestError(response.status);
-  }
 
   return parseListNotesResponse(data);
 }
@@ -147,12 +144,9 @@ export async function createNote(
     title: input.title,
   };
 
-  const { data, response } = await apiClient(token).POST('/v1/notes', {
+  const { data } = await apiClient(token).POST('/v1/notes', {
     body: request,
   });
-  if (!response.ok) {
-    throw new APIRequestError(response.status);
-  }
 
   return parseNoteResponse(data);
 }
@@ -170,14 +164,8 @@ async function apiFetch(request: Request, token?: string): Promise<Response> {
     return response;
   }
 
-  const headers = new Headers(response.headers);
-  headers.delete('content-length');
-  headers.delete('transfer-encoding');
-  return new Response(null, {
-    headers,
-    status: response.status,
-    statusText: response.statusText,
-  });
+  const error = await parseAPIRequestError(response);
+  throw new APIRequestError(error.status, error.body, error.retryAfter);
 }
 
 function authenticatedRequest(request: Request, token?: string): Request {

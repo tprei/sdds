@@ -279,7 +279,7 @@ describe('notes API client', () => {
     );
 
     await expect(getNote('missing-note')).rejects.toMatchObject(
-      new APIRequestError(httpStatusNotFound),
+      new APIRequestError(httpStatusNotFound, { code: 'not_found' }),
     );
   });
 
@@ -364,7 +364,7 @@ describe('notes API client', () => {
     );
 
     await expect(searchNotes({ query: '' })).rejects.toMatchObject(
-      new APIRequestError(httpStatusBadRequest),
+      new APIRequestError(httpStatusBadRequest, { code: 'invalid_search' }),
     );
   });
 

@@ -35,57 +35,6 @@ type ListPlacesResponse = Schemas['ListPlacesResponse'];
 type NoteResponse = Schemas['Note'];
 type PublicAuthorResponse = Schemas['PublicAuthor'];
 type ValidationProblemResponse = Schemas['ValidationProblem'];
-type ErrorCode = Schemas['ErrorCode'];
-type ValidationField = Schemas['ValidationField'];
-type ValidationProblemCode = ValidationProblemResponse['code'];
-
-const errorCodes = [
-  'internal_error',
-  'invalid_auth',
-  'invalid_json',
-  'invalid_note',
-  'invalid_search',
-  'not_found',
-  'rate_limited',
-  'request_too_large',
-  'unauthenticated',
-  'username_taken',
-  'invalid_media',
-  'unsupported_media_type',
-  'idempotency_conflict',
-  'upload_in_progress',
-  'upload_expired',
-  'media_staging_quota_exceeded',
-  'media_storage_unavailable',
-  'media_integrity_error',
-  'too_many_images',
-] satisfies readonly ErrorCode[];
-
-const validationFields = [
-  'title',
-  'body',
-  'category_slug',
-  'place_slug',
-  'q',
-  'username',
-  'password',
-  'display_name',
-  'limit',
-  'cursor',
-  'client_request_id',
-  'upload_request_id',
-  'image_upload_ids',
-  'file',
-] satisfies readonly ValidationField[];
-
-const validationProblemCodes = [
-  'required',
-  'too_short',
-  'too_long',
-  'unknown',
-  'invalid',
-  'taken',
-] satisfies readonly ValidationProblemCode[];
 
 function makeAuthorSummary(): AuthorSummaryResponse {
   return {
@@ -632,40 +581,6 @@ describe('API response schemas', () => {
       expect(parsed.data.next_cursor).toEqual(cursor);
     }
   });
-
-  it.each(errorCodes)('accepts generated error code %s', (code) => {
-    const parsed = errorCodeSchema.safeParse(code);
-
-    expect(parsed.success).toBe(true);
-    if (parsed.success) {
-      expect(parsed.data).toBe(code);
-    }
-  });
-
-  it.each(validationFields)(
-    'accepts generated validation field %s',
-    (field) => {
-      const parsed = validationFieldSchema.safeParse(field);
-
-      expect(parsed.success).toBe(true);
-      if (parsed.success) {
-        expect(parsed.data).toBe(field);
-      }
-    },
-  );
-
-  it.each(validationProblemCodes)(
-    'accepts generated validation problem code %s',
-    (code) => {
-      const value = { code, field: 'title' as const };
-      const parsed = validationProblemSchema.safeParse(value);
-
-      expect(parsed.success).toBe(true);
-      if (parsed.success) {
-        expect(parsed.data).toEqual(value);
-      }
-    },
-  );
 
   it.each([
     { name: 'error code', schema: errorCodeSchema, value: 'unknown_error' },

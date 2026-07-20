@@ -28,7 +28,10 @@ export type ComposeDraftStore = {
   get(ownerID: string): ComposeDraft | null;
   removeImage(ownerID: string): ComposeDraft | null;
   selectImage(ownerID: string, asset: ImageUploadAsset): ComposeDraft | null;
-  refreshImageUpload(ownerID: string): ComposeDraft | null;
+  refreshImageUpload(
+    ownerID: string,
+    uploadRequestID: string,
+  ): ComposeDraft | null;
   setImageReceipt(
     ownerID: string,
     uploadRequestID: string,
@@ -160,9 +163,13 @@ export function createComposeDraftStore(
         },
       });
     },
-    refreshImageUpload(ownerID) {
+    refreshImageUpload(ownerID, uploadRequestID) {
       const current = drafts.get(ownerID);
-      if (current === undefined || current.fields.image === null) {
+      if (
+        current === undefined ||
+        current.fields.image === null ||
+        current.fields.image.uploadRequestId !== uploadRequestID
+      ) {
         return null;
       }
       return update(ownerID, {

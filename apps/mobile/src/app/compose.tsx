@@ -26,10 +26,8 @@ import {
 } from '@/features/notes/compose-draft';
 import { listCatalogs } from '@/lib/api/catalogs';
 import {
-  createPreparedImageUploadCache,
   ImageUploadRequestError,
-  prepareCachedImageUpload,
-  type PreparedImageUploadCache,
+  prepareImageUpload,
 } from '@/lib/api/image-uploads';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { APIRequestError, createNote } from '@/lib/api/notes';
@@ -126,7 +124,6 @@ function AuthenticatedComposeScreen({
   const bodyRef = useRef(initialDraft?.body ?? '');
   const imageRef = useRef(initialDraft?.image ?? null);
   const [image, setImage] = useState(initialDraft?.image ?? null);
-  const imageUploadCacheRef = useRef<PreparedImageUploadCache | null>(null);
   const submitAbortControllerRef = useRef<AbortController | null>(null);
   const [categorySlug, setCategorySlug] = useState<string | null>(
     initialDraft?.categorySlug ?? null,
@@ -159,8 +156,6 @@ function AuthenticatedComposeScreen({
     if (!activeRef.current) {
       return;
     }
-    imageUploadCacheRef.current?.clear();
-    imageUploadCacheRef.current = null;
     currentDraftRequestIDRef.current = null;
     submittingRef.current = false;
     titleRef.current = '';
@@ -227,8 +222,6 @@ function AuthenticatedComposeScreen({
     return () => {
       submitAbortControllerRef.current?.abort();
       submitAbortControllerRef.current = null;
-      imageUploadCacheRef.current?.clear();
-      imageUploadCacheRef.current = null;
       unsubscribe();
       activeRef.current = false;
     };
@@ -347,8 +340,6 @@ function AuthenticatedComposeScreen({
         });
         return;
       }
-      imageUploadCacheRef.current?.clear();
-      imageUploadCacheRef.current = null;
       const draft = draftStore.selectImage(ownerID, selectedAsset);
       if (draft === null) {
         return;
@@ -375,8 +366,6 @@ function AuthenticatedComposeScreen({
     }
     submitAbortControllerRef.current?.abort();
     submitAbortControllerRef.current = null;
-    imageUploadCacheRef.current?.clear();
-    imageUploadCacheRef.current = null;
     const draft = draftStore.removeImage(ownerID);
     currentDraftRequestIDRef.current = draft?.clientRequestId ?? null;
     imageRef.current = draft?.image ?? null;
@@ -450,10 +439,11 @@ function AuthenticatedComposeScreen({
 
     const storedReceipt = draft.image?.imageReceipt;
     if (storedReceipt !== null && storedReceipt !== undefined) {
-      if (storedReceipt.expiresAt <= Date.now()) {
-        imageUploadCacheRef.current?.clear();
-        imageUploadCacheRef.current = null;
-        const refreshed = draftStore.refreshImageUpload(ownerID);
+      if (storedReceipt.expiresAt <= Date.now() && draft.image !== null) {
+        const refreshed = draftStore.refreshImageUpload(
+          ownerID,
+          draft.image.uploadRequestId,
+        );
         if (refreshed === null) {
           return;
         }
@@ -466,6 +456,8 @@ function AuthenticatedComposeScreen({
 
     const submittedOwnerID = ownerID;
     const submittedRequestID = draft.clientRequestId;
+    const submittedUploadRequestID =
+      draft.image === null ? null : draft.image.uploadRequestId;
     const abortController = new AbortController();
     submitAbortControllerRef.current = abortController;
     submittingRef.current = true;
@@ -473,22 +465,16 @@ function AuthenticatedComposeScreen({
     try {
       let imageUploadIds: string[] | undefined;
       if (draft.image !== null) {
+        const uploadRequestID = draft.image.uploadRequestId;
         let receipt = draft.image.imageReceipt;
         if (receipt === null) {
-          const cache =
-            imageUploadCacheRef.current ??
-            (imageUploadCacheRef.current = createPreparedImageUploadCache({
-              uuid: () => draftStore.get(ownerID)?.image?.uploadRequestId ?? '',
-            }));
-          receipt = await prepareCachedImageUpload(
-            cache,
-            draft.image.asset,
-            token,
-            { signal: abortController.signal },
-          );
+          receipt = await prepareImageUpload(draft.image.asset, token, {
+            signal: abortController.signal,
+            uploadRequestId: uploadRequestID,
+          });
           const receiptDraft = draftStore.setImageReceipt(
             submittedOwnerID,
-            draft.image.uploadRequestId,
+            uploadRequestID,
             receipt,
           );
           if (
@@ -503,6 +489,7 @@ function AuthenticatedComposeScreen({
             }
             return;
           }
+          draft = receiptDraft;
           imageRef.current = receiptDraft.image;
           setImage(receiptDraft.image);
         }
@@ -548,18 +535,28 @@ function AuthenticatedComposeScreen({
         setSubmitState({ status: 'idle' });
         return;
       }
-      if (
-        error instanceof ImageUploadRequestError &&
-        error.code === 'upload_expired'
-      ) {
-        imageUploadCacheRef.current?.clear();
-        imageUploadCacheRef.current = null;
-        const refreshed = draftStore.refreshImageUpload(submittedOwnerID);
-        if (refreshed !== null) {
-          currentDraftRequestIDRef.current = refreshed.clientRequestId;
-          imageRef.current = refreshed.image;
-          setImage(refreshed.image);
+      const uploadExpired =
+        (error instanceof ImageUploadRequestError ||
+          error instanceof APIRequestError) &&
+        error.code === 'upload_expired';
+      if (uploadExpired) {
+        if (submittedUploadRequestID === null) {
+          submittingRef.current = false;
+          setSubmitState({ status: 'idle' });
+          return;
         }
+        const refreshed = draftStore.refreshImageUpload(
+          submittedOwnerID,
+          submittedUploadRequestID,
+        );
+        if (refreshed === null) {
+          submittingRef.current = false;
+          setSubmitState({ status: 'idle' });
+          return;
+        }
+        currentDraftRequestIDRef.current = refreshed.clientRequestId;
+        imageRef.current = refreshed.image;
+        setImage(refreshed.image);
         submittingRef.current = false;
         setSubmitState({
           status: 'error',

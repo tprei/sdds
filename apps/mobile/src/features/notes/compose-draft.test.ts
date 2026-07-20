@@ -28,7 +28,11 @@ const firstFields: ComposeDraftFields = {
   title: ' title ',
 };
 
+const imageFile = new File(['image bytes'], 'photo.jpg', {
+  type: 'image/jpeg',
+});
 const imageAsset: ImageUploadAsset = {
+  file: imageFile,
   fileName: 'photo.jpg',
   height: 800,
   mimeType: 'image/jpeg',
@@ -68,6 +72,58 @@ describe('compose draft store', () => {
       title: 'title',
     });
     expect(unchanged).toEqual(first);
+  });
+
+  it('keeps the same asset generation and receipt when reselected', () => {
+    const store = createComposeDraftStore(
+      uuidSequence('upload-1', 'request-1', 'request-2'),
+    );
+    const selected = store.selectImage('owner-1', imageAsset);
+    const ready = store.setImageReceipt(
+      'owner-1',
+      selected?.image?.uploadRequestId ?? '',
+      imageReceipt,
+    );
+
+    expect(store.selectImage('owner-1', imageAsset)).toEqual(ready);
+    expect(
+      store.update('owner-1', {
+        body: 'changed',
+        categorySlug: null,
+        image: ready?.image ?? null,
+        placeSlug: null,
+        title: '',
+      })?.clientRequestId,
+    ).toBe('request-2');
+  });
+  it('replaces a ready image when a new File has identical metadata', () => {
+    const store = createComposeDraftStore(
+      uuidSequence('upload-a', 'request-a', 'upload-b', 'request-b'),
+    );
+    const first = store.selectImage('owner-1', imageAsset);
+    store.setImageReceipt(
+      'owner-1',
+      first?.image?.uploadRequestId ?? '',
+      imageReceipt,
+    );
+    const replacementFile = new File(['replacement bytes'], 'photo.jpg', {
+      type: 'image/jpeg',
+    });
+    const replacementAsset: ImageUploadAsset = {
+      ...imageAsset,
+      file: replacementFile,
+    };
+
+    const replacement = store.selectImage('owner-1', replacementAsset);
+
+    expect(replacement?.image?.asset).toBe(replacementAsset);
+    expect(replacement?.image?.asset.file).toBe(replacementFile);
+    expect(replacement?.image?.imageReceipt).toBeNull();
+    expect(replacement?.image?.uploadRequestId).toBe('upload-b');
+    expect(replacement?.clientRequestId).toBe('request-b');
+    expect(
+      store.setImageReceipt('owner-1', 'upload-a', imageReceipt),
+    ).toBeNull();
   });
 
   it('rotates the request identity when normalized fields change', () => {
@@ -166,12 +222,14 @@ describe('compose draft store', () => {
     store.selectImage('owner-1', imageAsset);
     store.setImageReceipt('owner-1', 'upload-1', imageReceipt);
 
-    const refreshed = store.refreshImageUpload('owner-1');
+    const refreshed = store.refreshImageUpload('owner-1', 'upload-1');
 
     expect(refreshed?.image?.asset).toBe(imageAsset);
     expect(refreshed?.image?.uploadRequestId).toBe('upload-2');
     expect(refreshed?.image?.imageReceipt).toBeNull();
     expect(refreshed?.clientRequestId).toBe('request-2');
+    expect(store.refreshImageUpload('owner-1', 'upload-1')).toBeNull();
+    expect(store.get('owner-1')).toEqual(refreshed);
   });
 });
 

@@ -1,4 +1,4 @@
-package media
+package s3store
 
 import (
 	"bytes"
@@ -8,21 +8,21 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"syscall"
+	"testing"
+	"time"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
-	"io"
-	"net"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
-	"strings"
-	"syscall"
-	"testing"
-	"time"
+	"github.com/tprei/sdds/services/api/internal/media"
 )
 
 type fakeS3Client struct {
@@ -52,14 +52,14 @@ func (fake *fakeS3Client) GetObject(_ context.Context, _ *s3.GetObjectInput, _ .
 func (fake *fakeS3Client) DeleteObject(_ context.Context, _ *s3.DeleteObjectInput, _ ...func(*s3.Options)) (*s3.DeleteObjectOutput, error) {
 	return &s3.DeleteObjectOutput{}, fake.deleteErr
 }
-func newFakeStore(_ *testing.T, fake *fakeS3Client) *S3Store {
-	return &S3Store{client: fake, bucket: "bucket", timeout: time.Second}
+func newFakeStore(_ *testing.T, fake *fakeS3Client) *Store {
+	return &Store{client: fake, bucket: "bucket", timeout: time.Second}
 }
-func testKey() ObjectKey { return "note-images/018f3a7b-4e2c-7abc-8def-0123456789ab" }
-func testInput(body []byte) PutObject {
-	return PutObject{Key: testKey(), Body: bytes.NewReader(body), Size: int64(len(body)), SHA256: sha256.Sum256(body), ContentType: "image/jpeg"}
+func testKey() media.ObjectKey { return "note-images/018f3a7b-4e2c-7abc-8def-0123456789ab" }
+func testInput(body []byte) media.PutObject {
+	return media.PutObject{Key: testKey(), Body: bytes.NewReader(body), Size: int64(len(body)), SHA256: sha256.Sum256(body), ContentType: "image/jpeg"}
 }
-func matchingHead(input PutObject) *s3.HeadObjectOutput {
+func matchingHead(input media.PutObject) *s3.HeadObjectOutput {
 	digest := hex.EncodeToString(input.SHA256[:])
 	return &s3.HeadObjectOutput{ContentLength: &input.Size, Metadata: map[string]string{digestMetadataKey: digest}}
 }
@@ -81,9 +81,9 @@ func (reader *zeroThenExtra) Read(buffer []byte) (int, error) {
 }
 func TestPutValidatesBytesDigestAndRewinds(t *testing.T) {
 	body, digest := []byte("image bytes"), sha256.Sum256([]byte("image bytes"))
-	for _, key := range []ObjectKey{"", "note-images/not-a-uuid", "note-images/../01234567-89ab-cdef-0123-456789abcdef", "system/readiness", "/note-images/01234567-89ab-cdef-0123-456789abcdef"} {
-		if err := ValidateObjectKey(key); !errors.Is(err, ErrInvalidObjectKey) {
-			t.Errorf("ValidateObjectKey(%q) = %v", key, err)
+	for _, key := range []media.ObjectKey{"", "note-images/not-a-uuid", "note-images/../01234567-89ab-cdef-0123-456789abcdef", "system/readiness", "/note-images/01234567-89ab-cdef-0123-456789abcdef"} {
+		if err := validateObjectKey(key); !errors.Is(err, media.ErrInvalidObjectKey) {
+			t.Errorf("validateObjectKey(%q) = %v", key, err)
 		}
 	}
 	tests := []struct {
@@ -100,8 +100,8 @@ func TestPutValidatesBytesDigestAndRewinds(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fake := &fakeS3Client{}
-			input := PutObject{Key: testKey(), Body: test.body, Size: test.size, SHA256: test.hash}
-			if err := newFakeStore(t, fake).Put(context.Background(), input); !errors.Is(err, ErrObjectIntegrity) || fake.putCalls != 0 {
+			input := media.PutObject{Key: testKey(), Body: test.body, Size: test.size, SHA256: test.hash}
+			if err := newFakeStore(t, fake).Put(context.Background(), input); !errors.Is(err, media.ErrObjectIntegrity) || fake.putCalls != 0 {
 				t.Fatalf("Put error = %v, calls = %d", err, fake.putCalls)
 			}
 		})
@@ -154,7 +154,7 @@ func TestReconciliationMismatchAndProviderMapping(t *testing.T) {
 	input := testInput([]byte("same"))
 	fake := &fakeS3Client{putErr: &smithy.GenericAPIError{Code: "PreconditionFailed"}, headOutput: matchingHead(input)}
 	*fake.headOutput.ContentLength++
-	if err := newFakeStore(t, fake).Put(context.Background(), input); !errors.Is(err, ErrObjectExists) {
+	if err := newFakeStore(t, fake).Put(context.Background(), input); !errors.Is(err, media.ErrObjectExists) {
 		t.Fatalf("mismatched reconciliation error = %v, want exists", err)
 	}
 	for _, test := range []struct {
@@ -162,17 +162,17 @@ func TestReconciliationMismatchAndProviderMapping(t *testing.T) {
 		err  error
 		want error
 	}{
-		{"NoSuchKey", &smithy.GenericAPIError{Code: "NoSuchKey"}, ErrObjectNotFound},
-		{"NotFound", &smithy.GenericAPIError{Code: "NotFound"}, ErrObjectUnavailable},
-		{"NoSuchBucket", &smithy.GenericAPIError{Code: "NoSuchBucket"}, ErrObjectUnavailable},
-		{"raw 404", responseError(404), ErrObjectUnavailable},
+		{"NoSuchKey", &smithy.GenericAPIError{Code: "NoSuchKey"}, media.ErrObjectNotFound},
+		{"NotFound", &smithy.GenericAPIError{Code: "NotFound"}, media.ErrObjectUnavailable},
+		{"NoSuchBucket", &smithy.GenericAPIError{Code: "NoSuchBucket"}, media.ErrObjectUnavailable},
+		{"raw 404", responseError(404), media.ErrObjectUnavailable},
 	} {
 		if got := mapProviderError(test.err); !errors.Is(got, test.want) {
 			t.Errorf("%s: mapProviderError = %v, want %v", test.name, got, test.want)
 		}
 	}
 	fake = &fakeS3Client{getErr: &smithy.GenericAPIError{Code: "NoSuchKey"}}
-	if _, err := newFakeStore(t, fake).Open(context.Background(), testKey()); !errors.Is(err, ErrObjectNotFound) {
+	if _, err := newFakeStore(t, fake).Open(context.Background(), testKey()); !errors.Is(err, media.ErrObjectNotFound) {
 		t.Fatalf("Open missing error = %v", err)
 	}
 	fake = &fakeS3Client{deleteErr: &smithy.GenericAPIError{Code: "NoSuchKey"}}
@@ -192,16 +192,6 @@ func TestOpenStreamsProviderBody(t *testing.T) {
 		t.Fatalf("read object = %q, err = %v", got, err)
 	}
 }
-func TestValidateEndpoint(t *testing.T) {
-	for _, test := range []struct {
-		raw string
-		ok  bool
-	}{{"http://rustfs:9000", true}, {"http://rustfs:9000/", true}, {"http://rustfs:9000/api", false}} {
-		if got := validateEndpoint(test.raw) == nil; got != test.ok {
-			t.Errorf("validateEndpoint(%q) = %v, want %v", test.raw, got, test.ok)
-		}
-	}
-}
 
 func validReadinessHead() *s3.HeadObjectOutput {
 	return &s3.HeadObjectOutput{ContentLength: aws.Int64(readinessSentinelContentLength), ChecksumSHA256: aws.String(readinessSentinelChecksumSHA256), Metadata: map[string]string{digestMetadataKey: readinessSentinelDigest}}
@@ -213,20 +203,20 @@ func TestVerifyReadinessContract(t *testing.T) {
 		edit func(*s3.HeadObjectOutput)
 	}{
 		{"valid", nil, nil},
-		{"empty response", ErrObjectIntegrity, nil},
-		{"missing length", ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { h.ContentLength = nil }},
-		{"wrong length", ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { n := readinessSentinelContentLength + 1; h.ContentLength = &n }},
-		{"missing checksum", ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { h.ChecksumSHA256 = nil }},
-		{"same-length corrupt checksum", ErrObjectIntegrity, func(h *s3.HeadObjectOutput) {
+		{"empty response", media.ErrObjectIntegrity, nil},
+		{"missing length", media.ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { h.ContentLength = nil }},
+		{"wrong length", media.ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { n := readinessSentinelContentLength + 1; h.ContentLength = &n }},
+		{"missing checksum", media.ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { h.ChecksumSHA256 = nil }},
+		{"same-length corrupt checksum", media.ErrObjectIntegrity, func(h *s3.HeadObjectOutput) {
 			payload := []byte(readinessSentinelPayload)
 			payload[len(payload)-2] = '0'
 			checksum := sha256.Sum256(payload)
 			value := base64.StdEncoding.EncodeToString(checksum[:])
 			h.ChecksumSHA256 = &value
 		}},
-		{"missing metadata", ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { h.Metadata = nil }},
-		{"unexpected metadata", ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { h.Metadata["extra"] = "value" }},
-		{"provider missing", ErrObjectNotFound, nil},
+		{"missing metadata", media.ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { h.Metadata = nil }},
+		{"unexpected metadata", media.ErrObjectIntegrity, func(h *s3.HeadObjectOutput) { h.Metadata["extra"] = "value" }},
+		{"provider missing", media.ErrObjectNotFound, nil},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -248,7 +238,7 @@ func TestVerifyReadinessContract(t *testing.T) {
 		})
 	}
 }
-func TestNewS3StoreSDKWireContract(t *testing.T) {
+func TestNewStoreSDKWireContract(t *testing.T) {
 	body, input := []byte("signed image"), testInput([]byte("signed image"))
 	access, secret := "access-key", "secret-key"
 	var puts, heads int
@@ -289,15 +279,12 @@ func TestNewS3StoreSDKWireContract(t *testing.T) {
 		},
 	}
 	defer transport.CloseIdleConnections()
-	dir := t.TempDir()
-	accessFile, secretFile := filepath.Join(dir, "access"), filepath.Join(dir, "secret")
-	if err := os.WriteFile(accessFile, []byte(access), 0600); err != nil {
-		t.Fatal(err)
+	config := Config{
+		endpoint: "http://rustfs:9000", region: "us-east-1", bucket: "bucket", usePathStyle: true,
+		accessKey: access, secretKey: secret,
+		timeout: time.Second, retryMaxAttempts: 1, loaded: true,
 	}
-	if err := os.WriteFile(secretFile, []byte(secret), 0600); err != nil {
-		t.Fatal(err)
-	}
-	store, err := newS3Store(context.Background(), Config{Endpoint: "http://rustfs:9000", Region: "us-east-1", Bucket: "bucket", UsePathStyle: true, AccessKeyFile: accessFile, SecretKeyFile: secretFile, Timeout: time.Second, RetryMaxAttempts: 1}, &http.Client{Transport: transport})
+	store, err := newStore(context.Background(), config, &http.Client{Transport: transport})
 	if err != nil {
 		t.Fatal(err)
 	}

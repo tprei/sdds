@@ -12,6 +12,7 @@ import (
 
 	"github.com/tprei/sdds/services/api/internal/httpapi"
 	"github.com/tprei/sdds/services/api/internal/media"
+	"github.com/tprei/sdds/services/api/internal/s3store"
 	"github.com/tprei/sdds/services/api/internal/sqlite"
 )
 
@@ -26,9 +27,18 @@ type databaseReadiness interface {
 	PingContext(context.Context) error
 }
 
+type mediaReadiness interface {
+	VerifyReadiness(context.Context) error
+}
+
+type readyObjectStore interface {
+	media.ObjectStore
+	mediaReadiness
+}
+
 type runtimeReadiness struct {
 	database databaseReadiness
-	media    media.ReadinessChecker
+	media    mediaReadiness
 }
 
 func (readiness runtimeReadiness) Check(ctx context.Context) error {
@@ -47,9 +57,12 @@ func (readiness runtimeReadiness) Check(ctx context.Context) error {
 	return nil
 }
 
-var newMediaStore = func(ctx context.Context, config media.Config) (media.ReadinessChecker, error) {
-	return media.NewS3Store(ctx, config)
+var newMediaStore = func(ctx context.Context, config s3store.Config) (readyObjectStore, error) {
+	store, err := s3store.New(ctx, config)
+	return store, err
 }
+
+var loadS3Config = s3store.LoadConfigFromEnv
 
 var listenAndServe = func(server *http.Server) error {
 	return server.ListenAndServe()
@@ -69,23 +82,26 @@ func main() {
 func run() error {
 	args := os.Args[1:]
 	if len(args) > 0 && (len(args) != 1 || args[0] != commandMigrate) {
-		return runWithArgs(context.Background(), config{}, args)
+		return runWithArgs(context.Background(), config{}, s3store.Config{}, args)
 	}
-	load := loadServerConfig
-	if len(args) == 1 {
-		load = loadConfig
-	}
-	cfg, err := load()
+	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
-	return runWithArgs(context.Background(), cfg, args)
+	if len(args) == 1 {
+		return runWithArgs(context.Background(), cfg, s3store.Config{}, args)
+	}
+	s3Config, err := loadS3Config()
+	if err != nil {
+		return err
+	}
+	return runWithArgs(context.Background(), cfg, s3Config, args)
 }
 
-func runWithArgs(ctx context.Context, config config, args []string) error {
+func runWithArgs(ctx context.Context, config config, s3Config s3store.Config, args []string) error {
 	switch {
 	case len(args) == 0:
-		return runServer(ctx, config)
+		return runServer(ctx, config, s3Config)
 	case len(args) == 1 && args[0] == commandMigrate:
 		return runMigrations(ctx, config)
 	default:
@@ -107,7 +123,7 @@ func runMigrations(ctx context.Context, config config) (err error) {
 	return nil
 }
 
-func runServer(ctx context.Context, config config) (err error) {
+func runServer(ctx context.Context, config config, s3Config s3store.Config) (err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -121,7 +137,7 @@ func runServer(ctx context.Context, config config) (err error) {
 		}
 	}()
 
-	store, err := newMediaStore(ctx, config.media)
+	store, err := newMediaStore(ctx, s3Config)
 	if err != nil {
 		return fmt.Errorf("create media store: %w", err)
 	}
@@ -130,19 +146,15 @@ func runServer(ctx context.Context, config config) (err error) {
 	if err := store.VerifyReadiness(readinessCtx); err != nil {
 		return fmt.Errorf("verify media readiness: %w", err)
 	}
-	objectStore, ok := store.(media.ObjectStore)
-	if !ok {
-		return errors.New("media store does not support object operations")
-	}
 	noteStore := sqlite.NewNoteStore(db)
 	catalogStore := sqlite.NewCatalogStore(db)
 	userStore := sqlite.NewUserStore(db)
 	uploadStore := sqlite.NewImageUploadStore(db)
-	uploadService, err := media.NewUploadService(uploadStore, objectStore, media.UploadConfig{})
+	uploadService, err := media.NewUploadService(uploadStore, store, media.UploadConfig{})
 	if err != nil {
 		return fmt.Errorf("create upload service: %w", err)
 	}
-	imageReader := media.NewImageReader(noteStore, objectStore)
+	imageReader := media.NewImageReader(noteStore, store)
 	cleanupCtx, cleanupCancel := context.WithTimeout(ctx, startupReadinessTimeout)
 	if err := uploadService.CleanupExpired(cleanupCtx, time.Now()); err != nil {
 		cleanupCancel()

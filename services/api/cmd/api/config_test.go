@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,7 +9,16 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tprei/sdds/services/api/internal/httpapi"
-	"github.com/tprei/sdds/services/api/internal/media"
+	"github.com/tprei/sdds/services/api/internal/s3store"
+)
+
+const (
+	mediaEndpointEnv      = "SDDS_MEDIA_S3_ENDPOINT"
+	mediaRegionEnv        = "SDDS_MEDIA_S3_REGION"
+	mediaBucketEnv        = "SDDS_MEDIA_S3_BUCKET"
+	mediaPathStyleEnv     = "SDDS_MEDIA_S3_PATH_STYLE"
+	mediaAccessKeyFileEnv = "SDDS_MEDIA_S3_ACCESS_KEY_FILE"
+	mediaSecretKeyFileEnv = "SDDS_MEDIA_S3_SECRET_KEY_FILE"
 )
 
 func TestLoadConfigUsesDefaults(t *testing.T) {
@@ -91,28 +101,24 @@ func TestLoadConfigRejectsInvalidAuthLimits(t *testing.T) {
 	}
 }
 
-func TestLoadServerConfigUsesMediaEnvironment(t *testing.T) {
+func TestLoadS3ConfigUsesMediaEnvironment(t *testing.T) {
 	clearConfigEnv(t)
-	accessKeyFile, secretKeyFile := setValidMediaEnv(t)
-	got, err := loadServerConfig()
-	if err != nil {
-		t.Fatalf("load server config: %v", err)
-	}
-
-	want := config{
-		authLimits: httpapi.DefaultAuthLimits(), databasePath: defaultDatabasePath, httpAddr: defaultHTTPAddr,
-		media: media.Config{
-			Endpoint: "http://rustfs:9000/", Region: "us-east-1", Bucket: "sdds-media", UsePathStyle: true,
-			AccessKeyFile: accessKeyFile, SecretKeyFile: secretKeyFile,
-			Timeout: mediaRequestTimeout, RetryMaxAttempts: mediaRetryMaxAttempts,
-		},
-	}
-	if diff := cmp.Diff(want, got, cmp.AllowUnexported(config{})); diff != "" {
-		t.Fatalf("config mismatch (-want +got):\n%s", diff)
+	setValidMediaEnv(t)
+	if _, err := s3store.LoadConfigFromEnv(); err != nil {
+		t.Fatalf("load S3 config: %v", err)
 	}
 }
 
-func TestLoadMediaConfigRejectsInvalidValues(t *testing.T) {
+func TestLoadS3ConfigAllowsHTTPSPath(t *testing.T) {
+	clearConfigEnv(t)
+	setValidMediaEnv(t)
+	t.Setenv(mediaEndpointEnv, "https://objects.example.com/base")
+	if _, err := s3store.LoadConfigFromEnv(); err != nil {
+		t.Fatalf("load HTTPS endpoint config: %v", err)
+	}
+}
+
+func TestLoadS3ConfigRejectsInvalidValues(t *testing.T) {
 	missingFile := filepath.Join(t.TempDir(), "missing")
 	tests := []struct {
 		name, env, value, want, prefix, fileContents string
@@ -125,6 +131,7 @@ func TestLoadMediaConfigRejectsInvalidValues(t *testing.T) {
 		{"access key file missing", mediaAccessKeyFileEnv, "", mediaAccessKeyFileEnv + " is required", "", "", false},
 		{"secret key file missing", mediaSecretKeyFileEnv, "", mediaSecretKeyFileEnv + " is required", "", "", false},
 		{"endpoint syntax", mediaEndpointEnv, "://rustfs:9000", mediaEndpointEnv + " must be a valid HTTP(S) URL", "", "", false},
+		{"endpoint opaque", mediaEndpointEnv, "https:rustfs", mediaEndpointEnv + " must be a valid HTTP(S) URL", "", "", false},
 		{"endpoint scheme", mediaEndpointEnv, "ftp://rustfs:9000", mediaEndpointEnv + " must use HTTP or HTTPS", "", "", false},
 		{"endpoint insecure remote", mediaEndpointEnv, "http://localhost:9000", mediaEndpointEnv + " must use HTTPS except for http://rustfs:9000", "", "", false},
 		{"endpoint insecure lookalike", mediaEndpointEnv, "http://rustfs.example:9000", mediaEndpointEnv + " must use HTTPS except for http://rustfs:9000", "", "", false},
@@ -134,6 +141,7 @@ func TestLoadMediaConfigRejectsInvalidValues(t *testing.T) {
 		{"endpoint query", mediaEndpointEnv, "https://example.com?x=1", mediaEndpointEnv + " must be a valid HTTP(S) URL", "", "", false},
 		{"endpoint fragment", mediaEndpointEnv, "https://example.com#fragment", mediaEndpointEnv + " must be a valid HTTP(S) URL", "", "", false},
 		{"path style invalid", mediaPathStyleEnv, "yes", mediaPathStyleEnv + " must be true or false", "", "", false},
+		{"path style uppercase", mediaPathStyleEnv, "TRUE", mediaPathStyleEnv + " must be true or false", "", "", false},
 		{"access key unreadable", mediaAccessKeyFileEnv, missingFile, "", "read " + mediaAccessKeyFileEnv + ":", "", false},
 		{"secret key unreadable", mediaSecretKeyFileEnv, missingFile, "", "read " + mediaSecretKeyFileEnv + ":", "", false},
 		{"access key empty", mediaAccessKeyFileEnv, "", mediaAccessKeyFileEnv + " contains an empty credential", "", " \n\t", true},
@@ -150,16 +158,16 @@ func TestLoadMediaConfigRejectsInvalidValues(t *testing.T) {
 			if tt.fileContents != "" {
 				writeMediaFile(t, os.Getenv(tt.env), tt.fileContents)
 			}
-			assertMediaConfigError(t, tt.want, tt.prefix)
+			assertS3ConfigError(t, tt.want, tt.prefix)
 		})
 	}
 }
 
-func assertMediaConfigError(t *testing.T, want, prefix string) {
+func assertS3ConfigError(t *testing.T, want, prefix string) {
 	t.Helper()
-	_, err := loadMediaConfig()
+	_, err := s3store.LoadConfigFromEnv()
 	if err == nil {
-		t.Fatal("load media config error is nil")
+		t.Fatal("load S3 config error is nil")
 	}
 	if prefix != "" {
 		if got := err.Error(); !strings.HasPrefix(got, prefix) {
@@ -172,15 +180,43 @@ func assertMediaConfigError(t *testing.T, want, prefix string) {
 	}
 }
 
-func TestReadMediaSecretFileNormalizesWhitespace(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "secret")
-	writeMediaFile(t, path, "  access-key\r\n")
-	got, err := readMediaSecretFile(mediaAccessKeyFileEnv, path)
-	if err != nil {
-		t.Fatalf("read secret: %v", err)
+func TestLoadS3ConfigNormalizesCredentialWhitespace(t *testing.T) {
+	clearConfigEnv(t)
+	accessKeyFile, secretKeyFile := setValidMediaEnv(t)
+	writeMediaFile(t, accessKeyFile, "  access-key\r\n")
+	writeMediaFile(t, secretKeyFile, "\tsecret-key \n")
+	if _, err := s3store.LoadConfigFromEnv(); err != nil {
+		t.Fatalf("load normalized credentials: %v", err)
 	}
-	if got != "access-key" {
-		t.Fatalf("normalized secret = %q, want %q", got, "access-key")
+}
+
+func TestLoadS3ConfigAllowsReadableCredentialFiles(t *testing.T) {
+	clearConfigEnv(t)
+	accessKeyFile, secretKeyFile := setValidMediaEnv(t)
+	for _, path := range []string{accessKeyFile, secretKeyFile} {
+		if err := os.Chmod(path, 0o444); err != nil {
+			t.Fatalf("set credential file mode: %v", err)
+		}
+	}
+	if _, err := s3store.LoadConfigFromEnv(); err != nil {
+		t.Fatalf("load readable credentials: %v", err)
+	}
+}
+
+func TestS3ConfigReadsCredentialsOnce(t *testing.T) {
+	clearConfigEnv(t)
+	accessKeyFile, secretKeyFile := setValidMediaEnv(t)
+	config, err := s3store.LoadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load S3 config: %v", err)
+	}
+	for _, path := range []string{accessKeyFile, secretKeyFile} {
+		if err := os.Remove(path); err != nil {
+			t.Fatalf("remove credential file: %v", err)
+		}
+	}
+	if _, err := s3store.New(context.Background(), config); err != nil {
+		t.Fatalf("new store after credentials are removed: %v", err)
 	}
 }
 

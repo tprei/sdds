@@ -19,6 +19,15 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Lint Go
+        run: |
+          files=$(gofmt -l services/api tests/integration)
+          if [ -n "$files" ]; then
+            printf '%s\n' "$files"
+            exit 1
+          fi
+          go tool golangci-lint run ./services/api/... ./tests/integration
+
       - name: Test API
         run: go test ./services/api/...
 
@@ -158,8 +167,8 @@ jobs:
       - name: Install packages
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm lint
+      - name: Lint OpenAPI and TypeScript
+        run: pnpm openapi:lint && pnpm lint:ts
 
       - name: Check mobile API schemas
         run: pnpm api:schema:check

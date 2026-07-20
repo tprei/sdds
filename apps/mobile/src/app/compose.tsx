@@ -1,6 +1,10 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import {
+  launchImageLibraryAsync,
+  UIImagePickerPreferredAssetRepresentationMode,
+} from 'expo-image-picker';
 
 import {
   EmptyStateCard,
@@ -21,6 +25,12 @@ import {
   type ComposeDraftStore,
 } from '@/features/notes/compose-draft';
 import { listCatalogs } from '@/lib/api/catalogs';
+import {
+  createPreparedImageUploadCache,
+  ImageUploadRequestError,
+  prepareCachedImageUpload,
+  type PreparedImageUploadCache,
+} from '@/lib/api/image-uploads';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { APIRequestError, createNote } from '@/lib/api/notes';
 import { badRequestStatus, unauthorizedStatus } from '@/lib/api/status';
@@ -32,6 +42,9 @@ type SubmitState =
   | { status: 'submitting' }
   | { status: 'success' }
   | { status: 'error'; message: string };
+
+const unsupportedImageMessage =
+  'Essa imagem não é compatível. Escolha uma imagem JPEG ou PNG.';
 
 type CatalogState =
   | { status: 'loading' }
@@ -111,6 +124,10 @@ function AuthenticatedComposeScreen({
   const placeSlugRef = useRef<string | null>(initialDraft?.placeSlug ?? null);
   const titleRef = useRef(initialDraft?.title ?? '');
   const bodyRef = useRef(initialDraft?.body ?? '');
+  const imageRef = useRef(initialDraft?.image ?? null);
+  const [image, setImage] = useState(initialDraft?.image ?? null);
+  const imageUploadCacheRef = useRef<PreparedImageUploadCache | null>(null);
+  const submitAbortControllerRef = useRef<AbortController | null>(null);
   const [categorySlug, setCategorySlug] = useState<string | null>(
     initialDraft?.categorySlug ?? null,
   );
@@ -142,10 +159,14 @@ function AuthenticatedComposeScreen({
     if (!activeRef.current) {
       return;
     }
+    imageUploadCacheRef.current?.clear();
+    imageUploadCacheRef.current = null;
     currentDraftRequestIDRef.current = null;
     submittingRef.current = false;
     titleRef.current = '';
     bodyRef.current = '';
+    imageRef.current = null;
+    setImage(null);
     categorySlugRef.current = null;
     placeSlugRef.current = null;
     setTitle('');
@@ -164,10 +185,12 @@ function AuthenticatedComposeScreen({
     bodyRef.current = draft.body;
     categorySlugRef.current = draft.categorySlug;
     placeSlugRef.current = draft.placeSlug;
+    imageRef.current = draft.image;
     setTitle(draft.title);
     setBody(draft.body);
     setCategorySlug(draft.categorySlug);
     setPlaceSlug(draft.placeSlug);
+    setImage(draft.image);
     setSubmitState({ status: 'idle' });
   }, []);
 
@@ -202,6 +225,10 @@ function AuthenticatedComposeScreen({
       hydrateDraft(latestDraft);
     }
     return () => {
+      submitAbortControllerRef.current?.abort();
+      submitAbortControllerRef.current = null;
+      imageUploadCacheRef.current?.clear();
+      imageUploadCacheRef.current = null;
       unsubscribe();
       activeRef.current = false;
     };
@@ -233,6 +260,7 @@ function AuthenticatedComposeScreen({
         categorySlug: categorySlugRef.current,
         placeSlug: placeSlugRef.current,
         title: nextTitle,
+        image: imageRef.current,
       });
     },
     [syncDraft],
@@ -250,6 +278,7 @@ function AuthenticatedComposeScreen({
         categorySlug: categorySlugRef.current,
         placeSlug: placeSlugRef.current,
         title: titleRef.current,
+        image: imageRef.current,
       });
     },
     [syncDraft],
@@ -267,6 +296,7 @@ function AuthenticatedComposeScreen({
         categorySlug: nextSlug,
         placeSlug: placeSlugRef.current,
         title: titleRef.current,
+        image: imageRef.current,
       });
     },
     [syncDraft],
@@ -284,10 +314,74 @@ function AuthenticatedComposeScreen({
         categorySlug: categorySlugRef.current,
         placeSlug: nextSlug,
         title: titleRef.current,
+        image: imageRef.current,
       });
     },
     [syncDraft],
   );
+
+  const pickImage = useCallback(async () => {
+    if (!activeRef.current || submittingRef.current) {
+      return;
+    }
+    try {
+      const result = await launchImageLibraryAsync({
+        allowsEditing: false,
+        allowsMultipleSelection: false,
+        mediaTypes: ['images'],
+        preferredAssetRepresentationMode:
+          UIImagePickerPreferredAssetRepresentationMode.Compatible,
+        selectionLimit: 1,
+      });
+      if (!activeRef.current || submittingRef.current || result.canceled) {
+        return;
+      }
+      const selectedAsset = result.assets[0];
+      if (selectedAsset === undefined) {
+        return;
+      }
+      if (!isSupportedImageMimeType(selectedAsset.mimeType)) {
+        setSubmitState({
+          status: 'error',
+          message: unsupportedImageMessage,
+        });
+        return;
+      }
+      imageUploadCacheRef.current?.clear();
+      imageUploadCacheRef.current = null;
+      const draft = draftStore.selectImage(ownerID, selectedAsset);
+      if (draft === null) {
+        return;
+      }
+      currentDraftRequestIDRef.current = draft.clientRequestId;
+      imageRef.current = draft.image;
+      setImage(draft.image);
+      setSubmitState({ status: 'idle' });
+    } catch (error: unknown) {
+      if (!activeRef.current || submittingRef.current || isAbortError(error)) {
+        return;
+      }
+      setSubmitState({
+        status: 'error',
+        message:
+          'Não deu pra selecionar a imagem agora. Tente de novo em instantes.',
+      });
+    }
+  }, [draftStore, ownerID]);
+
+  const removeImage = useCallback(() => {
+    if (!activeRef.current || submittingRef.current) {
+      return;
+    }
+    submitAbortControllerRef.current?.abort();
+    submitAbortControllerRef.current = null;
+    imageUploadCacheRef.current?.clear();
+    imageUploadCacheRef.current = null;
+    const draft = draftStore.removeImage(ownerID);
+    currentDraftRequestIDRef.current = draft?.clientRequestId ?? null;
+    imageRef.current = draft?.image ?? null;
+    setImage(draft?.image ?? null);
+  }, [draftStore, ownerID]);
 
   useFocusEffect(
     useCallback(() => {
@@ -343,27 +437,83 @@ function AuthenticatedComposeScreen({
       return;
     }
 
-    const draft = syncDraft({
+    let draft = syncDraft({
       body: trimmedBody,
       categorySlug,
       placeSlug,
       title: trimmedTitle,
+      image: imageRef.current,
     });
     if (draft === null) {
       return;
     }
 
+    const storedReceipt = draft.image?.imageReceipt;
+    if (storedReceipt !== null && storedReceipt !== undefined) {
+      if (storedReceipt.expiresAt <= Date.now()) {
+        imageUploadCacheRef.current?.clear();
+        imageUploadCacheRef.current = null;
+        const refreshed = draftStore.refreshImageUpload(ownerID);
+        if (refreshed === null) {
+          return;
+        }
+        draft = refreshed;
+        currentDraftRequestIDRef.current = refreshed.clientRequestId;
+        imageRef.current = refreshed.image;
+        setImage(refreshed.image);
+      }
+    }
+
     const submittedOwnerID = ownerID;
     const submittedRequestID = draft.clientRequestId;
+    const abortController = new AbortController();
+    submitAbortControllerRef.current = abortController;
     submittingRef.current = true;
     setSubmitState({ status: 'submitting' });
-
     try {
+      let imageUploadIds: string[] | undefined;
+      if (draft.image !== null) {
+        let receipt = draft.image.imageReceipt;
+        if (receipt === null) {
+          const cache =
+            imageUploadCacheRef.current ??
+            (imageUploadCacheRef.current = createPreparedImageUploadCache({
+              uuid: () => draftStore.get(ownerID)?.image?.uploadRequestId ?? '',
+            }));
+          receipt = await prepareCachedImageUpload(
+            cache,
+            draft.image.asset,
+            token,
+            { signal: abortController.signal },
+          );
+          const receiptDraft = draftStore.setImageReceipt(
+            submittedOwnerID,
+            draft.image.uploadRequestId,
+            receipt,
+          );
+          if (
+            receiptDraft === null ||
+            !activeRef.current ||
+            draftStore.get(submittedOwnerID)?.clientRequestId !==
+              submittedRequestID
+          ) {
+            if (activeRef.current) {
+              submittingRef.current = false;
+              setSubmitState({ status: 'idle' });
+            }
+            return;
+          }
+          imageRef.current = receiptDraft.image;
+          setImage(receiptDraft.image);
+        }
+        imageUploadIds = [receipt.imageUploadId];
+      }
       await createNote(
         {
           body: draft.body,
           categorySlug: draft.categorySlug ?? categorySlug,
           clientRequestId: submittedRequestID,
+          imageUploadIds,
           placeSlug: draft.placeSlug,
           title: draft.title,
         },
@@ -383,20 +533,46 @@ function AuthenticatedComposeScreen({
         resetDraft();
       }
     } catch (error) {
+      if (isAbortError(error)) {
+        if (activeRef.current) {
+          submittingRef.current = false;
+        }
+        return;
+      }
       if (!activeRef.current) {
         return;
       }
-      if (
-        draftStore.get(submittedOwnerID)?.clientRequestId !== submittedRequestID
-      ) {
+      const currentDraft = draftStore.get(submittedOwnerID);
+      if (currentDraft?.clientRequestId !== submittedRequestID) {
         submittingRef.current = false;
         setSubmitState({ status: 'idle' });
         return;
       }
       if (
-        error instanceof APIRequestError &&
-        error.status === unauthorizedStatus
+        error instanceof ImageUploadRequestError &&
+        error.code === 'upload_expired'
       ) {
+        imageUploadCacheRef.current?.clear();
+        imageUploadCacheRef.current = null;
+        const refreshed = draftStore.refreshImageUpload(submittedOwnerID);
+        if (refreshed !== null) {
+          currentDraftRequestIDRef.current = refreshed.clientRequestId;
+          imageRef.current = refreshed.image;
+          setImage(refreshed.image);
+        }
+        submittingRef.current = false;
+        setSubmitState({
+          status: 'error',
+          message: 'A imagem expirou. Tente publicar de novo.',
+        });
+        return;
+      }
+      const unauthorized =
+        (error instanceof APIRequestError &&
+          error.status === unauthorizedStatus) ||
+        (error instanceof ImageUploadRequestError &&
+          error.status === unauthorizedStatus);
+      if (unauthorized) {
         submittingRef.current = false;
         setSubmitState({
           status: 'error',
@@ -439,6 +615,10 @@ function AuthenticatedComposeScreen({
         status: 'error',
         message: 'Não deu pra publicar agora. Tente de novo em instantes.',
       });
+    } finally {
+      if (submitAbortControllerRef.current === abortController) {
+        submitAbortControllerRef.current = null;
+      }
     }
   }
 
@@ -556,6 +736,37 @@ function AuthenticatedComposeScreen({
             </View>
           </>
         ) : null}
+        <View style={styles.field}>
+          <Text style={styles.label}>Imagem</Text>
+          {image === null ? (
+            <FoundationButton
+              disabled={isSubmitting}
+              label="Adicionar imagem"
+              onPress={pickImage}
+              testID="compose-add-image"
+            />
+          ) : (
+            <>
+              <Text testID="compose-image-name">
+                {image.asset.fileName ?? image.asset.uri}
+              </Text>
+              <View style={styles.optionRow}>
+                <FoundationButton
+                  disabled={isSubmitting}
+                  label="Trocar imagem"
+                  onPress={pickImage}
+                  testID="compose-replace-image"
+                />
+                <FoundationButton
+                  disabled={isSubmitting}
+                  label="Remover imagem"
+                  onPress={removeImage}
+                  testID="compose-remove-image"
+                />
+              </View>
+            </>
+          )}
+        </View>
         {submitState.status === 'success' ? (
           <Text style={styles.statusSuccess}>
             Publicado. Indo pro início...
@@ -565,6 +776,7 @@ function AuthenticatedComposeScreen({
           <Text style={styles.statusError}>{submitState.message}</Text>
         ) : null}
         <FoundationButton
+          testID="compose-submit"
           disabled={!canSubmit}
           label={isSubmitting ? 'Publicando...' : 'Publicar'}
           onPress={handleSubmit}
@@ -618,4 +830,25 @@ function ComposeAuthGate({
 
 function textLength(value: string): number {
   return Array.from(value).length;
+}
+
+function isSupportedImageMimeType(
+  mimeType: string | null | undefined,
+): boolean {
+  if (mimeType === null || mimeType === undefined) {
+    return true;
+  }
+  const normalizedMimeType = mimeType.trim().toLowerCase();
+  return (
+    normalizedMimeType === 'image/jpeg' || normalizedMimeType === 'image/png'
+  );
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    error.name === 'AbortError'
+  );
 }

@@ -1,10 +1,20 @@
 import * as Crypto from 'expo-crypto';
+import type {
+  ImageUploadAsset,
+  ImageUploadReceipt,
+} from '@/lib/api/image-uploads';
 
+export type ComposeDraftImage = {
+  asset: ImageUploadAsset;
+  imageReceipt: ImageUploadReceipt | null;
+  uploadRequestId: string;
+};
 export type ComposeDraftFields = {
   body: string;
   categorySlug: string | null;
   placeSlug: string | null;
   title: string;
+  image: ComposeDraftImage | null;
 };
 
 export type ComposeDraft = ComposeDraftFields & {
@@ -16,6 +26,14 @@ export type ComposeDraftCompletionListener = (clientRequestID: string) => void;
 export type ComposeDraftStore = {
   clear(ownerID: string, clientRequestID: string): boolean;
   get(ownerID: string): ComposeDraft | null;
+  removeImage(ownerID: string): ComposeDraft | null;
+  selectImage(ownerID: string, asset: ImageUploadAsset): ComposeDraft | null;
+  refreshImageUpload(ownerID: string): ComposeDraft | null;
+  setImageReceipt(
+    ownerID: string,
+    uploadRequestID: string,
+    receipt: ImageUploadReceipt,
+  ): ComposeDraft | null;
   subscribe(
     ownerID: string,
     listener: ComposeDraftCompletionListener,
@@ -29,6 +47,13 @@ type StoredComposeDraft = {
   fingerprint: string;
 };
 
+const emptyDraftFields: ComposeDraftFields = {
+  body: '',
+  categorySlug: null,
+  image: null,
+  placeSlug: null,
+  title: '',
+};
 export function createComposeDraftStore(
   randomUUID: () => string,
 ): ComposeDraftStore {
@@ -42,6 +67,30 @@ export function createComposeDraftStore(
     for (const listener of [...ownerListeners]) {
       listener(clientRequestID);
     }
+  };
+  const update = (
+    ownerID: string,
+    fields: ComposeDraftFields,
+  ): ComposeDraft | null => {
+    const normalizedFields = normalizeFields(fields);
+    if (isEmpty(normalizedFields)) {
+      drafts.delete(ownerID);
+      return null;
+    }
+
+    const fingerprint = draftFingerprint(normalizedFields);
+    const current = drafts.get(ownerID);
+    if (current?.fingerprint === fingerprint) {
+      return composeDraft(current);
+    }
+
+    const next: StoredComposeDraft = {
+      clientRequestId: randomUUID(),
+      fields: normalizedFields,
+      fingerprint,
+    };
+    drafts.set(ownerID, next);
+    return composeDraft(next);
   };
 
   return {
@@ -83,27 +132,70 @@ export function createComposeDraftStore(
       }
       return composeDraft(current);
     },
-    update(ownerID, fields) {
-      const normalizedFields = normalizeFields(fields);
-      if (isEmpty(normalizedFields)) {
-        drafts.delete(ownerID);
-        return null;
-      }
-
-      const fingerprint = JSON.stringify(normalizedFields);
+    removeImage(ownerID) {
       const current = drafts.get(ownerID);
-      if (current?.fingerprint === fingerprint) {
+      if (current === undefined || current.fields.image === null) {
+        return current === undefined ? null : composeDraft(current);
+      }
+      return update(ownerID, { ...current.fields, image: null });
+    },
+    selectImage(ownerID, asset) {
+      const current = drafts.get(ownerID);
+      const currentImage = current?.fields.image;
+      if (
+        current !== undefined &&
+        currentImage !== null &&
+        currentImage !== undefined &&
+        currentImage.asset.file === asset.file &&
+        imageAssetKey(currentImage.asset) === imageAssetKey(asset)
+      ) {
         return composeDraft(current);
       }
-
+      return update(ownerID, {
+        ...(current?.fields ?? emptyDraftFields),
+        image: {
+          asset,
+          imageReceipt: null,
+          uploadRequestId: randomUUID(),
+        },
+      });
+    },
+    refreshImageUpload(ownerID) {
+      const current = drafts.get(ownerID);
+      if (current === undefined || current.fields.image === null) {
+        return null;
+      }
+      return update(ownerID, {
+        ...current.fields,
+        image: {
+          ...current.fields.image,
+          imageReceipt: null,
+          uploadRequestId: randomUUID(),
+        },
+      });
+    },
+    setImageReceipt(ownerID, uploadRequestID, receipt) {
+      const current = drafts.get(ownerID);
+      const image = current?.fields.image;
+      if (
+        current === undefined ||
+        image === undefined ||
+        image === null ||
+        image.uploadRequestId !== uploadRequestID
+      ) {
+        return null;
+      }
       const next: StoredComposeDraft = {
-        clientRequestId: randomUUID(),
-        fields: normalizedFields,
-        fingerprint,
+        ...current,
+        fields: {
+          ...current.fields,
+          image: { ...image, imageReceipt: receipt },
+        },
       };
       drafts.set(ownerID, next);
       return composeDraft(next);
     },
+    update,
   };
 }
 
@@ -122,6 +214,7 @@ function normalizeFields(fields: ComposeDraftFields): ComposeDraftFields {
   return {
     body: fields.body.trim(),
     categorySlug: normalizeSlug(fields.categorySlug),
+    image: fields.image,
     placeSlug: normalizeSlug(fields.placeSlug),
     title: fields.title.trim(),
   };
@@ -136,7 +229,34 @@ function isEmpty(fields: ComposeDraftFields): boolean {
   return (
     fields.body === '' &&
     fields.categorySlug === null &&
+    fields.image === null &&
     fields.placeSlug === null &&
     fields.title === ''
   );
+}
+function draftFingerprint(fields: ComposeDraftFields): string {
+  return JSON.stringify({
+    body: fields.body,
+    categorySlug: fields.categorySlug,
+    image:
+      fields.image === null
+        ? null
+        : {
+            asset: imageAssetKey(fields.image.asset),
+            uploadRequestId: fields.image.uploadRequestId,
+          },
+    placeSlug: fields.placeSlug,
+    title: fields.title,
+  });
+}
+
+function imageAssetKey(asset: ImageUploadAsset): string {
+  return [
+    asset.uri,
+    asset.fileName ?? '',
+    asset.fileSize ?? '',
+    asset.height,
+    asset.mimeType ?? '',
+    asset.width,
+  ].join('\u0000');
 }

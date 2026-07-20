@@ -1,5 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
-import * as Crypto from 'expo-crypto';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
@@ -15,6 +14,12 @@ import {
   resolveSelectedPlaceSlug,
 } from '@/features/notes/catalog';
 import type { NoteCatalog } from '@/features/notes/catalog';
+import {
+  composeDraftStore,
+  type ComposeDraft,
+  type ComposeDraftFields,
+  type ComposeDraftStore,
+} from '@/features/notes/compose-draft';
 import { listCatalogs } from '@/lib/api/catalogs';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { APIRequestError, createNote } from '@/lib/api/notes';
@@ -33,23 +38,174 @@ type CatalogState =
   | { status: 'ready'; catalog: NoteCatalog }
   | { status: 'error' };
 
+type ComposeScreenProps = {
+  draftStore?: ComposeDraftStore;
+};
 
-export default function ComposeScreen() {
+type AuthenticatedComposeScreenProps = {
+  draftStore: ComposeDraftStore;
+  logout: () => Promise<void>;
+  ownerID: string;
+  token: string;
+};
+
+export default function ComposeScreen({
+  draftStore = composeDraftStore,
+}: ComposeScreenProps = {}) {
   const router = useRouter();
-  const { logout, state: authState } = useAuth();
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const categorySlugRef = useRef<string | null>(null);
-  const placeSlugRef = useRef<string | null>(null);
-  const [categorySlug, setCategorySlug] = useState<string | null>(null);
-  const [placeSlug, setPlaceSlug] = useState<string | null>(null);
+  const { logout, state } = useAuth();
+
+  if (state.status === 'authenticated') {
+    return (
+      <AuthenticatedComposeScreen
+        key={state.user.id}
+        draftStore={draftStore}
+        logout={logout}
+        ownerID={state.user.id}
+        token={state.token}
+      />
+    );
+  }
+
+  return (
+    <FoundationScreen
+      eyebrow="Escrever"
+      title="Conta uma dica"
+      description="Uma nota curta, útil e com cara de indicação de amigo."
+    >
+      <ComposeAuthGate
+        status={state.status}
+        onLogin={() => {
+          router.push({
+            pathname: '/login',
+            params: { next: '/compose' },
+          });
+        }}
+        onSignup={() => {
+          router.push({
+            pathname: '/signup',
+            params: { next: '/compose' },
+          });
+        }}
+      />
+    </FoundationScreen>
+  );
+}
+
+function AuthenticatedComposeScreen({
+  draftStore,
+  logout,
+  ownerID,
+  token,
+}: AuthenticatedComposeScreenProps) {
+  const router = useRouter();
+  const initialDraft = draftStore.get(ownerID);
+  const currentDraftRequestIDRef = useRef<string | null>(
+    initialDraft?.clientRequestId ?? null,
+  );
+  const [title, setTitle] = useState(initialDraft?.title ?? '');
+  const [body, setBody] = useState(initialDraft?.body ?? '');
+  const categorySlugRef = useRef<string | null>(
+    initialDraft?.categorySlug ?? null,
+  );
+  const placeSlugRef = useRef<string | null>(initialDraft?.placeSlug ?? null);
+  const titleRef = useRef(initialDraft?.title ?? '');
+  const bodyRef = useRef(initialDraft?.body ?? '');
+  const [categorySlug, setCategorySlug] = useState<string | null>(
+    initialDraft?.categorySlug ?? null,
+  );
+  const [placeSlug, setPlaceSlug] = useState<string | null>(
+    initialDraft?.placeSlug ?? null,
+  );
   const [catalogState, setCatalogState] = useState<CatalogState>({
     status: 'loading',
   });
   const [submitState, setSubmitState] = useState<SubmitState>({
     status: 'idle',
   });
-  const clientRequestIdentityRef = useRef<{ fingerprint: string; id: string } | null>(null);
+  const submittingRef = useRef(false);
+  const activeRef = useRef(false);
+
+  const syncDraft = useCallback(
+    (fields: ComposeDraftFields): ComposeDraft | null => {
+      if (!activeRef.current) {
+        return null;
+      }
+      const next = draftStore.update(ownerID, fields);
+      currentDraftRequestIDRef.current = next?.clientRequestId ?? null;
+      return next;
+    },
+    [draftStore, ownerID],
+  );
+
+  const clearLocalDraft = useCallback(() => {
+    if (!activeRef.current) {
+      return;
+    }
+    currentDraftRequestIDRef.current = null;
+    submittingRef.current = false;
+    titleRef.current = '';
+    bodyRef.current = '';
+    categorySlugRef.current = null;
+    placeSlugRef.current = null;
+    setTitle('');
+    setBody('');
+    setCategorySlug(null);
+    setPlaceSlug(null);
+    setSubmitState({ status: 'idle' });
+  }, []);
+
+  const hydrateDraft = useCallback((draft: ComposeDraft) => {
+    if (!activeRef.current) {
+      return;
+    }
+    currentDraftRequestIDRef.current = draft.clientRequestId;
+    titleRef.current = draft.title;
+    bodyRef.current = draft.body;
+    categorySlugRef.current = draft.categorySlug;
+    placeSlugRef.current = draft.placeSlug;
+    setTitle(draft.title);
+    setBody(draft.body);
+    setCategorySlug(draft.categorySlug);
+    setPlaceSlug(draft.placeSlug);
+    setSubmitState({ status: 'idle' });
+  }, []);
+
+  const resetDraft = useCallback(() => {
+    if (!activeRef.current) {
+      return;
+    }
+    clearLocalDraft();
+    setSubmitState({ status: 'success' });
+    router.navigate('/');
+  }, [clearLocalDraft, router]);
+
+  useLayoutEffect(() => {
+    activeRef.current = true;
+    const unsubscribe = draftStore.subscribe(ownerID, (completedRequestID) => {
+      if (
+        !activeRef.current ||
+        currentDraftRequestIDRef.current !== completedRequestID
+      ) {
+        return;
+      }
+      resetDraft();
+    });
+    const latestDraft = draftStore.get(ownerID);
+    if (latestDraft === null) {
+      if (currentDraftRequestIDRef.current !== null) {
+        clearLocalDraft();
+      }
+    } else if (
+      latestDraft.clientRequestId !== currentDraftRequestIDRef.current
+    ) {
+      hydrateDraft(latestDraft);
+    }
+    return () => {
+      unsubscribe();
+      activeRef.current = false;
+    };
+  }, [clearLocalDraft, draftStore, hydrateDraft, ownerID, resetDraft]);
 
   const trimmedTitle = title.trim();
   const trimmedBody = body.trim();
@@ -63,21 +219,75 @@ export default function ComposeScreen() {
     bodyLength <= 4000 &&
     catalogState.status === 'ready' &&
     categorySlug !== null &&
-    authState.status === 'authenticated' &&
     !isSubmitting;
 
-  const selectCategorySlug = useCallback((nextSlug: string | null) => {
-    if (isSubmitting) return;
-    categorySlugRef.current = nextSlug;
-    setCategorySlug(nextSlug);
-  }, [isSubmitting]);
+  const updateTitle = useCallback(
+    (nextTitle: string) => {
+      if (!activeRef.current || submittingRef.current) {
+        return;
+      }
+      titleRef.current = nextTitle;
+      setTitle(nextTitle);
+      syncDraft({
+        body: bodyRef.current,
+        categorySlug: categorySlugRef.current,
+        placeSlug: placeSlugRef.current,
+        title: nextTitle,
+      });
+    },
+    [syncDraft],
+  );
 
-  const selectPlaceSlug = useCallback((nextSlug: string | null) => {
-    if (isSubmitting) return;
-    placeSlugRef.current = nextSlug;
-    setPlaceSlug(nextSlug);
-  }, [isSubmitting]);
+  const updateBody = useCallback(
+    (nextBody: string) => {
+      if (!activeRef.current || submittingRef.current) {
+        return;
+      }
+      bodyRef.current = nextBody;
+      setBody(nextBody);
+      syncDraft({
+        body: nextBody,
+        categorySlug: categorySlugRef.current,
+        placeSlug: placeSlugRef.current,
+        title: titleRef.current,
+      });
+    },
+    [syncDraft],
+  );
 
+  const selectCategorySlug = useCallback(
+    (nextSlug: string | null) => {
+      if (!activeRef.current || submittingRef.current) {
+        return;
+      }
+      categorySlugRef.current = nextSlug;
+      setCategorySlug(nextSlug);
+      syncDraft({
+        body: bodyRef.current,
+        categorySlug: nextSlug,
+        placeSlug: placeSlugRef.current,
+        title: titleRef.current,
+      });
+    },
+    [syncDraft],
+  );
+
+  const selectPlaceSlug = useCallback(
+    (nextSlug: string | null) => {
+      if (!activeRef.current || submittingRef.current) {
+        return;
+      }
+      placeSlugRef.current = nextSlug;
+      setPlaceSlug(nextSlug);
+      syncDraft({
+        body: bodyRef.current,
+        categorySlug: categorySlugRef.current,
+        placeSlug: nextSlug,
+        title: titleRef.current,
+      });
+    },
+    [syncDraft],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -113,6 +323,9 @@ export default function ComposeScreen() {
 
       return () => {
         isActive = false;
+        if (!activeRef.current) {
+          return;
+        }
         setSubmitState((current) =>
           current.status === 'success' ? { status: 'idle' } : current,
         );
@@ -120,70 +333,63 @@ export default function ComposeScreen() {
     }, [selectCategorySlug, selectPlaceSlug]),
   );
 
-  function stableClientRequestId(
-    nextTitle: string,
-    nextBody: string,
-    nextCategorySlug: string,
-    nextPlaceSlug: string | null,
-  ): string {
-    const fingerprint = JSON.stringify({
-      body: nextBody.trim(),
-      category_slug: nextCategorySlug.trim(),
-      place_slug: nextPlaceSlug?.trim() ?? '',
-      title: nextTitle.trim(),
-    });
-    const current = clientRequestIdentityRef.current;
-    if (current?.fingerprint === fingerprint) {
-      return current.id;
-    }
-    const id = Crypto.randomUUID();
-    clientRequestIdentityRef.current = { fingerprint, id };
-    return id;
-  }
-
   async function handleSubmit() {
     if (
+      !activeRef.current ||
+      submittingRef.current ||
       !canSubmit ||
-      categorySlug === null ||
-      authState.status !== 'authenticated'
+      categorySlug === null
     ) {
       return;
     }
-    const clientRequestId = stableClientRequestId(
-      trimmedTitle,
-      trimmedBody,
+
+    const draft = syncDraft({
+      body: trimmedBody,
       categorySlug,
       placeSlug,
-    );
-    const submittedFingerprint = clientRequestIdentityRef.current?.fingerprint;
+      title: trimmedTitle,
+    });
+    if (draft === null) {
+      return;
+    }
+
+    const submittedOwnerID = ownerID;
+    const submittedRequestID = draft.clientRequestId;
+    submittingRef.current = true;
     setSubmitState({ status: 'submitting' });
 
     try {
       await createNote(
         {
-          body: trimmedBody,
-          categorySlug,
-          clientRequestId,
-          placeSlug,
-          title: trimmedTitle,
+          body: draft.body,
+          categorySlug: draft.categorySlug ?? categorySlug,
+          clientRequestId: submittedRequestID,
+          placeSlug: draft.placeSlug,
+          title: draft.title,
         },
-        authState.token,
+        token,
       );
-      if (
-        clientRequestIdentityRef.current?.fingerprint !== submittedFingerprint
-      ) {
+      const cleared = draftStore.clear(submittedOwnerID, submittedRequestID);
+      if (!activeRef.current) {
+        return;
+      }
+      if (!cleared) {
+        submittingRef.current = false;
         setSubmitState({ status: 'idle' });
         return;
       }
-      clientRequestIdentityRef.current = null;
-      setTitle('');
-      setBody('');
-      setSubmitState({ status: 'success' });
-      router.navigate('/');
+
+      if (currentDraftRequestIDRef.current === submittedRequestID) {
+        resetDraft();
+      }
     } catch (error) {
+      if (!activeRef.current) {
+        return;
+      }
       if (
-        clientRequestIdentityRef.current?.fingerprint !== submittedFingerprint
+        draftStore.get(submittedOwnerID)?.clientRequestId !== submittedRequestID
       ) {
+        submittingRef.current = false;
         setSubmitState({ status: 'idle' });
         return;
       }
@@ -191,14 +397,38 @@ export default function ComposeScreen() {
         error instanceof APIRequestError &&
         error.status === unauthorizedStatus
       ) {
-        await logout();
+        submittingRef.current = false;
         setSubmitState({
           status: 'error',
           message: 'Sua sessão expirou. Entre de novo para publicar.',
         });
+        if (!activeRef.current) {
+          return;
+        }
+        try {
+          await logout();
+        } catch (logoutError: unknown) {
+          if (!activeRef.current) {
+            return;
+          }
+          void logoutError;
+          submittingRef.current = false;
+          setSubmitState({
+            status: 'error',
+            message: 'Sua sessão expirou. Entre de novo para publicar.',
+          });
+          return;
+        }
+        if (!activeRef.current) {
+          return;
+        }
         return;
       }
-      if (error instanceof APIRequestError && error.status === badRequestStatus) {
+      submittingRef.current = false;
+      if (
+        error instanceof APIRequestError &&
+        error.status === badRequestStatus
+      ) {
         setSubmitState({
           status: 'error',
           message: 'Revise o título, o texto, a categoria e o lugar.',
@@ -218,146 +448,128 @@ export default function ComposeScreen() {
       title="Conta uma dica"
       description="Uma nota curta, útil e com cara de indicação de amigo."
     >
-      {authState.status !== 'authenticated' ? (
-        <ComposeAuthGate
-          status={authState.status}
-          onLogin={() => {
-            router.push({
-              pathname: '/login',
-              params: { next: '/compose' },
-            });
-          }}
-          onSignup={() => {
-            router.push({
-              pathname: '/signup',
-              params: { next: '/compose' },
-            });
-          }}
+      <>
+        <FoundationTextInput
+          accessibilityLabel="Título da nota"
+          editable={!isSubmitting}
+          onChangeText={updateTitle}
+          placeholder="Título"
+          value={title}
         />
-      ) : (
-        <>
-          <FoundationTextInput
-            accessibilityLabel="Título da nota"
-            editable={!isSubmitting}
-            onChangeText={setTitle}
-            placeholder="Título"
-            value={title}
-          />
-          <FoundationTextInput
-            accessibilityLabel="Texto da nota"
-            multiline
-            editable={!isSubmitting}
-            onChangeText={setBody}
-            placeholder="O que você quer compartilhar?"
-            value={body}
-          />
-          {catalogState.status === 'loading' ? (
-            <Text style={styles.statusSuccess}>Carregando categorias...</Text>
-          ) : null}
-          {catalogState.status === 'error' ? (
-            <Text style={styles.statusError}>
-              Não deu pra carregar categorias e lugares.
-            </Text>
-          ) : null}
-          {catalogState.status === 'ready' ? (
-            <>
-              <View style={styles.field}>
-                <Text style={styles.label}>Categoria</Text>
-                <View style={styles.optionRow}>
-                  {catalogState.catalog.activeCategories.map((option) => (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        selected: option.slug === categorySlug,
-                      }}
-                      key={option.slug}
-                      onPress={() => selectCategorySlug(option.slug)}
-                      style={[
-                        styles.option,
-                        option.slug === categorySlug
-                          ? styles.optionSelected
-                          : null,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.optionText,
-                          option.slug === categorySlug
-                            ? styles.optionTextSelected
-                            : null,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-              <View style={styles.field}>
-                <Text style={styles.label}>Lugar</Text>
-                <View style={styles.optionRow}>
+        <FoundationTextInput
+          accessibilityLabel="Texto da nota"
+          multiline
+          editable={!isSubmitting}
+          onChangeText={updateBody}
+          placeholder="O que você quer compartilhar?"
+          value={body}
+        />
+        {catalogState.status === 'loading' ? (
+          <Text style={styles.statusSuccess}>Carregando categorias...</Text>
+        ) : null}
+        {catalogState.status === 'error' ? (
+          <Text style={styles.statusError}>
+            Não deu pra carregar categorias e lugares.
+          </Text>
+        ) : null}
+        {catalogState.status === 'ready' ? (
+          <>
+            <View style={styles.field}>
+              <Text style={styles.label}>Categoria</Text>
+              <View style={styles.optionRow}>
+                {catalogState.catalog.activeCategories.map((option) => (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityState={{ selected: placeSlug === null }}
-                    onPress={() => selectPlaceSlug(null)}
+                    accessibilityState={{
+                      selected: option.slug === categorySlug,
+                    }}
+                    key={option.slug}
+                    onPress={() => selectCategorySlug(option.slug)}
                     style={[
                       styles.option,
-                      placeSlug === null ? styles.optionSelected : null,
+                      option.slug === categorySlug
+                        ? styles.optionSelected
+                        : null,
                     ]}
                   >
                     <Text
                       style={[
                         styles.optionText,
-                        placeSlug === null ? styles.optionTextSelected : null,
+                        option.slug === categorySlug
+                          ? styles.optionTextSelected
+                          : null,
                       ]}
                     >
-                      Sem lugar específico
+                      {option.label}
                     </Text>
                   </Pressable>
-                  {catalogState.catalog.activePlaces.map((option) => (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        selected: option.slug === placeSlug,
-                      }}
-                      key={option.slug}
-                      onPress={() => selectPlaceSlug(option.slug)}
+                ))}
+              </View>
+            </View>
+            <View style={styles.field}>
+              <Text style={styles.label}>Lugar</Text>
+              <View style={styles.optionRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: placeSlug === null }}
+                  onPress={() => selectPlaceSlug(null)}
+                  style={[
+                    styles.option,
+                    placeSlug === null ? styles.optionSelected : null,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      placeSlug === null ? styles.optionTextSelected : null,
+                    ]}
+                  >
+                    Sem lugar específico
+                  </Text>
+                </Pressable>
+                {catalogState.catalog.activePlaces.map((option) => (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{
+                      selected: option.slug === placeSlug,
+                    }}
+                    key={option.slug}
+                    onPress={() => selectPlaceSlug(option.slug)}
+                    style={[
+                      styles.option,
+                      option.slug === placeSlug ? styles.optionSelected : null,
+                    ]}
+                  >
+                    <Text
                       style={[
-                        styles.option,
-                        option.slug === placeSlug ? styles.optionSelected : null,
+                        styles.optionText,
+                        option.slug === placeSlug
+                          ? styles.optionTextSelected
+                          : null,
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.optionText,
-                          option.slug === placeSlug
-                            ? styles.optionTextSelected
-                            : null,
-                        ]}
-                      >
-                        {option.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                ))}
               </View>
-            </>
-          ) : null}
-          {submitState.status === 'success' ? (
-            <Text style={styles.statusSuccess}>
-              Publicado. Indo pro início...
-            </Text>
-          ) : null}
-          {submitState.status === 'error' ? (
-            <Text style={styles.statusError}>{submitState.message}</Text>
-          ) : null}
-          <FoundationButton
-            disabled={!canSubmit}
-            label={isSubmitting ? 'Publicando...' : 'Publicar'}
-            onPress={handleSubmit}
-          />
-        </>
-      )}
+            </View>
+          </>
+        ) : null}
+        {submitState.status === 'success' ? (
+          <Text style={styles.statusSuccess}>
+            Publicado. Indo pro início...
+          </Text>
+        ) : null}
+        {submitState.status === 'error' ? (
+          <Text style={styles.statusError}>{submitState.message}</Text>
+        ) : null}
+        <FoundationButton
+          disabled={!canSubmit}
+          label={isSubmitting ? 'Publicando...' : 'Publicar'}
+          onPress={handleSubmit}
+        />
+      </>
     </FoundationScreen>
   );
 }
@@ -375,7 +587,7 @@ function ComposeAuthGate({
     return (
       <EmptyStateCard
         title="Conferindo sua sessão"
-      body="A gente já libera o formulário se você estiver com uma conta ativa."
+        body="A gente já libera o formulário se você estiver com uma conta ativa."
       />
     );
   }
@@ -385,7 +597,7 @@ function ComposeAuthGate({
       <>
         <EmptyStateCard
           title="Não deu pra confirmar sua sessão"
-        body="Verifique sua conexão e entre de novo para publicar."
+          body="Verifique sua conexão e entre de novo para publicar."
         />
         <FoundationButton label="Entrar" onPress={onLogin} />
       </>

@@ -103,7 +103,8 @@ func TestNoteImagesMigrationRejectsInvalidStorageClasses(t *testing.T) {
 }
 
 func TestNoteStoreHydratesOrderedImagesForEveryReadPath(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	db := openMigratedDatabase(t, ctx)
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	store := newTestNoteStore(db, func() time.Time { return now })
@@ -152,11 +153,17 @@ func TestNoteStoreHydratesOrderedImagesForEveryReadPath(t *testing.T) {
 		{"search notes", func() ([]note.Note, error) {
 			return store.SearchNotes(ctx, note.SearchInput{Query: "fotos", Limit: 10})
 		}},
+		{"search category notes", func() ([]note.Note, error) {
+			return store.SearchNotes(ctx, note.SearchInput{Query: "fotos", CategorySlug: note.CategorySlugFood, Limit: 10})
+		}},
 	}
 	for _, test := range reads {
 		found, err := test.read()
 		if err != nil {
 			t.Fatalf("%s: %v", test.label, err)
+		}
+		if len(found) != 1 {
+			t.Fatalf("%s count = %d, want 1", test.label, len(found))
 		}
 		assertNoteImages(t, found, created.ID, wantImages)
 	}

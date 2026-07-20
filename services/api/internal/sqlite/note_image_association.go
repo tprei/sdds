@@ -2,10 +2,7 @@ package sqlite
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -13,11 +10,26 @@ import (
 	"github.com/tprei/sdds/services/api/internal/note"
 )
 
-type noteCreateQueryer interface {
-	ExecContext(context.Context, string, ...any) (sql.Result, error)
-	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
-	QueryRowContext(context.Context, string, ...any) *sql.Row
-}
+const (
+	consumeImageUploadSQL = `
+		UPDATE image_uploads
+		SET state = 'consumed', consumed_note_id = ?, updated_at = ?
+		WHERE id = ? AND user_id = ? AND state = 'ready' AND consumed_note_id IS NULL AND expires_at > ?
+	`
+	findImageUploadForAssociationSQL = `
+		SELECT id, user_id, storage_key, state, consumed_note_id,
+			content_type, byte_size, width, height, sha256,
+			created_at, updated_at, expires_at
+		FROM image_uploads
+		WHERE id = ?
+	`
+	insertNoteImageSQL = `
+		INSERT INTO note_images (
+			id, note_id, storage_key, content_type, byte_size, width, height,
+			sha256, position, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+)
 
 type noteImageAssociation struct {
 	ID          string
@@ -35,60 +47,32 @@ type noteImageAssociation struct {
 	ExpiresAt   int64
 }
 
-func noteCreateFingerprint(input note.CreateInput) string {
-	hasher := sha256.New()
-	var length [8]byte
-	writeFrame := func(value []byte) {
-		binary.BigEndian.PutUint64(length[:], uint64(len(value)))
-		_, _ = hasher.Write(length[:])
-		_, _ = hasher.Write(value)
-	}
-	writeUint64 := func(value uint64) {
-		binary.BigEndian.PutUint64(length[:], value)
-		_, _ = hasher.Write(length[:])
-	}
-
-	writeFrame([]byte("note.create.v1"))
-	writeFrame([]byte(input.Title))
-	writeFrame([]byte(input.Body))
-	writeFrame([]byte(input.CategorySlug))
-	if input.PlaceSlug == "" {
-		_, _ = hasher.Write([]byte{0})
-	} else {
-		_, _ = hasher.Write([]byte{1})
-		writeFrame([]byte(input.PlaceSlug))
-	}
-	writeUint64(uint64(len(input.ImageUploadIDs)))
-	for _, imageUploadID := range input.ImageUploadIDs {
-		writeFrame([]byte(imageUploadID))
-	}
-	return hex.EncodeToString(hasher.Sum(nil))
-}
-
-func readNoteCreateRequest(ctx context.Context, queryer noteCreateQueryer, userID, clientRequestID string) (requestSHA256, noteID string, found bool, err error) {
-	err = queryer.QueryRowContext(ctx, findNoteCreateRequestSQL, userID, clientRequestID).Scan(&requestSHA256, &noteID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", "", false, nil
-	}
-	if err != nil {
-		return "", "", false, err
-	}
-	return requestSHA256, noteID, true, nil
-}
-
-func (store *NoteStore) loadNoteForCreate(ctx context.Context, queryer noteCreateQueryer, id string) (note.Note, error) {
-	found, err := scanNoteRow(queryer.QueryRowContext(ctx, findNoteSQL, id))
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return note.Note{}, note.ErrNoteNotFound
+func associateImageUploads(ctx context.Context, tx *sql.Tx, input note.CreateInput, noteID string, now time.Time) error {
+	for position, imageUploadID := range input.ImageUploadIDs {
+		upload, err := consumeImageUpload(ctx, tx, string(input.UserID), imageUploadID, noteID, now)
+		if err != nil {
+			return fmt.Errorf("consume image upload %q: %w", imageUploadID, err)
 		}
-		return note.Note{}, err
+		upload.Position = position
+		if _, err := tx.ExecContext(
+			ctx,
+			insertNoteImageSQL,
+			upload.ID,
+			noteID,
+			upload.StorageKey,
+			upload.ContentType,
+			upload.ByteSize,
+			upload.Width,
+			upload.Height,
+			upload.SHA256,
+			upload.Position,
+			unixMillis(now),
+			unixMillis(now),
+		); err != nil {
+			return fmt.Errorf("insert note image: %w", err)
+		}
 	}
-	notes := []note.Note{found}
-	if err := hydrateNoteImagesWithQueryer(ctx, queryer, notes); err != nil {
-		return note.Note{}, err
-	}
-	return notes[0], nil
+	return nil
 }
 
 func consumeImageUpload(ctx context.Context, tx *sql.Tx, userID, imageUploadID, noteID string, now time.Time) (noteImageAssociation, error) {
@@ -132,10 +116,10 @@ func consumeImageUpload(ctx context.Context, tx *sql.Tx, userID, imageUploadID, 
 	return upload, nil
 }
 
-func readImageUploadForAssociation(ctx context.Context, queryer noteCreateQueryer, imageUploadID string) (noteImageAssociation, bool, error) {
+func readImageUploadForAssociation(ctx context.Context, tx *sql.Tx, imageUploadID string) (noteImageAssociation, bool, error) {
 	var upload noteImageAssociation
 	var consumedNoteID sql.NullString
-	if err := queryer.QueryRowContext(ctx, findImageUploadForAssociationSQL, imageUploadID).Scan(
+	if err := tx.QueryRowContext(ctx, findImageUploadForAssociationSQL, imageUploadID).Scan(
 		&upload.ID,
 		&upload.UserID,
 		&upload.StorageKey,

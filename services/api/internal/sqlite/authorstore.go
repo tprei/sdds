@@ -105,8 +105,8 @@ func (store *NoteStore) ListAuthorNotes(ctx context.Context, input note.AuthorNo
 	for index := range page.Notes {
 		hydrated[index] = page.Notes[index].Note
 	}
-	if err := store.hydrateNoteImages(ctx, hydrated); err != nil {
-		return note.AuthorNotesPage{}, fmt.Errorf("hydrate author note images: %w", err)
+	if err := store.loadNotesWithOrderedImages(ctx, hydrated); err != nil {
+		return note.AuthorNotesPage{}, fmt.Errorf("load author note images: %w", err)
 	}
 	for index := range page.Notes {
 		page.Notes[index].Note = hydrated[index]

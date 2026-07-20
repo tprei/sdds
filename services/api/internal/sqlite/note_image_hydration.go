@@ -2,6 +2,8 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -24,11 +26,34 @@ const listNoteImagesSQL = `
 	ORDER BY note_id ASC, position ASC
 `
 
-func (store *NoteStore) hydrateNoteImages(ctx context.Context, notes []note.Note) error {
-	return hydrateNoteImagesWithQueryer(ctx, store.db, notes)
+type noteLookupQuerier interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
 }
 
-func hydrateNoteImagesWithQueryer(ctx context.Context, queryer noteCreateQueryer, notes []note.Note) (err error) {
+type noteImageQuerier interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}
+
+func loadNoteWithOrderedImages(ctx context.Context, noteQuery noteLookupQuerier, imageQuery noteImageQuerier, id string) (note.Note, error) {
+	found, err := scanNoteRow(noteQuery.QueryRowContext(ctx, findNoteSQL, id))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return note.Note{}, note.ErrNoteNotFound
+		}
+		return note.Note{}, err
+	}
+	notes := []note.Note{found}
+	if err := loadOrderedImagesForNotes(ctx, imageQuery, notes); err != nil {
+		return note.Note{}, err
+	}
+	return notes[0], nil
+}
+
+func (store *NoteStore) loadNotesWithOrderedImages(ctx context.Context, notes []note.Note) error {
+	return loadOrderedImagesForNotes(ctx, store.db, notes)
+}
+
+func loadOrderedImagesForNotes(ctx context.Context, queryer noteImageQuerier, notes []note.Note) (err error) {
 	if len(notes) == 0 {
 		return nil
 	}

@@ -36,22 +36,22 @@ trap 'rm -rf "$tmp"' 0 1 2 3 15
 MC_CONFIG_DIR="$tmp/mc"
 export MC_CONFIG_DIR
 mkdir -p "$MC_CONFIG_DIR"
-mc alias set root "$ENDPOINT" "$ROOT_ACCESS" "$ROOT_SECRET" --api S3v4 >"$tmp/out" 2>"$tmp/error" || die "root admin login failed"
-aws_root() { AWS_ACCESS_KEY_ID="$ROOT_ACCESS" AWS_SECRET_ACCESS_KEY="$ROOT_SECRET" aws --endpoint-url "$ENDPOINT" "$@"; }
-aws_api() { AWS_ACCESS_KEY_ID="$API_ACCESS" AWS_SECRET_ACCESS_KEY="$API_SECRET" aws --endpoint-url "$ENDPOINT" "$@"; }
-aws_credentials() { access=$1; secret=$2; shift 2; AWS_ACCESS_KEY_ID="$access" AWS_SECRET_ACCESS_KEY="$secret" aws --endpoint-url "$ENDPOINT" "$@"; }
-unsigned() { env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN -u AWS_PROFILE AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_EC2_METADATA_DISABLED=true aws --no-sign-request --endpoint-url "$ENDPOINT" "$@"; }
-expect_denied() {
+configure_mc_alias() { mc alias set "$1" "$2" "$3" "$4" --api S3v4; }
+root_aws() { AWS_ACCESS_KEY_ID="$ROOT_ACCESS" AWS_SECRET_ACCESS_KEY="$ROOT_SECRET" aws --endpoint-url "$ENDPOINT" "$@"; }
+api_aws() { AWS_ACCESS_KEY_ID="$API_ACCESS" AWS_SECRET_ACCESS_KEY="$API_SECRET" aws --endpoint-url "$ENDPOINT" "$@"; }
+api_aws_with_secret() { api_aws_with_secret_secret=$1; shift; AWS_ACCESS_KEY_ID="$API_ACCESS" AWS_SECRET_ACCESS_KEY="$api_aws_with_secret_secret" aws --endpoint-url "$ENDPOINT" "$@"; }
+unsigned_aws() { env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN -u AWS_PROFILE AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_EC2_METADATA_DISABLED=true aws --no-sign-request --endpoint-url "$ENDPOINT" "$@"; }
+command_is_access_denied() {
   if "$@" >"$tmp/error" 2>&1; then return 1; fi
   grep -Eiq 'AccessDenied|Access Denied' "$tmp/error"
 }
-expect_secret_denied() {
+command_rejects_api_secret() {
   if "$@" >"$tmp/error" 2>&1; then return 1; fi
   grep -Eiq 'SignatureDoesNotMatch|AccessDenied|Access Denied|Forbidden|403' "$tmp/error"
 }
 
-check_policy() {
-  python - "$1" "$POLICY" <<'PY'
+policy_document_matches() {
+  python - "$1" "$2" <<'PY'
 import json, sys
 
 def statement(value):
@@ -78,7 +78,7 @@ if got_statements != want_statements:
     raise SystemExit(1)
 PY
 }
-mc_missing() {
+mc_error_is_missing() {
   python - "$1" "$2" "$3" <<'PY'
 import json, sys
 needle = sys.argv[3]
@@ -93,7 +93,7 @@ for path in sys.argv[1:3]:
 raise SystemExit(1)
 PY
 }
-check_user() {
+api_user_attachment_matches() {
   python - "$1" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1]))
@@ -103,7 +103,7 @@ if value.get('status') != 'success' or value.get('policyName') != 'sdds-media-ap
     raise SystemExit(1)
 PY
 }
-check_acl() {
+bucket_acl_is_owner_only() {
   python - "$1" "$2" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1]))
@@ -122,7 +122,7 @@ if 'ID' in grantee and grantee['ID'] != owner.get('ID'):
     raise SystemExit(1)
 PY
 }
-check_anonymous() {
+anonymous_access_is_private() {
   python - "$1" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1]))
@@ -130,8 +130,8 @@ if value.get('status') != 'success' or value.get('permission') != 'private':
     raise SystemExit(1)
 PY
 }
-check_meta() {
-  python - "$1" "$SENTINEL_SHA256" "$SENTINEL_CHECKSUM" <<'PY'
+sentinel_metadata_matches() {
+  python - "$1" "$2" "$3" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1]))
 if value.get('ContentLength') != 20 or value.get('ContentType') != 'application/octet-stream' or value.get('ChecksumSHA256') != sys.argv[3]:
@@ -141,101 +141,153 @@ if value.get('Metadata') != {'sha256': sys.argv[2]}:
 PY
 }
 
-if ! aws_root s3api head-bucket --bucket "$BUCKET" >"$tmp/out" 2>"$tmp/error"; then
-  aws_root s3api create-bucket --bucket "$BUCKET" >"$tmp/out" 2>"$tmp/error" || die "bucket create failed"
-fi
-aws_root s3api list-buckets --query Owner --output json >"$tmp/root-owner" 2>"$tmp/error" || die "root owner lookup failed"
-aws_root s3api get-bucket-acl --bucket "$BUCKET" >"$tmp/acl" 2>"$tmp/error" || die "bucket ACL lookup failed"
-check_acl "$tmp/acl" "$tmp/root-owner" || die "bucket ownership or ACL drift"
-version=$(aws_root s3api get-bucket-versioning --bucket "$BUCKET" --query Status --output text 2>"$tmp/error") || die "versioning lookup failed"
-[ "$version" = None ] || die "bucket versioning is enabled"
-if aws_root s3api get-object-lock-configuration --bucket "$BUCKET" >"$tmp/out" 2>"$tmp/error"; then
-  die "object lock is enabled"
-fi
-grep -Eq 'ObjectLockConfigurationNotFoundError' "$tmp/error" || die "object lock status is unsupported"
-if aws_root s3api get-bucket-lifecycle-configuration --bucket "$BUCKET" >"$tmp/out" 2>"$tmp/error"; then
-  die "bucket lifecycle is configured"
-fi
-grep -Eq 'NoSuchLifecycleConfiguration' "$tmp/error" || die "lifecycle status is unsupported"
-if aws_root s3api get-bucket-policy --bucket "$BUCKET" >"$tmp/out" 2>"$tmp/error"; then
-  die "anonymous bucket policy is configured"
-fi
-grep -Eq 'NoSuchBucketPolicy' "$tmp/error" || die "bucket policy status is unsupported"
-mc anonymous get "root/$BUCKET" --json >"$tmp/anonymous" 2>"$tmp/error" || die "anonymous access lookup failed"
-check_anonymous "$tmp/anonymous" || die "anonymous access is not private"
+ensure_bucket_exists() {
+  if ! root_aws s3api head-bucket --bucket "$1" >"$2/out" 2>"$2/error"; then
+    root_aws s3api create-bucket --bucket "$1" >"$2/out" 2>"$2/error" || die "bucket create failed"
+  fi
+}
+verify_bucket_owner_acl() {
+  root_aws s3api list-buckets --query Owner --output json >"$2/root-owner" 2>"$2/error" || die "root owner lookup failed"
+  root_aws s3api get-bucket-acl --bucket "$1" >"$2/acl" 2>"$2/error" || die "bucket ACL lookup failed"
+  bucket_acl_is_owner_only "$2/acl" "$2/root-owner" || die "bucket ownership or ACL drift"
+}
+verify_bucket_versioning_disabled() {
+  verify_bucket_versioning_disabled_version=$(root_aws s3api get-bucket-versioning --bucket "$1" --query Status --output text 2>"$2/error") || die "versioning lookup failed"
+  [ "$verify_bucket_versioning_disabled_version" = None ] || die "bucket versioning is enabled"
+}
+verify_bucket_object_lock_disabled() {
+  if root_aws s3api get-object-lock-configuration --bucket "$1" >"$2/out" 2>"$2/error"; then
+    die "object lock is enabled"
+  fi
+  grep -Eq 'ObjectLockConfigurationNotFoundError' "$2/error" || die "object lock status is unsupported"
+}
+verify_bucket_lifecycle_absent() {
+  if root_aws s3api get-bucket-lifecycle-configuration --bucket "$1" >"$2/out" 2>"$2/error"; then
+    die "bucket lifecycle is configured"
+  fi
+  grep -Eq 'NoSuchLifecycleConfiguration' "$2/error" || die "lifecycle status is unsupported"
+}
+verify_bucket_policy_absent() {
+  if root_aws s3api get-bucket-policy --bucket "$1" >"$2/out" 2>"$2/error"; then
+    die "anonymous bucket policy is configured"
+  fi
+  grep -Eq 'NoSuchBucketPolicy' "$2/error" || die "bucket policy status is unsupported"
+}
+verify_anonymous_access_private() {
+  mc anonymous get "root/$1" --json >"$2/anonymous" 2>"$2/error" || die "anonymous access lookup failed"
+  anonymous_access_is_private "$2/anonymous" || die "anonymous access is not private"
+}
+ensure_public_access_block() {
+  if root_aws s3api get-public-access-block --bucket "$1" --query PublicAccessBlockConfiguration --output json >"$2/pab" 2>"$2/error"; then
+    [ "$(tr -d '[:space:]' <"$2/pab")" = '{"BlockPublicAcls":true,"IgnorePublicAcls":true,"BlockPublicPolicy":true,"RestrictPublicBuckets":true}' ] || die "public-access-block drift"
+  else
+    root_aws s3api put-public-access-block --bucket "$1" --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true >"$2/out" 2>"$2/error" || die "public-access-block setup failed"
+    root_aws s3api get-public-access-block --bucket "$1" --query PublicAccessBlockConfiguration --output json >"$2/pab" 2>"$2/error" || die "public-access-block verification failed"
+    [ "$(tr -d '[:space:]' <"$2/pab")" = '{"BlockPublicAcls":true,"IgnorePublicAcls":true,"BlockPublicPolicy":true,"RestrictPublicBuckets":true}' ] || die "public-access-block setup drift"
+  fi
+}
+bootstrap_private_bucket() {
+  ensure_bucket_exists "$1" "$2"
+  verify_bucket_owner_acl "$1" "$2"
+  verify_bucket_versioning_disabled "$1" "$2"
+  verify_bucket_object_lock_disabled "$1" "$2"
+  verify_bucket_lifecycle_absent "$1" "$2"
+  verify_bucket_policy_absent "$1" "$2"
+  verify_anonymous_access_private "$1" "$2"
+  ensure_public_access_block "$1" "$2"
+}
 
-if aws_root s3api get-public-access-block --bucket "$BUCKET" --query PublicAccessBlockConfiguration --output json >"$tmp/pab" 2>"$tmp/error"; then
-  [ "$(tr -d '[:space:]' <"$tmp/pab")" = '{"BlockPublicAcls":true,"IgnorePublicAcls":true,"BlockPublicPolicy":true,"RestrictPublicBuckets":true}' ] || die "public-access-block drift"
-else
-  aws_root s3api put-public-access-block --bucket "$BUCKET" --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true >"$tmp/out" 2>"$tmp/error" || die "public-access-block setup failed"
-  aws_root s3api get-public-access-block --bucket "$BUCKET" --query PublicAccessBlockConfiguration --output json >"$tmp/pab" 2>"$tmp/error" || die "public-access-block verification failed"
-  [ "$(tr -d '[:space:]' <"$tmp/pab")" = '{"BlockPublicAcls":true,"IgnorePublicAcls":true,"BlockPublicPolicy":true,"RestrictPublicBuckets":true}' ] || die "public-access-block setup drift"
-fi
+ensure_api_policy() {
+  if mc admin policy info root "$1" --json >"$3/policy" 2>"$3/error"; then
+    policy_document_matches "$3/policy" "$2" || die "API policy drift"
+  else
+    mc_error_is_missing "$3/policy" "$3/error" "policy does not exist" || die "API policy lookup failed"
+    mc admin policy create root "$1" "$2" >"$3/out" 2>"$3/error" || die "API policy create failed"
+    mc admin policy info root "$1" --json >"$3/policy" 2>"$3/error" || die "API policy lookup failed"
+    policy_document_matches "$3/policy" "$2" || die "API policy verification failed"
+  fi
+}
+ensure_api_user() {
+  if mc admin user info root "$1" --json >"$4/user" 2>"$4/error"; then
+    api_user_attachment_matches "$4/user" || die "API user attachment drift"
+  else
+    mc_error_is_missing "$4/user" "$4/error" "NoSuchResource" || die "API user lookup failed"
+    mc admin user add root "$1" "$2" >"$4/out" 2>"$4/error" || die "API user create failed"
+  fi
+  mc admin policy attach root "$3" --user "$1" >"$4/out" 2>"$4/error" || die "API policy attachment failed"
+  mc admin user info root "$1" --json >"$4/user" 2>"$4/error" || die "API user lookup failed"
+  api_user_attachment_matches "$4/user" || die "API user verification failed"
+}
 
-if mc admin policy info root "$POLICY_NAME" --json >"$tmp/policy" 2>"$tmp/error"; then
-  check_policy "$tmp/policy" || die "API policy drift"
-else
-  mc_missing "$tmp/policy" "$tmp/error" "policy does not exist" || die "API policy lookup failed"
-  mc admin policy create root "$POLICY_NAME" "$POLICY" >"$tmp/out" 2>"$tmp/error" || die "API policy create failed"
-  mc admin policy info root "$POLICY_NAME" --json >"$tmp/policy" 2>"$tmp/error" || die "API policy lookup failed"
-  check_policy "$tmp/policy" || die "API policy verification failed"
-fi
-if mc admin user info root "$API_ACCESS" --json >"$tmp/user" 2>"$tmp/error"; then
-  check_user "$tmp/user" || die "API user attachment drift"
-else
-  mc_missing "$tmp/user" "$tmp/error" "NoSuchResource" || die "API user lookup failed"
-  mc admin user add root "$API_ACCESS" "$API_SECRET" >"$tmp/out" 2>"$tmp/error" || die "API user create failed"
-fi
-mc admin policy attach root "$POLICY_NAME" --user "$API_ACCESS" >"$tmp/out" 2>"$tmp/error" || die "API policy attachment failed"
-mc admin user info root "$API_ACCESS" --json >"$tmp/user" 2>"$tmp/error" || die "API user lookup failed"
-check_user "$tmp/user" || die "API user verification failed"
-
-printf '%s\n' 'sdds-media-ready-v1' >"$tmp/sentinel"
-if aws_root s3api head-object --bucket "$BUCKET" --key system/readiness --checksum-mode ENABLED \
-    --query '{ContentLength:ContentLength,ContentType:ContentType,ChecksumSHA256:ChecksumSHA256,Metadata:Metadata}' --output json >"$tmp/meta" 2>"$tmp/error"; then
-  check_meta "$tmp/meta" || die "readiness sentinel metadata drift"
-else
-  grep -Eq '(NoSuchKey|NotFound|404)' "$tmp/error" || die "readiness sentinel lookup failed"
-  aws_root s3api put-object --bucket "$BUCKET" --key system/readiness --body "$tmp/sentinel" --content-type application/octet-stream \
-    --checksum-algorithm SHA256 --checksum-sha256 "$SENTINEL_CHECKSUM" --metadata "sha256=$SENTINEL_SHA256" >"$tmp/out" 2>"$tmp/error" || die "readiness sentinel create failed"
-  aws_root s3api head-object --bucket "$BUCKET" --key system/readiness --checksum-mode ENABLED \
-    --query '{ContentLength:ContentLength,ContentType:ContentType,ChecksumSHA256:ChecksumSHA256,Metadata:Metadata}' --output json >"$tmp/meta" 2>"$tmp/error" || die "readiness sentinel verification failed"
-  check_meta "$tmp/meta" || die "readiness sentinel setup drift"
-fi
-aws_root s3api get-object --bucket "$BUCKET" --key system/readiness "$tmp/sentinel-root" >"$tmp/out" 2>"$tmp/error" || die "root sentinel read failed"
-cmp -s "$tmp/sentinel" "$tmp/sentinel-root" || die "readiness sentinel payload drift"
-[ "$(sha256sum "$tmp/sentinel-root" | awk '{print $1}')" = "$SENTINEL_SHA256" ] || die "readiness sentinel hash drift"
-
-ROTATION_SECRET="sdds-rotation-$API_ACCESS"
-mc admin user add root "$API_ACCESS" "$ROTATION_SECRET" >"$tmp/out" 2>"$tmp/error" || die "API secret rotation setup failed"
-aws_credentials "$API_ACCESS" "$ROTATION_SECRET" s3api head-object --bucket "$BUCKET" --key system/readiness --checksum-mode ENABLED \
-  --query '{ContentLength:ContentLength,ContentType:ContentType,ChecksumSHA256:ChecksumSHA256,Metadata:Metadata}' --output json >"$tmp/rotation-meta" 2>"$tmp/error" || die "rotated API credential failed"
-check_meta "$tmp/rotation-meta" || die "rotated API credential metadata failed"
-mc admin user add root "$API_ACCESS" "$API_SECRET" >"$tmp/out" 2>"$tmp/error" || die "API secret reapply failed"
-mc admin policy attach root "$POLICY_NAME" --user "$API_ACCESS" >"$tmp/out" 2>"$tmp/error" || die "API policy reattachment failed"
-mc admin user info root "$API_ACCESS" --json >"$tmp/user" 2>"$tmp/error" || die "API user lookup failed"
-check_user "$tmp/user" || die "API user verification failed"
-expect_secret_denied aws_credentials "$API_ACCESS" "$ROTATION_SECRET" s3api head-object --bucket "$BUCKET" --key system/readiness || die "old API secret was accepted"
-aws_api s3api head-object --bucket "$BUCKET" --key system/readiness --checksum-mode ENABLED \
-  --query '{ContentLength:ContentLength,ContentType:ContentType,ChecksumSHA256:ChecksumSHA256,Metadata:Metadata}' --output json >"$tmp/api-meta" 2>"$tmp/error" || die "API readiness permission failed"
-check_meta "$tmp/api-meta" || die "API readiness metadata failed"
-mc alias set api "$ENDPOINT" "$API_ACCESS" "$API_SECRET" --api S3v4 >"$tmp/out" 2>"$tmp/error" || die "API mc login unexpectedly failed"
-expect_denied mc admin policy info api "$POLICY_NAME" --json || die "API policy-info denial was not AccessDenied"; expect_denied mc admin policy list api --json || die "API policy-list denial was not AccessDenied"; expect_denied mc admin policy attach api "$POLICY_NAME" --user "$API_ACCESS" || die "API policy-attach denial was not AccessDenied"; expect_denied mc admin user add api sdds-denied-probe sdds-denied-secret || die "API user-add denial was not AccessDenied"
-
-printf '%s\n' 'sdds-init-probe-v1' >"$tmp/probe"
-probe_hash=$(sha256sum "$tmp/probe" | awk '{print $1}')
-aws_api s3api put-object --bucket "$BUCKET" --key note-images/.sdds-init-probe --body "$tmp/probe" --content-type application/octet-stream --metadata "sha256=$probe_hash" >"$tmp/out" 2>"$tmp/error" || die "API note-images write permission failed"
-aws_api s3api get-object --bucket "$BUCKET" --key note-images/.sdds-init-probe "$tmp/probe-get" >"$tmp/out" 2>"$tmp/error" || die "API note-images read permission failed"
-cmp -s "$tmp/probe" "$tmp/probe-get" || die "API note-images payload mismatch"
-aws_api s3api delete-object --bucket "$BUCKET" --key note-images/.sdds-init-probe >"$tmp/out" 2>"$tmp/error" || die "API note-images delete permission failed"
-for key in system/init-probe note-images-evil/init-probe; do
-  expect_denied aws_api s3api put-object --bucket "$BUCKET" --key "$key" --body "$tmp/probe" || die "API write denial was not AccessDenied"
-  expect_denied aws_api s3api get-object --bucket "$BUCKET" --key "$key" "$tmp/blocked" || die "API read denial was not AccessDenied"
-  expect_denied aws_api s3api delete-object --bucket "$BUCKET" --key "$key" || die "API delete denial was not AccessDenied"
-done
-expect_denied aws_api s3api list-objects-v2 --bucket "$BUCKET" || die "API list denial was not AccessDenied"
-if aws_api s3api head-bucket --bucket "$BUCKET" >"$tmp/out" 2>"$tmp/error"; then die "API bucket inspection succeeded"; fi
-grep -Eiq 'Forbidden|403' "$tmp/error" || die "API bucket denial was not HTTP 403"
-expect_denied unsigned s3api get-object --bucket "$BUCKET" --key system/readiness "$tmp/unsigned-get" || die "unsigned GET denial was not AccessDenied"
-expect_denied unsigned s3api list-objects-v2 --bucket "$BUCKET" || die "unsigned LIST denial was not AccessDenied"
-printf '%s\n' 'rustfs bootstrap verified'
+ensure_readiness_sentinel() {
+  printf '%s\n' 'sdds-media-ready-v1' >"$2/sentinel"
+  if root_aws s3api head-object --bucket "$1" --key system/readiness --checksum-mode ENABLED \
+      --query '{ContentLength:ContentLength,ContentType:ContentType,ChecksumSHA256:ChecksumSHA256,Metadata:Metadata}' --output json >"$2/meta" 2>"$2/error"; then
+    sentinel_metadata_matches "$2/meta" "$3" "$4" || die "readiness sentinel metadata drift"
+  else
+    grep -Eq '(NoSuchKey|NotFound|404)' "$2/error" || die "readiness sentinel lookup failed"
+    root_aws s3api put-object --bucket "$1" --key system/readiness --body "$2/sentinel" --content-type application/octet-stream \
+      --checksum-algorithm SHA256 --checksum-sha256 "$4" --metadata "sha256=$3" >"$2/out" 2>"$2/error" || die "readiness sentinel create failed"
+    root_aws s3api head-object --bucket "$1" --key system/readiness --checksum-mode ENABLED \
+      --query '{ContentLength:ContentLength,ContentType:ContentType,ChecksumSHA256:ChecksumSHA256,Metadata:Metadata}' --output json >"$2/meta" 2>"$2/error" || die "readiness sentinel verification failed"
+    sentinel_metadata_matches "$2/meta" "$3" "$4" || die "readiness sentinel setup drift"
+  fi
+  root_aws s3api get-object --bucket "$1" --key system/readiness "$2/sentinel-root" >"$2/out" 2>"$2/error" || die "root sentinel read failed"
+  cmp -s "$2/sentinel" "$2/sentinel-root" || die "readiness sentinel payload drift"
+  [ "$(sha256sum "$2/sentinel-root" | awk '{print $1}')" = "$3" ] || die "readiness sentinel hash drift"
+}
+verify_api_secret_rotation() {
+  verify_api_secret_rotation_secret="sdds-rotation-$2"
+  mc admin user add root "$2" "$verify_api_secret_rotation_secret" >"$4/out" 2>"$4/error" || die "API secret rotation setup failed"
+  api_aws_with_secret "$verify_api_secret_rotation_secret" s3api head-object --bucket "$1" --key system/readiness --checksum-mode ENABLED \
+    --query '{ContentLength:ContentLength,ContentType:ContentType,ChecksumSHA256:ChecksumSHA256,Metadata:Metadata}' --output json >"$4/rotation-meta" 2>"$4/error" || die "rotated API credential failed"
+  sentinel_metadata_matches "$4/rotation-meta" "$SENTINEL_SHA256" "$SENTINEL_CHECKSUM" || die "rotated API credential metadata failed"
+  mc admin user add root "$2" "$3" >"$4/out" 2>"$4/error" || die "API secret reapply failed"
+  mc admin policy attach root "$POLICY_NAME" --user "$2" >"$4/out" 2>"$4/error" || die "API policy reattachment failed"
+  mc admin user info root "$2" --json >"$4/user" 2>"$4/error" || die "API user lookup failed"
+  api_user_attachment_matches "$4/user" || die "API user verification failed"
+  command_rejects_api_secret api_aws_with_secret "$verify_api_secret_rotation_secret" s3api head-object --bucket "$1" --key system/readiness || die "old API secret was accepted"
+}
+verify_api_readiness_access() {
+  api_aws s3api head-object --bucket "$1" --key system/readiness --checksum-mode ENABLED \
+    --query '{ContentLength:ContentLength,ContentType:ContentType,ChecksumSHA256:ChecksumSHA256,Metadata:Metadata}' --output json >"$2/api-meta" 2>"$2/error" || die "API readiness permission failed"
+  sentinel_metadata_matches "$2/api-meta" "$SENTINEL_SHA256" "$SENTINEL_CHECKSUM" || die "API readiness metadata failed"
+}
+verify_api_admin_denials() {
+  configure_mc_alias api "$ENDPOINT" "$2" "$API_SECRET" >"$3/out" 2>"$3/error" || die "API mc login unexpectedly failed"
+  command_is_access_denied mc admin policy info api "$1" --json || die "API policy-info denial was not AccessDenied"; command_is_access_denied mc admin policy list api --json || die "API policy-list denial was not AccessDenied"; command_is_access_denied mc admin policy attach api "$1" --user "$2" || die "API policy-attach denial was not AccessDenied"; command_is_access_denied mc admin user add api sdds-denied-probe sdds-denied-secret || die "API user-add denial was not AccessDenied"
+}
+verify_api_object_permissions() {
+  printf '%s\n' 'sdds-init-probe-v1' >"$2/probe"
+  verify_api_object_permissions_probe_hash=$(sha256sum "$2/probe" | awk '{print $1}')
+  api_aws s3api put-object --bucket "$1" --key note-images/.sdds-init-probe --body "$2/probe" --content-type application/octet-stream --metadata "sha256=$verify_api_object_permissions_probe_hash" >"$2/out" 2>"$2/error" || die "API note-images write permission failed"
+  api_aws s3api get-object --bucket "$1" --key note-images/.sdds-init-probe "$2/probe-get" >"$2/out" 2>"$2/error" || die "API note-images read permission failed"
+  cmp -s "$2/probe" "$2/probe-get" || die "API note-images payload mismatch"
+  api_aws s3api delete-object --bucket "$1" --key note-images/.sdds-init-probe >"$2/out" 2>"$2/error" || die "API note-images delete permission failed"
+  for verify_api_object_permissions_key in system/init-probe note-images-evil/init-probe; do
+    command_is_access_denied api_aws s3api put-object --bucket "$1" --key "$verify_api_object_permissions_key" --body "$2/probe" || die "API write denial was not AccessDenied"
+    command_is_access_denied api_aws s3api get-object --bucket "$1" --key "$verify_api_object_permissions_key" "$2/blocked" || die "API read denial was not AccessDenied"
+    command_is_access_denied api_aws s3api delete-object --bucket "$1" --key "$verify_api_object_permissions_key" || die "API delete denial was not AccessDenied"
+  done
+  command_is_access_denied api_aws s3api list-objects-v2 --bucket "$1" || die "API list denial was not AccessDenied"
+  if api_aws s3api head-bucket --bucket "$1" >"$2/out" 2>"$2/error"; then die "API bucket inspection succeeded"; fi
+  grep -Eiq 'Forbidden|403' "$2/error" || die "API bucket denial was not HTTP 403"
+}
+verify_unsigned_private_access() {
+  command_is_access_denied unsigned_aws s3api get-object --bucket "$1" --key system/readiness "$2/unsigned-get" || die "unsigned GET denial was not AccessDenied"
+  command_is_access_denied unsigned_aws s3api list-objects-v2 --bucket "$1" || die "unsigned LIST denial was not AccessDenied"
+}
+run_bootstrap() {
+  configure_mc_alias root "$ENDPOINT" "$ROOT_ACCESS" "$ROOT_SECRET" >"$1/out" 2>"$1/error" || die "root admin login failed"
+  bootstrap_private_bucket "$BUCKET" "$1"
+  ensure_api_policy "$POLICY_NAME" "$POLICY" "$1"
+  ensure_api_user "$API_ACCESS" "$API_SECRET" "$POLICY_NAME" "$1"
+  ensure_readiness_sentinel "$BUCKET" "$1" "$SENTINEL_SHA256" "$SENTINEL_CHECKSUM"
+  verify_api_secret_rotation "$BUCKET" "$API_ACCESS" "$API_SECRET" "$1"
+  verify_api_readiness_access "$BUCKET" "$1"
+  verify_api_admin_denials "$POLICY_NAME" "$API_ACCESS" "$1"
+  verify_api_object_permissions "$BUCKET" "$1"
+  verify_unsigned_private_access "$BUCKET" "$1"
+  printf '%s\n' 'rustfs bootstrap verified'
+}
+run_bootstrap "$tmp"

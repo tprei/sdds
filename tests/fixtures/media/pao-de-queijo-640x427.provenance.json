@@ -1,0 +1,33 @@
+{
+  "fixture_path": "tests/fixtures/media/pao-de-queijo-640x427.jpg",
+  "title": "Pao de queijo brasil",
+  "description": "Fotografia de pães de queijo",
+  "author": "Acfariac",
+  "source_file_page_url": "https://commons.wikimedia.org/wiki/File:Pao_de_queijo_brasil.jpg",
+  "source_original_url": "https://upload.wikimedia.org/wikipedia/commons/a/aa/Pao_de_queijo_brasil.jpg",
+  "source_original_mime": "image/jpeg",
+  "source_original_width": 1024,
+  "source_original_height": 683,
+  "source_original_byte_size": 64078,
+  "source_original_sha1": "5c95699a7e4e1a366480ee30dceb1d71807c7584",
+  "license_spdx": "CC-BY-SA-4.0",
+  "license_name": "Creative Commons Attribution-ShareAlike 4.0 International",
+  "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "attribution": "“Pao de queijo brasil” by Acfariac, from Wikimedia Commons, licensed under CC BY-SA 4.0. Modified for SDDS: auto-oriented, converted to sRGB, proportionally resized to 640×427, and stripped of metadata; no endorsement implied.",
+  "changes": [
+    "Auto-oriented before metadata removal.",
+    "Converted to sRGB.",
+    "Proportionally resized to 640×427 without cropping.",
+    "Stripped of EXIF, GPS, comments, thumbnails, and profiles."
+  ],
+  "fixture_license_spdx": "CC-BY-SA-4.0",
+  "tool": "ImageMagick 7 (magick)",
+  "tool_version": "Version: ImageMagick 7.1.2-27 Q16-HDRI aarch64 e4c2b403b:20260705 https://imagemagick.org\nCopyright: (C) 1999 ImageMagick Studio LLC\nLicense: https://imagemagick.org/license/\nFeatures: Cipher DPC HDRI Modules\nDelegates (built-in): bzlib freetype heic jng jpeg lcms ltdl lzma png tiff webp xml zlib zstd\nCompiler: clang (21.0.0)",
+  "jpeg_delegate_version": "libjpeg-turbo version 3.2.0 (build 20260630)",
+  "command": "MAGICK_THREAD_LIMIT=1 magick Pao_de_queijo_brasil.jpg -auto-orient -colorspace sRGB -resize '640x640>' -strip -sampling-factor 4:2:0 -define jpeg:dct-method=islow -define jpeg:optimize-coding=false -interlace none -quality 82 tests/fixtures/media/pao-de-queijo-640x427.jpg",
+  "fixture_mime": "image/jpeg",
+  "fixture_width": 640,
+  "fixture_height": 427,
+  "fixture_byte_size": 33887,
+  "fixture_sha256": "57e8aeda4753fca6b9077b271ccee6d6558923a72767b9c1bf3773e43254afbb"
+}

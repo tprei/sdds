@@ -28,7 +28,8 @@ type noteFields struct {
 }
 
 func TestAPIRuntimeBoundaries(t *testing.T) {
-	client := newAPIClient(t)
+	publicClient := newAPIClient(t)
+	client := publicClient
 
 	waitForReadiness(t, client)
 
@@ -267,6 +268,7 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 
 	requireListNotesCategoryFilterError(t, client, "comida")
 	requireSearchNotesCategoryFilterError(t, client, "comida")
+	requireMediaAPIRuntimeBoundaries(t, publicClient, client, loggedInSession.User.Author)
 }
 
 func requireCatalogs(t *testing.T, client *openapi.ClientWithResponses) {

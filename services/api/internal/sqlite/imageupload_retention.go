@@ -53,6 +53,22 @@ func (store *ImageUploadStore) ClaimExpired(ctx context.Context, now time.Time, 
 			err = fmt.Errorf("rollback image upload cleanup claim: %w", rollbackErr)
 		}
 	}()
+
+	ids, err := store.selectExpiredImageUploadIDs(ctx, tx, now, limit)
+	if err != nil {
+		return nil, err
+	}
+	uploads, err = store.claimSelectedExpiredImageUploads(ctx, tx, ids, leaseUntil, now)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit image upload cleanup claim: %w", err)
+	}
+	return uploads, nil
+}
+
+func (store *ImageUploadStore) selectExpiredImageUploadIDs(ctx context.Context, tx *sql.Tx, now time.Time, limit int) ([]string, error) {
 	rows, err := tx.QueryContext(ctx, selectExpiredImageUploadIDsSQL, unixMillis(now), unixMillis(now), limit)
 	if err != nil {
 		return nil, fmt.Errorf("select expired image uploads: %w", err)
@@ -73,30 +89,41 @@ func (store *ImageUploadStore) ClaimExpired(ctx context.Context, now time.Time, 
 	if err := rows.Close(); err != nil {
 		return nil, fmt.Errorf("close expired image uploads: %w", err)
 	}
-	uploads = make([]media.Upload, 0, len(ids))
+	return ids, nil
+}
+
+func (store *ImageUploadStore) claimSelectedExpiredImageUploads(ctx context.Context, tx *sql.Tx, ids []string, leaseUntil, now time.Time) ([]media.Upload, error) {
+	uploads := make([]media.Upload, 0, len(ids))
 	for _, id := range ids {
-		result, err := tx.ExecContext(ctx, claimImageUploadSQL,
-			unixMillis(leaseUntil), unixMillis(now), id, unixMillis(now), unixMillis(now))
+		upload, claimed, err := store.claimExpiredImageUpload(ctx, tx, id, leaseUntil, now)
 		if err != nil {
-			return nil, fmt.Errorf("claim expired image upload: %w", err)
+			return nil, err
 		}
-		claimed, err := result.RowsAffected()
-		if err != nil {
-			return nil, fmt.Errorf("read claimed image upload count: %w", err)
+		if claimed {
+			uploads = append(uploads, upload)
 		}
-		if claimed != 1 {
-			continue
-		}
-		upload, err := store.findUpload(ctx, tx.QueryRowContext(ctx, findImageUploadByIDSQL, id))
-		if err != nil {
-			return nil, fmt.Errorf("load claimed image upload: %w", err)
-		}
-		uploads = append(uploads, upload)
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("commit image upload cleanup claim: %w", err)
 	}
 	return uploads, nil
+}
+
+func (store *ImageUploadStore) claimExpiredImageUpload(ctx context.Context, tx *sql.Tx, id string, leaseUntil, now time.Time) (media.Upload, bool, error) {
+	result, err := tx.ExecContext(ctx, claimImageUploadSQL,
+		unixMillis(leaseUntil), unixMillis(now), id, unixMillis(now), unixMillis(now))
+	if err != nil {
+		return media.Upload{}, false, fmt.Errorf("claim expired image upload: %w", err)
+	}
+	claimed, err := result.RowsAffected()
+	if err != nil {
+		return media.Upload{}, false, fmt.Errorf("read claimed image upload count: %w", err)
+	}
+	if claimed != 1 {
+		return media.Upload{}, false, nil
+	}
+	upload, err := store.findUpload(ctx, tx.QueryRowContext(ctx, findImageUploadByIDSQL, id))
+	if err != nil {
+		return media.Upload{}, false, fmt.Errorf("load claimed image upload: %w", err)
+	}
+	return upload, true, nil
 }
 func (store *ImageUploadStore) FinalizeExpired(ctx context.Context, id string, now time.Time) error {
 	now = normalizeTime(now)

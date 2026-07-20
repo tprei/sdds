@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"github.com/tprei/sdds/services/api/internal/media"
 	"time"
@@ -47,120 +46,6 @@ func NewImageUploadStore(db *sql.DB) *ImageUploadStore {
 }
 func newImageUploadStore(db *sql.DB, clock func() time.Time) *ImageUploadStore {
 	return &ImageUploadStore{db: db, clock: clock}
-}
-func (store *ImageUploadStore) BeginPending(ctx context.Context, input media.PendingInput) (upload media.Upload, err error) {
-	now := normalizeTime(store.clock())
-	tx, err := store.db.BeginTx(ctx, nil)
-	if err != nil {
-		return media.Upload{}, fmt.Errorf("begin image upload pending transaction: %w", err)
-	}
-	defer func() {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && err == nil {
-			err = fmt.Errorf("rollback image upload pending transaction: %w", rollbackErr)
-		}
-	}()
-	current, findErr := store.findUpload(ctx, tx.QueryRowContext(ctx, findImageUploadByUserRequestSQL, input.UserID, input.UploadRequestID))
-	if errors.Is(findErr, media.ErrUploadNotFound) {
-		input, err = normalizePendingInput(input, now)
-		if err != nil {
-			return media.Upload{}, err
-		}
-		if err := store.enforceUploadQuota(ctx, tx, input.UserID, input.ByteSize, now); err != nil {
-			return media.Upload{}, err
-		}
-		if _, err := tx.ExecContext(ctx, insertImageUploadSQL, input.ID, input.UserID, string(input.StorageKey),
-			input.UploadRequestID, media.UploadPending, input.ContentType, input.ByteSize, input.Width, input.Height,
-			input.SHA256, unixMillis(input.CreatedAt), unixMillis(input.UpdatedAt), unixMillis(input.WriteLeaseUntil),
-			unixMillis(input.ExpiresAt), unixMillis(input.RequestRetentionUntil)); err != nil {
-			if isUniqueConstraintError(err) {
-				current, findErr = store.findUpload(ctx, tx.QueryRowContext(ctx, findImageUploadByUserRequestSQL, input.UserID, input.UploadRequestID))
-				if findErr == nil {
-					return store.claimExistingPending(ctx, tx, current, input, now)
-				}
-			}
-			return media.Upload{}, fmt.Errorf("insert pending image upload: %w", err)
-		}
-		created, err := store.findUpload(ctx, tx.QueryRowContext(ctx, findImageUploadByIDSQL, input.ID))
-		if err != nil {
-			return media.Upload{}, fmt.Errorf("load pending image upload: %w", err)
-		}
-		if err := tx.Commit(); err != nil {
-			return media.Upload{}, fmt.Errorf("commit pending image upload: %w", err)
-		}
-		return created, nil
-	}
-	if findErr != nil {
-		return media.Upload{}, fmt.Errorf("find image upload request: %w", findErr)
-	}
-	input, err = normalizePendingLease(input, now)
-	if err != nil {
-		return media.Upload{}, err
-	}
-	return store.claimExistingPending(ctx, tx, current, input, now)
-}
-func (store *ImageUploadStore) claimExistingPending(ctx context.Context, tx *sql.Tx, current media.Upload, input media.PendingInput, now time.Time) (media.Upload, error) {
-	if !sameUploadContent(current, input) {
-		return media.Upload{}, media.ErrUploadIdempotencyConflict
-	}
-	switch current.State {
-	case media.UploadPending:
-		if !current.ExpiresAt.After(now) {
-			return media.Upload{}, media.ErrUploadExpired
-		}
-		if current.WriteLeaseUntil.After(now) {
-			return media.Upload{}, media.ErrUploadInProgress
-		}
-		leaseUntil := input.WriteLeaseUntil
-		if !leaseUntil.After(now) {
-			leaseUntil = now.Add(media.UploadLeaseDuration)
-		}
-		result, err := tx.ExecContext(ctx, reclaimPendingImageUploadSQL,
-			unixMillis(leaseUntil),
-			unixMillis(now),
-			current.ID,
-			unixMillis(now),
-		)
-		if err != nil {
-			return media.Upload{}, fmt.Errorf("reclaim pending image upload: %w", err)
-		}
-		updated, err := result.RowsAffected()
-		if err != nil {
-			return media.Upload{}, fmt.Errorf("read reclaimed image upload count: %w", err)
-		}
-		if updated == 0 {
-			return media.Upload{}, media.ErrUploadInProgress
-		}
-		claimed, err := store.findUpload(ctx, tx.QueryRowContext(ctx, findImageUploadByIDSQL, current.ID))
-		if err != nil {
-			return media.Upload{}, fmt.Errorf("load reclaimed image upload: %w", err)
-		}
-		if err := tx.Commit(); err != nil {
-			return media.Upload{}, fmt.Errorf("commit reclaimed image upload: %w", err)
-		}
-		return claimed, nil
-	case media.UploadReady:
-		if !current.ExpiresAt.After(now) {
-			return media.Upload{}, media.ErrUploadExpired
-		}
-		if err := tx.Commit(); err != nil {
-			return media.Upload{}, fmt.Errorf("commit existing image upload: %w", err)
-		}
-		return current, nil
-	case media.UploadConsumed:
-		if !current.RequestRetentionUntil.After(now) {
-			return media.Upload{}, media.ErrUploadExpired
-		}
-		if err := tx.Commit(); err != nil {
-			return media.Upload{}, fmt.Errorf("commit existing image upload: %w", err)
-		}
-		return current, nil
-	case media.UploadDeleting:
-		return media.Upload{}, media.ErrUploadInProgress
-	case media.UploadExpired:
-		return media.Upload{}, media.ErrUploadExpired
-	default:
-		return media.Upload{}, fmt.Errorf("unknown image upload state %q", current.State)
-	}
 }
 func (store *ImageUploadStore) MarkReady(ctx context.Context, input media.ReadyInput) (bool, error) {
 	now := normalizeTime(store.clock())

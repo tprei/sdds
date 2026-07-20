@@ -22,6 +22,89 @@ tags:
   - name: Notes
     description: Text-first recommendation notes.
 paths:
+  /v1/media/image-uploads:
+    post:
+      operationId: prepareImageUpload
+      summary: Stage one private image upload
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/PrepareImageUploadMultipart"
+      responses:
+        "201":
+          description: Image staged and ready for association.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageUploadReceipt"
+        "400":
+          description: Invalid multipart structure or image metadata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Missing or invalid session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Upload identity conflict, in-progress retry, or expired identity.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: Encoded image or multipart body exceeds the limit.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "415":
+          description: Unsupported image format.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Staged-upload quota exceeded.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The media could not be persisted due to an internal error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Media storage is temporarily unavailable.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /healthz:
     get:
       operationId: getHealth
@@ -606,6 +689,55 @@ components:
         display_order:
           type: integer
           format: int32
+    ImageUploadReceipt:
+      type: object
+      additionalProperties: false
+      required:
+        - image_upload_id
+        - content_type
+        - byte_size
+        - width
+        - height
+        - expires_at
+      properties:
+        image_upload_id:
+          type: string
+          format: uuid
+        content_type:
+          type: string
+          enum:
+            - image/jpeg
+            - image/png
+        byte_size:
+          type: integer
+          format: int64
+          minimum: 1
+        width:
+          type: integer
+          format: int32
+          minimum: 1
+        height:
+          type: integer
+          format: int32
+          minimum: 1
+        expires_at:
+          type: integer
+          format: int64
+          minimum: 1
+    PrepareImageUploadMultipart:
+      type: object
+      additionalProperties: false
+      required:
+        - upload_request_id
+        - file
+      properties:
+        upload_request_id:
+          type: string
+          format: uuid
+          maxLength: 128
+        file:
+          type: string
+          format: binary
     CreateNoteRequest:
       type: object
       additionalProperties: false
@@ -695,6 +827,15 @@ components:
         - ErrorCodeRequestTooLarge
         - ErrorCodeUnauthenticated
         - ErrorCodeUsernameTaken
+        - ErrorCodeInvalidMedia
+        - ErrorCodeUnsupportedMediaType
+        - ErrorCodeIdempotencyConflict
+        - ErrorCodeUploadInProgress
+        - ErrorCodeUploadExpired
+        - ErrorCodeMediaStagingQuotaExceeded
+        - ErrorCodeMediaStorageUnavailable
+        - ErrorCodeMediaIntegrityError
+        - ErrorCodeTooManyImages
       enum:
         - internal_error
         - invalid_auth
@@ -706,6 +847,15 @@ components:
         - request_too_large
         - unauthenticated
         - username_taken
+        - invalid_media
+        - unsupported_media_type
+        - idempotency_conflict
+        - upload_in_progress
+        - upload_expired
+        - media_staging_quota_exceeded
+        - media_storage_unavailable
+        - media_integrity_error
+        - too_many_images
     ErrorResponse:
       type: object
       additionalProperties: false
@@ -849,6 +999,10 @@ components:
         - ValidationFieldDisplayName
         - ValidationFieldLimit
         - ValidationFieldCursor
+        - ValidationFieldClientRequestID
+        - ValidationFieldUploadRequestID
+        - ValidationFieldImageUploadIDs
+        - ValidationFieldFile
       enum:
         - title
         - body
@@ -860,6 +1014,10 @@ components:
         - display_name
         - limit
         - cursor
+        - client_request_id
+        - upload_request_id
+        - image_upload_ids
+        - file
     ValidationProblem:
       type: object
       additionalProperties: false

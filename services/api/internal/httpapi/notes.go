@@ -51,6 +51,54 @@ func (handler server) GetNote(w http.ResponseWriter, r *http.Request, noteID str
 	writeJSON(w, http.StatusOK, newNoteResponse(found))
 }
 
+func (handler server) MarkNoteUseful(w http.ResponseWriter, r *http.Request, noteID string) {
+	current, ok := currentSessionFromContext(r.Context())
+	if !ok {
+		writeUnauthenticated(w)
+		return
+	}
+
+	if _, err := handler.notes.store.FindNote(r.Context(), noteID); err != nil {
+		if errors.Is(err, note.ErrNoteNotFound) {
+			writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
+			return
+		}
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+
+	if err := handler.notes.useful.MarkUseful(r.Context(), note.MarkUsefulInput{NoteID: noteID, UserID: current.User.ID}); err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+
+	noContent(w, r)
+}
+
+func (handler server) UnmarkNoteUseful(w http.ResponseWriter, r *http.Request, noteID string) {
+	current, ok := currentSessionFromContext(r.Context())
+	if !ok {
+		writeUnauthenticated(w)
+		return
+	}
+
+	if _, err := handler.notes.store.FindNote(r.Context(), noteID); err != nil {
+		if errors.Is(err, note.ErrNoteNotFound) {
+			writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
+			return
+		}
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+
+	if err := handler.notes.useful.UnmarkUseful(r.Context(), note.UnmarkUsefulInput{NoteID: noteID, UserID: current.User.ID}); err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+
+	noContent(w, r)
+}
+
 func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {
 	current, ok := currentSessionFromContext(r.Context())
 	if !ok {

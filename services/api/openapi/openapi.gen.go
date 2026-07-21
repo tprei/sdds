@@ -544,6 +544,12 @@ type ClientInterface interface {
 	// GetNote request
 	GetNote(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UnmarkNoteUseful request
+	UnmarkNoteUseful(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MarkNoteUseful request
+	MarkNoteUseful(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListPlaces request
 	ListPlaces(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -745,6 +751,30 @@ func (c *Client) CreateNote(ctx context.Context, body CreateNoteJSONRequestBody,
 
 func (c *Client) GetNote(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetNoteRequest(c.Server, noteId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UnmarkNoteUseful(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUnmarkNoteUsefulRequest(c.Server, noteId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MarkNoteUseful(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMarkNoteUsefulRequest(c.Server, noteId)
 	if err != nil {
 		return nil, err
 	}
@@ -1292,6 +1322,74 @@ func NewGetNoteRequest(server string, noteId string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewUnmarkNoteUsefulRequest generates requests for UnmarkNoteUseful
+func NewUnmarkNoteUsefulRequest(server string, noteId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "note_id", noteId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/notes/%s/useful", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewMarkNoteUsefulRequest generates requests for MarkNoteUseful
+func NewMarkNoteUsefulRequest(server string, noteId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "note_id", noteId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/notes/%s/useful", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListPlacesRequest generates requests for ListPlaces
 func NewListPlacesRequest(server string) (*http.Request, error) {
 	var err error
@@ -1475,6 +1573,12 @@ type ClientWithResponsesInterface interface {
 
 	// GetNoteWithResponse request
 	GetNoteWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*GetNoteHTTPResponse, error)
+
+	// UnmarkNoteUsefulWithResponse request
+	UnmarkNoteUsefulWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*UnmarkNoteUsefulHTTPResponse, error)
+
+	// MarkNoteUsefulWithResponse request
+	MarkNoteUsefulWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*MarkNoteUsefulHTTPResponse, error)
 
 	// ListPlacesWithResponse request
 	ListPlacesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPlacesHTTPResponse, error)
@@ -1948,6 +2052,72 @@ func (r GetNoteHTTPResponse) ContentType() string {
 	return ""
 }
 
+type UnmarkNoteUsefulHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r UnmarkNoteUsefulHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UnmarkNoteUsefulHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UnmarkNoteUsefulHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type MarkNoteUsefulHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r MarkNoteUsefulHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MarkNoteUsefulHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r MarkNoteUsefulHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListPlacesHTTPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2160,6 +2330,24 @@ func (c *ClientWithResponses) GetNoteWithResponse(ctx context.Context, noteId st
 		return nil, err
 	}
 	return ParseGetNoteHTTPResponse(rsp)
+}
+
+// UnmarkNoteUsefulWithResponse request returning *UnmarkNoteUsefulHTTPResponse
+func (c *ClientWithResponses) UnmarkNoteUsefulWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*UnmarkNoteUsefulHTTPResponse, error) {
+	rsp, err := c.UnmarkNoteUseful(ctx, noteId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUnmarkNoteUsefulHTTPResponse(rsp)
+}
+
+// MarkNoteUsefulWithResponse request returning *MarkNoteUsefulHTTPResponse
+func (c *ClientWithResponses) MarkNoteUsefulWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*MarkNoteUsefulHTTPResponse, error) {
+	rsp, err := c.MarkNoteUseful(ctx, noteId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMarkNoteUsefulHTTPResponse(rsp)
 }
 
 // ListPlacesWithResponse request returning *ListPlacesHTTPResponse
@@ -2839,6 +3027,100 @@ func ParseGetNoteHTTPResponse(rsp *http.Response) (*GetNoteHTTPResponse, error) 
 			return nil, err
 		}
 		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUnmarkNoteUsefulHTTPResponse parses an HTTP response from a UnmarkNoteUsefulWithResponse call
+func ParseUnmarkNoteUsefulHTTPResponse(rsp *http.Response) (*UnmarkNoteUsefulHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UnmarkNoteUsefulHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseMarkNoteUsefulHTTPResponse parses an HTTP response from a MarkNoteUsefulWithResponse call
+func ParseMarkNoteUsefulHTTPResponse(rsp *http.Response) (*MarkNoteUsefulHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MarkNoteUsefulHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest ErrorResponse

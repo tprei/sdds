@@ -194,3 +194,213 @@ func TestUsefulStoreCascadesOnBareUserDeletion(t *testing.T) {
 		t.Fatalf("reaction count after user delete = %d, want 0", got)
 	}
 }
+
+func TestNoteStoreLoadsUsefulStateForEveryReadPath(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	times := []time.Time{
+		time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
+		time.Date(2026, 7, 2, 12, 1, 0, 0, time.UTC),
+	}
+	index := 0
+	store := newTestNoteStore(db, func() time.Time {
+		if index >= len(times) {
+			return times[len(times)-1]
+		}
+		current := times[index]
+		index++
+		return current
+	})
+	insertBareUsefulStoreUser(t, ctx, db, usefulStoreOtherUserID)
+	insertBareUsefulStoreUser(t, ctx, db, usefulStoreSecondUserID)
+
+	older, err := store.CreateNote(ctx, note.CreateInput{
+		ClientRequestID: "older-useful-note",
+		Title:           "Older useful note",
+		Body:            "oldermarker useful body",
+		CategorySlug:    note.CategorySlugFood,
+		PlaceSlug:       note.PlaceSlugSaoPaulo,
+	})
+	if err != nil {
+		t.Fatalf("create older note: %v", err)
+	}
+	newer, err := store.CreateNote(ctx, note.CreateInput{
+		ClientRequestID: "newer-useful-note",
+		Title:           "Newer useful note",
+		Body:            "newermarker useful body",
+		CategorySlug:    note.CategorySlugFood,
+		PlaceSlug:       note.PlaceSlugSaoPaulo,
+	})
+	if err != nil {
+		t.Fatalf("create newer note: %v", err)
+	}
+	for _, noteID := range []string{older.ID, newer.ID} {
+		if err := store.MarkUseful(ctx, note.MarkUsefulInput{NoteID: noteID, UserID: systemNoteOwnerUserID}); err != nil {
+			t.Fatalf("mark useful by owner for %s: %v", noteID, err)
+		}
+		if err := store.MarkUseful(ctx, note.MarkUsefulInput{NoteID: noteID, UserID: usefulStoreOtherUserID}); err != nil {
+			t.Fatalf("mark useful by other viewer for %s: %v", noteID, err)
+		}
+	}
+
+	type readCase struct {
+		name string
+		read func(viewer user.UserID) (note.Note, error)
+		want string
+	}
+	readCases := []readCase{
+		{
+			name: "recent list",
+			read: func(viewer user.UserID) (note.Note, error) {
+				found, err := store.ListRecentNotes(ctx, note.ListInput{Limit: 10, ViewerUserID: viewer})
+				if err != nil {
+					return note.Note{}, err
+				}
+				if len(found) != 2 {
+					t.Fatalf("recent list count = %d, want 2", len(found))
+				}
+				return found[0], nil
+			},
+			want: newer.ID,
+		},
+		{
+			name: "recent category list",
+			read: func(viewer user.UserID) (note.Note, error) {
+				found, err := store.ListRecentNotes(ctx, note.ListInput{
+					CategorySlug: note.CategorySlugFood,
+					Limit:        10,
+					ViewerUserID: viewer,
+				})
+				if err != nil {
+					return note.Note{}, err
+				}
+				if len(found) != 2 {
+					t.Fatalf("recent category list count = %d, want 2", len(found))
+				}
+				return found[0], nil
+			},
+			want: newer.ID,
+		},
+		{
+			name: "detail",
+			read: func(viewer user.UserID) (note.Note, error) {
+				return store.FindNote(ctx, newer.ID, viewer)
+			},
+			want: newer.ID,
+		},
+		{
+			name: "search",
+			read: func(viewer user.UserID) (note.Note, error) {
+				found, err := store.SearchNotes(ctx, note.SearchInput{
+					Query:        "newermarker",
+					Limit:        10,
+					ViewerUserID: viewer,
+				})
+				if err != nil {
+					return note.Note{}, err
+				}
+				if len(found) != 1 {
+					t.Fatalf("search count = %d, want 1", len(found))
+				}
+				return found[0], nil
+			},
+			want: newer.ID,
+		},
+		{
+			name: "search category",
+			read: func(viewer user.UserID) (note.Note, error) {
+				found, err := store.SearchNotes(ctx, note.SearchInput{
+					CategorySlug: note.CategorySlugFood,
+					Query:        "newermarker",
+					Limit:        10,
+					ViewerUserID: viewer,
+				})
+				if err != nil {
+					return note.Note{}, err
+				}
+				if len(found) != 1 {
+					t.Fatalf("search category count = %d, want 1", len(found))
+				}
+				return found[0], nil
+			},
+			want: newer.ID,
+		},
+		{
+			name: "author first page",
+			read: func(viewer user.UserID) (note.Note, error) {
+				page, err := store.ListAuthorNotes(ctx, note.AuthorNotesInput{
+					AuthorID:     systemNoteOwnerAuthorID,
+					Limit:        1,
+					ViewerUserID: viewer,
+				})
+				if err != nil {
+					return note.Note{}, err
+				}
+				if len(page.Notes) != 1 {
+					t.Fatalf("author first page count = %d, want 1", len(page.Notes))
+				}
+				return page.Notes[0].Note, nil
+			},
+			want: newer.ID,
+		},
+		{
+			name: "author after cursor",
+			read: func(viewer user.UserID) (note.Note, error) {
+				firstPage, err := store.ListAuthorNotes(ctx, note.AuthorNotesInput{
+					AuthorID:     systemNoteOwnerAuthorID,
+					Limit:        1,
+					ViewerUserID: viewer,
+				})
+				if err != nil {
+					return note.Note{}, err
+				}
+				if len(firstPage.Notes) != 1 {
+					t.Fatalf("author first page count = %d, want 1", len(firstPage.Notes))
+				}
+				secondPage, err := store.ListAuthorNotes(ctx, note.AuthorNotesInput{
+					AuthorID:     systemNoteOwnerAuthorID,
+					Limit:        1,
+					After:        &firstPage.Notes[0].Position,
+					ViewerUserID: viewer,
+				})
+				if err != nil {
+					return note.Note{}, err
+				}
+				if len(secondPage.Notes) != 1 {
+					t.Fatalf("author after page count = %d, want 1", len(secondPage.Notes))
+				}
+				return secondPage.Notes[0].Note, nil
+			},
+			want: older.ID,
+		},
+	}
+
+	viewers := []struct {
+		name       string
+		viewer     user.UserID
+		wantMarked bool
+	}{
+		{name: "marking viewer", viewer: systemNoteOwnerUserID, wantMarked: true},
+		{name: "non-marking viewer", viewer: usefulStoreSecondUserID, wantMarked: false},
+	}
+
+	for _, viewer := range viewers {
+		for _, readCase := range readCases {
+			t.Run(viewer.name+"/"+readCase.name, func(t *testing.T) {
+				found, err := readCase.read(viewer.viewer)
+				if err != nil {
+					t.Fatalf("%s: %v", readCase.name, err)
+				}
+				if found.ID != readCase.want {
+					t.Fatalf("%s note id = %q, want %q", readCase.name, found.ID, readCase.want)
+				}
+				if found.UsefulCount != 2 {
+					t.Fatalf("%s useful count = %d, want 2", readCase.name, found.UsefulCount)
+				}
+				if found.UsefulByCurrentUser != viewer.wantMarked {
+					t.Fatalf("%s useful_by_current_user = %v, want %v", readCase.name, found.UsefulByCurrentUser, viewer.wantMarked)
+				}
+			})
+		}
+	}
+}

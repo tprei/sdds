@@ -90,7 +90,10 @@ describe('NoteCard media', () => {
         categoryLabel="Comida"
         note={currentNote}
         onPress={onPress}
+        onPressUseful={() => undefined}
         placeLabel={null}
+        usefulError={false}
+        usefulPending={false}
       />,
     );
 
@@ -100,6 +103,7 @@ describe('NoteCard media', () => {
     expect(nativeImages[0]?.props.accessible).toBe(false);
 
     const notePressable = renderer.root.findByProps({
+      accessibilityLabel: `Abrir nota com imagem: ${currentNote.title}`,
       accessibilityRole: 'button',
     });
     expect(notePressable.props.accessibilityLabel).toBe(
@@ -114,7 +118,7 @@ describe('NoteCard media', () => {
   it('keeps note text when its first image fails to load', async () => {
     const currentNote = note([firstImage]);
     const renderer = render(
-      <NoteCard categoryLabel="Comida" note={currentNote} placeLabel={null} />,
+      <NoteCard categoryLabel="Comida" note={currentNote} onPressUseful={() => undefined} placeLabel={null} usefulError={false} usefulPending={false} />,
     );
     const nativeImage = renderer.root.findByType('img');
     expect(nativeImage.props.accessible).toBe(true);

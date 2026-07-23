@@ -10,15 +10,11 @@ import { NoteDetailContent } from '@/features/notes/note-detail-content';
 import { buildNoteCatalog, labelNote } from '@/features/notes/catalog';
 import type { LabelledNote } from '@/features/notes/catalog';
 import { listCatalogs } from '@/lib/api/catalogs';
-import {
-  APIRequestError,
-  getNote,
-  markNoteUseful,
-  unmarkNoteUseful,
-} from '@/lib/api/notes';
+import { APIRequestError, getNote } from '@/lib/api/notes';
 import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { useUsefulMutation } from '@/features/notes/use-useful-mutation';
 
 type NoteDetailState =
   | { status: 'loading' }
@@ -32,7 +28,6 @@ type AuthenticatedNoteDetailScreenProps = {
   token: string;
 };
 
-type UsefulMutationState = 'idle' | 'pending' | 'error';
 
 const notFoundStatus = 404;
 
@@ -99,14 +94,34 @@ function AuthenticatedNoteDetailScreen({
 }: AuthenticatedNoteDetailScreenProps) {
   const router = useRouter();
   const detailGenerationRef = useRef(0);
-  const [mutationState, setMutationState] = useState<UsefulMutationState>('idle');
   const [state, setState] = useState<NoteDetailState>({ status: 'loading' });
+
+  const { getMutationState, toggleUseful: handleToggleUseful } = useUsefulMutation({
+    token,
+    onSessionExpired,
+    getGeneration: () => detailGenerationRef.current,
+    isStale: (gen) => gen !== detailGenerationRef.current,
+    onStaleWrite: () => {
+      detailGenerationRef.current += 1;
+      void Promise.all([listCatalogs(token), getNote(noteID, token)])
+        .then(([catalogs, note]) => {
+          const labelled = labelNote(buildNoteCatalog(catalogs), note);
+          if (labelled !== null) setState({ status: 'ready', note: labelled });
+        })
+        .catch(() => setState({ status: 'error' }));
+    },
+    applyResult: (noteId, updater) => {
+      setState((current) => {
+        if (current.status !== 'ready') return current;
+        return { status: 'ready', note: updater(current.note) as typeof current.note };
+      });
+    },
+  });
 
   useFocusEffect(
     useCallback(() => {
       const generation = ++detailGenerationRef.current;
       let isActive = true;
-      setMutationState('idle');
       setState({ status: 'loading' });
 
       Promise.all([listCatalogs(token), getNote(noteID, token)])
@@ -130,7 +145,9 @@ function AuthenticatedNoteDetailScreen({
             detailGenerationRef.current += 1;
             try {
               await onSessionExpired();
-            } catch {}
+            } catch {
+              setState({ status: 'error' });
+            }
             return;
           }
           setState(
@@ -147,49 +164,6 @@ function AuthenticatedNoteDetailScreen({
     }, [noteID, onSessionExpired, token]),
   );
 
-  const handleToggleUseful = useCallback(async () => {
-    if (state.status !== 'ready' || mutationState === 'pending') {
-      return;
-    }
-
-    const generation = detailGenerationRef.current;
-    const note = state.note;
-    setMutationState('pending');
-
-    try {
-      if (note.usefulByCurrentUser) {
-        await unmarkNoteUseful(note.id, token);
-      } else {
-        await markNoteUseful(note.id, token);
-      }
-      if (detailGenerationRef.current !== generation) {
-        return;
-      }
-      setState({
-        status: 'ready',
-        note: {
-          ...note,
-          usefulByCurrentUser: !note.usefulByCurrentUser,
-          usefulCount: note.usefulByCurrentUser
-            ? note.usefulCount - 1
-            : note.usefulCount + 1,
-        },
-      });
-      setMutationState('idle');
-    } catch (error: unknown) {
-      if (detailGenerationRef.current !== generation) {
-        return;
-      }
-      if (requestStatus(error) === unauthorizedStatus) {
-        detailGenerationRef.current += 1;
-        try {
-          await onSessionExpired();
-        } catch {}
-        return;
-      }
-      setMutationState('error');
-    }
-  }, [mutationState, onSessionExpired, state, token]);
 
   let content: React.ReactNode;
   if (state.status === 'loading') {
@@ -221,10 +195,10 @@ function AuthenticatedNoteDetailScreen({
           router.push({ pathname: '/authors/[id]', params: { id: authorID } })
         }
         onPressUseful={() => {
-          void handleToggleUseful();
+          void handleToggleUseful(state.note);
         }}
-        usefulError={mutationState === 'error'}
-        usefulPending={mutationState === 'pending'}
+        usefulError={getMutationState(state.note.id) === 'error'}
+        usefulPending={getMutationState(state.note.id) === 'pending'}
       />
     );
   }

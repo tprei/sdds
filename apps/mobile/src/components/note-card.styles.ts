@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { radius, semanticColors, spacing, typography } from '@sdds/tokens';
+import { colors, radius, semanticColors, spacing, typography } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   author: {
@@ -18,6 +18,14 @@ export const styles = StyleSheet.create({
   },
   authorPressed: {
     opacity: 0.7,
+  },
+  actionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sp3,
+    marginBottom: spacing.sp5,
+    marginHorizontal: spacing.sp5,
   },
   body: {
     color: semanticColors.textBody,
@@ -68,5 +76,12 @@ export const styles = StyleSheet.create({
     fontSize: typography.sizeTitle,
     fontWeight: typography.weightBold,
     lineHeight: 24,
+  },
+  usefulError: {
+    color: colors.danger500,
+    fontSize: typography.sizeSmall,
+    fontWeight: typography.weightSemibold,
+    marginBottom: spacing.sp5,
+    marginHorizontal: spacing.sp5,
   },
 });

@@ -11,7 +11,11 @@ import { useFocusEffect } from 'expo-router';
 import { NoteCard } from '../../components/note-card';
 import { FoundationButton } from '../../components/foundation-screen';
 import { listCatalogs } from '../../lib/api/catalogs';
-import { APIRequestError } from '../../lib/api/notes';
+import {
+  APIRequestError,
+  markNoteUseful,
+  unmarkNoteUseful,
+} from '../../lib/api/notes';
 import { requestStatus } from '../../lib/api/request-error';
 import { unauthorizedStatus } from '../../lib/api/status';
 import { getPublicAuthor, listAuthorNotes } from '../../lib/api/authors';
@@ -31,6 +35,7 @@ type Props = {
   onSessionExpired: () => Promise<void>;
 };
 type ProfileError = 'not_found' | 'error' | null;
+type UsefulMutationState = 'error' | 'pending';
 
 function initials(name: string): string {
   return name
@@ -94,9 +99,13 @@ function InitialError({
 function ProfileNotes({
   notes,
   onPressNote,
+  onToggleUseful,
+  usefulMutations,
 }: {
   notes: LabelledNote[];
   onPressNote: (noteID: string) => void;
+  onToggleUseful: (note: LabelledNote) => Promise<void>;
+  usefulMutations: Partial<Record<string, UsefulMutationState>>;
 }) {
   if (notes.length === 0) {
     return <Text style={styles.message}>Nenhuma nota ainda.</Text>;
@@ -110,7 +119,12 @@ function ProfileNotes({
           key={note.id}
           note={note}
           onPress={() => onPressNote(note.id)}
+          onPressUseful={() => {
+            void onToggleUseful(note);
+          }}
           placeLabel={note.placeLabel}
+          usefulError={usefulMutations[note.id] === 'error'}
+          usefulPending={usefulMutations[note.id] === 'pending'}
         />
       ))}
     </>
@@ -166,8 +180,12 @@ export function AuthorProfileContent({
   const [loadingNext, setLoadingNext] = useState(false);
   const [error, setError] = useState<ProfileError>(null);
   const [nextError, setNextError] = useState(false);
+  const [usefulMutations, setUsefulMutations] = useState<
+    Partial<Record<string, UsefulMutationState>>
+  >({});
   const pendingCursor = useRef<string | null | undefined>(undefined);
   const requestVersion = useRef(0);
+  const usefulMutationGenerationRef = useRef(0);
   const [activeAuthorID, setActiveAuthorID] = useState<string | null>(null);
   const currentAuthorID = useRef(authorID);
 
@@ -186,7 +204,9 @@ export function AuthorProfileContent({
 
   const invalidateRequests = useCallback(() => {
     requestVersion.current += 1;
+    usefulMutationGenerationRef.current += 1;
     pendingCursor.current = undefined;
+    setUsefulMutations({});
   }, []);
 
   const loadInitial = useCallback(async () => {
@@ -201,7 +221,9 @@ export function AuthorProfileContent({
     setCursor(null);
     setLoadingNext(false);
     setNextError(false);
+    setUsefulMutations({});
     setLoading(true);
+    usefulMutationGenerationRef.current += 1;
     setError(null);
     try {
       const [profile, page, catalogs] = await Promise.all([
@@ -223,7 +245,7 @@ export function AuthorProfileContent({
         return;
       }
       if (requestStatus(caught) === unauthorizedStatus) {
-        await onSessionExpired();
+        await onSessionExpired().catch(() => undefined);
         return;
       }
       setActiveAuthorID(requestedAuthorID);
@@ -272,7 +294,7 @@ export function AuthorProfileContent({
           return;
         }
         if (requestStatus(caught) === unauthorizedStatus) {
-          await onSessionExpired();
+          await onSessionExpired().catch(() => undefined);
           return;
         }
         setNextError(true);
@@ -284,6 +306,59 @@ export function AuthorProfileContent({
       }
     },
     [authorID, isCurrentRequest, onSessionExpired, token],
+  );
+
+  const toggleUseful = useCallback(
+    async (target: LabelledNote) => {
+      if (usefulMutations[target.id] === 'pending') {
+        return;
+      }
+      const generation = usefulMutationGenerationRef.current;
+      setUsefulMutations((current) => ({
+        ...current,
+        [target.id]: 'pending',
+      }));
+      try {
+        if (target.usefulByCurrentUser) {
+          await unmarkNoteUseful(target.id, token);
+        } else {
+          await markNoteUseful(target.id, token);
+        }
+        if (usefulMutationGenerationRef.current !== generation) {
+          return;
+        }
+        setNotes((current) =>
+          current.map((note) =>
+            note.id === target.id
+              ? {
+                  ...note,
+                  usefulByCurrentUser: !note.usefulByCurrentUser,
+                  usefulCount: note.usefulByCurrentUser
+                    ? note.usefulCount - 1
+                    : note.usefulCount + 1,
+                }
+              : note,
+          ),
+        );
+        setUsefulMutations((current) => {
+          const { [target.id]: _removed, ...rest } = current;
+          return rest;
+        });
+      } catch (error: unknown) {
+        if (usefulMutationGenerationRef.current !== generation) {
+          return;
+        }
+        if (requestStatus(error) === unauthorizedStatus) {
+          await onSessionExpired().catch(() => undefined);
+          return;
+        }
+        setUsefulMutations((current) => ({
+          ...current,
+          [target.id]: 'error',
+        }));
+      }
+    },
+    [onSessionExpired, token, usefulMutations],
   );
 
   useFocusEffect(
@@ -326,7 +401,12 @@ export function AuthorProfileContent({
       testID="author-profile-scroll"
     >
       <ProfileHeader author={author} />
-      <ProfileNotes notes={notes} onPressNote={onPressNote} />
+      <ProfileNotes
+        notes={notes}
+        onPressNote={onPressNote}
+        onToggleUseful={toggleUseful}
+        usefulMutations={usefulMutations}
+      />
       <PaginationStatus
         error={nextError}
         loading={loadingNext}

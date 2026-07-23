@@ -5,7 +5,9 @@ import {
   createNote,
   getNote,
   listNotes,
+  markNoteUseful,
   searchNotes,
+  unmarkNoteUseful,
 } from './notes';
 import type { components } from './generated/schema';
 
@@ -114,6 +116,8 @@ describe('notes API client', () => {
       placeSlug: 'sao-paulo',
       title: 'Cafe bom',
       updatedAt: 1782993600000,
+      usefulCount: 0,
+      usefulByCurrentUser: false,
     });
   });
 
@@ -201,6 +205,40 @@ describe('notes API client', () => {
     const note = await getNote(exampleNoteID, exampleToken);
 
     expect(note).toEqual(expectedNote());
+  });
+
+  it('sends mark useful requests with bearer auth and no body parsing', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return new Response(null, { status: 204 });
+    });
+
+    await markNoteUseful(exampleNoteID, exampleToken);
+
+    const request = onlyFetchCall(calls);
+    expect(request.url).toBe(
+      `http://localhost:8080/v1/notes/${exampleNoteID}/useful`,
+    );
+    expect(request.method).toBe('PUT');
+    expect(request.headers.get('authorization')).toBe(`Bearer ${exampleToken}`);
+  });
+
+  it('sends unmark useful requests with bearer auth and no body parsing', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return new Response(null, { status: 204 });
+    });
+
+    await unmarkNoteUseful(exampleNoteID, exampleToken);
+
+    const request = onlyFetchCall(calls);
+    expect(request.url).toBe(
+      `http://localhost:8080/v1/notes/${exampleNoteID}/useful`,
+    );
+    expect(request.method).toBe('DELETE');
+    expect(request.headers.get('authorization')).toBe(`Bearer ${exampleToken}`);
   });
 
   it('resolves root-relative image URLs and preserves absolute URLs', async () => {
@@ -525,6 +563,8 @@ function expectedNote() {
     placeSlug: 'sao-paulo',
     title: 'Cafe bom',
     updatedAt: 1782993600000,
+    usefulCount: 0,
+    usefulByCurrentUser: false,
   };
 }
 function jsonResponse(value: unknown, status = 200): Response {

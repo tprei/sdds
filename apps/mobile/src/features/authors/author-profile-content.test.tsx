@@ -338,6 +338,8 @@ function note(id: string, title: string): Note {
     placeSlug: null,
     title,
     updatedAt: 1782993600000,
+    usefulCount: 0,
+    usefulByCurrentUser: false,
   };
 }
 

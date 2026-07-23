@@ -19,6 +19,8 @@ export type Note = {
   placeSlug: string | null;
   title: string;
   updatedAt: number;
+  usefulCount: number;
+  usefulByCurrentUser: boolean;
 };
 
 export type NoteImage = {
@@ -102,6 +104,32 @@ export async function getNote(id: string, token: string): Promise<Note> {
   });
 
   return parseNoteResponse(data);
+}
+
+export async function markNoteUseful(
+  noteID: string,
+  token: string,
+): Promise<void> {
+  await apiClient(token).PUT('/v1/notes/{note_id}/useful', {
+    params: {
+      path: {
+        note_id: noteID,
+      },
+    },
+  });
+}
+
+export async function unmarkNoteUseful(
+  noteID: string,
+  token: string,
+): Promise<void> {
+  await apiClient(token).DELETE('/v1/notes/{note_id}/useful', {
+    params: {
+      path: {
+        note_id: noteID,
+      },
+    },
+  });
 }
 
 export async function searchNotes(
@@ -209,6 +237,8 @@ export function mapNoteResponse(value: NoteResponse): Note {
     placeSlug: value.place_slug,
     title: value.title,
     updatedAt: value.updated_at,
+    usefulCount: value.useful_count,
+    usefulByCurrentUser: value.useful_by_current_user,
   };
 }
 

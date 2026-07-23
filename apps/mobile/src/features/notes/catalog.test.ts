@@ -89,5 +89,7 @@ function apiNote(): Note {
     placeSlug: 'sao-paulo',
     title: 'Café bom',
     updatedAt: 1782993600000,
+    usefulCount: 0,
+    usefulByCurrentUser: false,
   };
 }

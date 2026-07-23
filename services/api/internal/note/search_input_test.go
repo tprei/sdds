@@ -24,6 +24,17 @@ func TestNormalizeSearchInputTrimsQuery(t *testing.T) {
 	}
 }
 
+func TestNormalizeSearchInputPreservesViewerUserID(t *testing.T) {
+	normalized := NormalizeSearchInput(SearchInput{
+		Query:        "café bom",
+		ViewerUserID: "viewer-user",
+	})
+
+	if normalized.ViewerUserID != "viewer-user" {
+		t.Fatalf("viewer user id = %q, want %q", normalized.ViewerUserID, "viewer-user")
+	}
+}
+
 func TestNormalizeSearchInputUsesDefaultLimit(t *testing.T) {
 	normalized := NormalizeSearchInput(SearchInput{
 		Query: "café bom",

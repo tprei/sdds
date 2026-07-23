@@ -19,6 +19,8 @@ const configuredAPIBaseURLEnvName = 'EXPO_PUBLIC_SDDS_API_BASE_URL';
 const authorID = 'author-id';
 const noteID = 'note-id';
 
+const exampleToken = 'session-token';
+
 const malformedPageCases: [string, unknown][] = [
   ['missing cursor', { notes: [apiNote()] }],
   ['empty cursor', { next_cursor: '', notes: [] }],
@@ -46,7 +48,7 @@ describe('authors API client', () => {
       }),
     );
 
-    await expect(getPublicAuthor(authorID)).resolves.toEqual({
+    await expect(getPublicAuthor(authorID, exampleToken)).resolves.toEqual({
       displayName: 'Thiago',
       id: authorID,
       noteCount: 3,
@@ -64,7 +66,7 @@ describe('authors API client', () => {
     });
 
     await expect(
-      listAuthorNotes({ authorID, cursor: 'after-cursor', limit: 2 }),
+      listAuthorNotes({ authorID, cursor: 'after-cursor', limit: 2 }, exampleToken),
     ).resolves.toEqual({
       nextCursor: 'next-cursor',
       notes: [expectedNote()],
@@ -80,7 +82,7 @@ describe('authors API client', () => {
   it('accepts a terminal author note page without a cursor', async () => {
     stubFetch(async () => jsonResponse({ next_cursor: null, notes: [] }));
 
-    await expect(listAuthorNotes({ authorID })).resolves.toEqual({
+    await expect(listAuthorNotes({ authorID }, exampleToken)).resolves.toEqual({
       nextCursor: null,
       notes: [],
     });
@@ -100,7 +102,7 @@ describe('authors API client', () => {
       }),
     );
 
-    await expect(listAuthorNotes({ authorID })).resolves.toEqual({
+    await expect(listAuthorNotes({ authorID }, exampleToken)).resolves.toEqual({
       nextCursor: null,
       notes: [expectedNote()],
     });
@@ -111,7 +113,7 @@ describe('authors API client', () => {
     async (_name, response) => {
       stubFetch(async () => jsonResponse(response));
 
-      await expect(listAuthorNotes({ authorID })).rejects.toThrow(
+      await expect(listAuthorNotes({ authorID }, exampleToken)).rejects.toThrow(
         APIResponseError,
       );
     },
@@ -127,7 +129,7 @@ describe('authors API client', () => {
       }),
     );
 
-    await expect(getPublicAuthor(authorID)).resolves.toEqual({
+    await expect(getPublicAuthor(authorID, exampleToken)).resolves.toEqual({
       displayName: 'Thiago',
       id: authorID,
       noteCount: 3,
@@ -137,7 +139,7 @@ describe('authors API client', () => {
   it('raises request errors for author status failures', async () => {
     stubFetch(async () => jsonResponse({ code: 'not_found' }, 404));
 
-    await expect(getPublicAuthor(authorID)).rejects.toMatchObject(
+    await expect(getPublicAuthor(authorID, exampleToken)).rejects.toMatchObject(
       new APIRequestError(404),
     );
   });
@@ -145,7 +147,7 @@ describe('authors API client', () => {
   it('raises request errors for author note status failures', async () => {
     stubFetch(async () => jsonResponse({ code: 'invalid_note' }, 400));
 
-    await expect(listAuthorNotes({ authorID })).rejects.toMatchObject(
+    await expect(listAuthorNotes({ authorID }, exampleToken)).rejects.toMatchObject(
       new APIRequestError(400),
     );
   });
@@ -153,7 +155,7 @@ describe('authors API client', () => {
   it('raises request errors for unreadable author status bodies', async () => {
     stubFetch(async () => unreadableResponse(404));
 
-    await expect(getPublicAuthor(authorID)).rejects.toMatchObject(
+    await expect(getPublicAuthor(authorID, exampleToken)).rejects.toMatchObject(
       new APIRequestError(404),
     );
   });
@@ -161,7 +163,7 @@ describe('authors API client', () => {
   it('raises request errors for unreadable author note status bodies', async () => {
     stubFetch(async () => unreadableResponse(500));
 
-    await expect(listAuthorNotes({ authorID })).rejects.toMatchObject(
+    await expect(listAuthorNotes({ authorID }, exampleToken)).rejects.toMatchObject(
       new APIRequestError(500),
     );
   });
@@ -179,6 +181,8 @@ function apiNote() {
     id: noteID,
     images: [],
     place_slug: null,
+    useful_count: 0,
+    useful_by_current_user: false,
     title: 'Café bom',
     updated_at: 1782993600000,
   };

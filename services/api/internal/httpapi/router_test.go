@@ -110,18 +110,20 @@ func TestNewRouterRequiresMediaDependencies(t *testing.T) {
 }
 
 func newTestRouter(notes fakeNoteStore) http.Handler {
-	handler := newRouterForTest(notes, fakeCatalog{}, fakeUserStore{
-		findCurrentSession: func(_ context.Context, tokenHash string, _ time.Time) (user.CurrentSession, error) {
-			if tokenHash != user.HashSessionToken("current-token") {
-				return user.CurrentSession{}, user.ErrSessionNotFound
-			}
-			return user.CurrentSession{
-				Session: user.Session{UserID: "user-id-thiago", TokenHash: tokenHash},
-				User:    user.User{ID: "user-id-thiago", State: user.UserStateActive},
-				Author:  user.Author{ID: "author-id-thiago", UserID: "user-id-thiago", DisplayName: "Thiago"},
-			}, nil
-		},
-	}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
+	return withCurrentSessionHeader(newRouterForTest(
+		notes,
+		fakeCatalog{},
+		authenticatedFakeUserStore(fakeUserStore{}),
+		DefaultAuthLimits(),
+		fakeReadiness{},
+		fakeUploadPreparer{},
+		fakeAttachedImageReader{},
+	))
+}
+
+// withCurrentSessionHeader wraps a handler so every request carries the test
+// bearer token required by the authenticated route group.
+func withCurrentSessionHeader(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Header.Set("Authorization", "Bearer current-token")
 		handler.ServeHTTP(w, r)
@@ -309,7 +311,7 @@ func TestRouterRejectsPlainOptionsRequest(t *testing.T) {
 
 type fakeNoteStore struct {
 	createNote      func(ctx context.Context, input note.CreateInput) (note.Note, error)
-	findNote        func(ctx context.Context, id string) (note.Note, error)
+	findNote        func(ctx context.Context, id string, viewerUserID user.UserID) (note.Note, error)
 	listNotes       func(ctx context.Context, input note.ListInput) ([]note.Note, error)
 	searchNotes     func(ctx context.Context, input note.SearchInput) ([]note.Note, error)
 	listAuthorNotes func(ctx context.Context, input note.AuthorNotesInput) (note.AuthorNotesPage, error)
@@ -324,11 +326,11 @@ func (store fakeNoteStore) CreateNote(ctx context.Context, input note.CreateInpu
 	return store.createNote(ctx, input)
 }
 
-func (store fakeNoteStore) FindNote(ctx context.Context, id string) (note.Note, error) {
+func (store fakeNoteStore) FindNote(ctx context.Context, id string, viewerUserID user.UserID) (note.Note, error) {
 	if store.findNote == nil {
 		return note.Note{}, fmt.Errorf("find note not implemented")
 	}
-	return store.findNote(ctx, id)
+	return store.findNote(ctx, id, viewerUserID)
 }
 
 func (store fakeNoteStore) ListRecentNotes(ctx context.Context, input note.ListInput) ([]note.Note, error) {
@@ -447,6 +449,28 @@ func (store fakeUserStore) FindCurrentSession(ctx context.Context, tokenHash str
 		return user.CurrentSession{}, fmt.Errorf("find current session not implemented")
 	}
 	return store.findCurrentSession(ctx, tokenHash, now)
+}
+
+// testCurrentUserSessionResolver is the explicit session resolver used by
+// authenticated test routers. It accepts the "current-token" bearer and
+// resolves the fixed test identity used across handler tests.
+func testCurrentUserSessionResolver(_ context.Context, tokenHash string, _ time.Time) (user.CurrentSession, error) {
+	if tokenHash != user.HashSessionToken("current-token") {
+		return user.CurrentSession{}, user.ErrSessionNotFound
+	}
+	return user.CurrentSession{
+		Session: user.Session{UserID: "user-id-thiago", TokenHash: tokenHash},
+		User:    user.User{ID: "user-id-thiago", State: user.UserStateActive},
+		Author:  user.Author{ID: "author-id-thiago", UserID: "user-id-thiago", DisplayName: "Thiago"},
+	}, nil
+}
+
+// authenticatedFakeUserStore returns a fakeUserStore whose findCurrentSession
+// resolves the test bearer token, preserving any overrides supplied by the
+// caller (for example a custom findPublicAuthor).
+func authenticatedFakeUserStore(overrides fakeUserStore) fakeUserStore {
+	overrides.findCurrentSession = testCurrentUserSessionResolver
+	return overrides
 }
 
 func (store fakeUserStore) RevokeSession(ctx context.Context, sessionID user.SessionID, revokedAt time.Time) error {

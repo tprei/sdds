@@ -43,8 +43,7 @@ func TestPublicAuthorProfileRuntimeBoundaries(t *testing.T) {
 	}
 	secondNote := createNote(t, secondClient, openapi.CreateNoteJSONRequestBody{Title: fmt.Sprintf("Perfil B %d", suffix), Body: "Nota do segundo autor.", CategorySlug: "food", ClientRequestId: fmt.Sprintf("author-b-1-%d", suffix)})
 
-	publicClient := newAPIClient(t)
-	profileResponse, err := publicClient.GetAuthorWithResponse(context.Background(), firstSession.User.Author.Id)
+	profileResponse, err := firstClient.GetAuthorWithResponse(context.Background(), firstSession.User.Author.Id)
 	if err != nil {
 		t.Fatalf("GET /v1/authors/{author_id}: %v", err)
 	}
@@ -60,7 +59,7 @@ func TestPublicAuthorProfileRuntimeBoundaries(t *testing.T) {
 	requireNoPrivateAuthorPayload(t, profileResponse.Body)
 
 	limit := 2
-	firstPage, firstPageBody := listAuthorNotesWithBody(t, publicClient, firstSession.User.Author.Id, &openapi.ListAuthorNotesParams{Limit: &limit})
+	firstPage, firstPageBody := listAuthorNotesWithBody(t, firstClient, firstSession.User.Author.Id, &openapi.ListAuthorNotesParams{Limit: &limit})
 	if len(firstPage.Notes) != limit {
 		t.Fatalf("first author page count = %d, want %d", len(firstPage.Notes), limit)
 	}
@@ -68,7 +67,7 @@ func TestPublicAuthorProfileRuntimeBoundaries(t *testing.T) {
 		t.Fatal("first page next_cursor = nil, want cursor")
 	}
 
-	secondPage, secondPageBody := listAuthorNotesWithBody(t, publicClient, firstSession.User.Author.Id, &openapi.ListAuthorNotesParams{Limit: &limit, Cursor: firstPage.NextCursor})
+	secondPage, secondPageBody := listAuthorNotesWithBody(t, firstClient, firstSession.User.Author.Id, &openapi.ListAuthorNotesParams{Limit: &limit, Cursor: firstPage.NextCursor})
 	if secondPage.NextCursor != nil {
 		t.Fatalf("second page next_cursor = %q, want nil", *secondPage.NextCursor)
 	}
@@ -78,7 +77,7 @@ func TestPublicAuthorProfileRuntimeBoundaries(t *testing.T) {
 	requireAuthorNotesWirePayload(t, firstPageBody)
 	requireAuthorNotesWirePayload(t, secondPageBody)
 
-	secondProfileResponse, err := publicClient.GetAuthorWithResponse(context.Background(), secondSession.User.Author.Id)
+	secondProfileResponse, err := firstClient.GetAuthorWithResponse(context.Background(), secondSession.User.Author.Id)
 	if err != nil {
 		t.Fatalf("GET /v1/authors/{second_author_id}: %v", err)
 	}
@@ -89,13 +88,13 @@ func TestPublicAuthorProfileRuntimeBoundaries(t *testing.T) {
 	if secondProfileResponse.JSON200.NoteCount != 1 {
 		t.Fatalf("second profile note_count = %d, want 1", secondProfileResponse.JSON200.NoteCount)
 	}
-	secondNotes := listAuthorNotes(t, publicClient, secondSession.User.Author.Id, &openapi.ListAuthorNotesParams{Limit: &limit})
+	secondNotes := listAuthorNotes(t, firstClient, secondSession.User.Author.Id, &openapi.ListAuthorNotesParams{Limit: &limit})
 	if len(secondNotes.Notes) != 1 || secondNotes.Notes[0].Id != secondNote.Id {
 		t.Fatalf("second author notes = %#v, want only %q", secondNotes.Notes, secondNote.Id)
 	}
 
-	requireUnknownAuthorErrors(t, publicClient)
-	requireInvalidAuthorNotesParams(t, publicClient, firstSession.User.Author.Id)
+	requireUnknownAuthorErrors(t, firstClient)
+	requireInvalidAuthorNotesParams(t, firstClient, firstSession.User.Author.Id)
 }
 
 func listAuthorNotes(t *testing.T, client *openapi.ClientWithResponses, authorID string, params *openapi.ListAuthorNotesParams) openapi.AuthorNotesPage {
@@ -235,7 +234,7 @@ func requireAuthorNotesWirePayload(t *testing.T, body []byte) {
 		if !ok {
 			t.Fatalf("note = %T, want object", value)
 		}
-		requireWireKeys(t, noteObject, "id", "title", "body", "category_slug", "place_slug", "author", "images", "created_at", "updated_at")
+		requireWireKeys(t, noteObject, "id", "title", "body", "category_slug", "place_slug", "author", "images", "useful_count", "useful_by_current_user", "created_at", "updated_at")
 		images, ok := noteObject["images"].([]any)
 		if !ok || len(images) != 0 {
 			t.Fatalf("note images = %#v, want empty array", noteObject["images"])

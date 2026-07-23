@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/tprei/sdds/services/api/internal/note"
+	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 const listNoteImagesSQL = `
@@ -34,8 +35,8 @@ type noteImageQuerier interface {
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 }
 
-func loadNoteWithOrderedImages(ctx context.Context, noteQuery noteLookupQuerier, imageQuery noteImageQuerier, id string) (note.Note, error) {
-	found, err := scanNoteRow(noteQuery.QueryRowContext(ctx, findNoteSQL, id))
+func loadNoteWithOrderedImages(ctx context.Context, noteQuery noteLookupQuerier, imageQuery noteImageQuerier, id string, viewerUserID user.UserID) (note.Note, error) {
+	found, err := scanNoteRow(noteQuery.QueryRowContext(ctx, findNoteSQL, string(viewerUserID), id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return note.Note{}, note.ErrNoteNotFound

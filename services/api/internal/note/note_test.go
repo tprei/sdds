@@ -61,6 +61,16 @@ func TestNormalizeAuthorNotesInputDefaultsLimit(t *testing.T) {
 	}
 }
 
+func TestNormalizeAuthorNotesInputPreservesViewerUserID(t *testing.T) {
+	input := NormalizeAuthorNotesInput(AuthorNotesInput{
+		ViewerUserID: "viewer-user",
+	})
+
+	if input.ViewerUserID != "viewer-user" {
+		t.Fatalf("viewer user id = %q, want %q", input.ViewerUserID, "viewer-user")
+	}
+}
+
 func TestValidateCreateInputTreatsTrimmedEmptyCategoryAsRequired(t *testing.T) {
 	problems := ValidateCreateInput(CreateInput{
 		Title:           "Café bom",

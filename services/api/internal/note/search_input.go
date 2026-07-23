@@ -3,6 +3,8 @@ package note
 import (
 	"strings"
 	"unicode/utf8"
+
+	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 const (
@@ -14,6 +16,7 @@ type SearchInput struct {
 	CategorySlug CategorySlug
 	Query        string
 	Limit        int
+	ViewerUserID user.UserID
 }
 
 func NormalizeSearchInput(input SearchInput) SearchInput {
@@ -26,6 +29,7 @@ func NormalizeSearchInput(input SearchInput) SearchInput {
 		CategorySlug: NormalizeCategorySlug(input.CategorySlug),
 		Query:        strings.TrimSpace(input.Query),
 		Limit:        limit,
+		ViewerUserID: input.ViewerUserID,
 	}
 }
 

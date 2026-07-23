@@ -15,18 +15,34 @@ import (
 )
 
 const (
+	// noteProjectionSQL selects the standard note row plus the two useful
+	// reaction columns. The viewer placeholder appears first because both
+	// useful expressions reference it; every query that uses this projection
+	// must put the viewer user id before its other arguments.
+	noteProjectionSQL = `
+		notes.id,
+		notes.user_id,
+		notes.title,
+		notes.body,
+		notes.category_slug,
+		notes.place_slug,
+		authors.id,
+		authors.display_name,
+		(SELECT COUNT(*)
+		   FROM note_useful_reactions AS counted_reactions
+		  WHERE counted_reactions.note_id = notes.id) AS useful_count,
+		EXISTS (
+		    SELECT 1
+		      FROM note_useful_reactions AS viewer_reaction
+		     WHERE viewer_reaction.note_id = notes.id
+		       AND viewer_reaction.user_id = ?
+		) AS useful_by_current_user,
+		notes.created_at,
+		notes.updated_at
+	`
 	listRecentNotesSQL = `
 		SELECT
-			notes.id,
-			notes.user_id,
-			notes.title,
-			notes.body,
-			notes.category_slug,
-			notes.place_slug,
-			authors.id,
-			authors.display_name,
-			notes.created_at,
-			notes.updated_at
+		` + noteProjectionSQL + `
 		FROM notes
 		JOIN authors ON authors.user_id = notes.user_id
 		ORDER BY notes.created_at DESC, notes.id DESC
@@ -34,16 +50,7 @@ const (
 	`
 	listRecentNotesByCategorySQL = `
 		SELECT
-			notes.id,
-			notes.user_id,
-			notes.title,
-			notes.body,
-			notes.category_slug,
-			notes.place_slug,
-			authors.id,
-			authors.display_name,
-			notes.created_at,
-			notes.updated_at
+		` + noteProjectionSQL + `
 		FROM notes
 		JOIN authors ON authors.user_id = notes.user_id
 		WHERE notes.category_slug = ?
@@ -52,16 +59,7 @@ const (
 	`
 	findNoteSQL = `
 		SELECT
-			notes.id,
-			notes.user_id,
-			notes.title,
-			notes.body,
-			notes.category_slug,
-			notes.place_slug,
-			authors.id,
-			authors.display_name,
-			notes.created_at,
-			notes.updated_at
+		` + noteProjectionSQL + `
 		FROM notes
 		JOIN authors ON authors.user_id = notes.user_id
 		WHERE notes.id = ?
@@ -71,16 +69,7 @@ const (
 	`
 	searchNotesSQL = `
 		SELECT
-			notes.id,
-			notes.user_id,
-			notes.title,
-			notes.body,
-			notes.category_slug,
-			notes.place_slug,
-			authors.id,
-			authors.display_name,
-			notes.created_at,
-			notes.updated_at
+		` + noteProjectionSQL + `
 		FROM note_search
 		JOIN notes ON notes.id = note_search.note_id
 		JOIN authors ON authors.user_id = notes.user_id
@@ -90,16 +79,7 @@ const (
 	`
 	searchNotesByCategorySQL = `
 		SELECT
-			notes.id,
-			notes.user_id,
-			notes.title,
-			notes.body,
-			notes.category_slug,
-			notes.place_slug,
-			authors.id,
-			authors.display_name,
-			notes.created_at,
-			notes.updated_at
+		` + noteProjectionSQL + `
 		FROM note_search
 		JOIN notes ON notes.id = note_search.note_id
 		JOIN authors ON authors.user_id = notes.user_id
@@ -125,8 +105,8 @@ func newNoteStore(db *sql.DB, clock func() time.Time) *NoteStore {
 	return &NoteStore{db: db, clock: clock}
 }
 
-func (store *NoteStore) FindNote(ctx context.Context, id string) (note.Note, error) {
-	found, err := loadNoteWithOrderedImages(ctx, store.db, store.db, id)
+func (store *NoteStore) FindNote(ctx context.Context, id string, viewerUserID user.UserID) (note.Note, error) {
+	found, err := loadNoteWithOrderedImages(ctx, store.db, store.db, id, viewerUserID)
 	if err == nil {
 		return found, nil
 	}
@@ -143,10 +123,10 @@ func (store *NoteStore) ListRecentNotes(ctx context.Context, input note.ListInpu
 	}
 
 	query := listRecentNotesSQL
-	args := []any{normalized.Limit}
+	args := []any{string(normalized.ViewerUserID), normalized.Limit}
 	if normalized.CategorySlug != "" {
 		query = listRecentNotesByCategorySQL
-		args = []any{string(normalized.CategorySlug), normalized.Limit}
+		args = []any{string(normalized.ViewerUserID), string(normalized.CategorySlug), normalized.Limit}
 	}
 
 	rows, err := store.db.QueryContext(ctx, query, args...)
@@ -192,10 +172,10 @@ func (store *NoteStore) SearchNotes(ctx context.Context, input note.SearchInput)
 	}
 
 	query := searchNotesSQL
-	args := []any{matchExpression, normalized.Limit}
+	args := []any{string(normalized.ViewerUserID), matchExpression, normalized.Limit}
 	if normalized.CategorySlug != "" {
 		query = searchNotesByCategorySQL
-		args = []any{matchExpression, string(normalized.CategorySlug), normalized.Limit}
+		args = []any{string(normalized.ViewerUserID), matchExpression, string(normalized.CategorySlug), normalized.Limit}
 	}
 
 	rows, err := store.db.QueryContext(ctx, query, args...)
@@ -288,6 +268,8 @@ func scanNoteValues(scan func(dest ...any) error) (note.Note, error) {
 		&placeSlug,
 		&authorID,
 		&found.Author.DisplayName,
+		&found.UsefulCount,
+		&found.UsefulByCurrentUser,
 		&createdAt,
 		&updatedAt,
 	); err != nil {

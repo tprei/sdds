@@ -9,6 +9,8 @@ import type {
   PrepareImageUploadOptions,
 } from '@/lib/api/image-uploads';
 import type { CreateNoteInput } from '@/lib/api/notes';
+import { requestStatus } from '@/lib/api/request-error';
+import { unauthorizedStatus } from '@/lib/api/status';
 
 export type ComposeCatalogState =
   { status: 'loading' } | { status: 'ready'; catalog: NoteCatalog } | { status: 'error' };
@@ -24,9 +26,15 @@ export type ComposeImagePickerResult = {
 };
 export type ComposeControllerPorts = {
   createNote: (input: CreateNoteInput, token: string) => Promise<unknown>;
-  loadCatalogs: () => Promise<Catalogs>; onPublished: () => void;
-  onSessionExpired: () => Promise<void>; pickImage: () => Promise<ComposeImagePickerResult>;
-  prepareImageUpload: (asset: ImageUploadAsset, token: string, options: PrepareImageUploadOptions) => Promise<ImageUploadReceipt>;
+  loadCatalogs: (token: string) => Promise<Catalogs>;
+  onPublished: () => void;
+  onSessionExpired: () => Promise<void>;
+  pickImage: () => Promise<ComposeImagePickerResult>;
+  prepareImageUpload: (
+    asset: ImageUploadAsset,
+    token: string,
+    options: PrepareImageUploadOptions,
+  ) => Promise<ImageUploadReceipt>;
 };
 export type CreateComposeControllerInput = {
   draftStore: ComposeDraftStore; ownerID: string; ports: ComposeControllerPorts; token: string;
@@ -264,11 +272,22 @@ export function createComposeController(
     catalogState = { status: 'loading' };
     publish();
     try {
-      void ports.loadCatalogs().then(
+      void ports.loadCatalogs(token).then(
         (catalogs) => {
           completeCatalog({ ...intent, catalogs });
         },
-        () => {
+        async (error: unknown) => {
+          if (
+            !active ||
+            activationGeneration !== intent.activation ||
+            catalogGeneration !== intent.focus
+          ) {
+            return;
+          }
+          if (requestStatus(error) === unauthorizedStatus) {
+            await ports.onSessionExpired();
+            return;
+          }
           completeCatalog({ ...intent, catalogs: null });
         },
       );
@@ -436,7 +455,7 @@ export function createComposeController(
       }
       return;
     }
-    if (requestStatus(error) === 401) {
+    if (requestStatus(error) === unauthorizedStatus) {
       settle(context, { status: 'error', message: expiredSessionMessage });
       try {
         await ports.onSessionExpired();
@@ -450,7 +469,10 @@ export function createComposeController(
     }
     settle(context, {
       status: 'error',
-      message: requestStatus(error) === 400 ? invalidSubmissionMessage : submitFailureMessage,
+      message:
+        requestStatus(error) === 400
+          ? invalidSubmissionMessage
+          : submitFailureMessage,
     });
   }
 
@@ -484,7 +506,3 @@ function requestCode(error: unknown): string | undefined {
   return undefined;
 }
 
-function requestStatus(error: unknown): number | undefined {
-  if (typeof error === 'object' && error !== null && 'status' in error && typeof error.status === 'number') return error.status;
-  return undefined;
-}

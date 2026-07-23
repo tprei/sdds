@@ -747,7 +747,7 @@ func TestNoteImagesMigrationPreservesExistingTextOnlyNotes(t *testing.T) {
 		})
 	}
 
-	found, err := store.FindNote(ctx, "existing-text-note")
+	found, err := store.FindNote(ctx, "existing-text-note", systemNoteOwnerUserID)
 	if err != nil {
 		t.Fatalf("find migrated note: %v", err)
 	}

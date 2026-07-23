@@ -116,7 +116,7 @@ func TestListNotesFiltersByCategory(t *testing.T) {
 }
 
 func TestListNotesTreatsBlankCategoryFilterAsUnfiltered(t *testing.T) {
-	router := newRouterForTest(fakeNoteStore{
+	router := withCurrentSessionHeader(newRouterForTest(fakeNoteStore{
 		listNotes: func(_ context.Context, input note.ListInput) ([]note.Note, error) {
 			if input.CategorySlug != "" {
 				t.Fatalf("category slug = %q, want empty", input.CategorySlug)
@@ -128,7 +128,7 @@ func TestListNotesTreatsBlankCategoryFilterAsUnfiltered(t *testing.T) {
 			t.Fatal("FindActiveCategory should not be called")
 			return note.Category{}, nil
 		},
-	}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
+	}, authenticatedFakeUserStore(fakeUserStore{}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/notes?category_slug=+%09+", nil)
@@ -318,7 +318,7 @@ func TestSearchNotesFiltersByCategory(t *testing.T) {
 }
 
 func TestSearchNotesTreatsBlankCategoryFilterAsUnfiltered(t *testing.T) {
-	router := newRouterForTest(fakeNoteStore{
+	router := withCurrentSessionHeader(newRouterForTest(fakeNoteStore{
 		searchNotes: func(_ context.Context, input note.SearchInput) ([]note.Note, error) {
 			if input.CategorySlug != "" {
 				t.Fatalf("category slug = %q, want empty", input.CategorySlug)
@@ -330,7 +330,7 @@ func TestSearchNotesTreatsBlankCategoryFilterAsUnfiltered(t *testing.T) {
 			t.Fatal("FindActiveCategory should not be called")
 			return note.Category{}, nil
 		},
-	}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
+	}, authenticatedFakeUserStore(fakeUserStore{}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=cafe&category_slug=+%09+", nil)
@@ -552,7 +552,7 @@ func TestSearchNotesReturnsInternalError(t *testing.T) {
 func TestGetNoteReturnsNote(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	router := newTestRouter(fakeNoteStore{
-		findNote: func(_ context.Context, id string) (note.Note, error) {
+		findNote: func(_ context.Context, id string, _ user.UserID) (note.Note, error) {
 			if id != exampleNoteID {
 				t.Fatalf("id = %q, want note id", id)
 			}
@@ -599,7 +599,7 @@ func TestGetNoteReturnsNote(t *testing.T) {
 
 func TestGetNoteReturnsNotFound(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
-		findNote: func(context.Context, string) (note.Note, error) {
+		findNote: func(context.Context, string, user.UserID) (note.Note, error) {
 			return note.Note{}, note.ErrNoteNotFound
 		},
 	})
@@ -625,7 +625,7 @@ func TestGetNoteReturnsNotFound(t *testing.T) {
 
 func TestGetNoteReturnsInternalError(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
-		findNote: func(context.Context, string) (note.Note, error) {
+		findNote: func(context.Context, string, user.UserID) (note.Note, error) {
 			return note.Note{}, errors.New("database unavailable")
 		},
 	})
@@ -756,7 +756,7 @@ func TestCreateNoteRejectsMissingSessionBeforeValidation(t *testing.T) {
 			createCalled = true
 			return note.Note{}, nil
 		},
-	}, fakeCatalog{}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
+	}, fakeCatalog{}, authenticatedFakeUserStore(fakeUserStore{}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(`{`))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()

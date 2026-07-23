@@ -131,7 +131,7 @@ func TestNoteStoreFindsNoteByID(t *testing.T) {
 		t.Fatalf("create note: %v", err)
 	}
 
-	found, err := store.FindNote(ctx, created.ID)
+	found, err := store.FindNote(ctx, created.ID, systemNoteOwnerUserID)
 	if err != nil {
 		t.Fatalf("find note: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestNoteStoreFindsUnknownNoteAsNotFound(t *testing.T) {
 	db := openMigratedDatabase(t, ctx)
 
 	store := newTestNoteStore(db, time.Now)
-	_, err := store.FindNote(ctx, "missing-note")
+	_, err := store.FindNote(ctx, "missing-note", systemNoteOwnerUserID)
 	if !errors.Is(err, note.ErrNoteNotFound) {
 		t.Fatalf("find note error = %v, want ErrNoteNotFound", err)
 	}

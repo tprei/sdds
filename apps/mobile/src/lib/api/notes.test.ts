@@ -120,7 +120,7 @@ describe('notes API client', () => {
   it('parses notes without a place', async () => {
     stubFetch(async () => jsonResponse(apiNote({ place_slug: null })));
 
-    await expect(getNote(exampleNoteID)).resolves.toMatchObject({
+    await expect(getNote(exampleNoteID, exampleToken)).resolves.toMatchObject({
       placeSlug: null,
     });
   });
@@ -144,7 +144,7 @@ describe('notes API client', () => {
   it('parses listed notes from the API list response shape', async () => {
     stubFetch(async () => jsonResponse(apiListNotesResponse()));
 
-    const notes = await listNotes();
+    const notes = await listNotes({}, exampleToken);
 
     expect(notes).toEqual([expectedNote()]);
   });
@@ -156,7 +156,7 @@ describe('notes API client', () => {
       return jsonResponse(apiListNotesResponse());
     });
 
-    await listNotes();
+    await listNotes({}, exampleToken);
 
     const request = onlyFetchCall(calls);
     const url = new URL(request.url);
@@ -172,7 +172,7 @@ describe('notes API client', () => {
       return jsonResponse(apiListNotesResponse());
     });
 
-    await listNotes({ categorySlug: 'food' });
+    await listNotes({ categorySlug: 'food' }, exampleToken);
 
     const request = onlyFetchCall(calls);
     const url = new URL(request.url);
@@ -188,7 +188,7 @@ describe('notes API client', () => {
       return jsonResponse(apiNote());
     });
 
-    await getNote(exampleNoteID);
+    await getNote(exampleNoteID, exampleToken);
 
     const request = onlyFetchCall(calls);
     expect(request.url).toBe(`http://localhost:8080/v1/notes/${exampleNoteID}`);
@@ -198,7 +198,7 @@ describe('notes API client', () => {
   it('parses fetched notes from the API wire shape', async () => {
     stubFetch(async () => jsonResponse(apiNote()));
 
-    const note = await getNote(exampleNoteID);
+    const note = await getNote(exampleNoteID, exampleToken);
 
     expect(note).toEqual(expectedNote());
   });
@@ -219,7 +219,7 @@ describe('notes API client', () => {
       ),
     );
 
-    await expect(getNote(exampleNoteID)).resolves.toMatchObject({
+    await expect(getNote(exampleNoteID, exampleToken)).resolves.toMatchObject({
       images: [
         {
           byteSize: 481234,
@@ -252,7 +252,7 @@ describe('notes API client', () => {
       ),
     );
 
-    await expect(getNote(exampleNoteID)).resolves.toMatchObject({
+    await expect(getNote(exampleNoteID, exampleToken)).resolves.toMatchObject({
       images: [{ url: 'https://api.example.com/v1/media/images/image-id' }],
     });
   });
@@ -262,7 +262,7 @@ describe('notes API client', () => {
       jsonResponse(apiNote({ images: [apiImage({ url: 'http://[::1' })] })),
     );
 
-    await expect(getNote(exampleNoteID)).rejects.toThrow(APIResponseError);
+    await expect(getNote(exampleNoteID, exampleToken)).rejects.toThrow(APIResponseError);
   });
 
   it('rejects note responses without required images', async () => {
@@ -270,7 +270,7 @@ describe('notes API client', () => {
     delete note.images;
     stubFetch(async () => jsonResponse({ notes: [note] }));
 
-    await expect(listNotes()).rejects.toThrow(APIResponseError);
+    await expect(listNotes({}, exampleToken)).rejects.toThrow(APIResponseError);
   });
 
   it('raises request errors for missing fetched notes', async () => {
@@ -278,7 +278,7 @@ describe('notes API client', () => {
       jsonResponse({ code: 'not_found' }, httpStatusNotFound),
     );
 
-    await expect(getNote('missing-note')).rejects.toMatchObject(
+    await expect(getNote('missing-note', exampleToken)).rejects.toMatchObject(
       new APIRequestError(httpStatusNotFound, { code: 'not_found' }),
     );
   });
@@ -293,7 +293,7 @@ describe('notes API client', () => {
       ),
     );
 
-    await expect(getNote(exampleNoteID)).resolves.toMatchObject({
+    await expect(getNote(exampleNoteID, exampleToken)).resolves.toMatchObject({
       categorySlug: 'future-category',
       placeSlug: 'future-place',
     });
@@ -306,7 +306,7 @@ describe('notes API client', () => {
       return jsonResponse(apiListNotesResponse());
     });
 
-    await searchNotes({ query: 'restaurante brasileiro Dublin 12 barato' });
+    await searchNotes({ query: 'restaurante brasileiro Dublin 12 barato' }, exampleToken);
 
     const request = onlyFetchCall(calls);
     const url = new URL(request.url);
@@ -326,7 +326,7 @@ describe('notes API client', () => {
       return jsonResponse(apiListNotesResponse());
     });
 
-    await searchNotes({ categorySlug: 'food', query: 'cafe' });
+    await searchNotes({ categorySlug: 'food', query: 'cafe' }, exampleToken);
 
     const request = onlyFetchCall(calls);
     const url = new URL(request.url);
@@ -343,7 +343,7 @@ describe('notes API client', () => {
       return jsonResponse(apiListNotesResponse());
     });
 
-    await searchNotes({ query: '  cafe bom  ' });
+    await searchNotes({ query: '  cafe bom  ' }, exampleToken);
 
     const request = onlyFetchCall(calls);
     const url = new URL(request.url);
@@ -353,7 +353,7 @@ describe('notes API client', () => {
   it('parses searched notes from the API list response shape', async () => {
     stubFetch(async () => jsonResponse(apiListNotesResponse()));
 
-    const notes = await searchNotes({ query: 'cafe' });
+    const notes = await searchNotes({ query: 'cafe' }, exampleToken);
 
     expect(notes).toEqual([expectedNote()]);
   });
@@ -363,7 +363,7 @@ describe('notes API client', () => {
       jsonResponse({ code: 'invalid_search' }, httpStatusBadRequest),
     );
 
-    await expect(searchNotes({ query: '' })).rejects.toMatchObject(
+    await expect(searchNotes({ query: '' }, exampleToken)).rejects.toMatchObject(
       new APIRequestError(httpStatusBadRequest, { code: 'invalid_search' }),
     );
   });
@@ -380,7 +380,7 @@ describe('notes API client', () => {
       }),
     );
 
-    await expect(searchNotes({ query: 'cafe' })).rejects.toThrow(
+    await expect(searchNotes({ query: 'cafe' }, exampleToken)).rejects.toThrow(
       APIResponseError,
     );
   });
@@ -402,7 +402,7 @@ describe('notes API client', () => {
       }),
     );
 
-    await expect(listNotes()).rejects.toThrow(APIResponseError);
+    await expect(listNotes({}, exampleToken)).rejects.toThrow(APIResponseError);
   });
 
   it('ignores extra note response fields', async () => {
@@ -417,7 +417,7 @@ describe('notes API client', () => {
       }),
     );
 
-    await expect(listNotes()).resolves.toEqual([expectedNote()]);
+    await expect(listNotes({}, exampleToken)).resolves.toEqual([expectedNote()]);
   });
 
   it('rejects invalid timestamp values', async () => {
@@ -433,7 +433,7 @@ describe('notes API client', () => {
       }),
     );
 
-    await expect(listNotes()).rejects.toThrow(APIResponseError);
+    await expect(listNotes({}, exampleToken)).rejects.toThrow(APIResponseError);
   });
 
   it('rejects invalid author response shapes', async () => {
@@ -451,7 +451,7 @@ describe('notes API client', () => {
       }),
     );
 
-    await expect(listNotes()).rejects.toThrow(APIResponseError);
+    await expect(listNotes({}, exampleToken)).rejects.toThrow(APIResponseError);
   });
 
   it('ignores extra legacy city slug response fields', async () => {
@@ -466,7 +466,7 @@ describe('notes API client', () => {
       }),
     );
 
-    await expect(listNotes()).resolves.toEqual([expectedNote()]);
+    await expect(listNotes({}, exampleToken)).resolves.toEqual([expectedNote()]);
   });
 });
 
@@ -487,6 +487,8 @@ function apiNote(overrides: Partial<NoteResponse> = {}): NoteResponse {
     id: exampleNoteID,
     images: [],
     place_slug: 'sao-paulo',
+    useful_count: 0,
+    useful_by_current_user: false,
     title: 'Cafe bom',
     updated_at: 1782993600000,
     ...overrides,

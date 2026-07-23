@@ -168,7 +168,7 @@ func TestNoteStoreHydratesOrderedImagesForEveryReadPath(t *testing.T) {
 		assertNoteImages(t, found, created.ID, wantImages)
 	}
 
-	found, err := store.FindNote(ctx, created.ID)
+	found, err := store.FindNote(ctx, created.ID, systemNoteOwnerUserID)
 	if err != nil {
 		t.Fatalf("find note: %v", err)
 	}

@@ -43,8 +43,14 @@ func (handler server) ListAuthorNotes(w http.ResponseWriter, r *http.Request, au
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}
+	current, ok := currentSessionFromContext(r.Context())
+	if !ok {
+		writeUnauthenticated(w)
+		return
+	}
 	cursor, problems := decodeAuthorNotesCursor(params.Cursor)
 	input := note.NormalizeAuthorNotesInput(authorNotesInput(authorID, params, cursor))
+	input.ViewerUserID = current.User.ID
 	problems = append(problems, note.ValidateAuthorNotesInput(input)...)
 	if len(problems) > 0 {
 		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, problems))

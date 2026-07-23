@@ -15,6 +15,7 @@ import (
 	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
+	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 const (
@@ -26,14 +27,14 @@ const (
 )
 
 func TestGetAuthorReturnsPublicProfileWithoutAuthentication(t *testing.T) {
-	router := newRouterForTest(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
+	router := withCurrentSessionHeader(newRouterForTest(fakeNoteStore{}, fakeCatalog{}, authenticatedFakeUserStore(fakeUserStore{
 		findPublicAuthor: func(_ context.Context, authorID author.AuthorID) (author.PublicAuthor, error) {
 			if authorID != exampleAuthorID {
 				t.Fatalf("author id = %q, want %q", authorID, exampleAuthorID)
 			}
 			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 27}, nil
 		},
-	}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
+	}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/authors/"+string(exampleAuthorID), nil)
@@ -59,11 +60,11 @@ func TestGetAuthorReturnsPublicProfileWithoutAuthentication(t *testing.T) {
 }
 
 func TestGetAuthorReturnsNotFound(t *testing.T) {
-	router := newRouterForTest(fakeNoteStore{}, fakeCatalog{}, fakeUserStore{
+	router := withCurrentSessionHeader(newRouterForTest(fakeNoteStore{}, fakeCatalog{}, authenticatedFakeUserStore(fakeUserStore{
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 			return author.PublicAuthor{}, author.ErrAuthorNotFound
 		},
-	}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
+	}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/authors/missing-author", nil)
 
@@ -78,10 +79,13 @@ func TestGetAuthorReturnsNotFound(t *testing.T) {
 
 func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 	createdAt := time.UnixMilli(exampleAuthorCreatedMS).UTC()
-	router := newRouterForTest(fakeNoteStore{
+	router := withCurrentSessionHeader(newRouterForTest(fakeNoteStore{
 		listAuthorNotes: func(_ context.Context, input note.AuthorNotesInput) (note.AuthorNotesPage, error) {
 			if input.AuthorID != exampleAuthorID {
 				t.Fatalf("author id = %q, want %q", input.AuthorID, exampleAuthorID)
+			}
+			if input.ViewerUserID != user.UserID("user-id-thiago") {
+				t.Fatalf("viewer user id = %q, want %q", input.ViewerUserID, user.UserID("user-id-thiago"))
 			}
 			if input.Limit != note.AuthorNotesDefaultLimit {
 				t.Fatalf("limit = %d, want %d", input.Limit, note.AuthorNotesDefaultLimit)
@@ -91,11 +95,11 @@ func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 			}
 			return note.AuthorNotesPage{Notes: []note.AuthorNote{authorHTTPAuthorNote(exampleAuthorNoteID, createdAt, exampleCursorPageKey)}, HasMore: true}, nil
 		},
-	}, fakeCatalog{}, fakeUserStore{
+	}, fakeCatalog{}, authenticatedFakeUserStore(fakeUserStore{
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 2}, nil
 		},
-	}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
+	}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/authors/"+string(exampleAuthorID)+"/notes", nil)
@@ -134,7 +138,7 @@ func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 	if !ok {
 		t.Fatalf("wire note = %T, want object", notesValue[0])
 	}
-	requireExactJSONKeys(t, noteValue, "id", "title", "body", "category_slug", "place_slug", "author", "images", "created_at", "updated_at")
+	requireExactJSONKeys(t, noteValue, "id", "title", "body", "category_slug", "place_slug", "author", "images", "useful_count", "useful_by_current_user", "created_at", "updated_at")
 	imagesValue, ok := noteValue["images"].([]any)
 	if !ok || len(imagesValue) != 0 {
 		t.Fatalf("wire note images = %#v, want empty array", noteValue["images"])
@@ -150,18 +154,18 @@ func TestListAuthorNotesDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 func TestListAuthorNotesReturnsCursorForLongLegacyID(t *testing.T) {
 	createdAt := time.UnixMilli(exampleAuthorCreatedMS).UTC()
 	longID := strings.Repeat("😀", 100)
-	router := newRouterForTest(fakeNoteStore{
+	router := withCurrentSessionHeader(newRouterForTest(fakeNoteStore{
 		listAuthorNotes: func(context.Context, note.AuthorNotesInput) (note.AuthorNotesPage, error) {
 			return note.AuthorNotesPage{
 				Notes:   []note.AuthorNote{authorHTTPAuthorNote(longID, createdAt, exampleCursorPageKey)},
 				HasMore: true,
 			}, nil
 		},
-	}, fakeCatalog{}, fakeUserStore{
+	}, fakeCatalog{}, authenticatedFakeUserStore(fakeUserStore{
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 2}, nil
 		},
-	}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
+	}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/authors/"+string(exampleAuthorID)+"/notes", nil)
@@ -194,8 +198,11 @@ func TestListAuthorNotesPassesExplicitLimitAndCursor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode cursor: %v", err)
 	}
-	router := newRouterForTest(fakeNoteStore{
+	router := withCurrentSessionHeader(newRouterForTest(fakeNoteStore{
 		listAuthorNotes: func(_ context.Context, input note.AuthorNotesInput) (note.AuthorNotesPage, error) {
+			if input.ViewerUserID != user.UserID("user-id-thiago") {
+				t.Fatalf("viewer user id = %q, want %q", input.ViewerUserID, user.UserID("user-id-thiago"))
+			}
 			if input.Limit != 2 {
 				t.Fatalf("limit = %d, want 2", input.Limit)
 			}
@@ -207,11 +214,11 @@ func TestListAuthorNotesPassesExplicitLimitAndCursor(t *testing.T) {
 			}
 			return note.AuthorNotesPage{Notes: []note.AuthorNote{}}, nil
 		},
-	}, fakeCatalog{}, fakeUserStore{
+	}, fakeCatalog{}, authenticatedFakeUserStore(fakeUserStore{
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 0}, nil
 		},
-	}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
+	}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/authors/"+string(exampleAuthorID)+"/notes?limit=2&cursor="+encoded, nil)
 
@@ -284,17 +291,17 @@ func TestListAuthorNotesRejectsInvalidParametersBeforeAuthorLookup(t *testing.T)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := newRouterForTest(fakeNoteStore{
+			router := withCurrentSessionHeader(newRouterForTest(fakeNoteStore{
 				listAuthorNotes: func(context.Context, note.AuthorNotesInput) (note.AuthorNotesPage, error) {
 					t.Fatal("ListAuthorNotes should not be called")
 					return note.AuthorNotesPage{}, nil
 				},
-			}, fakeCatalog{}, fakeUserStore{
+			}, fakeCatalog{}, authenticatedFakeUserStore(fakeUserStore{
 				findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 					t.Fatal("FindPublicAuthor should not be called")
 					return author.PublicAuthor{}, nil
 				},
-			}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
+			}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
 			response := httptest.NewRecorder()
 			request := httptest.NewRequest(http.MethodGet, "/v1/authors/"+string(exampleAuthorID)+"/notes?"+tt.query, nil)
 
@@ -317,16 +324,16 @@ func TestListAuthorNotesRejectsInvalidParametersBeforeAuthorLookup(t *testing.T)
 }
 
 func TestListAuthorNotesReturnsNotFoundForUnknownAuthor(t *testing.T) {
-	router := newRouterForTest(fakeNoteStore{
+	router := withCurrentSessionHeader(newRouterForTest(fakeNoteStore{
 		listAuthorNotes: func(context.Context, note.AuthorNotesInput) (note.AuthorNotesPage, error) {
 			t.Fatal("ListAuthorNotes should not be called")
 			return note.AuthorNotesPage{}, nil
 		},
-	}, fakeCatalog{}, fakeUserStore{
+	}, fakeCatalog{}, authenticatedFakeUserStore(fakeUserStore{
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 			return author.PublicAuthor{}, author.ErrAuthorNotFound
 		},
-	}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
+	}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/authors/missing-author/notes", nil)
 
@@ -340,15 +347,15 @@ func TestListAuthorNotesReturnsNotFoundForUnknownAuthor(t *testing.T) {
 }
 
 func TestListAuthorNotesReturnsInternalError(t *testing.T) {
-	router := newRouterForTest(fakeNoteStore{
+	router := withCurrentSessionHeader(newRouterForTest(fakeNoteStore{
 		listAuthorNotes: func(context.Context, note.AuthorNotesInput) (note.AuthorNotesPage, error) {
 			return note.AuthorNotesPage{}, errors.New("database unavailable")
 		},
-	}, fakeCatalog{}, fakeUserStore{
+	}, fakeCatalog{}, authenticatedFakeUserStore(fakeUserStore{
 		findPublicAuthor: func(context.Context, author.AuthorID) (author.PublicAuthor, error) {
 			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 1}, nil
 		},
-	}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
+	}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/authors/"+string(exampleAuthorID)+"/notes", nil)
 

@@ -151,14 +151,7 @@ func newRouter(notes noteHandlers, auth authHandlers, media mediaHandlers, syste
 	router.Route("/v1", func(router chi.Router) {
 		router.Group(func(router chi.Router) {
 			router.Use(validateOpenAPIRequest)
-			router.Get("/categories", wrapper.ListCategories)
-			router.Get("/places", wrapper.ListPlaces)
-			router.Get("/notes", wrapper.ListNotes)
-			router.Get("/authors/{author_id}", wrapper.GetAuthor)
-			router.Get("/authors/{author_id}/notes", wrapper.ListAuthorNotes)
 			router.Get("/media/images/{image_id}", wrapper.GetMediaImage)
-			router.Get("/notes/{note_id}", wrapper.GetNote)
-			router.Get("/search/notes", wrapper.SearchNotes)
 			router.Post("/auth/users", wrapper.CreateAuthUser)
 			router.Post("/auth/sessions", wrapper.CreateAuthSession)
 		})
@@ -170,6 +163,13 @@ func newRouter(notes noteHandlers, auth authHandlers, media mediaHandlers, syste
 		router.Group(func(router chi.Router) {
 			router.Use(requireCurrentSession)
 			router.Use(validateOpenAPIRequest)
+			router.Get("/categories", wrapper.ListCategories)
+			router.Get("/places", wrapper.ListPlaces)
+			router.Get("/notes", wrapper.ListNotes)
+			router.Get("/authors/{author_id}", wrapper.GetAuthor)
+			router.Get("/authors/{author_id}/notes", wrapper.ListAuthorNotes)
+			router.Get("/notes/{note_id}", wrapper.GetNote)
+			router.Get("/search/notes", wrapper.SearchNotes)
 			router.Put("/notes/{note_id}/useful", wrapper.MarkNoteUseful)
 			router.Delete("/notes/{note_id}/useful", wrapper.UnmarkNoteUseful)
 			router.Post("/notes", wrapper.CreateNote)

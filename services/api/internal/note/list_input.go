@@ -1,10 +1,13 @@
 package note
 
+import "github.com/tprei/sdds/services/api/internal/user"
+
 const ListDefaultLimit = 50
 
 type ListInput struct {
 	CategorySlug CategorySlug
 	Limit        int
+	ViewerUserID user.UserID
 }
 
 func NormalizeListInput(input ListInput) ListInput {
@@ -16,6 +19,7 @@ func NormalizeListInput(input ListInput) ListInput {
 	return ListInput{
 		CategorySlug: NormalizeCategorySlug(input.CategorySlug),
 		Limit:        limit,
+		ViewerUserID: input.ViewerUserID,
 	}
 }
 

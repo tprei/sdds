@@ -213,6 +213,8 @@ paths:
       summary: List category catalog
       tags:
         - Catalog
+      security:
+        - bearerAuth: []
       responses:
         "200":
           description: Category catalog rows.
@@ -232,12 +234,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is missing a valid authenticated session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/places:
     get:
       operationId: listPlaces
       summary: List place catalog
       tags:
         - Catalog
+      security:
+        - bearerAuth: []
       responses:
         "200":
           description: Place catalog rows.
@@ -253,6 +263,12 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: The API could not list places.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is missing a valid authenticated session.
           content:
             application/json:
               schema:
@@ -422,6 +438,8 @@ paths:
       summary: Get a public author profile
       tags:
         - Authors
+      security:
+        - bearerAuth: []
       parameters:
         - name: author_id
           in: path
@@ -453,12 +471,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is missing a valid authenticated session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/authors/{author_id}/notes:
     get:
       operationId: listAuthorNotes
       summary: List an author's notes
       tags:
         - Authors
+      security:
+        - bearerAuth: []
       parameters:
         - name: author_id
           in: path
@@ -507,12 +533,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is missing a valid authenticated session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/notes:
     get:
       operationId: listNotes
       summary: List recent notes
       tags:
         - Notes
+      security:
+        - bearerAuth: []
       parameters:
         - name: category_slug
           in: query
@@ -535,6 +569,12 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: The API could not list notes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is missing a valid authenticated session.
           content:
             application/json:
               schema:
@@ -601,6 +641,8 @@ paths:
       summary: Get a note
       tags:
         - Notes
+      security:
+        - bearerAuth: []
       parameters:
         - name: note_id
           in: path
@@ -632,6 +674,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is missing a valid authenticated session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/notes/{note_id}/useful:
     put:
       operationId: markNoteUseful
@@ -649,12 +697,6 @@ paths:
       responses:
         "204":
           description: The note was marked useful.
-        "400":
-          description: The request does not match the API contract.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: The request is missing a valid authenticated session.
           content:
@@ -689,12 +731,6 @@ paths:
       responses:
         "204":
           description: The useful mark was removed.
-        "400":
-          description: The request does not match the API contract.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: The request is missing a valid authenticated session.
           content:
@@ -719,6 +755,8 @@ paths:
       summary: Search notes
       tags:
         - Notes
+      security:
+        - bearerAuth: []
       parameters:
         - name: q
           in: query
@@ -747,6 +785,12 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: The API could not search notes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is missing a valid authenticated session.
           content:
             application/json:
               schema:
@@ -1132,6 +1176,8 @@ components:
         - created_at
         - updated_at
         - images
+        - useful_count
+        - useful_by_current_user
       properties:
         id:
           type: string
@@ -1160,6 +1206,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/NoteImage"
+        useful_count:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Number of users who marked this note useful.
+        useful_by_current_user:
+          type: boolean
+          description: Whether the current authenticated user marked this note useful.
     ValidationField:
       type: string
       x-enum-varnames:

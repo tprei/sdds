@@ -11,13 +11,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
+	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 func TestGetNoteMapsOrderedImageMetadataToResponse(t *testing.T) {
 	createdAt := time.UnixMilli(1782993600000).UTC()
 	updatedAt := time.UnixMilli(1782993601000).UTC()
 	router := newTestRouter(fakeNoteStore{
-		findNote: func(_ context.Context, id string) (note.Note, error) {
+		findNote: func(_ context.Context, id string, _ user.UserID) (note.Note, error) {
 			return note.Note{
 				ID:           id,
 				Title:        "Café bom",

@@ -407,6 +407,13 @@ export interface components {
              */
             updated_at: number;
             images: components["schemas"]["NoteImage"][];
+            /**
+             * Format: int64
+             * @description Number of users who marked this note useful.
+             */
+            useful_count: number;
+            /** @description Whether the current authenticated user marked this note useful. */
+            useful_by_current_user: boolean;
         };
         /** @enum {string} */
         ValidationField: "title" | "body" | "category_slug" | "place_slug" | "q" | "username" | "password" | "display_name" | "limit" | "cursor" | "client_request_id" | "upload_request_id" | "image_upload_ids" | "file";
@@ -676,6 +683,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description The request is missing a valid authenticated session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description The API could not list categories. */
             500: {
                 headers: {
@@ -707,6 +723,15 @@ export interface operations {
             };
             /** @description The request does not match the API contract. */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is missing a valid authenticated session. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -984,6 +1009,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description The request is missing a valid authenticated session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description The author was not found. */
             404: {
                 headers: {
@@ -1038,6 +1072,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description The request is missing a valid authenticated session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description The author was not found. */
             404: {
                 headers: {
@@ -1081,6 +1124,15 @@ export interface operations {
             };
             /** @description The request does not match the API contract. */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is missing a valid authenticated session. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1206,6 +1258,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description The request is missing a valid authenticated session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description The note was not found. */
             404: {
                 headers: {
@@ -1243,15 +1304,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            /** @description The request does not match the API contract. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
             };
             /** @description The request is missing a valid authenticated session. */
             401: {
@@ -1299,15 +1351,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            /** @description The request does not match the API contract. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
             };
             /** @description The request is missing a valid authenticated session. */
             401: {
@@ -1363,6 +1406,15 @@ export interface operations {
             };
             /** @description The search query is invalid. */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is missing a valid authenticated session. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

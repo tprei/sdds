@@ -202,6 +202,8 @@ function expectedNote() {
     placeSlug: null,
     title: 'Café bom',
     updatedAt: 1782993600000,
+    usefulCount: 0,
+    usefulByCurrentUser: false,
   };
 }
 

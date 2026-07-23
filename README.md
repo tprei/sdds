@@ -92,11 +92,11 @@ The current product endpoints are:
 
 - `GET /healthz` reports process liveness.
 - `GET /readyz` reports SQLite and media readiness.
-- `GET /v1/categories` and `GET /v1/places` return catalogs.
+- `GET /v1/categories` and `GET /v1/places` require authentication and return catalogs.
 - `POST /v1/auth/users`, `POST /v1/auth/sessions`, and `GET`/`DELETE /v1/auth/session` own account/session operations.
-- `GET /v1/authors/{author_id}` and `GET /v1/authors/{author_id}/notes` return a public author and that author’s paginated notes.
-- `GET /v1/notes` returns a bounded list of up to 50 recent/category-filtered notes; `GET /v1/notes/{note_id}` returns one note; `GET /v1/search/notes` searches notes.
-- `POST /v1/notes` requires authentication, `title`, `body`, `category_slug`, and stable `client_request_id`; it accepts optional `place_slug` and zero or one ordered `image_upload_ids`, and atomically publishes the selected staged image with the note.
+- `GET /v1/authors/{author_id}` and `GET /v1/authors/{author_id}/notes` require authentication and return an author plus that author’s paginated notes.
+- `GET /v1/notes` requires authentication and returns a bounded list of up to 50 recent/category-filtered notes; `GET /v1/notes/{note_id}` requires authentication and returns one note; `GET /v1/search/notes` requires authentication and searches notes.
+- `PUT /v1/notes/{note_id}/useful` and `DELETE /v1/notes/{note_id}/useful` require authentication and idempotently mark or unmark a note as useful.
 - `POST /v1/media/image-uploads` requires authentication and stages exactly one private JPEG or PNG with a stable `upload_request_id`; its receipt is not public media.
 - `GET /v1/media/images/{image_id}` publicly streams bytes only for an attached image through the stable API URL; it never redirects to or exposes RustFS.
 
@@ -266,7 +266,7 @@ SDDS_API_BASE_URL=http://127.0.0.1:18080 pnpm test:api:integration
 docker compose -p sdds-api-integration -f infra/compose/compose.yaml down --volumes
 ```
 
-`pnpm test:api:integration` expects a live API and exercises public HTTP endpoints through the generated Go OpenAPI client. Keep it on the Compose path so it covers the built image, migrations, readiness, routing, SQLite persistence, and JSON contract together.
+`pnpm test:api:integration` expects a live API and exercises the generated Go OpenAPI client against the current authenticated product and operational endpoints. Keep it on the Compose path so it covers the built image, migrations, readiness, routing, SQLite persistence, and JSON contract together.
 
 Run the browser-level synthetic against the Dockerized stack:
 

@@ -57,6 +57,8 @@ function note(images: Note['images']): Note {
     placeSlug: null,
     title: 'Cafe bom',
     updatedAt: 1782993600000,
+    usefulCount: 0,
+    usefulByCurrentUser: false,
   };
 }
 

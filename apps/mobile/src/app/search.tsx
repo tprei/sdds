@@ -28,7 +28,11 @@ import type {
   SearchResultContext,
 } from '@/features/notes/search-screen';
 import { listCatalogs } from '@/lib/api/catalogs';
-import { searchNotes } from '@/lib/api/notes';
+import {
+  markNoteUseful,
+  searchNotes,
+  unmarkNoteUseful,
+} from '@/lib/api/notes';
 import type { Note } from '@/lib/api/notes';
 
 import { styles } from '@/features/notes/search-screen.styles';
@@ -54,16 +58,18 @@ type SearchScreenState =
     }
   | { request: SearchRequest; status: 'error' };
 
-const idleSearchState: SearchScreenState = { status: 'idle' };
-
 type AuthenticatedSearchScreenProps = {
   onSessionExpired: () => Promise<void>;
   token: string;
 };
 
+type UsefulMutationState = 'error' | 'pending';
+
+const idleSearchState: SearchScreenState = { status: 'idle' };
+
 export default function SearchScreen() {
-  const { logout, state } = useAuth();
   const router = useRouter();
+  const { logout, state } = useAuth();
 
   if (state.status === 'authenticated') {
     return (
@@ -114,6 +120,10 @@ function AuthenticatedSearchScreen({
     status: 'loading',
   });
   const [state, setState] = useState<SearchScreenState>(idleSearchState);
+  const [usefulMutations, setUsefulMutations] = useState<
+    Partial<Record<string, UsefulMutationState>>
+  >({});
+
   const openAuthor = useCallback(
     (authorID: string) => {
       router.push({ pathname: '/authors/[id]', params: { id: authorID } });
@@ -122,10 +132,7 @@ function AuthenticatedSearchScreen({
   );
   const openNote = useCallback(
     (note: Note) => {
-      router.push({
-        pathname: '/notes/[id]',
-        params: { id: note.id },
-      });
+      router.push({ pathname: '/notes/[id]', params: { id: note.id } });
     },
     [router],
   );
@@ -161,6 +168,7 @@ function AuthenticatedSearchScreen({
         appendRecentSearchQuery(current, request.query),
       );
       setSearchState({ request, status: 'loading' });
+      setUsefulMutations({});
 
       searchNotes(request.input, token)
         .then((notes) => {
@@ -216,6 +224,7 @@ function AuthenticatedSearchScreen({
     catalogRequestIDRef.current += 1;
     const requestID = catalogRequestIDRef.current;
     setCatalogState({ status: 'loading' });
+    setUsefulMutations({});
 
     listCatalogs(token)
       .then((catalogs) => {
@@ -268,6 +277,73 @@ function AuthenticatedSearchScreen({
       });
   }, [onSessionExpired, runSearch, token]);
 
+  const toggleUseful = useCallback(
+    async (target: LabelledNote) => {
+      if (usefulMutations[target.id] === 'pending') {
+        return;
+      }
+      const generation = `${catalogRequestIDRef.current}:${searchRequestIDRef.current}`;
+      setUsefulMutations((current) => ({
+        ...current,
+        [target.id]: 'pending',
+      }));
+      try {
+        if (target.usefulByCurrentUser) {
+          await unmarkNoteUseful(target.id, token);
+        } else {
+          await markNoteUseful(target.id, token);
+        }
+        if (
+          generation !==
+          `${catalogRequestIDRef.current}:${searchRequestIDRef.current}`
+        ) {
+          return;
+        }
+        setState((current) => {
+          if (current.status !== 'ready') {
+            return current;
+          }
+          return {
+            ...current,
+            notes: current.notes.map((note) =>
+              note.id === target.id
+                ? {
+                    ...note,
+                    usefulByCurrentUser: !note.usefulByCurrentUser,
+                    usefulCount: note.usefulByCurrentUser
+                      ? note.usefulCount - 1
+                      : note.usefulCount + 1,
+                  }
+                : note,
+            ),
+          };
+        });
+        setUsefulMutations((current) => {
+          const { [target.id]: _removed, ...rest } = current;
+          return rest;
+        });
+      } catch (error: unknown) {
+        if (
+          generation !==
+          `${catalogRequestIDRef.current}:${searchRequestIDRef.current}`
+        ) {
+          return;
+        }
+        if (requestStatus(error) === unauthorizedStatus) {
+          try {
+            await onSessionExpired();
+          } catch {}
+          return;
+        }
+        setUsefulMutations((current) => ({
+          ...current,
+          [target.id]: 'error',
+        }));
+      }
+    },
+    [onSessionExpired, token, usefulMutations],
+  );
+
   useFocusEffect(
     useCallback(() => {
       loadCatalogs();
@@ -282,6 +358,7 @@ function AuthenticatedSearchScreen({
   function handleQueryChange(value: string) {
     searchRequestIDRef.current += 1;
     submittedQueryRef.current = null;
+    setUsefulMutations({});
     setQuery(value);
     setSearchState(idleSearchState);
   }
@@ -297,6 +374,7 @@ function AuthenticatedSearchScreen({
   function handleClear() {
     searchRequestIDRef.current += 1;
     submittedQueryRef.current = null;
+    setUsefulMutations({});
     setQuery('');
     setSearchState(idleSearchState);
   }
@@ -364,8 +442,10 @@ function AuthenticatedSearchScreen({
           onOpenAuthor={openAuthor}
           onOpenNote={openNote}
           onSelectRecentQuery={handleSelectRecentQuery}
+          onToggleUseful={toggleUseful}
           recentQueries={recentQueries}
           state={state}
+          usefulMutations={usefulMutations}
         />
       )}
     </FoundationScreen>
@@ -418,14 +498,18 @@ function SearchStateContent({
   onOpenAuthor,
   onOpenNote,
   onSelectRecentQuery,
+  onToggleUseful,
   recentQueries,
   state,
+  usefulMutations,
 }: {
   onOpenAuthor: (authorID: string) => void;
   onOpenNote: (note: Note) => void;
   onSelectRecentQuery: (query: string) => void;
+  onToggleUseful: (note: LabelledNote) => Promise<void>;
   recentQueries: string[];
   state: SearchScreenState;
+  usefulMutations: Partial<Record<string, UsefulMutationState>>;
 }) {
   if (state.status === 'idle') {
     return (
@@ -482,7 +566,12 @@ function SearchStateContent({
           note={labelledNote}
           onPress={() => onOpenNote(labelledNote)}
           onPressAuthor={onOpenAuthor}
+          onPressUseful={() => {
+            void onToggleUseful(labelledNote);
+          }}
           placeLabel={labelledNote.placeLabel}
+          usefulError={usefulMutations[labelledNote.id] === 'error'}
+          usefulPending={usefulMutations[labelledNote.id] === 'pending'}
         />
       ))}
     </>

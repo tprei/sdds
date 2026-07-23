@@ -15,7 +15,11 @@ import { resolveCategoryFilterSlug } from '@/features/notes/category-filter';
 import { buildNoteCatalog, labelNotes } from '@/features/notes/catalog';
 import type { LabelledNote, NoteCatalog } from '@/features/notes/catalog';
 import { listCatalogs } from '@/lib/api/catalogs';
-import { listNotes } from '@/lib/api/notes';
+import {
+  listNotes,
+  markNoteUseful,
+  unmarkNoteUseful,
+} from '@/lib/api/notes';
 import type { ListNotesInput, Note } from '@/lib/api/notes';
 
 type CatalogState =
@@ -33,6 +37,8 @@ type AuthenticatedHomeScreenProps = {
   onSessionExpired: () => Promise<void>;
   token: string;
 };
+
+type UsefulMutationState = 'error' | 'pending';
 
 export default function HomeScreen() {
   const { logout, state } = useAuth();
@@ -88,12 +94,16 @@ function AuthenticatedHomeScreen({
     status: 'loading',
   });
   const [feedState, setFeedState] = useState<FeedState>({ status: 'loading' });
+  const [usefulMutations, setUsefulMutations] = useState<
+    Partial<Record<string, UsefulMutationState>>
+  >({});
 
   const loadFeed = useCallback(
     (catalog: NoteCatalog, categorySlug: string | null) => {
       requestIDRef.current += 1;
       const requestID = requestIDRef.current;
       setFeedState({ status: 'loading' });
+      setUsefulMutations({});
 
       listNotes(noteListInput(categorySlug), token)
         .then((notes) => {
@@ -118,9 +128,7 @@ function AuthenticatedHomeScreen({
           if (requestStatus(error) === unauthorizedStatus) {
             try {
               await onSessionExpired();
-            } catch {
-              setFeedState({ status: 'error' });
-            }
+            } catch {}
             return;
           }
           setFeedState({ status: 'error' });
@@ -134,6 +142,7 @@ function AuthenticatedHomeScreen({
     const requestID = requestIDRef.current;
     setCatalogState({ status: 'loading' });
     setFeedState({ status: 'loading' });
+    setUsefulMutations({});
 
     listCatalogs(token)
       .then((catalogs) => {
@@ -173,9 +182,7 @@ function AuthenticatedHomeScreen({
             if (requestStatus(error) === unauthorizedStatus) {
               try {
                 await onSessionExpired();
-              } catch {
-                setFeedState({ status: 'error' });
-              }
+              } catch {}
               return;
             }
             setFeedState({ status: 'error' });
@@ -188,11 +195,7 @@ function AuthenticatedHomeScreen({
         if (requestStatus(error) === unauthorizedStatus) {
           try {
             await onSessionExpired();
-          } catch {
-            catalogRef.current = null;
-            setCatalogState({ status: 'error' });
-            setFeedState({ status: 'error' });
-          }
+          } catch {}
           return;
         }
         catalogRef.current = null;
@@ -216,6 +219,67 @@ function AuthenticatedHomeScreen({
       }
     },
     [loadFeed],
+  );
+
+  const toggleUseful = useCallback(
+    async (target: LabelledNote) => {
+      if (usefulMutations[target.id] === 'pending') {
+        return;
+      }
+      const generation = requestIDRef.current;
+      setUsefulMutations((current) => ({
+        ...current,
+        [target.id]: 'pending',
+      }));
+      try {
+        if (target.usefulByCurrentUser) {
+          await unmarkNoteUseful(target.id, token);
+        } else {
+          await markNoteUseful(target.id, token);
+        }
+        if (requestIDRef.current !== generation) {
+          return;
+        }
+        setFeedState((current) => {
+          if (current.status !== 'ready') {
+            return current;
+          }
+          return {
+            status: 'ready',
+            notes: current.notes.map((note) =>
+              note.id === target.id
+                ? {
+                    ...note,
+                    usefulByCurrentUser: !note.usefulByCurrentUser,
+                    usefulCount: note.usefulByCurrentUser
+                      ? note.usefulCount - 1
+                      : note.usefulCount + 1,
+                  }
+                : note,
+            ),
+          };
+        });
+        setUsefulMutations((current) => {
+          const { [target.id]: _removed, ...rest } = current;
+          return rest;
+        });
+      } catch (error: unknown) {
+        if (requestIDRef.current !== generation) {
+          return;
+        }
+        if (requestStatus(error) === unauthorizedStatus) {
+          try {
+            await onSessionExpired();
+          } catch {}
+          return;
+        }
+        setUsefulMutations((current) => ({
+          ...current,
+          [target.id]: 'error',
+        }));
+      }
+    },
+    [onSessionExpired, token, usefulMutations],
   );
 
   useFocusEffect(
@@ -253,8 +317,10 @@ function AuthenticatedHomeScreen({
               params: { id: note.id },
             });
           }}
+          onToggleUseful={toggleUseful}
           selectedCategorySlug={selectedCategorySlug}
           state={feedState}
+          usefulMutations={usefulMutations}
         />
       )}
     </FoundationScreen>
@@ -316,14 +382,18 @@ function FeedContent({
   catalogState,
   onOpenAuthor,
   onOpenNote,
+  onToggleUseful,
   selectedCategorySlug,
   state,
+  usefulMutations,
 }: {
   catalogState: CatalogState;
   onOpenAuthor: (authorID: string) => void;
   onOpenNote: (note: Note) => void;
+  onToggleUseful: (note: LabelledNote) => Promise<void>;
   selectedCategorySlug: string | null;
   state: FeedState;
+  usefulMutations: Partial<Record<string, UsefulMutationState>>;
 }) {
   if (state.status === 'loading') {
     return (
@@ -359,7 +429,12 @@ function FeedContent({
       note={labelledNote}
       onPress={() => onOpenNote(labelledNote)}
       onPressAuthor={onOpenAuthor}
+      onPressUseful={() => {
+        void onToggleUseful(labelledNote);
+      }}
       placeLabel={labelledNote.placeLabel}
+      usefulError={usefulMutations[labelledNote.id] === 'error'}
+      usefulPending={usefulMutations[labelledNote.id] === 'pending'}
     />
   ));
 }

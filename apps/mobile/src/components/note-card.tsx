@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 import type { Note } from '@/lib/api/notes';
+import { UsefulButton } from '@/features/notes/useful-button';
 
 import { NoteMedia } from './note-media';
 import { styles } from './note-card.styles';
@@ -10,7 +11,10 @@ type NoteCardProps = {
   note: Note;
   onPress?: () => void;
   onPressAuthor?: (authorID: string) => void;
+  onPressUseful: () => void;
   placeLabel: string | null;
+  usefulError: boolean;
+  usefulPending: boolean;
 };
 
 export function NoteCard({
@@ -18,7 +22,10 @@ export function NoteCard({
   note,
   onPress,
   onPressAuthor,
+  onPressUseful,
   placeLabel,
+  usefulError,
+  usefulPending,
 }: NoteCardProps) {
   const metadata = (
     <View style={styles.metaRow}>
@@ -53,6 +60,15 @@ export function NoteCard({
       </Pressable>
     );
 
+  const usefulAction = (
+    <UsefulButton
+      count={note.usefulCount}
+      marked={note.usefulByCurrentUser}
+      onPress={onPressUseful}
+      pending={usefulPending}
+    />
+  );
+
   const noteAccessibilityLabel =
     note.images.length > 0
       ? `Abrir nota com imagem: ${note.title}`
@@ -71,31 +87,47 @@ export function NoteCard({
     </>
   );
 
-  const cardContent = (
-    <>
-      {noteContent}
-      {author}
-    </>
-  );
-
   if (onPress === undefined) {
-    return <View style={[styles.card, styles.noteTarget]}>{cardContent}</View>;
+    return (
+      <View style={styles.card}>
+        <View style={styles.noteTarget}>{noteContent}</View>
+        <View style={styles.actionRow}>
+          {author}
+          {usefulAction}
+        </View>
+        {usefulError ? (
+          <Text accessibilityRole="alert" style={styles.usefulError}>
+            Não deu pra atualizar o Útil. Tenta de novo.
+          </Text>
+        ) : null}
+      </View>
+    );
   }
 
   if (onPressAuthor === undefined) {
     return (
-      <Pressable
-        accessibilityLabel={noteAccessibilityLabel}
-        accessibilityRole="button"
-        onPress={onPress}
-        style={({ pressed }) => [
-          styles.card,
-          styles.noteTarget,
-          pressed ? styles.pressed : null,
-        ]}
-      >
-        {cardContent}
-      </Pressable>
+      <View style={styles.card}>
+        <Pressable
+          accessibilityLabel={noteAccessibilityLabel}
+          accessibilityRole="button"
+          onPress={onPress}
+          style={({ pressed }) => [
+            styles.noteTarget,
+            pressed ? styles.pressed : null,
+          ]}
+        >
+          {noteContent}
+        </Pressable>
+        <View style={styles.actionRow}>
+          {author}
+          {usefulAction}
+        </View>
+        {usefulError ? (
+          <Text accessibilityRole="alert" style={styles.usefulError}>
+            Não deu pra atualizar o Útil. Tenta de novo.
+          </Text>
+        ) : null}
+      </View>
     );
   }
 
@@ -112,7 +144,15 @@ export function NoteCard({
       >
         {noteContent}
       </Pressable>
-      {author}
+      <View style={styles.actionRow}>
+        {author}
+        {usefulAction}
+      </View>
+      {usefulError ? (
+        <Text accessibilityRole="alert" style={styles.usefulError}>
+          Não deu pra atualizar o Útil. Tenta de novo.
+        </Text>
+      ) : null}
     </View>
   );
 }

@@ -34,15 +34,15 @@ const (
 	mediaFixtureSHA256      = "57e8aeda4753fca6b9077b271ccee6d6558923a72767b9c1bf3773e43254afbb"
 )
 
-func requireMediaAPIRuntimeBoundaries(t *testing.T, publicClient *openapi.ClientWithResponses, client *openapi.ClientWithResponses, author openapi.AuthorSummary) {
+func requireMediaAPIRuntimeBoundaries(t *testing.T, publicClient *openapi.ClientWithResponses, productClient *openapi.ClientWithResponses, author openapi.AuthorSummary) {
 	t.Helper()
 
 	fixture := loadMediaFixture(t)
 	uploadRequestID := newMediaUUID(t)
-	receipt := prepareImageUpload(t, client, uploadRequestID, fixture)
+	receipt := prepareImageUpload(t, productClient, uploadRequestID, fixture)
 	requirePrivateBeforeAssociation(t, publicClient, receipt)
 
-	replayedReceipt := prepareImageUpload(t, client, uploadRequestID, fixture)
+	replayedReceipt := prepareImageUpload(t, productClient, uploadRequestID, fixture)
 	if !reflect.DeepEqual(receipt, replayedReceipt) {
 		t.Fatalf("replayed upload receipt mismatch (-first +replay):\nfirst=%#v\nreplay=%#v", receipt, replayedReceipt)
 	}
@@ -55,18 +55,18 @@ func requireMediaAPIRuntimeBoundaries(t *testing.T, publicClient *openapi.Client
 		ClientRequestId: "media-note-" + newMediaUUID(t),
 		ImageUploadIds:  &imageUploadIDs,
 	}
-	created := createNote(t, client, request)
+	created := createNote(t, productClient, request)
 	createdImage := requireSingleImageMetadata(t, created, receipt)
 	if !reflect.DeepEqual(author, created.Author) {
 		t.Fatalf("created note author mismatch (-want +got):\nwant=%#v\ngot=%#v", author, created.Author)
 	}
 
-	replayedNote := createNote(t, client, request)
+	replayedNote := createNote(t, productClient, request)
 	if !reflect.DeepEqual(created, replayedNote) {
 		t.Fatalf("replayed note mismatch (-first +replay):\nfirst=%#v\nreplay=%#v", created, replayedNote)
 	}
 
-	detail := getNote(t, publicClient, created.Id)
+	detail := getNote(t, productClient, created.Id)
 	if !reflect.DeepEqual(createdImage, requireSingleImageMetadata(t, detail, receipt)) {
 		t.Fatalf("detail image metadata mismatch (-create +detail):\ncreate=%#v\ndetail=%#v", createdImage, detail.Images[0])
 	}
@@ -74,7 +74,7 @@ func requireMediaAPIRuntimeBoundaries(t *testing.T, publicClient *openapi.Client
 		t.Fatalf("detail note author mismatch (-want +got):\nwant=%#v\ngot=%#v", author, detail.Author)
 	}
 
-	listed := findNoteByID(t, listNotes(t, publicClient), created.Id)
+	listed := findNoteByID(t, listNotes(t, productClient), created.Id)
 	if !reflect.DeepEqual(createdImage, requireSingleImageMetadata(t, listed, receipt)) {
 		t.Fatalf("collection image metadata mismatch (-create +collection):\ncreate=%#v\ncollection=%#v", createdImage, listed.Images[0])
 	}
@@ -85,7 +85,7 @@ func requireMediaAPIRuntimeBoundaries(t *testing.T, publicClient *openapi.Client
 	firstImage := getPublicMediaImage(t, publicClient, receipt)
 	secondImage := getPublicMediaImage(t, publicClient, receipt)
 	requireStableMediaResponse(t, firstImage, secondImage, fixture)
-	requireMediaLifecycleIfConfigured(t, publicClient, created, receipt, firstImage, fixture)
+	requireMediaLifecycleIfConfigured(t, publicClient, productClient, created, receipt, firstImage, fixture)
 }
 
 type mediaLifecycleConfig struct {
@@ -96,7 +96,7 @@ type mediaLifecycleConfig struct {
 
 const mediaLifecycleCommandTimeout = 135 * time.Second
 
-func requireMediaLifecycleIfConfigured(t *testing.T, publicClient *openapi.ClientWithResponses, wantNote openapi.Note, receipt openapi.ImageUploadReceipt, firstImage openapi.GetMediaImageHTTPResponse, fixture []byte) {
+func requireMediaLifecycleIfConfigured(t *testing.T, publicClient *openapi.ClientWithResponses, productClient *openapi.ClientWithResponses, wantNote openapi.Note, receipt openapi.ImageUploadReceipt, firstImage openapi.GetMediaImageHTTPResponse, fixture []byte) {
 	t.Helper()
 
 	config, enabled := mediaLifecycleConfigFromEnv(t)
@@ -105,12 +105,12 @@ func requireMediaLifecycleIfConfigured(t *testing.T, publicClient *openapi.Clien
 	}
 	t.Cleanup(func() { cleanupMediaLifecycle(t, config) })
 	restartMediaLifecycle(t, config, publicClient)
-	requireStableMediaNote(t, publicClient, wantNote, receipt)
+	requireStableMediaNote(t, productClient, wantNote, receipt)
 	restartedImage := getPublicMediaImage(t, publicClient, receipt)
 	requireStableMediaResponse(t, firstImage, restartedImage, fixture)
 	requireMediaStorageUnavailable(t, config, publicClient, receipt)
 	recoverMediaLifecycle(t, config, publicClient)
-	requireStableMediaNote(t, publicClient, wantNote, receipt)
+	requireStableMediaNote(t, productClient, wantNote, receipt)
 	recoveredImage := getPublicMediaImage(t, publicClient, receipt)
 	requireStableMediaResponse(t, firstImage, recoveredImage, fixture)
 }
@@ -226,10 +226,10 @@ func durableMediaNote(note openapi.Note) mediaLifecycleNote {
 	}
 }
 
-func requireStableMediaNote(t *testing.T, publicClient *openapi.ClientWithResponses, wantNote openapi.Note, receipt openapi.ImageUploadReceipt) {
+func requireStableMediaNote(t *testing.T, productClient *openapi.ClientWithResponses, wantNote openapi.Note, receipt openapi.ImageUploadReceipt) {
 	t.Helper()
 
-	got := getMediaLifecycleNote(t, publicClient, wantNote.Id)
+	got := getMediaLifecycleNote(t, productClient, wantNote.Id)
 	requireSingleImageMetadata(t, got, receipt)
 	wantDurable := durableMediaNote(wantNote)
 	gotDurable := durableMediaNote(got)
@@ -238,11 +238,11 @@ func requireStableMediaNote(t *testing.T, publicClient *openapi.ClientWithRespon
 	}
 }
 
-func getMediaLifecycleNote(t *testing.T, publicClient *openapi.ClientWithResponses, noteID string) openapi.Note {
+func getMediaLifecycleNote(t *testing.T, productClient *openapi.ClientWithResponses, noteID string) openapi.Note {
 	t.Helper()
 
 	ctx, cancel := mediaLifecycleRequestContext()
-	response, err := publicClient.GetNoteWithResponse(ctx, noteID)
+	response, err := productClient.GetNoteWithResponse(ctx, noteID)
 	cancel()
 	if err != nil {
 		t.Fatalf("GET /v1/notes/{note_id} during RustFS lifecycle: %v", err)

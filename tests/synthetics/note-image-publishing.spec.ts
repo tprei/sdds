@@ -64,7 +64,7 @@ async function authorSignupAndPublish(
 ): Promise<void> {
   await clickTab(page, 'Escrever');
   await expectVisible(
-    page.getByText('Entre para escrever', { exact: true }),
+    page.getByText('Entre para continuar', { exact: true }).first(),
     30_000,
   );
   await expectVisible(
@@ -127,7 +127,7 @@ async function logoutAndSignupReader(
   await expectVisible(page.getByRole('button', { exact: true, name: 'Sair' }));
   await page.getByRole('button', { exact: true, name: 'Sair' }).click();
   await expectVisible(
-    page.getByText('Entre para publicar', { exact: true }),
+    page.getByText('Entre para continuar', { exact: true }).first(),
     30_000,
   );
   await page.getByRole('button', { exact: true, name: 'Criar conta' }).click();

@@ -52,7 +52,11 @@ export default function ProfileScreen() {
       <View style={styles.authenticatedRoot}>
         <AuthorProfileContent
           authorID={state.user.author.id}
-          onPressNote={(noteID) => router.push({ pathname: '/notes/[id]', params: { id: noteID } })}
+          onPressNote={(noteID) =>
+            router.push({ pathname: '/notes/[id]', params: { id: noteID } })
+          }
+          onSessionExpired={logout}
+          token={state.token}
         />
         <View style={styles.logoutSection}>
           {logoutState.status === 'error' ? (
@@ -99,17 +103,21 @@ export default function ProfileScreen() {
       {state.status === 'anonymous' ? (
         <>
           <EmptyStateCard
-            title="Entre para publicar"
-            body="Você pode continuar lendo sem conta. Para escrever uma nota, entre ou crie uma conta."
+            title="Entre para continuar"
+            body="Entre ou crie uma conta para acessar as notas."
           />
           <FoundationButton
             label="Criar conta"
-            onPress={() => router.push({ pathname: '/signup', params: { next: '/profile' } })}
+            onPress={() =>
+              router.push({ pathname: '/signup', params: { next: '/profile' } })
+            }
             testID="profile-signup-button"
           />
           <FoundationButton
             label="Entrar"
-            onPress={() => router.push({ pathname: '/login', params: { next: '/profile' } })}
+            onPress={() =>
+              router.push({ pathname: '/login', params: { next: '/profile' } })
+            }
             testID="profile-login-button"
           />
         </>

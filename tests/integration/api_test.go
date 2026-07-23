@@ -39,8 +39,6 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	}
 	requireStatus(t, "GET /healthz", health.StatusCode(), http.StatusNoContent, health.Body)
 
-	requireCatalogs(t, client)
-
 	username := fmt.Sprintf("thiago-%d", time.Now().UnixNano())
 	displayName := "Thiago Integração"
 	password := "secret-password"
@@ -67,6 +65,7 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	requireAuthSession(t, loggedInSession, username, displayName)
 	requireCurrentSession(t, getAuthSession(t, client, loggedInSession.Token), loggedInSession)
 	client = newAuthenticatedAPIClient(t, loggedInSession.Token)
+	requireCatalogs(t, client)
 
 	initialNotes := listNotes(t, client)
 	if len(initialNotes.Notes) != 0 {

@@ -6,7 +6,7 @@ import {
   listCategoriesResponseSchema,
   listPlacesResponseSchema,
 } from './schema';
-import type { components, paths } from './generated/schema';
+import type { paths } from './generated/schema';
 
 export type CatalogCategory = {
   active: boolean;
@@ -26,47 +26,44 @@ export type Catalogs = {
   categories: CatalogCategory[];
   places: CatalogPlace[];
 };
-
-type GeneratedSchemas = components['schemas'];
-type CatalogCategoryResponse = GeneratedSchemas['CatalogCategory'];
-type CatalogPlaceResponse = GeneratedSchemas['CatalogPlace'];
-
 export class CatalogAPIResponseError extends Error {
   constructor() {
     super('catalog_api_response_invalid');
   }
 }
 
-export async function listCatalogs(): Promise<Catalogs> {
+export async function listCatalogs(token: string): Promise<Catalogs> {
   const [categories, places] = await Promise.all([
-    listCategories(),
-    listPlaces(),
+    listCategories(token),
+    listPlaces(token),
   ]);
 
   return { categories, places };
 }
 
-export async function listCategories(): Promise<CatalogCategory[]> {
-  const { data } = await apiClient().GET('/v1/categories');
+export async function listCategories(
+  token: string,
+): Promise<CatalogCategory[]> {
+  const { data } = await apiClient(token).GET('/v1/categories');
 
   return parseListCategoriesResponse(data);
 }
 
-export async function listPlaces(): Promise<CatalogPlace[]> {
-  const { data } = await apiClient().GET('/v1/places');
+export async function listPlaces(token: string): Promise<CatalogPlace[]> {
+  const { data } = await apiClient(token).GET('/v1/places');
 
   return parseListPlacesResponse(data);
 }
 
-function apiClient() {
+function apiClient(token: string) {
   return createClient<paths>({
     baseUrl: apiBaseURL(),
-    fetch: apiFetch,
+    fetch: (request) => apiFetch(request, token),
   });
 }
 
-async function apiFetch(request: Request): Promise<Response> {
-  const response = await fetch(request);
+async function apiFetch(request: Request, token: string): Promise<Response> {
+  const response = await fetch(authenticatedRequest(request, token));
   if (response.ok) {
     return response;
   }
@@ -75,13 +72,24 @@ async function apiFetch(request: Request): Promise<Response> {
   throw new APIRequestError(error.status, error.body, error.retryAfter);
 }
 
+function authenticatedRequest(request: Request, token: string): Request {
+  const headers = new Headers(request.headers);
+  headers.set('Authorization', `Bearer ${token}`);
+  return new Request(request, { headers });
+}
+
 function parseListCategoriesResponse(value: unknown): CatalogCategory[] {
   const categoriesResponse = listCategoriesResponseSchema.safeParse(value);
   if (!categoriesResponse.success) {
     throw new CatalogAPIResponseError();
   }
 
-  return categoriesResponse.data.categories.map(parseCatalogCategory);
+  return categoriesResponse.data.categories.map((value) => ({
+    active: value.active,
+    displayOrder: value.display_order,
+    label: value.label,
+    slug: value.slug,
+  }));
 }
 
 function parseListPlacesResponse(value: unknown): CatalogPlace[] {
@@ -90,23 +98,10 @@ function parseListPlacesResponse(value: unknown): CatalogPlace[] {
     throw new CatalogAPIResponseError();
   }
 
-  return placesResponse.data.places.map(parseCatalogPlace);
-}
-
-function parseCatalogCategory(value: CatalogCategoryResponse): CatalogCategory {
-  return {
+  return placesResponse.data.places.map((value) => ({
     active: value.active,
     displayOrder: value.display_order,
     label: value.label,
     slug: value.slug,
-  };
-}
-
-function parseCatalogPlace(value: CatalogPlaceResponse): CatalogPlace {
-  return {
-    active: value.active,
-    displayOrder: value.display_order,
-    label: value.label,
-    slug: value.slug,
-  };
+  }));
 }

@@ -93,7 +93,7 @@ func (store *NoteStore) createNoteInTransaction(ctx context.Context, tx *sql.Tx,
 		if storedSHA256 != requestSHA256 {
 			return note.Note{}, note.ErrIdempotencyConflict
 		}
-		created, err := loadNoteWithOrderedImages(ctx, tx, tx, storedNoteID)
+		created, err := loadNoteWithOrderedImages(ctx, tx, tx, storedNoteID, input.UserID)
 		if err != nil {
 			return note.Note{}, fmt.Errorf("load replayed note: %w", err)
 		}
@@ -126,7 +126,7 @@ func (store *NoteStore) createNoteInTransaction(ctx context.Context, tx *sql.Tx,
 	if err := insertNoteCreateRequest(ctx, tx, input, requestSHA256, created.ID, now); err != nil {
 		return note.Note{}, err
 	}
-	created, err = loadNoteWithOrderedImages(ctx, tx, tx, created.ID)
+	created, err = loadNoteWithOrderedImages(ctx, tx, tx, created.ID, input.UserID)
 	if err != nil {
 		return note.Note{}, fmt.Errorf("load created note: %w", err)
 	}
@@ -214,7 +214,7 @@ func (store *NoteStore) reconcileNoteCreateReceipt(ctx context.Context, input no
 	if storedSHA256 != requestSHA256 {
 		return note.Note{}, note.ErrIdempotencyConflict
 	}
-	created, err := loadNoteWithOrderedImages(ctx, store.db, store.db, storedNoteID)
+	created, err := loadNoteWithOrderedImages(ctx, store.db, store.db, storedNoteID, input.UserID)
 	if err != nil {
 		return note.Note{}, fmt.Errorf("load conflicting note: %w", err)
 	}

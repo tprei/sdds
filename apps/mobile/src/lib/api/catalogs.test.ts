@@ -24,6 +24,8 @@ type FetchCall = {
 };
 type FetchHandler = (request: Request) => Promise<Response>;
 
+const exampleToken = 'session-token';
+
 describe('catalogs API client', () => {
   beforeEach(() => {
     delete process.env[configuredAPIBaseURLEnvName];
@@ -42,7 +44,7 @@ describe('catalogs API client', () => {
       });
     });
 
-    await expect(listCategories()).resolves.toEqual([
+    await expect(listCategories(exampleToken)).resolves.toEqual([
       {
         active: true,
         displayOrder: 20,
@@ -65,7 +67,7 @@ describe('catalogs API client', () => {
       });
     });
 
-    await expect(listPlaces()).resolves.toEqual([
+    await expect(listPlaces(exampleToken)).resolves.toEqual([
       {
         active: true,
         displayOrder: 10,
@@ -99,7 +101,7 @@ describe('catalogs API client', () => {
       return jsonResponse({ code: 'not_found' }, httpStatusNotFound);
     });
 
-    await expect(listCatalogs()).resolves.toEqual({
+    await expect(listCatalogs(exampleToken)).resolves.toEqual({
       categories: [
         {
           active: true,
@@ -124,7 +126,7 @@ describe('catalogs API client', () => {
     stubFetch(async () =>
       jsonResponse({ code: 'internal_error' }, httpStatusInternalServerError),
     );
-    await expect(listCategories()).rejects.toMatchObject(
+    await expect(listCategories(exampleToken)).rejects.toMatchObject(
       new APIRequestError(httpStatusInternalServerError, {
         code: 'internal_error',
       }),
@@ -142,7 +144,7 @@ describe('catalogs API client', () => {
       }),
     );
 
-    await expect(listCategories()).rejects.toThrow(CatalogAPIResponseError);
+    await expect(listCategories(exampleToken)).rejects.toThrow(CatalogAPIResponseError);
   });
 
   it('ignores extra place response fields', async () => {
@@ -157,7 +159,7 @@ describe('catalogs API client', () => {
       }),
     );
 
-    await expect(listPlaces()).resolves.toEqual([
+    await expect(listPlaces(exampleToken)).resolves.toEqual([
       {
         active: true,
         displayOrder: 10,

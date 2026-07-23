@@ -347,8 +347,8 @@ function ComposeAuthGate({
   return (
     <>
       <EmptyStateCard
-        title="Entre para escrever"
-        body="Ler continua aberto. Para publicar uma nota, entre ou crie uma conta."
+        title="Entre para continuar"
+        body="Entre ou crie uma conta para acessar as notas."
       />
       <FoundationButton label="Criar conta" onPress={onSignup} />
       <FoundationButton label="Entrar" onPress={onLogin} />

@@ -1,6 +1,12 @@
 import type { AuthAPIErrorField } from '@/lib/api/auth';
 
-export type ReturnPath = '/' | '/compose' | '/profile';
+export type ReturnPath =
+  | '/'
+  | '/compose'
+  | '/profile'
+  | '/search'
+  | `/notes/${string}`
+  | `/authors/${string}`;
 
 export const genericLoginErrorMessage =
   'Não deu pra entrar agora. Tente de novo em instantes.';
@@ -9,12 +15,41 @@ export const genericSignupErrorMessage =
 export const usernameTakenErrorMessage =
   'Esse nome de usuário já está em uso.';
 
+const staticReturnPaths: readonly ReturnPath[] = [
+  '/',
+  '/compose',
+  '/profile',
+  '/search',
+];
+
 export function returnPathFromParam(
   value: string | string[] | undefined,
 ): ReturnPath {
-  if (value === '/compose' || value === '/profile') {
-    return value;
+  if (typeof value !== 'string') {
+    return '/';
   }
+  if (staticReturnPaths.includes(value as ReturnPath)) {
+    return value as ReturnPath;
+  }
+  if (value.includes('?') || value.includes('#') || value.includes('//')) {
+    return '/';
+  }
+
+  // Dynamic path IDs are limited to alphanumeric characters and hyphens
+  // (matching the app's canonical note/author ID format). This rejects
+  // encoded path separators, backslashes, percent-encoding, and other
+  // characters that could be used for path traversal or injection.
+  const idPattern = '[0-9a-zA-Z-]{1,128}';
+  const notesMatch = new RegExp(`^/notes/(${idPattern})$`).exec(value);
+  if (notesMatch !== null) {
+    return value as `/notes/${string}`;
+  }
+
+  const authorsMatch = new RegExp(`^/authors/(${idPattern})$`).exec(value);
+  if (authorsMatch !== null) {
+    return value as `/authors/${string}`;
+  }
+
   return '/';
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
+	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 type usefulCallLog struct {
@@ -57,7 +58,7 @@ func (log *usefulCallLog) assertCount(t *testing.T, want int) {
 func TestMarkNoteUsefulReturnsNoContent(t *testing.T) {
 	markCalls := newUsefulCallLog()
 	router := newTestRouter(fakeNoteStore{
-		findNote: func(_ context.Context, id string) (note.Note, error) {
+		findNote: func(_ context.Context, id string, _ user.UserID) (note.Note, error) {
 			if id != exampleNoteID {
 				t.Fatalf("find id = %q, want %q", id, exampleNoteID)
 			}
@@ -84,7 +85,7 @@ func TestMarkNoteUsefulReturnsNoContent(t *testing.T) {
 func TestMarkNoteUsefulIsIdempotent(t *testing.T) {
 	markCalls := newUsefulCallLog()
 	router := newTestRouter(fakeNoteStore{
-		findNote:   func(_ context.Context, id string) (note.Note, error) { return note.Note{ID: id}, nil },
+		findNote:   func(_ context.Context, id string, _ user.UserID) (note.Note, error) { return note.Note{ID: id}, nil },
 		markUseful: markCalls.mark(note.MarkUsefulInput{NoteID: exampleNoteID, UserID: "user-id-thiago"}, t),
 	})
 
@@ -106,7 +107,9 @@ func TestMarkNoteUsefulIsIdempotent(t *testing.T) {
 func TestMarkNoteUsefulReturnsNotFoundForUnknownNote(t *testing.T) {
 	markCalled := false
 	router := newTestRouter(fakeNoteStore{
-		findNote: func(context.Context, string) (note.Note, error) { return note.Note{}, note.ErrNoteNotFound },
+		findNote: func(context.Context, string, user.UserID) (note.Note, error) {
+			return note.Note{}, note.ErrNoteNotFound
+		},
 		markUseful: func(_ context.Context, _ note.MarkUsefulInput) error {
 			markCalled = true
 			return nil
@@ -130,7 +133,7 @@ func TestMarkNoteUsefulReturnsNotFoundForUnknownNote(t *testing.T) {
 
 func TestMarkNoteUsefulReturnsInternalErrorOnStoreFailure(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
-		findNote: func(_ context.Context, id string) (note.Note, error) { return note.Note{ID: id}, nil },
+		findNote: func(_ context.Context, id string, _ user.UserID) (note.Note, error) { return note.Note{ID: id}, nil },
 		markUseful: func(context.Context, note.MarkUsefulInput) error {
 			return errors.New("database unavailable")
 		},
@@ -151,7 +154,7 @@ func TestMarkNoteUsefulReturnsInternalErrorOnStoreFailure(t *testing.T) {
 func TestMarkNoteUsefulRejectsMissingSessionBeforeValidation(t *testing.T) {
 	markCalled := false
 	router := newRouterForTest(fakeNoteStore{
-		findNote: func(_ context.Context, id string) (note.Note, error) { return note.Note{ID: id}, nil },
+		findNote: func(_ context.Context, id string, _ user.UserID) (note.Note, error) { return note.Note{ID: id}, nil },
 		markUseful: func(_ context.Context, _ note.MarkUsefulInput) error {
 			markCalled = true
 			return nil
@@ -175,7 +178,7 @@ func TestMarkNoteUsefulRejectsMissingSessionBeforeValidation(t *testing.T) {
 func TestUnmarkNoteUsefulReturnsNoContent(t *testing.T) {
 	unmarkCalls := newUsefulCallLog()
 	router := newTestRouter(fakeNoteStore{
-		findNote:     func(_ context.Context, id string) (note.Note, error) { return note.Note{ID: id}, nil },
+		findNote:     func(_ context.Context, id string, _ user.UserID) (note.Note, error) { return note.Note{ID: id}, nil },
 		unmarkUseful: unmarkCalls.unmark(note.UnmarkUsefulInput{NoteID: exampleNoteID, UserID: "user-id-thiago"}, t),
 	})
 
@@ -197,7 +200,7 @@ func TestUnmarkNoteUsefulReturnsNoContent(t *testing.T) {
 func TestUnmarkNoteUsefulIsIdempotentWithoutPriorMark(t *testing.T) {
 	unmarkCalls := newUsefulCallLog()
 	router := newTestRouter(fakeNoteStore{
-		findNote:     func(_ context.Context, id string) (note.Note, error) { return note.Note{ID: id}, nil },
+		findNote:     func(_ context.Context, id string, _ user.UserID) (note.Note, error) { return note.Note{ID: id}, nil },
 		unmarkUseful: unmarkCalls.unmark(note.UnmarkUsefulInput{NoteID: exampleNoteID, UserID: "user-id-thiago"}, t),
 	})
 
@@ -219,7 +222,9 @@ func TestUnmarkNoteUsefulIsIdempotentWithoutPriorMark(t *testing.T) {
 func TestUnmarkNoteUsefulReturnsNotFoundForUnknownNote(t *testing.T) {
 	unmarkCalled := false
 	router := newTestRouter(fakeNoteStore{
-		findNote: func(context.Context, string) (note.Note, error) { return note.Note{}, note.ErrNoteNotFound },
+		findNote: func(context.Context, string, user.UserID) (note.Note, error) {
+			return note.Note{}, note.ErrNoteNotFound
+		},
 		unmarkUseful: func(_ context.Context, _ note.UnmarkUsefulInput) error {
 			unmarkCalled = true
 			return nil
@@ -244,7 +249,7 @@ func TestUnmarkNoteUsefulReturnsNotFoundForUnknownNote(t *testing.T) {
 func TestUnmarkNoteUsefulRejectsMissingSessionBeforeValidation(t *testing.T) {
 	unmarkCalled := false
 	router := newRouterForTest(fakeNoteStore{
-		findNote: func(_ context.Context, id string) (note.Note, error) { return note.Note{ID: id}, nil },
+		findNote: func(_ context.Context, id string, _ user.UserID) (note.Note, error) { return note.Note{ID: id}, nil },
 		unmarkUseful: func(_ context.Context, _ note.UnmarkUsefulInput) error {
 			unmarkCalled = true
 			return nil

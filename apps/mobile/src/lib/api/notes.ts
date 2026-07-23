@@ -78,9 +78,12 @@ export class APIResponseError extends Error {
   }
 }
 
-export async function listNotes(input: ListNotesInput = {}): Promise<Note[]> {
+export async function listNotes(
+  input: ListNotesInput,
+  token: string,
+): Promise<Note[]> {
   const query = noteListQuery(input);
-  const { data } = await apiClient().GET('/v1/notes', {
+  const { data } = await apiClient(token).GET('/v1/notes', {
     params: {
       query,
     },
@@ -89,8 +92,8 @@ export async function listNotes(input: ListNotesInput = {}): Promise<Note[]> {
   return parseListNotesResponse(data);
 }
 
-export async function getNote(id: string): Promise<Note> {
-  const { data } = await apiClient().GET('/v1/notes/{note_id}', {
+export async function getNote(id: string, token: string): Promise<Note> {
+  const { data } = await apiClient(token).GET('/v1/notes/{note_id}', {
     params: {
       path: {
         note_id: id,
@@ -101,9 +104,12 @@ export async function getNote(id: string): Promise<Note> {
   return parseNoteResponse(data);
 }
 
-export async function searchNotes(input: SearchNotesInput): Promise<Note[]> {
+export async function searchNotes(
+  input: SearchNotesInput,
+  token: string,
+): Promise<Note[]> {
   const query = noteSearchQuery(input);
-  const { data } = await apiClient().GET('/v1/search/notes', {
+  const { data } = await apiClient(token).GET('/v1/search/notes', {
     params: {
       query,
     },
@@ -151,14 +157,14 @@ export async function createNote(
   return parseNoteResponse(data);
 }
 
-function apiClient(token?: string) {
+function apiClient(token: string) {
   return createClient<paths>({
     baseUrl: apiBaseURL(),
     fetch: (request) => apiFetch(request, token),
   });
 }
 
-async function apiFetch(request: Request, token?: string): Promise<Response> {
+async function apiFetch(request: Request, token: string): Promise<Response> {
   const response = await fetch(authenticatedRequest(request, token));
   if (response.ok) {
     return response;
@@ -168,11 +174,7 @@ async function apiFetch(request: Request, token?: string): Promise<Response> {
   throw new APIRequestError(error.status, error.body, error.retryAfter);
 }
 
-function authenticatedRequest(request: Request, token?: string): Request {
-  if (token === undefined) {
-    return request;
-  }
-
+function authenticatedRequest(request: Request, token: string): Request {
   const headers = new Headers(request.headers);
   headers.set('Authorization', `Bearer ${token}`);
   return new Request(request, { headers });

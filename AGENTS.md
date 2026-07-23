@@ -41,6 +41,7 @@ AI code must be easy for a human to audit.
 - Do not create `docs/*` trees. Architecture and product decisions belong in `README.md` unless a human explicitly chooses another home.
 - Do not hide business rules in UI components, hooks, middleware, or database triggers.
 - Do not mix unrelated refactors into feature work.
+- Comments should represent the current world state, not describe changes over time. Do not write comments like "previously unauthenticated" or "now behind requireAuth" — write what the code does today.
 - Follow the writing guides in `agent-guidance/writing/WRITING_GO.md`, `agent-guidance/writing/WRITING_REACT_NATIVE.md`, `agent-guidance/writing/WRITING_TYPESCRIPT.md`, and `agent-guidance/writing/STACKED_DIFFS.md`.
 
 ## Domain-Driven Design

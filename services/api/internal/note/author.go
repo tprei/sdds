@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/tprei/sdds/services/api/internal/author"
+	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 const (
@@ -23,9 +24,10 @@ type AuthorNote struct {
 }
 
 type AuthorNotesInput struct {
-	AuthorID author.AuthorID
-	Limit    int
-	After    *AuthorNotePosition
+	AuthorID     author.AuthorID
+	Limit        int
+	After        *AuthorNotePosition
+	ViewerUserID user.UserID
 }
 
 type AuthorNotesPage struct {

@@ -12,16 +12,7 @@ const (
 	listAuthorNotesSQL = `
 		SELECT
 			notes.author_page_key,
-			notes.id,
-			notes.user_id,
-			notes.title,
-			notes.body,
-			notes.category_slug,
-			notes.place_slug,
-			authors.id,
-			authors.display_name,
-			notes.created_at,
-			notes.updated_at
+		` + noteProjectionSQL + `
 		FROM notes
 		JOIN authors ON authors.user_id = notes.user_id
 		WHERE authors.id = ?
@@ -31,16 +22,7 @@ const (
 	listAuthorNotesAfterSQL = `
 		SELECT
 			notes.author_page_key,
-			notes.id,
-			notes.user_id,
-			notes.title,
-			notes.body,
-			notes.category_slug,
-			notes.place_slug,
-			authors.id,
-			authors.display_name,
-			notes.created_at,
-			notes.updated_at
+		` + noteProjectionSQL + `
 		FROM notes
 		JOIN authors ON authors.user_id = notes.user_id
 		WHERE authors.id = ?
@@ -63,11 +45,11 @@ func (store *NoteStore) ListAuthorNotes(ctx context.Context, input note.AuthorNo
 
 	fetchLimit := input.Limit + 1
 	query := listAuthorNotesSQL
-	args := []any{input.AuthorID, fetchLimit}
+	args := []any{string(input.ViewerUserID), input.AuthorID, fetchLimit}
 	if input.After != nil {
 		createdAt := unixMillis(input.After.CreatedAt)
 		query = listAuthorNotesAfterSQL
-		args = []any{input.AuthorID, createdAt, createdAt, input.After.PageKey, fetchLimit}
+		args = []any{string(input.ViewerUserID), input.AuthorID, createdAt, createdAt, input.After.PageKey, fetchLimit}
 	}
 
 	rows, err := store.db.QueryContext(ctx, query, args...)

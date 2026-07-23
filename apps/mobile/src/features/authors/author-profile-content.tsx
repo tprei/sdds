@@ -12,6 +12,8 @@ import { NoteCard } from '../../components/note-card';
 import { FoundationButton } from '../../components/foundation-screen';
 import { listCatalogs } from '../../lib/api/catalogs';
 import { APIRequestError } from '../../lib/api/notes';
+import { requestStatus } from '../../lib/api/request-error';
+import { unauthorizedStatus } from '../../lib/api/status';
 import { getPublicAuthor, listAuthorNotes } from '../../lib/api/authors';
 import type { PublicAuthor } from '../../lib/api/authors';
 import {
@@ -22,7 +24,12 @@ import {
 } from '../notes/catalog';
 import { styles } from './author-profile-content.styles';
 
-type Props = { authorID: string; onPressNote: (noteID: string) => void };
+type Props = {
+  authorID: string;
+  onPressNote: (noteID: string) => void;
+  token: string;
+  onSessionExpired: () => Promise<void>;
+};
 type ProfileError = 'not_found' | 'error' | null;
 
 function initials(name: string): string {
@@ -145,7 +152,12 @@ function nearScrollEnd(event: {
   return contentOffset.y + layoutMeasurement.height >= contentSize.height - 120;
 }
 
-export function AuthorProfileContent({ authorID, onPressNote }: Props) {
+export function AuthorProfileContent({
+  authorID,
+  onPressNote,
+  token,
+  onSessionExpired,
+}: Props) {
   const [author, setAuthor] = useState<PublicAuthor | null>(null);
   const [catalog, setCatalog] = useState<NoteCatalog | null>(null);
   const [notes, setNotes] = useState<LabelledNote[]>([]);
@@ -193,9 +205,9 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
     setError(null);
     try {
       const [profile, page, catalogs] = await Promise.all([
-        getPublicAuthor(requestedAuthorID),
-        listAuthorNotes({ authorID: requestedAuthorID }),
-        listCatalogs(),
+        getPublicAuthor(requestedAuthorID, token),
+        listAuthorNotes({ authorID: requestedAuthorID }, token),
+        listCatalogs(token),
       ]);
       if (!isCurrentRequest(version, requestedAuthorID)) return;
       const nextCatalog = buildNoteCatalog(catalogs);
@@ -206,19 +218,26 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
       setNotes(labelledNotes);
       setCursor(page.nextCursor);
       setActiveAuthorID(requestedAuthorID);
-    } catch (caught) {
-      if (isCurrentRequest(version, requestedAuthorID)) {
-        setActiveAuthorID(requestedAuthorID);
-        setError(
-          caught instanceof APIRequestError && caught.status === 404
-            ? 'not_found'
-            : 'error',
-        );
+    } catch (caught: unknown) {
+      if (!isCurrentRequest(version, requestedAuthorID)) {
+        return;
       }
+      if (requestStatus(caught) === unauthorizedStatus) {
+        await onSessionExpired();
+        return;
+      }
+      setActiveAuthorID(requestedAuthorID);
+      setError(
+        caught instanceof APIRequestError && caught.status === 404
+          ? 'not_found'
+          : 'error',
+      );
     } finally {
-      if (isCurrentRequest(version, requestedAuthorID)) setLoading(false);
+      if (isCurrentRequest(version, requestedAuthorID)) {
+        setLoading(false);
+      }
     }
-  }, [authorID, isCurrentRequest]);
+  }, [authorID, isCurrentRequest, onSessionExpired, token]);
 
   const loadNext = useCallback(
     async (nextCursor: string, nextCatalog: NoteCatalog) => {
@@ -230,10 +249,13 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
       setLoadingNext(true);
       setNextError(false);
       try {
-        const page = await listAuthorNotes({
-          authorID: requestedAuthorID,
-          cursor: nextCursor,
-        });
+        const page = await listAuthorNotes(
+          {
+            authorID: requestedAuthorID,
+            cursor: nextCursor,
+          },
+          token,
+        );
         if (!isCurrentRequest(version, requestedAuthorID)) return;
         const labelledNotes = labelNotes(nextCatalog, page.notes);
         if (labelledNotes === null) throw new Error('catalog_labels_missing');
@@ -245,8 +267,15 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
           ];
         });
         setCursor(page.nextCursor);
-      } catch {
-        if (isCurrentRequest(version, requestedAuthorID)) setNextError(true);
+      } catch (caught: unknown) {
+        if (!isCurrentRequest(version, requestedAuthorID)) {
+          return;
+        }
+        if (requestStatus(caught) === unauthorizedStatus) {
+          await onSessionExpired();
+          return;
+        }
+        setNextError(true);
       } finally {
         if (isCurrentRequest(version, requestedAuthorID)) {
           pendingCursor.current = undefined;
@@ -254,7 +283,7 @@ export function AuthorProfileContent({ authorID, onPressNote }: Props) {
         }
       }
     },
-    [authorID, isCurrentRequest],
+    [authorID, isCurrentRequest, onSessionExpired, token],
   );
 
   useFocusEffect(

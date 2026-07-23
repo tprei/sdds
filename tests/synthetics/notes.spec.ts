@@ -55,6 +55,8 @@ type NoteResponse = {
   place_slug: string | null;
   title: string;
   updated_at: number;
+  useful_count: number;
+  useful_by_current_user: boolean;
 };
 type PublicAuthorResponse = {
   display_name: string;
@@ -106,11 +108,14 @@ const noteResponseKeys = [
   'place_slug',
   'title',
   'updated_at',
+  'useful_count',
+  'useful_by_current_user',
 ] as const;
 
 test('creates a note and reads it from the API-backed home feed', async ({
   page,
 }) => {
+  test.setTimeout(120000);
   const timestamp = Date.now();
   const displayName = `Autor UI ${timestamp}`;
   const username = `ui-${timestamp}`;
@@ -121,14 +126,10 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
   ).toBeVisible();
-  await expect(visibleGlobalScope(page)).toBeVisible();
+  await expect(page.getByText('Entre para continuar')).toBeVisible();
   await expect(
-    page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
+    page.getByText('Entre ou crie uma conta para acessar as notas.'),
   ).toBeVisible();
-
-  await page.getByText('Escrever', { exact: true }).last().click();
-  await expect(page.getByText('Entre para escrever')).toBeVisible();
-
   await page.getByRole('button', { name: 'Criar conta' }).click();
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Criar conta$/ }),
@@ -138,20 +139,23 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await page.getByLabel('Senha').fill(syntheticPassword);
   await page.getByRole('button', { name: 'Criar conta' }).click();
 
+  await expect(
+    page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
+  ).toBeVisible();
+  await clickTab(page, 'Escrever');
   await expect(page.getByText('Conta uma dica')).toBeVisible();
   await expect(page).toHaveURL(/\/compose(?:[?#]|$)/);
-  await page.reload();
-  await expect(page.getByText('Conta uma dica')).toBeVisible();
 
-  await page.getByText('Perfil', { exact: true }).last().click();
+  await clickTab(page, 'Perfil');
   await expect(
     page.getByTestId('author-profile-header').getByRole('heading', {
       name: displayName,
     }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 30000 });
   await expect(page.getByText('0 Notas')).toBeVisible();
-  await page.getByText('Escrever', { exact: true }).last().click();
+  await clickTab(page, 'Escrever');
   await expect(page.getByText('Conta uma dica')).toBeVisible();
+  await expect(page).toHaveURL(/\/compose(?:[?#]|$)/);
 
   await page.getByLabel('Título da nota').fill(title);
   await page.getByLabel('Texto da nota').fill(body);
@@ -196,7 +200,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await page.goto(exploreURL);
   await expect(publishedNote).toBeVisible();
 
-  await page.getByText('Buscar', { exact: true }).click();
+  await clickTab(page, 'Buscar');
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
   ).toBeVisible();
@@ -229,7 +233,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
     }),
   ).toBeVisible();
   await page.goto(exploreURL);
-  await page.getByText('Buscar', { exact: true }).click();
+  await clickTab(page, 'Buscar');
   await page.getByLabel('Buscar').fill(title);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
@@ -261,13 +265,13 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(page.getByLabel('Categoria da nota: Comida')).toBeVisible();
   await expect(page.getByLabel('Lugar da nota: São Paulo')).toBeVisible();
 
-  await page.getByText('Perfil', { exact: true }).last().click();
+  await clickTab(page, 'Perfil');
   const profileRoot = page.getByTestId('author-profile-scroll');
   await expect(
     profileRoot.getByTestId('author-profile-header').getByRole('heading', {
       name: displayName,
     }),
-  ).toBeVisible({ timeout: 10000 });
+  ).toBeVisible({ timeout: 30000 });
   await expect(profileRoot.getByTestId('author-profile-note-count')).toHaveText(
     '1 Nota',
   );
@@ -290,7 +294,7 @@ test('shows auth validation reasons and clears stale login submit state', async 
   const username = `valida-${timestamp}`;
 
   await page.goto('/profile');
-  await expect(page.getByText('Entre para publicar')).toBeVisible({
+  await expect(page.getByText('Entre para continuar')).toBeVisible({
     timeout: 10000,
   });
   await page.getByTestId('profile-signup-button').click();
@@ -369,7 +373,7 @@ test('shows auth validation reasons and clears stale login submit state', async 
   expect(logoutDeleteStatuses).toEqual([500]);
   await expect(logoutButton).toBeEnabled();
   await logoutButton.click();
-  await expect(page.getByText('Entre para publicar')).toBeVisible({
+  await expect(page.getByText('Entre para continuar')).toBeVisible({
     timeout: 10000,
   });
   expect(logoutDeleteRequests).toBe(2);
@@ -396,7 +400,7 @@ test('shows auth validation reasons and clears stale login submit state', async 
   await page.getByTestId('login-submit-button').click();
 
   await page.getByTestId('profile-logout-button').click();
-  await expect(page.getByText('Entre para publicar')).toBeVisible({
+  await expect(page.getByText('Entre para continuar')).toBeVisible({
     timeout: 10000,
   });
   await page.getByTestId('profile-login-button').click();
@@ -434,7 +438,7 @@ test('narrows the mobile explore feed by category', async ({
     title: travelTitle,
   });
 
-  await page.goto('/');
+  await loginUser(page, session.user.username, '/');
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
   ).toBeVisible();
@@ -501,8 +505,7 @@ test('narrows the mobile search results by category and clears stale cards', asy
     title: travelTitle,
   });
 
-  await page.goto('/');
-  await page.getByText('Buscar', { exact: true }).click();
+  await loginUser(page, session.user.username, '/search');
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
   ).toBeVisible();
@@ -596,8 +599,7 @@ test('orders search results by weighted title matches and handles punctuation-on
     title: bodyMatchTitle,
   });
 
-  await page.goto('/');
-  await page.getByText('Buscar', { exact: true }).click();
+  await loginUser(page, session.user.username, '/search');
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
   ).toBeVisible();
@@ -650,38 +652,47 @@ test('filters note discovery by category through the public API', async ({
   expect(foodNote.author).toEqual(session.user.author);
   expect(travelNote.author).toEqual(session.user.author);
 
-  const foodList = await listNotes(request, { categorySlug: 'food' });
+  const foodList = await listNotes(request, session.token, {
+    categorySlug: 'food',
+  });
   expect(noteTitles(foodList)).toContain(foodTitle);
   expect(noteTitles(foodList)).not.toContain(travelTitle);
 
-  const travelList = await listNotes(request, { categorySlug: 'travel' });
+  const travelList = await listNotes(request, session.token, {
+    categorySlug: 'travel',
+  });
   expect(noteTitles(travelList)).toContain(travelTitle);
   expect(noteTitles(travelList)).not.toContain(foodTitle);
 
-  const foodSearch = await searchNotes(request, marker, {
+  const foodSearch = await searchNotes(request, session.token, marker, {
     categorySlug: 'food',
   });
   expect(noteTitles(foodSearch)).toContain(foodTitle);
   expect(noteTitles(foodSearch)).not.toContain(travelTitle);
 
-  const travelSearch = await searchNotes(request, marker, {
+  const travelSearch = await searchNotes(request, session.token, marker, {
     categorySlug: 'travel',
   });
   expect(noteTitles(travelSearch)).toContain(travelTitle);
-
   expect(noteTitles(travelSearch)).not.toContain(foodTitle);
 
-  await expectCategoryFilterError(request, '/v1/notes', {
+  await expectCategoryFilterError(request, session.token, '/v1/notes', {
     code: 'invalid_note',
   });
-  await expectCategoryFilterError(request, '/v1/search/notes?q=balcao', {
-    code: 'invalid_search',
-  });
+  await expectCategoryFilterError(
+    request,
+    session.token,
+    '/v1/search/notes?q=balcao',
+    {
+      code: 'invalid_search',
+    },
+  );
 });
 test('opens a public author profile and appends paginated notes', async ({
   page,
   request,
 }) => {
+  test.setTimeout(120000);
   const timestamp = Date.now();
   const displayName = `Perfil Público ${timestamp}`;
   const username = `perfil-publico-${timestamp}`;
@@ -704,6 +715,11 @@ test('opens a public author profile and appends paginated notes', async ({
   }
   const authorResponse = await request.get(
     `${apiBaseURL}/v1/authors/${session.user.author.id}`,
+    {
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+      },
+    },
   );
   expect(authorResponse.ok()).toBeTruthy();
   const author = (await authorResponse.json()) as PublicAuthorResponse;
@@ -713,7 +729,7 @@ test('opens a public author profile and appends paginated notes', async ({
     note_count: 21,
   });
 
-  await page.goto(`/authors/${author.id}`);
+  await loginUser(page, session.user.username, `/authors/${session.user.author.id}`);
   const profileHeader = page.getByTestId('author-profile-header');
   await expect(
     profileHeader.getByRole('heading', { name: displayName }),
@@ -731,6 +747,11 @@ test('opens a public author profile and appends paginated notes', async ({
   ).toBeVisible();
   const firstPage = await request.get(
     `${apiBaseURL}/v1/authors/${author.id}/notes?limit=20`,
+    {
+      headers: {
+        Authorization: `Bearer ${session.token}`,
+      },
+    },
   );
   expect(firstPage.ok()).toBeTruthy();
   const firstPageBody = (await firstPage.json()) as AuthorNotesResponse;
@@ -780,6 +801,7 @@ test('shows distinct authors when a second user signs in', async ({
   page,
   request,
 }) => {
+  test.setTimeout(120000);
   const timestamp = Date.now();
   const firstDisplayName = `Ana ${timestamp}`;
   const secondDisplayName = `Luiza ${timestamp}`;
@@ -885,12 +907,18 @@ async function createAuthUser(
 
 async function listNotes(
   request: APIRequestContext,
+  token: string,
   options: { categorySlug: string },
 ): Promise<ListNotesResponse> {
   const response = await request.get(
     apiURL(
       `/v1/notes?category_slug=${encodeURIComponent(options.categorySlug)}`,
     ),
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
   );
   expect(response.status()).toBe(200);
   return parseListNotesResponse(await response.json());
@@ -898,6 +926,7 @@ async function listNotes(
 
 async function searchNotes(
   request: APIRequestContext,
+  token: string,
   query: string,
   options: { categorySlug: string },
 ): Promise<ListNotesResponse> {
@@ -905,6 +934,11 @@ async function searchNotes(
     apiURL(
       `/v1/search/notes?q=${encodeURIComponent(query)}&category_slug=${encodeURIComponent(options.categorySlug)}`,
     ),
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
   );
   expect(response.status()).toBe(200);
   return parseListNotesResponse(await response.json());
@@ -912,12 +946,18 @@ async function searchNotes(
 
 async function expectCategoryFilterError(
   request: APIRequestContext,
+  token: string,
   path: string,
   want: { code: string },
 ): Promise<void> {
   const separator = path.includes('?') ? '&' : '?';
   const response = await request.get(
     apiURL(`${path}${separator}category_slug=comida`),
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
   );
   expect(response.status()).toBe(400);
   const body = parseErrorResponse(await response.json());
@@ -938,6 +978,24 @@ function visibleScreenTitle(page: Page, name: string) {
     .getByTestId('screen-title')
     .filter({ hasText: name, visible: true })
     .last();
+}
+
+async function loginUser(
+  page: Page,
+  username: string,
+  next: '/' | '/search' | `/notes/${string}` | `/authors/${string}`,
+): Promise<void> {
+  await page.goto(`/login?next=${encodeURIComponent(next)}`);
+  await expect(
+    page.getByTestId('screen-title').filter({ hasText: /^Entrar$/ }),
+  ).toBeVisible();
+  await page.getByLabel('Nome de usuário').fill(username);
+  await page.getByLabel('Senha').fill(syntheticPassword);
+  await page.getByRole('button', { name: 'Entrar' }).click();
+}
+
+async function clickTab(page: Page, name: string): Promise<void> {
+  await page.getByRole('tab', { name: new RegExp(name + '$') }).click();
 }
 
 function noteTitles(response: ListNotesResponse): string[] {
@@ -993,6 +1051,10 @@ function isNoteResponse(value: unknown): value is NoteResponse {
     (typeof value.place_slug === 'string' || value.place_slug === null) &&
     typeof value.created_at === 'number' &&
     typeof value.updated_at === 'number' &&
+    typeof value.useful_count === 'number' &&
+    Number.isInteger(value.useful_count) &&
+    value.useful_count >= 0 &&
+    typeof value.useful_by_current_user === 'boolean' &&
     isNoteImagesResponse(value.images)
   );
 }

@@ -62,6 +62,8 @@ function makeNote(): NoteResponse {
     place_slug: null,
     title: 'A note',
     updated_at: 1700000001000,
+    useful_count: 0,
+    useful_by_current_user: false,
   };
 }
 

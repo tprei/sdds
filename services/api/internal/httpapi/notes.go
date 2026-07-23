@@ -15,7 +15,13 @@ const searchNotesLimit = note.SearchDefaultLimit
 const maxCreateNoteRequestBytes int64 = 32 * 1024
 
 func (handler server) ListNotes(w http.ResponseWriter, r *http.Request, params openapi.ListNotesParams) {
+	current, ok := currentSessionFromContext(r.Context())
+	if !ok {
+		writeUnauthenticated(w)
+		return
+	}
 	input := listNotesInput(params)
+	input.ViewerUserID = current.User.ID
 	if problems := note.ValidateListInput(input); len(problems) > 0 {
 		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, problems))
 		return
@@ -38,7 +44,12 @@ func (handler server) ListNotes(w http.ResponseWriter, r *http.Request, params o
 }
 
 func (handler server) GetNote(w http.ResponseWriter, r *http.Request, noteID string) {
-	found, err := handler.notes.store.FindNote(r.Context(), noteID)
+	current, ok := currentSessionFromContext(r.Context())
+	if !ok {
+		writeUnauthenticated(w)
+		return
+	}
+	found, err := handler.notes.store.FindNote(r.Context(), noteID, current.User.ID)
 	if errors.Is(err, note.ErrNoteNotFound) {
 		writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
 		return
@@ -58,7 +69,7 @@ func (handler server) MarkNoteUseful(w http.ResponseWriter, r *http.Request, not
 		return
 	}
 
-	if _, err := handler.notes.store.FindNote(r.Context(), noteID); err != nil {
+	if _, err := handler.notes.store.FindNote(r.Context(), noteID, current.User.ID); err != nil {
 		if errors.Is(err, note.ErrNoteNotFound) {
 			writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
 			return
@@ -82,7 +93,7 @@ func (handler server) UnmarkNoteUseful(w http.ResponseWriter, r *http.Request, n
 		return
 	}
 
-	if _, err := handler.notes.store.FindNote(r.Context(), noteID); err != nil {
+	if _, err := handler.notes.store.FindNote(r.Context(), noteID, current.User.ID); err != nil {
 		if errors.Is(err, note.ErrNoteNotFound) {
 			writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
 			return
@@ -154,7 +165,13 @@ func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {
 }
 
 func (handler server) SearchNotes(w http.ResponseWriter, r *http.Request, params openapi.SearchNotesParams) {
+	current, ok := currentSessionFromContext(r.Context())
+	if !ok {
+		writeUnauthenticated(w)
+		return
+	}
 	input := searchNoteInput(params)
+	input.ViewerUserID = current.User.ID
 	if problems := note.ValidateSearchInput(input); len(problems) > 0 {
 		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidSearch, problems))
 		return
@@ -288,8 +305,10 @@ func newNoteResponse(found note.Note) openapi.Note {
 			Id:          string(found.Author.ID),
 			DisplayName: found.Author.DisplayName,
 		},
-		Images:    images,
-		CreatedAt: found.CreatedAt.UTC().UnixMilli(),
-		UpdatedAt: found.UpdatedAt.UTC().UnixMilli(),
+		Images:              images,
+		UsefulCount:         found.UsefulCount,
+		UsefulByCurrentUser: found.UsefulByCurrentUser,
+		CreatedAt:           found.CreatedAt.UTC().UnixMilli(),
+		UpdatedAt:           found.UpdatedAt.UTC().UnixMilli(),
 	}
 }

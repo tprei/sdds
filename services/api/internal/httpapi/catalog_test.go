@@ -58,11 +58,11 @@ func TestListPlacesReturnsCatalogRows(t *testing.T) {
 }
 
 func TestListCategoriesReturnsInternalError(t *testing.T) {
-	router := newRouterForTest(fakeNoteStore{}, fakeCatalog{
+	router := withCurrentSessionHeader(newRouterForTest(fakeNoteStore{}, fakeCatalog{
 		listCategories: func(context.Context) ([]note.Category, error) {
 			return nil, errors.New("catalog unavailable")
 		},
-	}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
+	}, authenticatedFakeUserStore(fakeUserStore{}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/categories", nil)
 
@@ -75,11 +75,11 @@ func TestListCategoriesReturnsInternalError(t *testing.T) {
 }
 
 func TestListPlacesReturnsInternalError(t *testing.T) {
-	router := newRouterForTest(fakeNoteStore{}, fakeCatalog{
+	router := withCurrentSessionHeader(newRouterForTest(fakeNoteStore{}, fakeCatalog{
 		listPlaces: func(context.Context) ([]note.Place, error) {
 			return nil, errors.New("catalog unavailable")
 		},
-	}, fakeUserStore{}, DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
+	}, authenticatedFakeUserStore(fakeUserStore{}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/places", nil)
 

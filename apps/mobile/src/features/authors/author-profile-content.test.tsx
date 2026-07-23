@@ -64,13 +64,20 @@ vi.mock('expo-router', async () => {
   };
 });
 
+const exampleToken = 'session-token';
+const onSessionExpired = vi.fn(async () => undefined);
+
 const mocks = vi.hoisted(() => ({
-  getPublicAuthor: vi.fn<(authorID: string) => Promise<PublicAuthor>>(),
+  getPublicAuthor:
+    vi.fn<(authorID: string, token: string) => Promise<PublicAuthor>>(),
   listAuthorNotes:
     vi.fn<
-      (input: { authorID: string; cursor?: string }) => Promise<AuthorNotesPage>
+      (
+        input: { authorID: string; cursor?: string },
+        token: string,
+      ) => Promise<AuthorNotesPage>
     >(),
-  listCatalogs: vi.fn<() => Promise<Catalogs>>(),
+  listCatalogs: vi.fn<(token: string) => Promise<Catalogs>>(),
 }));
 
 vi.mock('../../lib/api/authors', () => ({
@@ -120,6 +127,8 @@ describe('AuthorProfileContent', () => {
         <AuthorProfileContent
           authorID="author-id"
           onPressNote={() => undefined}
+          onSessionExpired={onSessionExpired}
+          token={exampleToken}
         />,
       );
       await flushPromises();
@@ -134,10 +143,13 @@ describe('AuthorProfileContent', () => {
     });
 
     expect(mocks.listAuthorNotes).toHaveBeenCalledTimes(2);
-    expect(mocks.listAuthorNotes).toHaveBeenLastCalledWith({
-      authorID: 'author-id',
-      cursor: 'cursor-1',
-    });
+    expect(mocks.listAuthorNotes).toHaveBeenLastCalledWith(
+      {
+        authorID: 'author-id',
+        cursor: 'cursor-1',
+      },
+      exampleToken,
+    );
     expect(
       renderer!.root.findAllByProps({ accessibilityRole: 'alert' }),
     ).not.toHaveLength(0);
@@ -158,10 +170,13 @@ describe('AuthorProfileContent', () => {
     });
 
     expect(mocks.listAuthorNotes).toHaveBeenCalledTimes(3);
-    expect(mocks.listAuthorNotes).toHaveBeenLastCalledWith({
-      authorID: 'author-id',
-      cursor: 'cursor-1',
-    });
+    expect(mocks.listAuthorNotes).toHaveBeenLastCalledWith(
+      {
+        authorID: 'author-id',
+        cursor: 'cursor-1',
+      },
+      exampleToken,
+    );
     expect(
       renderer!.root.findAllByProps({ accessibilityRole: 'alert' }),
     ).toHaveLength(0);
@@ -195,8 +210,13 @@ describe('AuthorProfileContent', () => {
         <AuthorProfileContent
           authorID="author-id"
           onPressNote={() => undefined}
+          onSessionExpired={onSessionExpired}
+          token={exampleToken}
         />,
       );
+      await flushPromises();
+    });
+    await act(async () => {
       await flushPromises();
     });
     expect(textNodes(renderer!, 'Marina Alves')).not.toHaveLength(0);
@@ -207,6 +227,8 @@ describe('AuthorProfileContent', () => {
         <AuthorProfileContent
           authorID="next-author"
           onPressNote={() => undefined}
+          onSessionExpired={onSessionExpired}
+          token={exampleToken}
         />,
       );
       await flushPromises();
@@ -255,8 +277,13 @@ describe('AuthorProfileContent', () => {
         <AuthorProfileContent
           authorID="author-id"
           onPressNote={() => undefined}
+          onSessionExpired={onSessionExpired}
+          token={exampleToken}
         />,
       );
+      await flushPromises();
+    });
+    await act(async () => {
       await flushPromises();
     });
 
@@ -265,6 +292,8 @@ describe('AuthorProfileContent', () => {
         <AuthorProfileContent
           authorID="next-author"
           onPressNote={() => undefined}
+          onSessionExpired={onSessionExpired}
+          token={exampleToken}
         />,
       );
       await flushPromises();

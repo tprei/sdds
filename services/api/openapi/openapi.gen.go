@@ -338,6 +338,12 @@ type Note struct {
 
 	// UpdatedAt Unix timestamp in milliseconds.
 	UpdatedAt int64 `json:"updated_at"`
+
+	// UsefulByCurrentUser Whether the current authenticated user marked this note useful.
+	UsefulByCurrentUser bool `json:"useful_by_current_user"`
+
+	// UsefulCount Number of users who marked this note useful.
+	UsefulCount int64 `json:"useful_count"`
 }
 
 // NoteImage defines model for NoteImage.
@@ -1787,6 +1793,7 @@ type GetAuthorHTTPResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *PublicAuthor
 	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
 	JSON404      *ErrorResponse
 	JSON500      *ErrorResponse
 }
@@ -1820,6 +1827,7 @@ type ListAuthorNotesHTTPResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *AuthorNotesPage
 	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
 	JSON404      *ErrorResponse
 	JSON500      *ErrorResponse
 }
@@ -1853,6 +1861,7 @@ type ListCategoriesHTTPResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *ListCategoriesResponse
 	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
 	JSON500      *ErrorResponse
 }
 
@@ -1956,6 +1965,7 @@ type ListNotesHTTPResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *ListNotesResponse
 	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
 	JSON500      *ErrorResponse
 }
 
@@ -2024,6 +2034,7 @@ type GetNoteHTTPResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *Note
 	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
 	JSON404      *ErrorResponse
 	JSON500      *ErrorResponse
 }
@@ -2055,7 +2066,6 @@ func (r GetNoteHTTPResponse) ContentType() string {
 type UnmarkNoteUsefulHTTPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON400      *ErrorResponse
 	JSON401      *ErrorResponse
 	JSON404      *ErrorResponse
 	JSON500      *ErrorResponse
@@ -2088,7 +2098,6 @@ func (r UnmarkNoteUsefulHTTPResponse) ContentType() string {
 type MarkNoteUsefulHTTPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON400      *ErrorResponse
 	JSON401      *ErrorResponse
 	JSON404      *ErrorResponse
 	JSON500      *ErrorResponse
@@ -2123,6 +2132,7 @@ type ListPlacesHTTPResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *ListPlacesResponse
 	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
 	JSON500      *ErrorResponse
 }
 
@@ -2155,6 +2165,7 @@ type SearchNotesHTTPResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *ListNotesResponse
 	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
 	JSON500      *ErrorResponse
 }
 
@@ -2657,6 +2668,13 @@ func ParseGetAuthorHTTPResponse(rsp *http.Response) (*GetAuthorHTTPResponse, err
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2704,6 +2722,13 @@ func ParseListAuthorNotesHTTPResponse(rsp *http.Response) (*ListAuthorNotesHTTPR
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2750,6 +2775,13 @@ func ParseListCategoriesHTTPResponse(rsp *http.Response) (*ListCategoriesHTTPRes
 			return nil, err
 		}
 		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse
@@ -2920,6 +2952,13 @@ func ParseListNotesHTTPResponse(rsp *http.Response) (*ListNotesHTTPResponse, err
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -3028,6 +3067,13 @@ func ParseGetNoteHTTPResponse(rsp *http.Response) (*GetNoteHTTPResponse, error) 
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -3061,13 +3107,6 @@ func ParseUnmarkNoteUsefulHTTPResponse(rsp *http.Response) (*UnmarkNoteUsefulHTT
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -3108,13 +3147,6 @@ func ParseMarkNoteUsefulHTTPResponse(rsp *http.Response) (*MarkNoteUsefulHTTPRes
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -3169,6 +3201,13 @@ func ParseListPlacesHTTPResponse(rsp *http.Response) (*ListPlacesHTTPResponse, e
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -3208,6 +3247,13 @@ func ParseSearchNotesHTTPResponse(rsp *http.Response) (*SearchNotesHTTPResponse,
 			return nil, err
 		}
 		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse

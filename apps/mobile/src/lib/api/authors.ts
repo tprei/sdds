@@ -23,15 +23,15 @@ export type ListAuthorNotesInput = {
   cursor?: string;
 };
 
-function apiClient() {
+function apiClient(token: string) {
   return createClient<paths>({
     baseUrl: apiBaseURL(),
-    fetch: apiFetch,
+    fetch: (request) => apiFetch(request, token),
   });
 }
 
-async function apiFetch(request: Request): Promise<Response> {
-  const response = await fetch(request);
+async function apiFetch(request: Request, token: string): Promise<Response> {
+  const response = await fetch(authenticatedRequest(request, token));
   if (response.ok) {
     return response;
   }
@@ -46,8 +46,17 @@ async function apiFetch(request: Request): Promise<Response> {
   });
 }
 
-export async function getPublicAuthor(authorID: string): Promise<PublicAuthor> {
-  const { data, response } = await apiClient().GET('/v1/authors/{author_id}', {
+function authenticatedRequest(request: Request, token: string): Request {
+  const headers = new Headers(request.headers);
+  headers.set('Authorization', `Bearer ${token}`);
+  return new Request(request, { headers });
+}
+
+export async function getPublicAuthor(
+  authorID: string,
+  token: string,
+): Promise<PublicAuthor> {
+  const { data, response } = await apiClient(token).GET('/v1/authors/{author_id}', {
     params: { path: { author_id: authorID } },
   });
   if (!response.ok) {
@@ -66,8 +75,9 @@ export async function getPublicAuthor(authorID: string): Promise<PublicAuthor> {
 
 export async function listAuthorNotes(
   input: ListAuthorNotesInput,
+  token: string,
 ): Promise<AuthorNotesPage> {
-  const { data, response } = await apiClient().GET(
+  const { data, response } = await apiClient(token).GET(
     '/v1/authors/{author_id}/notes',
     {
       params: {

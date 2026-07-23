@@ -9,6 +9,9 @@ import {
   FoundationTextInput,
 } from '@/components/foundation-screen';
 import { NoteCard } from '@/components/note-card';
+import { useAuth } from '@/lib/auth/auth-provider';
+import { requestStatus } from '@/lib/api/request-error';
+import { unauthorizedStatus } from '@/lib/api/status';
 import { CategoryFilterControls } from '@/features/notes/category-filter-controls';
 import { resolveCategoryFilterSlug } from '@/features/notes/category-filter';
 import { buildNoteCatalog, labelNotes } from '@/features/notes/catalog';
@@ -53,7 +56,48 @@ type SearchScreenState =
 
 const idleSearchState: SearchScreenState = { status: 'idle' };
 
+type AuthenticatedSearchScreenProps = {
+  onSessionExpired: () => Promise<void>;
+  token: string;
+};
+
 export default function SearchScreen() {
+  const { logout, state } = useAuth();
+  const router = useRouter();
+
+  if (state.status === 'authenticated') {
+    return (
+      <AuthenticatedSearchScreen
+        key={state.user.id}
+        onSessionExpired={logout}
+        token={state.token}
+      />
+    );
+  }
+
+  return (
+    <FoundationScreen
+      eyebrow="Buscar"
+      title="Buscar"
+      description="Ache notas, produtos, lugares e dicas."
+    >
+      <ReadAuthGate
+        onLogin={() =>
+          router.push({ pathname: '/login', params: { next: '/search' } })
+        }
+        onSignup={() =>
+          router.push({ pathname: '/signup', params: { next: '/search' } })
+        }
+        status={state.status}
+      />
+    </FoundationScreen>
+  );
+}
+
+function AuthenticatedSearchScreen({
+  onSessionExpired,
+  token,
+}: AuthenticatedSearchScreenProps) {
   const router = useRouter();
   const catalogRequestIDRef = useRef(0);
   const searchRequestIDRef = useRef(0);
@@ -70,9 +114,12 @@ export default function SearchScreen() {
     status: 'loading',
   });
   const [state, setState] = useState<SearchScreenState>(idleSearchState);
-  const openAuthor = useCallback((authorID: string) => {
-    router.push({ pathname: '/authors/[id]', params: { id: authorID } });
-  }, [router]);
+  const openAuthor = useCallback(
+    (authorID: string) => {
+      router.push({ pathname: '/authors/[id]', params: { id: authorID } });
+    },
+    [router],
+  );
   const openNote = useCallback(
     (note: Note) => {
       router.push({
@@ -115,7 +162,7 @@ export default function SearchScreen() {
       );
       setSearchState({ request, status: 'loading' });
 
-      searchNotes(request.input)
+      searchNotes(request.input, token)
         .then((notes) => {
           if (
             !isCurrentSearchRequest({
@@ -144,7 +191,7 @@ export default function SearchScreen() {
               : { context, request, status: 'empty' },
           );
         })
-        .catch(() => {
+        .catch(async (error: unknown) => {
           if (
             !isCurrentSearchRequest({
               activeRequestID: searchRequestIDRef.current,
@@ -153,10 +200,16 @@ export default function SearchScreen() {
           ) {
             return;
           }
+          if (requestStatus(error) === unauthorizedStatus) {
+            try {
+              await onSessionExpired();
+            } catch {}
+            return;
+          }
           setSearchState({ request, status: 'error' });
         });
     },
-    [setSearchState],
+    [onSessionExpired, setSearchState, token],
   );
 
   const loadCatalogs = useCallback(() => {
@@ -164,7 +217,7 @@ export default function SearchScreen() {
     const requestID = catalogRequestIDRef.current;
     setCatalogState({ status: 'loading' });
 
-    listCatalogs()
+    listCatalogs(token)
       .then((catalogs) => {
         if (
           !isCurrentSearchRequest({
@@ -195,7 +248,7 @@ export default function SearchScreen() {
           runSearch(submittedQueryRef.current, resolvedCategorySlug);
         }
       })
-      .catch(() => {
+      .catch(async (error: unknown) => {
         if (
           !isCurrentSearchRequest({
             activeRequestID: catalogRequestIDRef.current,
@@ -204,10 +257,16 @@ export default function SearchScreen() {
         ) {
           return;
         }
+        if (requestStatus(error) === unauthorizedStatus) {
+          try {
+            await onSessionExpired();
+          } catch {}
+          return;
+        }
         catalogRef.current = null;
         setCatalogState({ status: 'error' });
       });
-  }, [runSearch]);
+  }, [onSessionExpired, runSearch, token]);
 
   useFocusEffect(
     useCallback(() => {
@@ -310,6 +369,48 @@ export default function SearchScreen() {
         />
       )}
     </FoundationScreen>
+  );
+}
+
+function ReadAuthGate({
+  onLogin,
+  onSignup,
+  status,
+}: {
+  onLogin: () => void;
+  onSignup: () => void;
+  status: 'anonymous' | 'error' | 'loading';
+}) {
+  if (status === 'loading') {
+    return (
+      <EmptyStateCard
+        title="Conferindo sua sessão"
+        body="A gente já libera o formulário se você estiver com uma conta ativa."
+      />
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <>
+        <EmptyStateCard
+          title="Não deu pra confirmar sua sessão"
+          body="Verifique sua conexão e entre de novo para publicar."
+        />
+        <FoundationButton label="Entrar" onPress={onLogin} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <EmptyStateCard
+        title="Entre para continuar"
+        body="Entre ou crie uma conta para acessar as notas."
+      />
+      <FoundationButton label="Criar conta" onPress={onSignup} />
+      <FoundationButton label="Entrar" onPress={onLogin} />
+    </>
   );
 }
 

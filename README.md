@@ -96,8 +96,8 @@ The current product endpoints are:
 - `POST /v1/auth/users`, `POST /v1/auth/sessions`, and `GET`/`DELETE /v1/auth/session` own account/session operations.
 - `GET /v1/authors/{author_id}` and `GET /v1/authors/{author_id}/notes` return a public author and that author’s paginated notes.
 - `GET /v1/notes` returns a bounded list of up to 50 recent/category-filtered notes; `GET /v1/notes/{note_id}` returns one note; `GET /v1/search/notes` searches notes.
-- `POST /v1/media/image-uploads` requires authentication and stages exactly one private JPEG or PNG with a stable `upload_request_id`; its receipt is not public media.
 - `POST /v1/notes` requires authentication, `title`, `body`, `category_slug`, and stable `client_request_id`; it accepts optional `place_slug` and zero or one ordered `image_upload_ids`, and atomically publishes the selected staged image with the note.
+- `POST /v1/media/image-uploads` requires authentication and stages exactly one private JPEG or PNG with a stable `upload_request_id`; its receipt is not public media.
 - `GET /v1/media/images/{image_id}` publicly streams bytes only for an attached image through the stable API URL; it never redirects to or exposes RustFS.
 
 ### Data

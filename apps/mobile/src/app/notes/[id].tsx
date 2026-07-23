@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
@@ -10,7 +10,12 @@ import { NoteDetailContent } from '@/features/notes/note-detail-content';
 import { buildNoteCatalog, labelNote } from '@/features/notes/catalog';
 import type { LabelledNote } from '@/features/notes/catalog';
 import { listCatalogs } from '@/lib/api/catalogs';
-import { APIRequestError, getNote } from '@/lib/api/notes';
+import {
+  APIRequestError,
+  getNote,
+  markNoteUseful,
+  unmarkNoteUseful,
+} from '@/lib/api/notes';
 import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
 import { useAuth } from '@/lib/auth/auth-provider';
@@ -26,6 +31,8 @@ type AuthenticatedNoteDetailScreenProps = {
   onSessionExpired: () => Promise<void>;
   token: string;
 };
+
+type UsefulMutationState = 'idle' | 'pending' | 'error';
 
 const notFoundStatus = 404;
 
@@ -69,7 +76,6 @@ export default function NoteDetailScreen() {
       title="Nota"
     >
       <ReadAuthGate
-        noteID={noteID}
         onLogin={() =>
           router.push({ pathname: '/login', params: { next: `/notes/${noteID}` } })
         }
@@ -92,16 +98,20 @@ function AuthenticatedNoteDetailScreen({
   token,
 }: AuthenticatedNoteDetailScreenProps) {
   const router = useRouter();
+  const detailGenerationRef = useRef(0);
+  const [mutationState, setMutationState] = useState<UsefulMutationState>('idle');
   const [state, setState] = useState<NoteDetailState>({ status: 'loading' });
 
   useFocusEffect(
     useCallback(() => {
+      const generation = ++detailGenerationRef.current;
       let isActive = true;
+      setMutationState('idle');
       setState({ status: 'loading' });
 
       Promise.all([listCatalogs(token), getNote(noteID, token)])
         .then(([catalogs, note]) => {
-          if (!isActive) {
+          if (!isActive || detailGenerationRef.current !== generation) {
             return;
           }
           const catalog = buildNoteCatalog(catalogs);
@@ -113,10 +123,11 @@ function AuthenticatedNoteDetailScreen({
           );
         })
         .catch(async (error: unknown) => {
-          if (!isActive) {
+          if (!isActive || detailGenerationRef.current !== generation) {
             return;
           }
           if (requestStatus(error) === unauthorizedStatus) {
+            detailGenerationRef.current += 1;
             try {
               await onSessionExpired();
             } catch {}
@@ -131,9 +142,92 @@ function AuthenticatedNoteDetailScreen({
 
       return () => {
         isActive = false;
+        detailGenerationRef.current += 1;
       };
     }, [noteID, onSessionExpired, token]),
   );
+
+  const handleToggleUseful = useCallback(async () => {
+    if (state.status !== 'ready' || mutationState === 'pending') {
+      return;
+    }
+
+    const generation = detailGenerationRef.current;
+    const note = state.note;
+    setMutationState('pending');
+
+    try {
+      if (note.usefulByCurrentUser) {
+        await unmarkNoteUseful(note.id, token);
+      } else {
+        await markNoteUseful(note.id, token);
+      }
+      if (detailGenerationRef.current !== generation) {
+        return;
+      }
+      setState({
+        status: 'ready',
+        note: {
+          ...note,
+          usefulByCurrentUser: !note.usefulByCurrentUser,
+          usefulCount: note.usefulByCurrentUser
+            ? note.usefulCount - 1
+            : note.usefulCount + 1,
+        },
+      });
+      setMutationState('idle');
+    } catch (error: unknown) {
+      if (detailGenerationRef.current !== generation) {
+        return;
+      }
+      if (requestStatus(error) === unauthorizedStatus) {
+        detailGenerationRef.current += 1;
+        try {
+          await onSessionExpired();
+        } catch {}
+        return;
+      }
+      setMutationState('error');
+    }
+  }, [mutationState, onSessionExpired, state, token]);
+
+  let content: React.ReactNode;
+  if (state.status === 'loading') {
+    content = (
+      <EmptyStateCard
+        title="Carregando a nota"
+        body="Buscando essa nota completa."
+      />
+    );
+  } else if (state.status === 'notFound') {
+    content = (
+      <EmptyStateCard
+        title="Nota não encontrada"
+        body="Essa nota não existe mais ou o link tá incompleto."
+      />
+    );
+  } else if (state.status === 'error') {
+    content = (
+      <EmptyStateCard
+        title="Não deu pra abrir"
+        body="Confira sua conexão e tente novamente em instantes."
+      />
+    );
+  } else {
+    content = (
+      <NoteDetailContent
+        note={state.note}
+        onPressAuthor={(authorID) =>
+          router.push({ pathname: '/authors/[id]', params: { id: authorID } })
+        }
+        onPressUseful={() => {
+          void handleToggleUseful();
+        }}
+        usefulError={mutationState === 'error'}
+        usefulPending={mutationState === 'pending'}
+      />
+    );
+  }
 
   return (
     <FoundationScreen
@@ -141,21 +235,17 @@ function AuthenticatedNoteDetailScreen({
       eyebrow="Nota"
       title="Nota"
     >
-      {renderNoteDetailState(state, (authorID) =>
-        router.push({ pathname: '/authors/[id]', params: { id: authorID } }),
-      )}
+      {content}
       <FoundationButton label="Voltar" onPress={() => router.back()} />
     </FoundationScreen>
   );
 }
 
 function ReadAuthGate({
-  noteID,
   onLogin,
   onSignup,
   status,
 }: {
-  noteID: string;
   onLogin: () => void;
   onSignup: () => void;
   status: 'anonymous' | 'error' | 'loading';
@@ -181,7 +271,6 @@ function ReadAuthGate({
     );
   }
 
-  void noteID;
   return (
     <>
       <EmptyStateCard
@@ -192,38 +281,4 @@ function ReadAuthGate({
       <FoundationButton label="Entrar" onPress={onLogin} />
     </>
   );
-}
-
-function renderNoteDetailState(
-  state: NoteDetailState,
-  onPressAuthor: (authorID: string) => void,
-) {
-  if (state.status === 'loading') {
-    return (
-      <EmptyStateCard
-        title="Carregando a nota"
-        body="Buscando essa nota completa."
-      />
-    );
-  }
-
-  if (state.status === 'notFound') {
-    return (
-      <EmptyStateCard
-        title="Nota não encontrada"
-        body="Essa nota não existe mais ou o link tá incompleto."
-      />
-    );
-  }
-
-  if (state.status === 'error') {
-    return (
-      <EmptyStateCard
-        title="Não deu pra abrir"
-        body="Confira sua conexão e tente novamente em instantes."
-      />
-    );
-  }
-
-  return <NoteDetailContent note={state.note} onPressAuthor={onPressAuthor} />;
 }

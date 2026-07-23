@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { radius, semanticColors, spacing, typography } from '@sdds/tokens';
+import { colors, radius, semanticColors, spacing, typography } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   author: {
@@ -71,5 +71,13 @@ export const styles = StyleSheet.create({
     fontSize: typography.sizeH2,
     fontWeight: typography.weightExtraBold,
     lineHeight: 31,
+  },
+  usefulError: {
+    color: colors.danger500,
+    fontSize: typography.sizeSmall,
+    fontWeight: typography.weightSemibold,
+  },
+  usefulSection: {
+    gap: spacing.sp3,
   },
 });

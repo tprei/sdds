@@ -24,7 +24,7 @@ vi.mock('react-native', () => {
   function NativePressable({ children, ...props }: NativeProps) {
     const content =
       typeof children === 'function' ? children({ pressed: false }) : children;
-    return createElement('div', props, content);
+    return createElement('button', props, content);
   }
 
   return {
@@ -88,7 +88,11 @@ describe('NoteDetailContent media', () => {
   it('keeps note text visible when there are no images', () => {
     const currentNote = note([]);
     const renderer = render(
-      <NoteDetailContent note={currentNote} onPressAuthor={() => undefined} />,
+      <NoteDetailContent
+        note={currentNote}
+        onPressAuthor={() => undefined}
+        onPressUseful={() => undefined}
+      />,
     );
 
     expect(renderer.root.findAllByType('img')).toHaveLength(0);
@@ -100,7 +104,11 @@ describe('NoteDetailContent media', () => {
   it('renders the first image from a seeded note', () => {
     const currentNote = note([firstImage, secondImage]);
     const renderer = render(
-      <NoteDetailContent note={currentNote} onPressAuthor={() => undefined} />,
+      <NoteDetailContent
+        note={currentNote}
+        onPressAuthor={() => undefined}
+        onPressUseful={() => undefined}
+      />,
     );
 
     const nativeImages = renderer.root.findAllByType('img');
@@ -116,7 +124,11 @@ describe('NoteDetailContent media', () => {
   it('keeps note text visible after an image load error', async () => {
     const currentNote = note([firstImage]);
     const renderer = render(
-      <NoteDetailContent note={currentNote} onPressAuthor={() => undefined} />,
+      <NoteDetailContent
+        note={currentNote}
+        onPressAuthor={() => undefined}
+        onPressUseful={() => undefined}
+      />,
     );
     const nativeImage = renderer.root.findByType('img');
 
@@ -131,5 +143,34 @@ describe('NoteDetailContent media', () => {
     expect(
       renderer.root.findAllByProps({ children: currentNote.body }),
     ).not.toHaveLength(0);
+  });
+
+  it('renders the shared useful action and inline error', () => {
+    const currentNote = {
+      ...note([]),
+      usefulCount: 3,
+      usefulByCurrentUser: true,
+    };
+    const renderer = render(
+      <NoteDetailContent
+        note={currentNote}
+        onPressAuthor={() => undefined}
+        onPressUseful={() => undefined}
+        usefulError
+        usefulPending={false}
+      />,
+    );
+
+    const buttons = renderer.root.findAll(
+      (node) =>
+        node.props.accessibilityRole === 'button' &&
+        node.props.accessibilityState?.selected === true,
+    );
+    expect(buttons.length).toBeGreaterThanOrEqual(1);
+    expect(
+      renderer.root.findByProps({
+        children: 'Não deu pra atualizar o Útil. Tenta de novo.',
+      }),
+    ).toBeDefined();
   });
 });

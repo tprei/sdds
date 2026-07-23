@@ -14,7 +14,7 @@ const rootStyle = { flex: 1 };
 export default function AuthorProfileScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
-  const { logout, state } = useAuth();
+  const { apiClient, logout, state } = useAuth();
   const authorID = typeof id === 'string' ? id.trim() : '';
 
   if (authorID.length === 0) {
@@ -37,7 +37,7 @@ export default function AuthorProfileScreen() {
           authorID={authorID}
           onPressNote={openNote}
           onSessionExpired={logout}
-          token={state.token}
+          apiClient={apiClient}
         />
       </View>
     );

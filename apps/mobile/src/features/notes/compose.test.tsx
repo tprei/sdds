@@ -35,16 +35,18 @@ const mocks = vi.hoisted(() => {
   return {
     APIRequestError: MockAPIRequestError,
     ImageUploadRequestError: MockImageUploadRequestError,
+    apiClient: {
+      createNote: vi.fn(),
+      listCatalogs: vi.fn(),
+      prepareImageUpload: vi.fn(),
+    },
     authState: {
       status: 'authenticated' as 'authenticated' | 'anonymous',
       token: 'token',
       user: { id: 'owner-1' },
     },
-    createNote: vi.fn(),
     launchImageLibraryAsync: vi.fn(),
-    listCatalogs: vi.fn(),
     logout: vi.fn(),
-    prepareImageUpload: vi.fn(),
     router: { navigate: vi.fn(), push: vi.fn() },
   };
 });
@@ -82,17 +84,8 @@ vi.mock('expo-router', () => ({
     React.useEffect(effect, [effect]),
   useRouter: () => mocks.router,
 }));
-vi.mock('@/lib/api/catalogs', () => ({ listCatalogs: mocks.listCatalogs }));
-vi.mock('@/lib/api/image-uploads', () => ({
-  ImageUploadRequestError: mocks.ImageUploadRequestError,
-  prepareImageUpload: mocks.prepareImageUpload,
-}));
-vi.mock('@/lib/api/notes', () => ({
-  APIRequestError: mocks.APIRequestError,
-  createNote: mocks.createNote,
-}));
 vi.mock('@/lib/auth/auth-provider', () => ({
-  useAuth: () => ({ logout: mocks.logout, state: mocks.authState }),
+  useAuth: () => ({ apiClient: mocks.apiClient, logout: mocks.logout, state: mocks.authState }),
 }));
 
 type NativeProps = {
@@ -177,13 +170,13 @@ beforeEach(() => {
   mocks.authState.status = 'authenticated';
   mocks.authState.token = 'token';
   mocks.authState.user = { id: 'owner-1' };
-  mocks.listCatalogs.mockResolvedValue(catalogs);
+  mocks.apiClient.listCatalogs.mockResolvedValue(catalogs);
   mocks.launchImageLibraryAsync.mockResolvedValue({
     canceled: true,
     assets: null,
   });
-  mocks.prepareImageUpload.mockResolvedValue(receipt);
-  mocks.createNote.mockResolvedValue(undefined);
+  mocks.apiClient.prepareImageUpload.mockResolvedValue(receipt);
+  mocks.apiClient.createNote.mockResolvedValue(undefined);
   mocks.logout.mockResolvedValue(undefined);
 });
 
@@ -325,11 +318,11 @@ describe('ComposeScreen', () => {
 
   it('uploads before create and reuses unchanged IDs and receipts on retry', async () => {
     const events: string[] = [];
-    mocks.prepareImageUpload.mockImplementation(async () => {
+    mocks.apiClient.prepareImageUpload.mockImplementation(async () => {
       events.push('upload');
       return receipt;
     });
-    mocks.createNote
+    mocks.apiClient.createNote
       .mockImplementationOnce(async () => {
         events.push('create');
         throw new Error('server');
@@ -352,9 +345,9 @@ describe('ComposeScreen', () => {
 
     await press(renderer, 'compose-submit');
     expect(events).toEqual(['upload', 'create', 'create']);
-    const firstUpload = mocks.prepareImageUpload.mock.calls[0]?.[2];
+    const firstUpload = mocks.apiClient.prepareImageUpload.mock.calls[0]?.[1];
     expect(firstUpload?.uploadRequestId).toBe(selected?.image?.uploadRequestId);
-    expect(mocks.createNote.mock.calls[0]?.[0]).toMatchObject({
+    expect(mocks.apiClient.createNote.mock.calls[0]?.[0]).toMatchObject({
       clientRequestId: selected?.clientRequestId,
       imageUploadIds: [receipt.imageUploadId],
     });
@@ -365,17 +358,16 @@ describe('ComposeScreen', () => {
 
   it('replaces a failed upload with the current asset and upload identity', async () => {
     const uploadRequestIDs: string[] = [];
-    mocks.prepareImageUpload.mockImplementation(
+    mocks.apiClient.prepareImageUpload.mockImplementation(
       async (
         _asset: ImageUploadAsset,
-        _token: string,
         options: { uploadRequestId: string },
       ) => {
         uploadRequestIDs.push(options.uploadRequestId);
         return { ...receipt, imageUploadId: options.uploadRequestId };
       },
     );
-    mocks.createNote
+    mocks.apiClient.createNote
       .mockRejectedValueOnce(new Error('server'))
       .mockResolvedValueOnce(undefined);
     const store = createComposeDraftStore(
@@ -403,11 +395,11 @@ describe('ComposeScreen', () => {
     await press(renderer, 'compose-submit');
 
     expect(uploadRequestIDs).toEqual(['upload-a', 'upload-b']);
-    expect(mocks.createNote.mock.calls[0]?.[0]).toMatchObject({
+    expect(mocks.apiClient.createNote.mock.calls[0]?.[0]).toMatchObject({
       clientRequestId: 'request-a',
       imageUploadIds: ['upload-a'],
     });
-    expect(mocks.createNote.mock.calls[1]?.[0]).toMatchObject({
+    expect(mocks.apiClient.createNote.mock.calls[1]?.[0]).toMatchObject({
       clientRequestId: 'request-b',
       imageUploadIds: ['upload-b'],
     });
@@ -438,10 +430,10 @@ describe('ComposeScreen', () => {
 
     await press(renderer, 'compose-submit');
 
-    const prepared = mocks.prepareImageUpload.mock.calls[0]?.[2];
+    const prepared = mocks.apiClient.prepareImageUpload.mock.calls[0]?.[1];
     expect(prepared?.uploadRequestId).toBe('upload-refreshed');
-    expect(mocks.createNote).toHaveBeenCalledOnce();
-    expect(mocks.createNote.mock.calls[0]?.[0]).toMatchObject({
+    expect(mocks.apiClient.createNote).toHaveBeenCalledOnce();
+    expect(mocks.apiClient.createNote.mock.calls[0]?.[0]).toMatchObject({
       clientRequestId: 'request-refreshed',
       imageUploadIds: [receipt.imageUploadId],
     });
@@ -449,7 +441,7 @@ describe('ComposeScreen', () => {
     renderer.unmount();
   });
   it('rotates IDs after upload expiry and retries the preserved asset', async () => {
-    mocks.prepareImageUpload
+    mocks.apiClient.prepareImageUpload
       .mockRejectedValueOnce(
         new mocks.ImageUploadRequestError(409, 'upload_expired'),
       )
@@ -486,11 +478,11 @@ describe('ComposeScreen', () => {
 
     await press(renderer, 'compose-submit');
 
-    expect(mocks.prepareImageUpload.mock.calls[1]?.[2].uploadRequestId).toBe(
+    expect(mocks.apiClient.prepareImageUpload.mock.calls[1]?.[1].uploadRequestId).toBe(
       refreshed?.image?.uploadRequestId,
     );
-    expect(mocks.createNote).toHaveBeenCalledOnce();
-    expect(mocks.createNote.mock.calls[0]?.[0]).toMatchObject({
+    expect(mocks.apiClient.createNote).toHaveBeenCalledOnce();
+    expect(mocks.apiClient.createNote.mock.calls[0]?.[0]).toMatchObject({
       clientRequestId: refreshed?.clientRequestId,
       imageUploadIds: [receipt.imageUploadId],
     });
@@ -498,7 +490,7 @@ describe('ComposeScreen', () => {
     renderer.unmount();
   });
   it('rotates IDs after note association expiry and retries the preserved receipt', async () => {
-    mocks.createNote
+    mocks.apiClient.createNote
       .mockRejectedValueOnce(new mocks.APIRequestError(409, 'upload_expired'))
       .mockResolvedValueOnce(undefined);
     const store = createComposeDraftStore(
@@ -525,19 +517,19 @@ describe('ComposeScreen', () => {
 
     await press(renderer, 'compose-submit');
 
-    const retryUpload = mocks.prepareImageUpload.mock.calls[0]?.[2];
-    const retryNote = mocks.createNote.mock.calls[1]?.[0];
+    const retryUpload = mocks.apiClient.prepareImageUpload.mock.calls[0]?.[1];
+    const retryNote = mocks.apiClient.createNote.mock.calls[1]?.[0];
     expect(retryUpload?.uploadRequestId).toBe(
       refreshed?.image?.uploadRequestId,
     );
     expect(retryNote?.clientRequestId).toBe(refreshed?.clientRequestId);
-    expect(mocks.createNote.mock.calls[1]?.[0]).toMatchObject({
+    expect(mocks.apiClient.createNote.mock.calls[1]?.[0]).toMatchObject({
       imageUploadIds: [receipt.imageUploadId],
     });
   });
   it('ignores stale note expiry after image replacement', async () => {
     const pending = deferred<void>();
-    mocks.createNote.mockReturnValueOnce(pending.promise);
+    mocks.apiClient.createNote.mockReturnValueOnce(pending.promise);
     const store = createComposeDraftStore(
       uuidSequence('request-1', 'upload-1'),
     );
@@ -567,7 +559,7 @@ describe('ComposeScreen', () => {
   });
   it('rejects a stale upload receipt after replacement', async () => {
     const pending = deferred<ImageUploadReceipt>();
-    mocks.prepareImageUpload.mockReturnValueOnce(pending.promise);
+    mocks.apiClient.prepareImageUpload.mockReturnValueOnce(pending.promise);
     const store = createComposeDraftStore(
       uuidSequence('request-1', 'upload-1'),
     );
@@ -587,7 +579,7 @@ describe('ComposeScreen', () => {
       await settle();
     });
 
-    expect(mocks.createNote).not.toHaveBeenCalled();
+    expect(mocks.apiClient.createNote).not.toHaveBeenCalled();
     const current = store.get('owner-1');
     expect(current?.image).toMatchObject({
       imageReceipt: null,
@@ -602,7 +594,7 @@ describe('ComposeScreen', () => {
     const store = createComposeDraftStore(
       uuidSequence('request-1', 'upload-1'),
     );
-    mocks.prepareImageUpload.mockRejectedValueOnce(
+    mocks.apiClient.prepareImageUpload.mockRejectedValueOnce(
       new mocks.ImageUploadRequestError(401),
     );
     const renderer = await renderCompose(store);
@@ -616,10 +608,10 @@ describe('ComposeScreen', () => {
     expect(store.get('owner-1')).toEqual(selected);
 
     await press(renderer, 'compose-submit');
-    expect(mocks.prepareImageUpload.mock.calls[1]?.[2].uploadRequestId).toBe(
+    expect(mocks.apiClient.prepareImageUpload.mock.calls[1]?.[1].uploadRequestId).toBe(
       selected?.image?.uploadRequestId,
     );
-    expect(mocks.createNote.mock.calls[0]?.[0]).toMatchObject({
+    expect(mocks.apiClient.createNote.mock.calls[0]?.[0]).toMatchObject({
       clientRequestId: selected?.clientRequestId,
       imageUploadIds: [receipt.imageUploadId],
     });
@@ -629,7 +621,7 @@ describe('ComposeScreen', () => {
     const store = createComposeDraftStore(
       uuidSequence('request-1', 'upload-1'),
     );
-    mocks.createNote
+    mocks.apiClient.createNote
       .mockRejectedValueOnce(new mocks.APIRequestError(401))
       .mockResolvedValueOnce(undefined);
     const renderer = await renderCompose(store);
@@ -643,8 +635,8 @@ describe('ComposeScreen', () => {
     await reauthenticate(renderer, store);
 
     await press(renderer, 'compose-submit');
-    expect(mocks.prepareImageUpload).toHaveBeenCalledOnce();
-    expect(mocks.createNote.mock.calls[1]?.[0]).toMatchObject({
+    expect(mocks.apiClient.prepareImageUpload).toHaveBeenCalledOnce();
+    expect(mocks.apiClient.createNote.mock.calls[1]?.[0]).toMatchObject({
       clientRequestId: ready?.clientRequestId,
       imageUploadIds: [receipt.imageUploadId],
     });
@@ -691,7 +683,7 @@ describe('ComposeScreen', () => {
     expect(store.get('owner-1')?.image).toBeNull();
 
     renderer = await renderCompose(store);
-    mocks.createNote.mockRejectedValueOnce(new mocks.APIRequestError(401));
+    mocks.apiClient.createNote.mockRejectedValueOnce(new mocks.APIRequestError(401));
     fill(renderer, 'Rascunho', 'Texto');
     await press(renderer, 'compose-submit');
     expect(mocks.logout).toHaveBeenCalledOnce();
@@ -701,7 +693,7 @@ describe('ComposeScreen', () => {
 
   it('fences duplicate submits and field mutation while publishing', async () => {
     const pending = deferred<void>();
-    mocks.createNote.mockReturnValueOnce(pending.promise);
+    mocks.apiClient.createNote.mockReturnValueOnce(pending.promise);
     const store = createComposeDraftStore(uuidSequence('request-1'));
     const renderer = await renderCompose(store);
     fill(renderer, 'Original', 'Texto');
@@ -712,14 +704,14 @@ describe('ComposeScreen', () => {
         .props.onPress();
     });
     await settle();
-    expect(mocks.createNote).toHaveBeenCalledOnce();
+    expect(mocks.apiClient.createNote).toHaveBeenCalledOnce();
     act(() => {
       void renderer.root
         .findByProps({ testID: 'compose-submit' })
         .props.onPress();
       input(renderer, 'Título da nota').props.onChangeText('Alterado');
     });
-    expect(mocks.createNote).toHaveBeenCalledOnce();
+    expect(mocks.apiClient.createNote).toHaveBeenCalledOnce();
     expect(store.get('owner-1')?.title).toBe('Original');
 
     pending.resolve();
@@ -800,8 +792,8 @@ async function waitForSubmitEnabled(
 async function waitForCatalogReady(
   renderer: ReactTestRenderer,
 ): Promise<void> {
-  const catalogLoad = mocks.listCatalogs.mock.results[
-    mocks.listCatalogs.mock.results.length - 1
+  const catalogLoad = mocks.apiClient.listCatalogs.mock.results[
+    mocks.apiClient.listCatalogs.mock.results.length - 1
   ]?.value;
   if (catalogLoad === undefined) {
     throw new Error('compose_catalog_load_missing');

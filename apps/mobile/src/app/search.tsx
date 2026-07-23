@@ -10,6 +10,7 @@ import {
 } from '@/components/foundation-screen';
 import { NoteCard } from '@/components/note-card';
 import { useAuth } from '@/lib/auth/auth-provider';
+import type { APIClient } from '@/lib/api/client';
 import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
 import { CategoryFilterControls } from '@/features/notes/category-filter-controls';
@@ -27,12 +28,6 @@ import type {
   SearchRequest,
   SearchResultContext,
 } from '@/features/notes/search-screen';
-import { listCatalogs } from '@/lib/api/catalogs';
-import {
-  markNoteUseful,
-  searchNotes,
-  unmarkNoteUseful,
-} from '@/lib/api/notes';
 import type { Note } from '@/lib/api/notes';
 
 import { styles } from '@/features/notes/search-screen.styles';
@@ -60,8 +55,8 @@ type SearchScreenState =
   | { request: SearchRequest; status: 'error' };
 
 type AuthenticatedSearchScreenProps = {
+  apiClient: APIClient;
   onSessionExpired: () => Promise<void>;
-  token: string;
 };
 
 type UsefulMutationState = 'error' | 'pending';
@@ -70,14 +65,14 @@ const idleSearchState: SearchScreenState = { status: 'idle' };
 
 export default function SearchScreen() {
   const router = useRouter();
-  const { logout, state } = useAuth();
+  const { apiClient, logout, state } = useAuth();
 
   if (state.status === 'authenticated') {
     return (
       <AuthenticatedSearchScreen
         key={state.user.id}
+        apiClient={apiClient}
         onSessionExpired={logout}
-        token={state.token}
       />
     );
   }
@@ -102,8 +97,8 @@ export default function SearchScreen() {
 }
 
 function AuthenticatedSearchScreen({
+  apiClient,
   onSessionExpired,
-  token,
 }: AuthenticatedSearchScreenProps) {
   const router = useRouter();
   const catalogRequestIDRef = useRef(0);
@@ -171,7 +166,7 @@ function AuthenticatedSearchScreen({
       setSearchState({ request, status: 'loading' });
       setUsefulMutations({});
 
-      searchNotes(request.input, token)
+      apiClient.searchNotes(request.input)
         .then((notes) => {
           if (
             !isCurrentSearchRequest({
@@ -218,7 +213,7 @@ function AuthenticatedSearchScreen({
           setSearchState({ request, status: 'error' });
         });
     },
-    [onSessionExpired, setSearchState, token],
+    [apiClient, onSessionExpired, setSearchState],
   );
 
   const loadCatalogs = useCallback(() => {
@@ -227,7 +222,7 @@ function AuthenticatedSearchScreen({
     setCatalogState({ status: 'loading' });
     setUsefulMutations({});
 
-    listCatalogs(token)
+    apiClient.listCatalogs()
       .then((catalogs) => {
         if (
           !isCurrentSearchRequest({
@@ -276,7 +271,7 @@ function AuthenticatedSearchScreen({
         catalogRef.current = null;
         setCatalogState({ status: 'error' });
       });
-  }, [onSessionExpired, runSearch, token]);
+  }, [apiClient, onSessionExpired, runSearch]);
 
   const toggleUseful = useCallback(
     async (target: LabelledNote) => {
@@ -290,9 +285,9 @@ function AuthenticatedSearchScreen({
       }));
       try {
         if (target.usefulByCurrentUser) {
-          await unmarkNoteUseful(target.id, token);
+          await apiClient.unmarkNoteUseful(target.id);
         } else {
-          await markNoteUseful(target.id, token);
+          await apiClient.markNoteUseful(target.id);
         }
         if (
           generation !==
@@ -342,7 +337,7 @@ function AuthenticatedSearchScreen({
         }));
       }
     },
-    [onSessionExpired, token, usefulMutations],
+    [apiClient, onSessionExpired, usefulMutations],
   );
 
   useFocusEffect(

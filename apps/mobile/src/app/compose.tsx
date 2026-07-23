@@ -17,10 +17,8 @@ import {
   composeDraftStore,
   type ComposeDraftStore,
 } from '@/features/notes/compose-draft';
-import { listCatalogs } from '@/lib/api/catalogs';
-import { prepareImageUpload } from '@/lib/api/image-uploads';
-import { createNote } from '@/lib/api/notes';
 import { useAuth } from '@/lib/auth/auth-provider';
+import type { APIClient } from '@/lib/api/client';
 
 import { styles } from '@/features/notes/compose-screen.styles';
 
@@ -29,26 +27,26 @@ type ComposeScreenProps = {
 };
 
 type AuthenticatedComposeScreenProps = {
+  apiClient: APIClient;
   draftStore: ComposeDraftStore;
   logout: () => Promise<void>;
   ownerID: string;
-  token: string;
 };
 
 export default function ComposeScreen({
   draftStore = composeDraftStore,
 }: ComposeScreenProps = {}) {
   const router = useRouter();
-  const { logout, state } = useAuth();
+  const { apiClient, logout, state } = useAuth();
 
   if (state.status === 'authenticated') {
     return (
       <AuthenticatedComposeScreen
         key={state.user.id}
+        apiClient={apiClient}
         draftStore={draftStore}
         logout={logout}
         ownerID={state.user.id}
-        token={state.token}
       />
     );
   }
@@ -79,10 +77,10 @@ export default function ComposeScreen({
 }
 
 function AuthenticatedComposeScreen({
+  apiClient,
   draftStore,
   logout,
   ownerID,
-  token,
 }: AuthenticatedComposeScreenProps) {
   const router = useRouter();
   const onPublished = useCallback(() => router.navigate('/'), [router]);
@@ -92,8 +90,8 @@ function AuthenticatedComposeScreen({
         draftStore,
         ownerID,
         ports: {
-          createNote,
-          loadCatalogs: listCatalogs,
+          createNote: (input) => apiClient.createNote(input),
+          loadCatalogs: () => apiClient.listCatalogs(),
           onPublished,
           onSessionExpired: logout,
           pickImage: () =>
@@ -105,15 +103,11 @@ function AuthenticatedComposeScreen({
                 UIImagePickerPreferredAssetRepresentationMode.Compatible,
               selectionLimit: 1,
             }),
-          prepareImageUpload,
+          prepareImageUpload: (asset, options) => apiClient.prepareImageUpload(asset, options),
         },
-        token: '',
       }),
-    [draftStore, logout, onPublished, ownerID],
+    [apiClient, draftStore, logout, onPublished, ownerID],
   );
-  useEffect(() => {
-    controller.setSessionToken(token);
-  }, [controller, token]);
   useEffect(() => {
     controller.activate();
     return () => controller.deactivate();

@@ -25,7 +25,7 @@ type LogoutState =
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { logout, state } = useAuth();
+  const { apiClient, logout, state } = useAuth();
   const [logoutState, setLogoutState] = useState<LogoutState>({
     status: 'idle',
   });
@@ -56,7 +56,7 @@ export default function ProfileScreen() {
             router.push({ pathname: '/notes/[id]', params: { id: noteID } })
           }
           onSessionExpired={logout}
-          token={state.token}
+          apiClient={apiClient}
         />
         <View style={styles.logoutSection}>
           {logoutState.status === 'error' ? (

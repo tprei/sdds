@@ -10,15 +10,10 @@ import { useFocusEffect } from 'expo-router';
 
 import { NoteCard } from '../../components/note-card';
 import { FoundationButton } from '../../components/foundation-screen';
-import { listCatalogs } from '../../lib/api/catalogs';
-import {
-  APIRequestError,
-  markNoteUseful,
-  unmarkNoteUseful,
-} from '../../lib/api/notes';
+import { APIRequestError } from '../../lib/api/notes';
 import { requestStatus } from '../../lib/api/request-error';
 import { unauthorizedStatus } from '../../lib/api/status';
-import { getPublicAuthor, listAuthorNotes } from '../../lib/api/authors';
+import type { APIClient } from '../../lib/api/client';
 import type { PublicAuthor } from '../../lib/api/authors';
 import {
   buildNoteCatalog,
@@ -31,7 +26,7 @@ import { styles } from './author-profile-content.styles';
 type Props = {
   authorID: string;
   onPressNote: (noteID: string) => void;
-  token: string;
+  apiClient: APIClient;
   onSessionExpired: () => Promise<void>;
 };
 type ProfileError = 'not_found' | 'error' | null;
@@ -167,9 +162,9 @@ function nearScrollEnd(event: {
 }
 
 export function AuthorProfileContent({
+  apiClient,
   authorID,
   onPressNote,
-  token,
   onSessionExpired,
 }: Props) {
   const [author, setAuthor] = useState<PublicAuthor | null>(null);
@@ -227,9 +222,9 @@ export function AuthorProfileContent({
     setError(null);
     try {
       const [profile, page, catalogs] = await Promise.all([
-        getPublicAuthor(requestedAuthorID, token),
-        listAuthorNotes({ authorID: requestedAuthorID }, token),
-        listCatalogs(token),
+        apiClient.getPublicAuthor(requestedAuthorID),
+        apiClient.listAuthorNotes({ authorID: requestedAuthorID }),
+        apiClient.listCatalogs(),
       ]);
       if (!isCurrentRequest(version, requestedAuthorID)) return;
       const nextCatalog = buildNoteCatalog(catalogs);
@@ -259,7 +254,7 @@ export function AuthorProfileContent({
         setLoading(false);
       }
     }
-  }, [authorID, isCurrentRequest, onSessionExpired, token]);
+  }, [apiClient, authorID, isCurrentRequest, onSessionExpired]);
 
   const loadNext = useCallback(
     async (nextCursor: string, nextCatalog: NoteCatalog) => {
@@ -271,12 +266,11 @@ export function AuthorProfileContent({
       setLoadingNext(true);
       setNextError(false);
       try {
-        const page = await listAuthorNotes(
+        const page = await apiClient.listAuthorNotes(
           {
             authorID: requestedAuthorID,
             cursor: nextCursor,
           },
-          token,
         );
         if (!isCurrentRequest(version, requestedAuthorID)) return;
         const labelledNotes = labelNotes(nextCatalog, page.notes);
@@ -305,7 +299,7 @@ export function AuthorProfileContent({
         }
       }
     },
-    [authorID, isCurrentRequest, onSessionExpired, token],
+    [apiClient, authorID, isCurrentRequest, onSessionExpired],
   );
 
   const toggleUseful = useCallback(
@@ -320,9 +314,9 @@ export function AuthorProfileContent({
       }));
       try {
         if (target.usefulByCurrentUser) {
-          await unmarkNoteUseful(target.id, token);
+          await apiClient.unmarkNoteUseful(target.id);
         } else {
-          await markNoteUseful(target.id, token);
+          await apiClient.markNoteUseful(target.id);
         }
         if (usefulMutationGenerationRef.current !== generation) {
           return;
@@ -358,7 +352,7 @@ export function AuthorProfileContent({
         }));
       }
     },
-    [onSessionExpired, token, usefulMutations],
+    [apiClient, onSessionExpired, usefulMutations],
   );
 
   useFocusEffect(

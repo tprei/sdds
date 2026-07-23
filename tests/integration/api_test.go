@@ -53,17 +53,18 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		Password:    password,
 		DisplayName: displayName,
 	})
-	currentSession := getAuthSession(t, client, createdSession.Token)
+	sessionClient := newAuthenticatedAPIClient(t, createdSession.Token)
+	currentSession := getAuthSession(t, sessionClient)
 	requireCurrentSession(t, currentSession, createdSession)
-	deleteAuthSession(t, client, createdSession.Token)
-	requireUnauthenticatedAuthSession(t, client, createdSession.Token)
+	deleteAuthSession(t, sessionClient)
+	requireUnauthenticatedAuthSession(t, sessionClient)
 	requireInvalidAuthSession(t, client, username, "wrong-password")
 	loggedInSession := createAuthSession(t, client, openapi.CreateAuthSessionJSONRequestBody{
 		Username: username,
 		Password: password,
 	})
 	requireAuthSession(t, loggedInSession, username, displayName)
-	requireCurrentSession(t, getAuthSession(t, client, loggedInSession.Token), loggedInSession)
+	requireCurrentSession(t, getAuthSession(t, newAuthenticatedAPIClient(t, loggedInSession.Token)), loggedInSession)
 	client = newAuthenticatedAPIClient(t, loggedInSession.Token)
 	requireCatalogs(t, client)
 
@@ -478,10 +479,10 @@ func requireInvalidAuthSession(t *testing.T, client *openapi.ClientWithResponses
 	}
 }
 
-func getAuthSession(t *testing.T, client *openapi.ClientWithResponses, token string) openapi.CurrentSessionResponse {
+func getAuthSession(t *testing.T, client *openapi.ClientWithResponses) openapi.CurrentSessionResponse {
 	t.Helper()
 
-	response, err := client.GetAuthSessionWithResponse(context.Background(), bearerTokenEditor(token))
+	response, err := client.GetAuthSessionWithResponse(context.Background())
 	if err != nil {
 		t.Fatalf("GET /v1/auth/session: %v", err)
 	}
@@ -492,10 +493,10 @@ func getAuthSession(t *testing.T, client *openapi.ClientWithResponses, token str
 	return *response.JSON200
 }
 
-func requireUnauthenticatedAuthSession(t *testing.T, client *openapi.ClientWithResponses, token string) {
+func requireUnauthenticatedAuthSession(t *testing.T, client *openapi.ClientWithResponses) {
 	t.Helper()
 
-	response, err := client.GetAuthSessionWithResponse(context.Background(), bearerTokenEditor(token))
+	response, err := client.GetAuthSessionWithResponse(context.Background())
 	if err != nil {
 		t.Fatalf("GET /v1/auth/session unauthenticated: %v", err)
 	}
@@ -508,10 +509,10 @@ func requireUnauthenticatedAuthSession(t *testing.T, client *openapi.ClientWithR
 	}
 }
 
-func deleteAuthSession(t *testing.T, client *openapi.ClientWithResponses, token string) {
+func deleteAuthSession(t *testing.T, client *openapi.ClientWithResponses) {
 	t.Helper()
 
-	response, err := client.DeleteAuthSessionWithResponse(context.Background(), bearerTokenEditor(token))
+	response, err := client.DeleteAuthSessionWithResponse(context.Background())
 	if err != nil {
 		t.Fatalf("DELETE /v1/auth/session: %v", err)
 	}

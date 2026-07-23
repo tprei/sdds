@@ -4,15 +4,16 @@ import {
   APIRequestError,
   APIResponseError,
 } from './notes';
-import {
-  getPublicAuthor,
-  listAuthorNotes,
-} from './authors';
+import { createAPIClient } from './client';
 
 vi.mock('react-native', () => ({
   Platform: {
     OS: 'ios',
   },
+}));
+
+vi.mock('expo-file-system', () => ({
+  File: class {},
 }));
 
 const configuredAPIBaseURLEnvName = 'EXPO_PUBLIC_SDDS_API_BASE_URL';
@@ -48,7 +49,8 @@ describe('authors API client', () => {
       }),
     );
 
-    await expect(getPublicAuthor(authorID, exampleToken)).resolves.toEqual({
+    const client = createAPIClient(exampleToken);
+    await expect(client.getPublicAuthor(authorID)).resolves.toEqual({
       displayName: 'Thiago',
       id: authorID,
       noteCount: 3,
@@ -65,8 +67,9 @@ describe('authors API client', () => {
       });
     });
 
+    const client = createAPIClient(exampleToken);
     await expect(
-      listAuthorNotes({ authorID, cursor: 'after-cursor', limit: 2 }, exampleToken),
+      client.listAuthorNotes({ authorID, cursor: 'after-cursor', limit: 2 }),
     ).resolves.toEqual({
       nextCursor: 'next-cursor',
       notes: [expectedNote()],
@@ -82,7 +85,8 @@ describe('authors API client', () => {
   it('accepts a terminal author note page without a cursor', async () => {
     stubFetch(async () => jsonResponse({ next_cursor: null, notes: [] }));
 
-    await expect(listAuthorNotes({ authorID }, exampleToken)).resolves.toEqual({
+    const client = createAPIClient(exampleToken);
+    await expect(client.listAuthorNotes({ authorID })).resolves.toEqual({
       nextCursor: null,
       notes: [],
     });
@@ -102,7 +106,8 @@ describe('authors API client', () => {
       }),
     );
 
-    await expect(listAuthorNotes({ authorID }, exampleToken)).resolves.toEqual({
+    const client = createAPIClient(exampleToken);
+    await expect(client.listAuthorNotes({ authorID })).resolves.toEqual({
       nextCursor: null,
       notes: [expectedNote()],
     });
@@ -113,7 +118,8 @@ describe('authors API client', () => {
     async (_name, response) => {
       stubFetch(async () => jsonResponse(response));
 
-      await expect(listAuthorNotes({ authorID }, exampleToken)).rejects.toThrow(
+      const client = createAPIClient(exampleToken);
+      await expect(client.listAuthorNotes({ authorID })).rejects.toThrow(
         APIResponseError,
       );
     },
@@ -129,7 +135,8 @@ describe('authors API client', () => {
       }),
     );
 
-    await expect(getPublicAuthor(authorID, exampleToken)).resolves.toEqual({
+    const client = createAPIClient(exampleToken);
+    await expect(client.getPublicAuthor(authorID)).resolves.toEqual({
       displayName: 'Thiago',
       id: authorID,
       noteCount: 3,
@@ -139,7 +146,8 @@ describe('authors API client', () => {
   it('raises request errors for author status failures', async () => {
     stubFetch(async () => jsonResponse({ code: 'not_found' }, 404));
 
-    await expect(getPublicAuthor(authorID, exampleToken)).rejects.toMatchObject(
+    const client = createAPIClient(exampleToken);
+    await expect(client.getPublicAuthor(authorID)).rejects.toMatchObject(
       new APIRequestError(404),
     );
   });
@@ -147,7 +155,8 @@ describe('authors API client', () => {
   it('raises request errors for author note status failures', async () => {
     stubFetch(async () => jsonResponse({ code: 'invalid_note' }, 400));
 
-    await expect(listAuthorNotes({ authorID }, exampleToken)).rejects.toMatchObject(
+    const client = createAPIClient(exampleToken);
+    await expect(client.listAuthorNotes({ authorID })).rejects.toMatchObject(
       new APIRequestError(400),
     );
   });
@@ -155,7 +164,8 @@ describe('authors API client', () => {
   it('raises request errors for unreadable author status bodies', async () => {
     stubFetch(async () => unreadableResponse(404));
 
-    await expect(getPublicAuthor(authorID, exampleToken)).rejects.toMatchObject(
+    const client = createAPIClient(exampleToken);
+    await expect(client.getPublicAuthor(authorID)).rejects.toMatchObject(
       new APIRequestError(404),
     );
   });
@@ -163,7 +173,8 @@ describe('authors API client', () => {
   it('raises request errors for unreadable author note status bodies', async () => {
     stubFetch(async () => unreadableResponse(500));
 
-    await expect(listAuthorNotes({ authorID }, exampleToken)).rejects.toMatchObject(
+    const client = createAPIClient(exampleToken);
+    await expect(client.listAuthorNotes({ authorID })).rejects.toMatchObject(
       new APIRequestError(500),
     );
   });

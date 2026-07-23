@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PublicAuthor, AuthorNotesPage } from '../../lib/api/authors';
 import type { Catalogs } from '../../lib/api/catalogs';
 import type { Note } from '../../lib/api/notes';
+import type { APIClient } from '../../lib/api/client';
 import { AuthorProfileContent } from './author-profile-content';
 
 const { createElement } = React;
@@ -64,30 +65,18 @@ vi.mock('expo-router', async () => {
   };
 });
 
-const exampleToken = 'session-token';
 const onSessionExpired = vi.fn(async () => undefined);
 
 const mocks = vi.hoisted(() => ({
-  getPublicAuthor:
-    vi.fn<(authorID: string, token: string) => Promise<PublicAuthor>>(),
+  getPublicAuthor: vi.fn<(authorID: string) => Promise<PublicAuthor>>(),
   listAuthorNotes:
-    vi.fn<
-      (
-        input: { authorID: string; cursor?: string },
-        token: string,
-      ) => Promise<AuthorNotesPage>
-    >(),
-  listCatalogs: vi.fn<(token: string) => Promise<Catalogs>>(),
+    vi.fn<(input: { authorID: string; cursor?: string }) => Promise<AuthorNotesPage>>(),
+  listCatalogs: vi.fn<() => Promise<Catalogs>>(),
+  markNoteUseful: vi.fn<(noteID: string) => Promise<void>>(),
+  unmarkNoteUseful: vi.fn<(noteID: string) => Promise<void>>(),
 }));
 
-vi.mock('../../lib/api/authors', () => ({
-  getPublicAuthor: mocks.getPublicAuthor,
-  listAuthorNotes: mocks.listAuthorNotes,
-}));
-
-vi.mock('../../lib/api/catalogs', () => ({
-  listCatalogs: mocks.listCatalogs,
-}));
+const mockClient = mocks as unknown as APIClient;
 
 const author: PublicAuthor = {
   displayName: 'Marina Alves',
@@ -128,7 +117,7 @@ describe('AuthorProfileContent', () => {
           authorID="author-id"
           onPressNote={() => undefined}
           onSessionExpired={onSessionExpired}
-          token={exampleToken}
+          apiClient={mockClient}
         />,
       );
       await flushPromises();
@@ -148,7 +137,6 @@ describe('AuthorProfileContent', () => {
         authorID: 'author-id',
         cursor: 'cursor-1',
       },
-      exampleToken,
     );
     expect(
       renderer!.root.findAllByProps({ accessibilityRole: 'alert' }),
@@ -175,7 +163,6 @@ describe('AuthorProfileContent', () => {
         authorID: 'author-id',
         cursor: 'cursor-1',
       },
-      exampleToken,
     );
     expect(
       renderer!.root.findAllByProps({ accessibilityRole: 'alert' }),
@@ -211,7 +198,7 @@ describe('AuthorProfileContent', () => {
           authorID="author-id"
           onPressNote={() => undefined}
           onSessionExpired={onSessionExpired}
-          token={exampleToken}
+          apiClient={mockClient}
         />,
       );
       await flushPromises();
@@ -228,7 +215,7 @@ describe('AuthorProfileContent', () => {
           authorID="next-author"
           onPressNote={() => undefined}
           onSessionExpired={onSessionExpired}
-          token={exampleToken}
+          apiClient={mockClient}
         />,
       );
       await flushPromises();
@@ -278,7 +265,7 @@ describe('AuthorProfileContent', () => {
           authorID="author-id"
           onPressNote={() => undefined}
           onSessionExpired={onSessionExpired}
-          token={exampleToken}
+          apiClient={mockClient}
         />,
       );
       await flushPromises();
@@ -293,7 +280,7 @@ describe('AuthorProfileContent', () => {
           authorID="next-author"
           onPressNote={() => undefined}
           onSessionExpired={onSessionExpired}
-          token={exampleToken}
+          apiClient={mockClient}
         />,
       );
       await flushPromises();

@@ -1,6 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { APIRequestError, createNote } from './notes';
+import { APIRequestError } from './notes';
+import { createAPIClient } from './client';
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+
+vi.mock('expo-file-system', () => ({ File: class {} }));
 afterEach(() => vi.unstubAllGlobals());
 const noteInput = {
   body: 'Texto da nota.',
@@ -30,7 +33,8 @@ it.each(noteErrorCases)(
           },
         ),
     );
-    const caught = await createNote(noteInput, 'session-token').catch(
+    const client = createAPIClient('session-token');
+    const caught = await client.createNote(noteInput).catch(
       (error: unknown) => error,
     );
     expect(caught).toBeInstanceOf(APIRequestError);

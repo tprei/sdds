@@ -1,13 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AuthSession, AuthUser, CurrentAuthSession } from '@/lib/api/auth';
-import {
-  AuthAPIRequestError,
-  createAuthSession,
-  createAuthUser,
-  deleteAuthSession,
-  getAuthSession,
-} from '@/lib/api/auth';
+import { AuthAPIRequestError } from '@/lib/api/auth';
 
 import { createAuthController } from './session';
 import {
@@ -15,6 +9,19 @@ import {
   readSessionToken,
   saveSessionToken,
 } from './session-storage';
+
+const mocks = vi.hoisted(() => {
+  const mockClient = {
+    createAuthSession: vi.fn(),
+    createAuthUser: vi.fn(),
+    deleteAuthSession: vi.fn(),
+    getAuthSession: vi.fn(),
+  };
+  return {
+    createAPIClient: vi.fn(() => mockClient),
+    mockClient,
+  };
+});
 
 vi.mock('@/lib/api/auth', () => ({
   AuthAPIRequestError: class AuthAPIRequestError extends Error {
@@ -25,10 +32,10 @@ vi.mock('@/lib/api/auth', () => ({
       this.status = status;
     }
   },
-  createAuthSession: vi.fn(),
-  createAuthUser: vi.fn(),
-  deleteAuthSession: vi.fn(),
-  getAuthSession: vi.fn(),
+}));
+
+vi.mock('@/lib/api/client', () => ({
+  createAPIClient: mocks.createAPIClient,
 }));
 
 vi.mock('./session-storage', () => ({
@@ -37,13 +44,16 @@ vi.mock('./session-storage', () => ({
   saveSessionToken: vi.fn(),
 }));
 
+const { createAPIClient, mockClient } = mocks;
+
 describe('auth session controller', () => {
   beforeEach(() => {
+    createAPIClient.mockClear();
+    mockClient.createAuthSession.mockReset();
+    mockClient.createAuthUser.mockReset();
+    mockClient.deleteAuthSession.mockReset();
+    mockClient.getAuthSession.mockReset();
     vi.mocked(clearSessionToken).mockReset();
-    vi.mocked(createAuthSession).mockReset();
-    vi.mocked(createAuthUser).mockReset();
-    vi.mocked(deleteAuthSession).mockReset();
-    vi.mocked(getAuthSession).mockReset();
     vi.mocked(readSessionToken).mockReset();
     vi.mocked(saveSessionToken).mockReset();
   });
@@ -54,25 +64,25 @@ describe('auth session controller', () => {
     await expect(createAuthController().bootstrap()).resolves.toEqual({
       status: 'anonymous',
     });
-    expect(getAuthSession).not.toHaveBeenCalled();
+    expect(mockClient.getAuthSession).not.toHaveBeenCalled();
   });
 
   it('boots authenticated when the stored token is valid', async () => {
     vi.mocked(readSessionToken).mockResolvedValue('stored-token');
-    vi.mocked(getAuthSession).mockResolvedValue(apiCurrentSession());
+    mockClient.getAuthSession.mockResolvedValue(apiCurrentSession());
 
     await expect(createAuthController().bootstrap()).resolves.toEqual({
       status: 'authenticated',
       token: 'stored-token',
       user: apiUser(),
     });
-    expect(getAuthSession).toHaveBeenCalledWith('stored-token');
+    expect(createAPIClient).toHaveBeenCalledWith('stored-token');
     expect(clearSessionToken).not.toHaveBeenCalled();
   });
 
   it('clears invalid stored tokens during boot', async () => {
     vi.mocked(readSessionToken).mockResolvedValue('expired-token');
-    vi.mocked(getAuthSession).mockRejectedValue(new AuthAPIRequestError(401));
+    mockClient.getAuthSession.mockRejectedValue(new AuthAPIRequestError(401));
     vi.mocked(clearSessionToken).mockResolvedValue(undefined);
 
     await expect(createAuthController().bootstrap()).resolves.toEqual({
@@ -87,13 +97,13 @@ describe('auth session controller', () => {
     await expect(createAuthController().bootstrap()).resolves.toEqual({
       status: 'error',
     });
-    expect(getAuthSession).not.toHaveBeenCalled();
+    expect(mockClient.getAuthSession).not.toHaveBeenCalled();
     expect(clearSessionToken).not.toHaveBeenCalled();
   });
 
   it('boots error when an invalid stored token cannot be cleared', async () => {
     vi.mocked(readSessionToken).mockResolvedValue('expired-token');
-    vi.mocked(getAuthSession).mockRejectedValue(new AuthAPIRequestError(401));
+    mockClient.getAuthSession.mockRejectedValue(new AuthAPIRequestError(401));
     vi.mocked(clearSessionToken).mockRejectedValue(new Error('storage failed'));
 
     await expect(createAuthController().bootstrap()).resolves.toEqual({
@@ -106,7 +116,7 @@ describe('auth session controller', () => {
     vi.mocked(readSessionToken)
       .mockResolvedValueOnce('expired-token')
       .mockResolvedValueOnce('fresh-token');
-    vi.mocked(getAuthSession)
+    mockClient.getAuthSession
       .mockRejectedValueOnce(new AuthAPIRequestError(401))
       .mockResolvedValueOnce(apiCurrentSession());
 
@@ -116,26 +126,26 @@ describe('auth session controller', () => {
       user: apiUser(),
     });
     expect(clearSessionToken).not.toHaveBeenCalled();
-    expect(getAuthSession).toHaveBeenNthCalledWith(1, 'expired-token');
-    expect(getAuthSession).toHaveBeenNthCalledWith(2, 'fresh-token');
+    expect(createAPIClient).toHaveBeenNthCalledWith(1, 'expired-token');
+    expect(createAPIClient).toHaveBeenNthCalledWith(2, 'fresh-token');
   });
 
   it('does not clear storage when the token is removed during boot', async () => {
     vi.mocked(readSessionToken)
       .mockResolvedValueOnce('expired-token')
       .mockResolvedValueOnce(null);
-    vi.mocked(getAuthSession).mockRejectedValue(new AuthAPIRequestError(401));
+    mockClient.getAuthSession.mockRejectedValue(new AuthAPIRequestError(401));
 
     await expect(createAuthController().bootstrap()).resolves.toEqual({
       status: 'anonymous',
     });
     expect(clearSessionToken).not.toHaveBeenCalled();
-    expect(getAuthSession).toHaveBeenCalledOnce();
+    expect(mockClient.getAuthSession).toHaveBeenCalledOnce();
   });
 
   it('keeps storage intact when boot fails without an auth rejection', async () => {
     vi.mocked(readSessionToken).mockResolvedValue('stored-token');
-    vi.mocked(getAuthSession).mockRejectedValue(new AuthAPIRequestError(500));
+    mockClient.getAuthSession.mockRejectedValue(new AuthAPIRequestError(500));
 
     await expect(createAuthController().bootstrap()).resolves.toEqual({
       status: 'error',
@@ -148,9 +158,9 @@ describe('auth session controller', () => {
     vi.mocked(readSessionToken)
       .mockResolvedValueOnce('expired-token')
       .mockResolvedValueOnce('expired-token');
-    vi.mocked(getAuthSession).mockReturnValueOnce(bootSession.promise);
+    mockClient.getAuthSession.mockReturnValueOnce(bootSession.promise);
     vi.mocked(clearSessionToken).mockResolvedValue(undefined);
-    vi.mocked(createAuthSession).mockResolvedValue(
+    mockClient.createAuthSession.mockResolvedValue(
       apiAuthSession({ token: 'fresh-token' }),
     );
     vi.mocked(saveSessionToken).mockResolvedValue(undefined);
@@ -163,7 +173,7 @@ describe('auth session controller', () => {
     });
 
     await flushQueuedMutation();
-    expect(createAuthSession).not.toHaveBeenCalled();
+    expect(mockClient.createAuthSession).not.toHaveBeenCalled();
 
     bootSession.reject(new AuthAPIRequestError(401));
 
@@ -180,7 +190,7 @@ describe('auth session controller', () => {
   });
 
   it('logs in and persists the returned token', async () => {
-    vi.mocked(createAuthSession).mockResolvedValue(apiAuthSession());
+    mockClient.createAuthSession.mockResolvedValue(apiAuthSession());
     vi.mocked(saveSessionToken).mockResolvedValue(undefined);
 
     await expect(
@@ -193,7 +203,7 @@ describe('auth session controller', () => {
       token: 'session-token',
       user: apiUser(),
     });
-    expect(createAuthSession).toHaveBeenCalledWith({
+    expect(mockClient.createAuthSession).toHaveBeenCalledWith({
       password: 'senha-secreta',
       username: 'thiago',
     });
@@ -203,7 +213,7 @@ describe('auth session controller', () => {
   it('serializes overlapping logins before persisting tokens', async () => {
     const firstSession = deferred<AuthSession>();
     const secondSession = deferred<AuthSession>();
-    vi.mocked(createAuthSession)
+    mockClient.createAuthSession
       .mockReturnValueOnce(firstSession.promise)
       .mockReturnValueOnce(secondSession.promise);
     vi.mocked(saveSessionToken).mockResolvedValue(undefined);
@@ -220,7 +230,7 @@ describe('auth session controller', () => {
 
     await flushQueuedMutation();
 
-    expect(createAuthSession).toHaveBeenCalledOnce();
+    expect(mockClient.createAuthSession).toHaveBeenCalledOnce();
     firstSession.resolve(apiAuthSession({ token: 'ana-token' }));
 
     await expect(firstLogin).resolves.toEqual({
@@ -230,8 +240,8 @@ describe('auth session controller', () => {
     });
     await flushQueuedMutation();
 
-    expect(createAuthSession).toHaveBeenCalledTimes(2);
-    expect(createAuthSession).toHaveBeenNthCalledWith(2, {
+    expect(mockClient.createAuthSession).toHaveBeenCalledTimes(2);
+    expect(mockClient.createAuthSession).toHaveBeenNthCalledWith(2, {
       password: 'senha-secreta',
       username: 'bia',
     });
@@ -248,7 +258,7 @@ describe('auth session controller', () => {
   });
 
   it('signs up and persists the returned token', async () => {
-    vi.mocked(createAuthUser).mockResolvedValue(apiAuthSession());
+    mockClient.createAuthUser.mockResolvedValue(apiAuthSession());
     vi.mocked(saveSessionToken).mockResolvedValue(undefined);
 
     await expect(
@@ -262,7 +272,7 @@ describe('auth session controller', () => {
       token: 'session-token',
       user: apiUser(),
     });
-    expect(createAuthUser).toHaveBeenCalledWith({
+    expect(mockClient.createAuthUser).toHaveBeenCalledWith({
       displayName: 'Thiago',
       password: 'senha-secreta',
       username: 'thiago',
@@ -271,7 +281,7 @@ describe('auth session controller', () => {
   });
 
   it('logs out by revoking and clearing an authenticated token', async () => {
-    vi.mocked(deleteAuthSession).mockResolvedValue(undefined);
+    mockClient.deleteAuthSession.mockResolvedValue(undefined);
     vi.mocked(clearSessionToken).mockResolvedValue(undefined);
 
     await expect(
@@ -281,12 +291,12 @@ describe('auth session controller', () => {
         user: apiUser(),
       }),
     ).resolves.toEqual({ status: 'anonymous' });
-    expect(deleteAuthSession).toHaveBeenCalledWith('session-token');
+    expect(createAPIClient).toHaveBeenCalledWith('session-token');
     expect(clearSessionToken).toHaveBeenCalledOnce();
   });
 
   it('clears local state when logout finds an already invalid token', async () => {
-    vi.mocked(deleteAuthSession).mockRejectedValue(new AuthAPIRequestError(401));
+    mockClient.deleteAuthSession.mockRejectedValue(new AuthAPIRequestError(401));
     vi.mocked(clearSessionToken).mockResolvedValue(undefined);
 
     await expect(
@@ -300,7 +310,7 @@ describe('auth session controller', () => {
   });
 
   it('logs out locally when server revocation fails after clearing the token', async () => {
-    vi.mocked(deleteAuthSession).mockRejectedValue(new AuthAPIRequestError(500));
+    mockClient.deleteAuthSession.mockRejectedValue(new AuthAPIRequestError(500));
     vi.mocked(clearSessionToken).mockResolvedValue(undefined);
 
     await expect(
@@ -310,13 +320,13 @@ describe('auth session controller', () => {
         user: apiUser(),
       }),
     ).resolves.toEqual({ status: 'anonymous' });
-    expect(deleteAuthSession).toHaveBeenCalledWith('session-token');
+    expect(createAPIClient).toHaveBeenCalledWith('session-token');
     expect(clearSessionToken).toHaveBeenCalledOnce();
   });
 
   it('keeps logout rejected when a failed revocation cannot clear the token', async () => {
     const clearError = new Error('storage failed');
-    vi.mocked(deleteAuthSession).mockRejectedValue(new AuthAPIRequestError(500));
+    mockClient.deleteAuthSession.mockRejectedValue(new AuthAPIRequestError(500));
     vi.mocked(clearSessionToken).mockRejectedValue(clearError);
 
     await expect(
@@ -326,13 +336,13 @@ describe('auth session controller', () => {
         user: apiUser(),
       }),
     ).rejects.toBe(clearError);
-    expect(deleteAuthSession).toHaveBeenCalledWith('session-token');
+    expect(createAPIClient).toHaveBeenCalledWith('session-token');
     expect(clearSessionToken).toHaveBeenCalledOnce();
   });
 
   it('keeps logout rejected when a revoked token cannot be cleared', async () => {
     const clearError = new Error('storage failed');
-    vi.mocked(deleteAuthSession).mockResolvedValue(undefined);
+    mockClient.deleteAuthSession.mockResolvedValue(undefined);
     vi.mocked(clearSessionToken).mockRejectedValue(clearError);
 
     await expect(
@@ -342,7 +352,7 @@ describe('auth session controller', () => {
         user: apiUser(),
       }),
     ).rejects.toBe(clearError);
-    expect(deleteAuthSession).toHaveBeenCalledWith('session-token');
+    expect(createAPIClient).toHaveBeenCalledWith('session-token');
     expect(clearSessionToken).toHaveBeenCalledOnce();
   });
 });

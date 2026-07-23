@@ -12,7 +12,6 @@ import type { ImageUploadAsset, ImageUploadReceipt } from '@/lib/api/image-uploa
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'singleton-request' }));
 
 const ownerID = 'owner-1';
-const token = 'session-token';
 const catalogs: Catalogs = { categories: [{ active: true, displayOrder: 1, label: 'Comida', slug: 'food' }], places: [] };
 const noVisibleCatalogs: Catalogs = { categories: [{ active: false, displayOrder: 1, label: 'Comida', slug: 'food' }], places: [] };
 const asset: ImageUploadAsset = { fileName: 'photo.jpg', height: 800, mimeType: 'image/jpeg', uri: 'file:///photo.jpg', width: 1200 };
@@ -26,7 +25,7 @@ describe('Compose controller transitions', () => {
     store.setImageReceipt(ownerID, selected.image?.uploadRequestId ?? '', receipt);
     const upload = vi.fn(async () => receipt); const create = vi.fn(async () => undefined);
     const controller = await ready(store, { createNote: create, prepareImageUpload: upload }); await controller.submit();
-    expect(upload).not.toHaveBeenCalled(); expect(create).toHaveBeenCalledWith(expect.objectContaining({ clientRequestId: selected.clientRequestId, imageUploadIds: [receipt.imageUploadId] }), token);
+    expect(upload).not.toHaveBeenCalled(); expect(create).toHaveBeenCalledWith(expect.objectContaining({ clientRequestId: selected.clientRequestId, imageUploadIds: [receipt.imageUploadId] }));
   });
 
   it('rotates expired receipts', async () => {
@@ -75,7 +74,7 @@ describe('Compose controller transitions', () => {
 
   it('aborts work on deactivation', async () => {
     const pending = deferred<ImageUploadReceipt>(); const store = draft('draft', 'upload', 'request'); image(store, asset); let signal: AbortSignal | undefined;
-    const create = vi.fn(async () => undefined); const controller = await ready(store, { createNote: create, prepareImageUpload: vi.fn((_asset, _token, options) => { signal = options.signal; return pending.promise; }) });
+    const create = vi.fn(async () => undefined); const controller = await ready(store, { createNote: create, prepareImageUpload: vi.fn((_asset, options) => { signal = options.signal; return pending.promise; }) });
     const publishing = controller.submit(); await tick(); controller.deactivate(); pending.resolve(receipt); await publishing;
     expect(signal?.aborted).toBe(true); expect(create).not.toHaveBeenCalled(); expect(store.get(ownerID)?.image?.imageReceipt).toBeNull();
   });
@@ -241,7 +240,7 @@ describe('Compose controller transitions', () => {
       submitState: { status: 'error', message: 'A imagem expirou. Tente publicar de novo.' },
     });
     await controller.submit();
-    expect(createNote).toHaveBeenLastCalledWith(expect.objectContaining({ categorySlug: 'travel' }), token);
+    expect(createNote).toHaveBeenLastCalledWith(expect.objectContaining({ categorySlug: 'travel' }));
   });
 
   it('does not commit a catalog after a subscriber starts a newer focus', async () => {
@@ -270,7 +269,7 @@ describe('Compose controller transitions', () => {
 
 function activated(store: ComposeDraftStore, overrides: Partial<ComposeControllerPorts> = {}) {
   const ports: ComposeControllerPorts = { createNote: async () => undefined, loadCatalogs: async () => catalogs, onPublished: () => undefined, onSessionExpired: async () => undefined, pickImage: async () => ({ assets: null, canceled: true }), prepareImageUpload: async () => receipt, ...overrides };
-  const controller = createComposeController({ draftStore: store, ownerID, ports, token }); controller.activate(); return controller;
+  const controller = createComposeController({ draftStore: store, ownerID, ports }); controller.activate(); return controller;
 }
 
 async function ready(store: ComposeDraftStore, overrides: Partial<ComposeControllerPorts> = {}) {

@@ -69,7 +69,7 @@ func newRouterWithAuthSeamsForTest(
 	imageReader media.AttachedImageReader,
 ) http.Handler {
 	return newRouter(
-		noteHandlers{store: notes, authorNotes: notes, catalog: catalog},
+		noteHandlers{store: notes, authorNotes: notes, useful: notes, catalog: catalog},
 		authHandlers{
 			users:                 users,
 			publicAuthors:         users,
@@ -313,6 +313,8 @@ type fakeNoteStore struct {
 	listNotes       func(ctx context.Context, input note.ListInput) ([]note.Note, error)
 	searchNotes     func(ctx context.Context, input note.SearchInput) ([]note.Note, error)
 	listAuthorNotes func(ctx context.Context, input note.AuthorNotesInput) (note.AuthorNotesPage, error)
+	markUseful      func(ctx context.Context, input note.MarkUsefulInput) error
+	unmarkUseful    func(ctx context.Context, input note.UnmarkUsefulInput) error
 }
 
 func (store fakeNoteStore) CreateNote(ctx context.Context, input note.CreateInput) (note.Note, error) {
@@ -348,6 +350,20 @@ func (store fakeNoteStore) ListAuthorNotes(ctx context.Context, input note.Autho
 		return note.AuthorNotesPage{}, fmt.Errorf("list author notes not implemented")
 	}
 	return store.listAuthorNotes(ctx, input)
+}
+
+func (store fakeNoteStore) MarkUseful(ctx context.Context, input note.MarkUsefulInput) error {
+	if store.markUseful == nil {
+		return fmt.Errorf("mark useful not implemented")
+	}
+	return store.markUseful(ctx, input)
+}
+
+func (store fakeNoteStore) UnmarkUseful(ctx context.Context, input note.UnmarkUsefulInput) error {
+	if store.unmarkUseful == nil {
+		return fmt.Errorf("unmark useful not implemented")
+	}
+	return store.unmarkUseful(ctx, input)
 }
 
 type fakeCatalog struct {

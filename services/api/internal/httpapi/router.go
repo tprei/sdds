@@ -16,6 +16,7 @@ import (
 type NoteStores interface {
 	note.Store
 	note.AuthorNoteStore
+	note.UsefulStore
 }
 
 type UserStores interface {
@@ -49,6 +50,7 @@ type SystemDependencies struct {
 type noteHandlers struct {
 	store       note.Store
 	authorNotes note.AuthorNoteStore
+	useful      note.UsefulStore
 	catalog     note.Catalog
 }
 
@@ -112,7 +114,7 @@ func DefaultAuthLimits() AuthLimits {
 func NewRouter(notes NotesDependencies, auth AuthDependencies, media MediaDependencies, system SystemDependencies) http.Handler {
 	hasher := newBoundedPasswordHasher(user.NewPasswordHasher(), auth.Limits.PasswordHashConcurrency)
 	return newRouter(
-		noteHandlers{store: notes.Stores, authorNotes: notes.Stores, catalog: notes.Catalog},
+		noteHandlers{store: notes.Stores, authorNotes: notes.Stores, useful: notes.Stores, catalog: notes.Catalog},
 		authHandlers{
 			users:                 auth.Users,
 			publicAuthors:         auth.Users,
@@ -168,6 +170,8 @@ func newRouter(notes noteHandlers, auth authHandlers, media mediaHandlers, syste
 		router.Group(func(router chi.Router) {
 			router.Use(requireCurrentSession)
 			router.Use(validateOpenAPIRequest)
+			router.Put("/notes/{note_id}/useful", wrapper.MarkNoteUseful)
+			router.Delete("/notes/{note_id}/useful", wrapper.UnmarkNoteUseful)
 			router.Post("/notes", wrapper.CreateNote)
 			router.Get("/auth/session", wrapper.GetAuthSession)
 			router.Delete("/auth/session", wrapper.DeleteAuthSession)

@@ -8,7 +8,7 @@ import (
 
 const (
 	corsAllowedHeaders = "Content-Type, Authorization"
-	corsAllowedMethods = "GET, POST, DELETE, OPTIONS"
+	corsAllowedMethods = "GET, POST, PUT, DELETE, OPTIONS"
 	headerOrigin       = "Origin"
 )
 

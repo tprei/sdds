@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { NoteMedia } from '@/components/note-media';
 
 import type { LabelledNote } from './catalog';
+import { UsefulButton } from './useful-button';
 import { styles } from './detail-screen.styles';
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
@@ -13,11 +14,17 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
 type NoteDetailContentProps = {
   note: LabelledNote;
   onPressAuthor: (authorID: string) => void;
+  onPressUseful?: () => void;
+  usefulError?: boolean;
+  usefulPending?: boolean;
 };
 
 export function NoteDetailContent({
   note,
   onPressAuthor,
+  onPressUseful = () => undefined,
+  usefulError = false,
+  usefulPending = false,
 }: NoteDetailContentProps) {
   return (
     <>
@@ -74,6 +81,19 @@ export function NoteDetailContent({
             {formatTimestamp(note.updatedAt)}
           </Text>
         </View>
+      </View>
+      <View style={styles.usefulSection}>
+        <UsefulButton
+          count={note.usefulCount}
+          marked={note.usefulByCurrentUser}
+          onPress={onPressUseful}
+          pending={usefulPending}
+        />
+        {usefulError ? (
+          <Text accessibilityRole="alert" style={styles.usefulError}>
+            Não deu pra atualizar o Útil. Tenta de novo.
+          </Text>
+        ) : null}
       </View>
     </>
   );

@@ -36,6 +36,7 @@ import {
 import type { Note } from '@/lib/api/notes';
 
 import { styles } from '@/features/notes/search-screen.styles';
+import { ReadAuthGate } from '@/components/read-auth-gate';
 
 type CatalogState =
   | { status: 'loading' }
@@ -451,49 +452,6 @@ function AuthenticatedSearchScreen({
     </FoundationScreen>
   );
 }
-
-function ReadAuthGate({
-  onLogin,
-  onSignup,
-  status,
-}: {
-  onLogin: () => void;
-  onSignup: () => void;
-  status: 'anonymous' | 'error' | 'loading';
-}) {
-  if (status === 'loading') {
-    return (
-      <EmptyStateCard
-        title="Conferindo sua sessão"
-        body="A gente já libera o formulário se você estiver com uma conta ativa."
-      />
-    );
-  }
-
-  if (status === 'error') {
-    return (
-      <>
-        <EmptyStateCard
-          title="Não deu pra confirmar sua sessão"
-          body="Verifique sua conexão e entre de novo para publicar."
-        />
-        <FoundationButton label="Entrar" onPress={onLogin} />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <EmptyStateCard
-        title="Entre para continuar"
-        body="Entre ou crie uma conta para acessar as notas."
-      />
-      <FoundationButton label="Criar conta" onPress={onSignup} />
-      <FoundationButton label="Entrar" onPress={onLogin} />
-    </>
-  );
-}
-
 function SearchStateContent({
   onOpenAuthor,
   onOpenNote,

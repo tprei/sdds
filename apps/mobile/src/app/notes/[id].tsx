@@ -15,6 +15,7 @@ import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { useUsefulMutation } from '@/features/notes/use-useful-mutation';
+import { ReadAuthGate } from '@/components/read-auth-gate';
 
 type NoteDetailState =
   | { status: 'loading' }
@@ -212,47 +213,5 @@ function AuthenticatedNoteDetailScreen({
       {content}
       <FoundationButton label="Voltar" onPress={() => router.back()} />
     </FoundationScreen>
-  );
-}
-
-function ReadAuthGate({
-  onLogin,
-  onSignup,
-  status,
-}: {
-  onLogin: () => void;
-  onSignup: () => void;
-  status: 'anonymous' | 'error' | 'loading';
-}) {
-  if (status === 'loading') {
-    return (
-      <EmptyStateCard
-        title="Conferindo sua sessão"
-        body="A gente já libera o formulário se você estiver com uma conta ativa."
-      />
-    );
-  }
-
-  if (status === 'error') {
-    return (
-      <>
-        <EmptyStateCard
-          title="Não deu pra confirmar sua sessão"
-          body="Verifique sua conexão e entre de novo para publicar."
-        />
-        <FoundationButton label="Entrar" onPress={onLogin} />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <EmptyStateCard
-        title="Entre para continuar"
-        body="Entre ou crie uma conta para acessar as notas."
-      />
-      <FoundationButton label="Criar conta" onPress={onSignup} />
-      <FoundationButton label="Entrar" onPress={onLogin} />
-    </>
   );
 }

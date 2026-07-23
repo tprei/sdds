@@ -3,6 +3,7 @@ import type { ImagePickerAsset } from 'expo-image-picker';
 
 import { apiBaseURL } from './config';
 import type { components } from './generated/schema';
+import type { BoundFetch } from './client';
 import { imageUploadReceiptSchema } from './schema';
 import { APIRequestError, parseAPIRequestError } from './request-error';
 import type { APIErrorResponse } from './request-error';
@@ -220,4 +221,65 @@ function delay(
     onAbort();
   }
   return promise;
+}
+
+
+export type ImageUploadsAPI = {
+  prepareImageUpload(
+    asset: ImageUploadAsset,
+    options: PrepareImageUploadOptions,
+  ): Promise<ImageUploadReceipt>;
+};
+
+export function bindImageUploadsAPI(fetch: BoundFetch): ImageUploadsAPI {
+  return {
+    async prepareImageUpload(asset, options) {
+      return runPrepareImageUpload(fetch, asset, options);
+    },
+  };
+}
+
+async function runPrepareImageUpload(
+  fetch: BoundFetch,
+  asset: ImageUploadAsset,
+  options: PrepareImageUploadOptions,
+): Promise<ImageUploadReceipt> {
+  throwIfAborted(options.signal);
+
+  const uploadRequestId = canonicalUploadRequestId(options.uploadRequestId);
+  const file = asset.file ?? new ExpoFile(asset.uri);
+  const filename = asset.fileName ?? file.name;
+  const maxAttempts = boundedPositiveInteger(options.maxAttempts, defaultMaxAttempts);
+  const maxDelayMs = boundedPositiveInteger(options.maxDelayMs, defaultMaxDelayMs);
+  const sleep = options.sleep ?? delay;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    throwIfAborted(options.signal);
+    const form = new FormData();
+    form.append('upload_request_id', uploadRequestId);
+    form.append('file', file, filename);
+    const request = new Request(`${apiBaseURL()}/v1/media/image-uploads`, {
+      body: form,
+      method: 'POST',
+      signal: options.signal,
+    });
+    const response = await fetch(request);
+
+    if (response.status === 201) {
+      return parseImageUploadReceipt(await readJSON(response));
+    }
+
+    const sharedError = await parseAPIRequestError(response);
+    throwIfAborted(options.signal);
+    const requestError = new ImageUploadRequestError(
+      sharedError.status,
+      sharedError.body,
+      sharedError.retryAfter,
+    );
+    if (!isRetryableImageUploadError(requestError) || attempt >= maxAttempts) {
+      throw requestError;
+    }
+    await sleep(retryDelay(requestError, attempt, maxDelayMs), options.signal);
+  }
+  throw new ImageUploadRequestError(503);
 }

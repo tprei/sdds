@@ -11,6 +11,7 @@ import {
 } from './schema';
 import type { APIErrorResponse, APIValidationProblem } from './request-error';
 import type { components, paths } from './generated/schema';
+import type { TypedTransport } from './client';
 export type AuthAuthor = {
   displayName: string;
   id: string;
@@ -170,5 +171,68 @@ function parseAuthorSummary(value: AuthorSummaryResponse): AuthAuthor {
   return {
     displayName: value.display_name,
     id: value.id,
+  };
+}
+
+
+export type AuthAPI = {
+  createAuthUser(input: CreateAuthUserInput): Promise<AuthSession>;
+  createAuthSession(input: CreateAuthSessionInput): Promise<AuthSession>;
+  getAuthSession(): Promise<CurrentAuthSession>;
+  deleteAuthSession(): Promise<void>;
+};
+
+function rewrapAuthTransportError(error: unknown): never {
+  if (error instanceof SharedAPIRequestError) {
+    throw new AuthAPIRequestError(error.status, error.body, error.retryAfter);
+  }
+  throw error;
+}
+
+export function bindAuthAPI(transport: TypedTransport): AuthAPI {
+  return {
+    async createAuthUser(input) {
+      const request: CreateUserRequest = {
+        display_name: input.displayName,
+        password: input.password,
+        username: input.username,
+      };
+      try {
+        const { data } = await transport.POST('/v1/auth/users', { body: request });
+        return parseAuthSessionResponse(data);
+      } catch (error) {
+        rewrapAuthTransportError(error);
+      }
+    },
+
+    async createAuthSession(input) {
+      const request: CreateSessionRequest = {
+        password: input.password,
+        username: input.username,
+      };
+      try {
+        const { data } = await transport.POST('/v1/auth/sessions', { body: request });
+        return parseAuthSessionResponse(data);
+      } catch (error) {
+        rewrapAuthTransportError(error);
+      }
+    },
+
+    async getAuthSession() {
+      try {
+        const { data } = await transport.GET('/v1/auth/session');
+        return parseCurrentSessionResponse(data);
+      } catch (error) {
+        rewrapAuthTransportError(error);
+      }
+    },
+
+    async deleteAuthSession() {
+      try {
+        await transport.DELETE('/v1/auth/session');
+      } catch (error) {
+        rewrapAuthTransportError(error);
+      }
+    },
   };
 }

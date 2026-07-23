@@ -7,6 +7,7 @@ import {
   listPlacesResponseSchema,
 } from './schema';
 import type { paths } from './generated/schema';
+import type { TypedTransport } from './client';
 
 export type CatalogCategory = {
   active: boolean;
@@ -104,4 +105,33 @@ function parseListPlacesResponse(value: unknown): CatalogPlace[] {
     label: value.label,
     slug: value.slug,
   }));
+}
+
+
+export type CatalogsAPI = {
+  listCatalogs(): Promise<Catalogs>;
+  listCategories(): Promise<CatalogCategory[]>;
+  listPlaces(): Promise<CatalogPlace[]>;
+};
+
+export function bindCatalogsAPI(transport: TypedTransport): CatalogsAPI {
+  return {
+    async listCatalogs() {
+      const [categories, places] = await Promise.all([
+        transport.GET('/v1/categories').then(({ data }) => parseListCategoriesResponse(data)),
+        transport.GET('/v1/places').then(({ data }) => parseListPlacesResponse(data)),
+      ]);
+      return { categories, places };
+    },
+
+    async listCategories() {
+      const { data } = await transport.GET('/v1/categories');
+      return parseListCategoriesResponse(data);
+    },
+
+    async listPlaces() {
+      const { data } = await transport.GET('/v1/places');
+      return parseListPlacesResponse(data);
+    },
+  };
 }

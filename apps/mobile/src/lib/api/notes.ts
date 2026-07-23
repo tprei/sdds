@@ -8,6 +8,7 @@ import {
 import { listNotesResponseSchema, noteSchema } from './schema';
 import type { APIErrorResponse } from './request-error';
 import type { components, paths } from './generated/schema';
+import type { TypedTransport } from './client';
 
 export type Note = {
   author: NoteAuthor;
@@ -281,4 +282,95 @@ function isAbsoluteURL(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+
+export type NotesAPI = {
+  listNotes(input: ListNotesInput): Promise<Note[]>;
+  getNote(id: string): Promise<Note>;
+  markNoteUseful(noteID: string): Promise<void>;
+  unmarkNoteUseful(noteID: string): Promise<void>;
+  searchNotes(input: SearchNotesInput): Promise<Note[]>;
+  createNote(input: CreateNoteInput): Promise<Note>;
+};
+
+function rewrapNotesTransportError(error: unknown): never {
+  if (error instanceof SharedAPIRequestError) {
+    throw new APIRequestError(error.status, error.body, error.retryAfter);
+  }
+  throw error;
+}
+
+export function bindNotesAPI(transport: TypedTransport): NotesAPI {
+  return {
+    async listNotes(input) {
+      try {
+        const { data } = await transport.GET('/v1/notes', {
+          params: { query: noteListQuery(input) },
+        });
+        return parseListNotesResponse(data);
+      } catch (error) {
+        rewrapNotesTransportError(error);
+      }
+    },
+
+    async getNote(id) {
+      try {
+        const { data } = await transport.GET('/v1/notes/{note_id}', {
+          params: { path: { note_id: id } },
+        });
+        return parseNoteResponse(data);
+      } catch (error) {
+        rewrapNotesTransportError(error);
+      }
+    },
+
+    async markNoteUseful(noteID) {
+      try {
+        await transport.PUT('/v1/notes/{note_id}/useful', {
+          params: { path: { note_id: noteID } },
+        });
+      } catch (error) {
+        rewrapNotesTransportError(error);
+      }
+    },
+
+    async unmarkNoteUseful(noteID) {
+      try {
+        await transport.DELETE('/v1/notes/{note_id}/useful', {
+          params: { path: { note_id: noteID } },
+        });
+      } catch (error) {
+        rewrapNotesTransportError(error);
+      }
+    },
+
+    async searchNotes(input) {
+      try {
+        const { data } = await transport.GET('/v1/search/notes', {
+          params: { query: noteSearchQuery(input) },
+        });
+        return parseListNotesResponse(data);
+      } catch (error) {
+        rewrapNotesTransportError(error);
+      }
+    },
+
+    async createNote(input) {
+      const request: CreateNoteRequest = {
+        body: input.body,
+        category_slug: input.categorySlug,
+        client_request_id: input.clientRequestId,
+        image_upload_ids: input.imageUploadIds,
+        place_slug: input.placeSlug ?? null,
+        title: input.title,
+      };
+      try {
+        const { data } = await transport.POST('/v1/notes', { body: request });
+        return parseNoteResponse(data);
+      } catch (error) {
+        rewrapNotesTransportError(error);
+      }
+    },
+  };
 }

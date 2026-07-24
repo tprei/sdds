@@ -139,6 +139,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await page.getByLabel('Senha').fill(syntheticPassword);
   await page.getByRole('button', { name: 'Criar conta' }).click();
 
+  await expect(page).toHaveURL(/\/(?:[?#]|$)/);
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
   ).toBeVisible();

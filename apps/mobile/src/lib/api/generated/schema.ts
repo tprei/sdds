@@ -227,6 +227,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/notes/{note_id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List note comments */
+        get: operations["listNoteComments"];
+        put?: never;
+        /** Create a note comment */
+        post: operations["createNoteComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notes/{note_id}/comments/{comment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a note comment */
+        delete: operations["deleteNoteComment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/notes/{note_id}/useful": {
         parameters: {
             query?: never;
@@ -305,6 +340,16 @@ export interface components {
             /** Format: int32 */
             display_order: number;
         };
+        Comment: {
+            id: string;
+            body: string;
+            author: components["schemas"]["AuthorSummary"];
+            /**
+             * Format: int64
+             * @description Unix timestamp in milliseconds.
+             */
+            created_at: number;
+        };
         ImageUploadReceipt: {
             /** Format: uuid */
             image_upload_id: string;
@@ -324,6 +369,9 @@ export interface components {
             upload_request_id: string;
             /** Format: binary */
             file: string;
+        };
+        CreateCommentRequest: {
+            body: string;
         };
         CreateNoteRequest: {
             title: string;
@@ -356,13 +404,17 @@ export interface components {
             author: components["schemas"]["AuthorSummary"];
         };
         /** @enum {string} */
-        ErrorCode: "internal_error" | "invalid_auth" | "invalid_json" | "invalid_note" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken" | "invalid_media" | "unsupported_media_type" | "idempotency_conflict" | "upload_in_progress" | "upload_expired" | "media_staging_quota_exceeded" | "media_storage_unavailable" | "media_integrity_error" | "too_many_images";
+        ErrorCode: "internal_error" | "forbidden" | "invalid_auth" | "invalid_comment" | "invalid_json" | "invalid_note" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken" | "invalid_media" | "unsupported_media_type" | "idempotency_conflict" | "upload_in_progress" | "upload_expired" | "media_staging_quota_exceeded" | "media_storage_unavailable" | "media_integrity_error" | "too_many_images";
         ErrorResponse: {
             code: components["schemas"]["ErrorCode"];
             fields?: components["schemas"]["ValidationProblem"][];
         };
         ListNotesResponse: {
             notes: components["schemas"]["Note"][];
+        };
+        ListNoteCommentsResponse: {
+            comments: components["schemas"]["Comment"][];
+            next_cursor: string | null;
         };
         ListCategoriesResponse: {
             categories: components["schemas"]["CatalogCategory"][];
@@ -1277,6 +1329,195 @@ export interface operations {
                 };
             };
             /** @description The API could not get the note. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listNoteComments: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                note_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description An oldest-first page of comments. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListNoteCommentsResponse"];
+                };
+            };
+            /** @description Invalid comment pagination. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is missing a valid authenticated session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The note was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not list note comments. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createNoteComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCommentRequest"];
+            };
+        };
+        responses: {
+            /** @description The created comment. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Comment"];
+                };
+            };
+            /** @description Invalid JSON or comment body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is missing a valid authenticated session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The note was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request body exceeds 8 KiB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not create the comment. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deleteNoteComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: string;
+                comment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The comment was deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The request is missing a valid authenticated session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The authenticated user is not the comment author. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The note or comment was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not delete the comment. */
             500: {
                 headers: {
                     [name: string]: unknown;

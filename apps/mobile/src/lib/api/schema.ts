@@ -138,7 +138,9 @@ export const imageUploadReceiptSchema = z.object({
 
 export const errorCodeSchema = z.enum([
   'internal_error',
+  'forbidden',
   'invalid_auth',
+  'invalid_comment',
   'invalid_json',
   'invalid_note',
   'invalid_search',

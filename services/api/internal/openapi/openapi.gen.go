@@ -30,9 +30,11 @@ const (
 
 // Defines values for ErrorCode.
 const (
+	ErrorCodeForbidden                 ErrorCode = "forbidden"
 	ErrorCodeIdempotencyConflict       ErrorCode = "idempotency_conflict"
 	ErrorCodeInternal                  ErrorCode = "internal_error"
 	ErrorCodeInvalidAuth               ErrorCode = "invalid_auth"
+	ErrorCodeInvalidComment            ErrorCode = "invalid_comment"
 	ErrorCodeInvalidJSON               ErrorCode = "invalid_json"
 	ErrorCodeInvalidMedia              ErrorCode = "invalid_media"
 	ErrorCodeInvalidNote               ErrorCode = "invalid_note"
@@ -54,11 +56,15 @@ const (
 // Valid indicates whether the value is a known member of the ErrorCode enum.
 func (e ErrorCode) Valid() bool {
 	switch e {
+	case ErrorCodeForbidden:
+		return true
 	case ErrorCodeIdempotencyConflict:
 		return true
 	case ErrorCodeInternal:
 		return true
 	case ErrorCodeInvalidAuth:
+		return true
+	case ErrorCodeInvalidComment:
 		return true
 	case ErrorCodeInvalidJSON:
 		return true
@@ -256,6 +262,21 @@ type CatalogPlace struct {
 // CategorySlug defines model for CategorySlug.
 type CategorySlug = string
 
+// Comment defines model for Comment.
+type Comment struct {
+	Author AuthorSummary `json:"author"`
+	Body   string        `json:"body"`
+
+	// CreatedAt Unix timestamp in milliseconds.
+	CreatedAt int64  `json:"created_at"`
+	Id        string `json:"id"`
+}
+
+// CreateCommentRequest defines model for CreateCommentRequest.
+type CreateCommentRequest struct {
+	Body string `json:"body"`
+}
+
 // CreateNoteRequest defines model for CreateNoteRequest.
 type CreateNoteRequest struct {
 	Body            string       `json:"body"`
@@ -318,6 +339,12 @@ type ImageUploadReceiptContentType string
 // ListCategoriesResponse defines model for ListCategoriesResponse.
 type ListCategoriesResponse struct {
 	Categories []CatalogCategory `json:"categories"`
+}
+
+// ListNoteCommentsResponse defines model for ListNoteCommentsResponse.
+type ListNoteCommentsResponse struct {
+	Comments   []Comment `json:"comments"`
+	NextCursor *string   `json:"next_cursor"`
 }
 
 // ListNotesResponse defines model for ListNotesResponse.
@@ -415,6 +442,12 @@ type ListNotesParams struct {
 	CategorySlug *CategorySlug `form:"category_slug,omitempty" json:"category_slug,omitempty"`
 }
 
+// ListNoteCommentsParams defines parameters for ListNoteComments.
+type ListNoteCommentsParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
 // SearchNotesParams defines parameters for SearchNotes.
 type SearchNotesParams struct {
 	// Q Raw user search text. Missing, blank, or overlong values return invalid_search.
@@ -435,6 +468,9 @@ type PrepareImageUploadMultipartRequestBody = PrepareImageUploadMultipart
 
 // CreateNoteJSONRequestBody defines body for CreateNote for application/json ContentType.
 type CreateNoteJSONRequestBody = CreateNoteRequest
+
+// CreateNoteCommentJSONRequestBody defines body for CreateNoteComment for application/json ContentType.
+type CreateNoteCommentJSONRequestBody = CreateCommentRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -480,6 +516,15 @@ type ServerInterface interface {
 	// Get a note
 	// (GET /v1/notes/{note_id})
 	GetNote(w http.ResponseWriter, r *http.Request, noteId string)
+	// List note comments
+	// (GET /v1/notes/{note_id}/comments)
+	ListNoteComments(w http.ResponseWriter, r *http.Request, noteId string, params ListNoteCommentsParams)
+	// Create a note comment
+	// (POST /v1/notes/{note_id}/comments)
+	CreateNoteComment(w http.ResponseWriter, r *http.Request, noteId string)
+	// Delete a note comment
+	// (DELETE /v1/notes/{note_id}/comments/{comment_id})
+	DeleteNoteComment(w http.ResponseWriter, r *http.Request, noteId string, commentId string)
 	// Remove a useful mark from a note
 	// (DELETE /v1/notes/{note_id}/useful)
 	UnmarkNoteUseful(w http.ResponseWriter, r *http.Request, noteId string)
@@ -579,6 +624,24 @@ func (_ Unimplemented) CreateNote(w http.ResponseWriter, r *http.Request) {
 // Get a note
 // (GET /v1/notes/{note_id})
 func (_ Unimplemented) GetNote(w http.ResponseWriter, r *http.Request, noteId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List note comments
+// (GET /v1/notes/{note_id}/comments)
+func (_ Unimplemented) ListNoteComments(w http.ResponseWriter, r *http.Request, noteId string, params ListNoteCommentsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a note comment
+// (POST /v1/notes/{note_id}/comments)
+func (_ Unimplemented) CreateNoteComment(w http.ResponseWriter, r *http.Request, noteId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete a note comment
+// (DELETE /v1/notes/{note_id}/comments/{comment_id})
+func (_ Unimplemented) DeleteNoteComment(w http.ResponseWriter, r *http.Request, noteId string, commentId string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -961,6 +1024,140 @@ func (siw *ServerInterfaceWrapper) GetNote(w http.ResponseWriter, r *http.Reques
 	handler.ServeHTTP(w, r)
 }
 
+// ListNoteComments operation middleware
+func (siw *ServerInterfaceWrapper) ListNoteComments(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "note_id" -------------
+	var noteId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "note_id", chi.URLParam(r, "note_id"), &noteId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "note_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListNoteCommentsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListNoteComments(w, r, noteId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateNoteComment operation middleware
+func (siw *ServerInterfaceWrapper) CreateNoteComment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "note_id" -------------
+	var noteId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "note_id", chi.URLParam(r, "note_id"), &noteId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "note_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateNoteComment(w, r, noteId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteNoteComment operation middleware
+func (siw *ServerInterfaceWrapper) DeleteNoteComment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "note_id" -------------
+	var noteId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "note_id", chi.URLParam(r, "note_id"), &noteId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "note_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "comment_id" -------------
+	var commentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "comment_id", chi.URLParam(r, "comment_id"), &commentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "comment_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteNoteComment(w, r, noteId, commentId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // UnmarkNoteUseful operation middleware
 func (siw *ServerInterfaceWrapper) UnmarkNoteUseful(w http.ResponseWriter, r *http.Request) {
 
@@ -1251,6 +1448,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/notes/{note_id}", wrapper.GetNote)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/notes/{note_id}/comments", wrapper.ListNoteComments)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/notes/{note_id}/comments", wrapper.CreateNoteComment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/v1/notes/{note_id}/comments/{comment_id}", wrapper.DeleteNoteComment)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/v1/notes/{note_id}/useful", wrapper.UnmarkNoteUseful)
@@ -2424,6 +2630,251 @@ func (response GetNote500JSONResponse) VisitGetNoteResponse(w http.ResponseWrite
 	return err
 }
 
+type ListNoteCommentsRequestObject struct {
+	NoteId string `json:"note_id"`
+	Params ListNoteCommentsParams
+}
+
+type ListNoteCommentsResponseObject interface {
+	VisitListNoteCommentsResponse(w http.ResponseWriter) error
+}
+
+type ListNoteComments200JSONResponse ListNoteCommentsResponse
+
+func (response ListNoteComments200JSONResponse) VisitListNoteCommentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNoteComments400JSONResponse ErrorResponse
+
+func (response ListNoteComments400JSONResponse) VisitListNoteCommentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNoteComments401JSONResponse ErrorResponse
+
+func (response ListNoteComments401JSONResponse) VisitListNoteCommentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNoteComments404JSONResponse ErrorResponse
+
+func (response ListNoteComments404JSONResponse) VisitListNoteCommentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNoteComments500JSONResponse ErrorResponse
+
+func (response ListNoteComments500JSONResponse) VisitListNoteCommentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNoteCommentRequestObject struct {
+	NoteId string `json:"note_id"`
+	Body   *CreateNoteCommentJSONRequestBody
+}
+
+type CreateNoteCommentResponseObject interface {
+	VisitCreateNoteCommentResponse(w http.ResponseWriter) error
+}
+
+type CreateNoteComment201JSONResponse Comment
+
+func (response CreateNoteComment201JSONResponse) VisitCreateNoteCommentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNoteComment400JSONResponse ErrorResponse
+
+func (response CreateNoteComment400JSONResponse) VisitCreateNoteCommentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNoteComment401JSONResponse ErrorResponse
+
+func (response CreateNoteComment401JSONResponse) VisitCreateNoteCommentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNoteComment404JSONResponse ErrorResponse
+
+func (response CreateNoteComment404JSONResponse) VisitCreateNoteCommentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNoteComment413JSONResponse ErrorResponse
+
+func (response CreateNoteComment413JSONResponse) VisitCreateNoteCommentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateNoteComment500JSONResponse ErrorResponse
+
+func (response CreateNoteComment500JSONResponse) VisitCreateNoteCommentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNoteCommentRequestObject struct {
+	NoteId    string `json:"note_id"`
+	CommentId string `json:"comment_id"`
+}
+
+type DeleteNoteCommentResponseObject interface {
+	VisitDeleteNoteCommentResponse(w http.ResponseWriter) error
+}
+
+type DeleteNoteComment204Response struct {
+}
+
+func (response DeleteNoteComment204Response) VisitDeleteNoteCommentResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteNoteComment401JSONResponse ErrorResponse
+
+func (response DeleteNoteComment401JSONResponse) VisitDeleteNoteCommentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNoteComment403JSONResponse ErrorResponse
+
+func (response DeleteNoteComment403JSONResponse) VisitDeleteNoteCommentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNoteComment404JSONResponse ErrorResponse
+
+func (response DeleteNoteComment404JSONResponse) VisitDeleteNoteCommentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteNoteComment500JSONResponse ErrorResponse
+
+func (response DeleteNoteComment500JSONResponse) VisitDeleteNoteCommentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type UnmarkNoteUsefulRequestObject struct {
 	NoteId string `json:"note_id"`
 }
@@ -2711,6 +3162,15 @@ type StrictServerInterface interface {
 	// Get a note
 	// (GET /v1/notes/{note_id})
 	GetNote(ctx context.Context, request GetNoteRequestObject) (GetNoteResponseObject, error)
+	// List note comments
+	// (GET /v1/notes/{note_id}/comments)
+	ListNoteComments(ctx context.Context, request ListNoteCommentsRequestObject) (ListNoteCommentsResponseObject, error)
+	// Create a note comment
+	// (POST /v1/notes/{note_id}/comments)
+	CreateNoteComment(ctx context.Context, request CreateNoteCommentRequestObject) (CreateNoteCommentResponseObject, error)
+	// Delete a note comment
+	// (DELETE /v1/notes/{note_id}/comments/{comment_id})
+	DeleteNoteComment(ctx context.Context, request DeleteNoteCommentRequestObject) (DeleteNoteCommentResponseObject, error)
 	// Remove a useful mark from a note
 	// (DELETE /v1/notes/{note_id}/useful)
 	UnmarkNoteUseful(ctx context.Context, request UnmarkNoteUsefulRequestObject) (UnmarkNoteUsefulResponseObject, error)
@@ -3129,6 +3589,93 @@ func (sh *strictHandler) GetNote(w http.ResponseWriter, r *http.Request, noteId 
 	}
 }
 
+// ListNoteComments operation middleware
+func (sh *strictHandler) ListNoteComments(w http.ResponseWriter, r *http.Request, noteId string, params ListNoteCommentsParams) {
+	var request ListNoteCommentsRequestObject
+
+	request.NoteId = noteId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListNoteComments(ctx, request.(ListNoteCommentsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListNoteComments")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListNoteCommentsResponseObject); ok {
+		if err := validResponse.VisitListNoteCommentsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateNoteComment operation middleware
+func (sh *strictHandler) CreateNoteComment(w http.ResponseWriter, r *http.Request, noteId string) {
+	var request CreateNoteCommentRequestObject
+
+	request.NoteId = noteId
+
+	var body CreateNoteCommentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateNoteComment(ctx, request.(CreateNoteCommentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateNoteComment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateNoteCommentResponseObject); ok {
+		if err := validResponse.VisitCreateNoteCommentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteNoteComment operation middleware
+func (sh *strictHandler) DeleteNoteComment(w http.ResponseWriter, r *http.Request, noteId string, commentId string) {
+	var request DeleteNoteCommentRequestObject
+
+	request.NoteId = noteId
+	request.CommentId = commentId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteNoteComment(ctx, request.(DeleteNoteCommentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteNoteComment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteNoteCommentResponseObject); ok {
+		if err := validResponse.VisitDeleteNoteCommentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // UnmarkNoteUseful operation middleware
 func (sh *strictHandler) UnmarkNoteUseful(w http.ResponseWriter, r *http.Request, noteId string) {
 	var request UnmarkNoteUsefulRequestObject
@@ -3236,70 +3783,74 @@ func (sh *strictHandler) SearchNotes(w http.ResponseWriter, r *http.Request, par
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"AP//",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

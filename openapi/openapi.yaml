@@ -680,6 +680,168 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/notes/{note_id}/comments:
+    get:
+      operationId: listNoteComments
+      summary: List note comments
+      tags:
+        - Notes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: note_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+      responses:
+        "200":
+          description: An oldest-first page of comments.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListNoteCommentsResponse"
+        "400":
+          description: Invalid comment pagination.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is missing a valid authenticated session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The note was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not list note comments.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: createNoteComment
+      summary: Create a note comment
+      tags:
+        - Notes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: note_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+      responses:
+        "201":
+          description: The created comment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          description: Invalid JSON or comment body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is missing a valid authenticated session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The note was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: The request body exceeds 8 KiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not create the comment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/notes/{note_id}/comments/{comment_id}:
+    delete:
+      operationId: deleteNoteComment
+      summary: Delete a note comment
+      tags:
+        - Notes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: note_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: comment_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: The comment was deleted.
+        "401":
+          description: The request is missing a valid authenticated session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: The authenticated user is not the comment author.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The note or comment was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not delete the comment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/notes/{note_id}/useful:
     put:
       operationId: markNoteUseful
@@ -896,6 +1058,28 @@ components:
         display_order:
           type: integer
           format: int32
+    Comment:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - body
+        - author
+        - created_at
+      properties:
+        id:
+          type: string
+        body:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        author:
+          $ref: "#/components/schemas/AuthorSummary"
+        created_at:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Unix timestamp in milliseconds.
     ImageUploadReceipt:
       type: object
       additionalProperties: false
@@ -945,6 +1129,16 @@ components:
         file:
           type: string
           format: binary
+    CreateCommentRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - body
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 1000
     CreateNoteRequest:
       type: object
       additionalProperties: false
@@ -1036,7 +1230,9 @@ components:
       type: string
       x-enum-varnames:
         - ErrorCodeInternal
+        - ErrorCodeForbidden
         - ErrorCodeInvalidAuth
+        - ErrorCodeInvalidComment
         - ErrorCodeInvalidJSON
         - ErrorCodeInvalidNote
         - ErrorCodeInvalidSearch
@@ -1056,7 +1252,9 @@ components:
         - ErrorCodeTooManyImages
       enum:
         - internal_error
+        - forbidden
         - invalid_auth
+        - invalid_comment
         - invalid_json
         - invalid_note
         - invalid_search
@@ -1096,6 +1294,22 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Note"
+    ListNoteCommentsResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - comments
+        - next_cursor
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+        next_cursor:
+          type: string
+          minLength: 1
+          maxLength: 512
+          nullable: true
     ListCategoriesResponse:
       type: object
       additionalProperties: false

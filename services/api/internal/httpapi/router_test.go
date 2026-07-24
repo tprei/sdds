@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tprei/sdds/services/api/internal/author"
+	"github.com/tprei/sdds/services/api/internal/comment"
 	"github.com/tprei/sdds/services/api/internal/media"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/user"
@@ -38,6 +39,41 @@ func (fake fakeReadiness) Check(ctx context.Context) error {
 	return fake.check(ctx)
 }
 
+type fakeCommentStore struct {
+	createComment    func(context.Context, comment.CreateInput) (comment.Comment, error)
+	findComment      func(context.Context, string, string) (comment.Comment, error)
+	listNoteComments func(context.Context, comment.ListInput) (comment.Page, error)
+	deleteComment    func(context.Context, string) error
+}
+
+func (fake fakeCommentStore) CreateComment(ctx context.Context, input comment.CreateInput) (comment.Comment, error) {
+	if fake.createComment == nil {
+		return comment.Comment{}, errors.New("comment store not implemented")
+	}
+	return fake.createComment(ctx, input)
+}
+
+func (fake fakeCommentStore) FindComment(ctx context.Context, noteID string, commentID string) (comment.Comment, error) {
+	if fake.findComment == nil {
+		return comment.Comment{}, errors.New("comment store not implemented")
+	}
+	return fake.findComment(ctx, noteID, commentID)
+}
+
+func (fake fakeCommentStore) ListNoteComments(ctx context.Context, input comment.ListInput) (comment.Page, error) {
+	if fake.listNoteComments == nil {
+		return comment.Page{}, errors.New("comment store not implemented")
+	}
+	return fake.listNoteComments(ctx, input)
+}
+
+func (fake fakeCommentStore) DeleteComment(ctx context.Context, commentID string) error {
+	if fake.deleteComment == nil {
+		return errors.New("comment store not implemented")
+	}
+	return fake.deleteComment(ctx, commentID)
+}
+
 func newRouterForTest(
 	notes NoteStores,
 	catalog note.Catalog,
@@ -49,6 +85,7 @@ func newRouterForTest(
 ) http.Handler {
 	return NewRouter(
 		NotesDependencies{Stores: notes, Catalog: catalog},
+		CommentDependencies{Store: fakeCommentStore{}},
 		AuthDependencies{Users: users, Limits: authLimits},
 		MediaDependencies{ImageUploads: uploadService, AttachedImages: imageReader},
 		SystemDependencies{Readiness: readiness},
@@ -70,6 +107,7 @@ func newRouterWithAuthSeamsForTest(
 ) http.Handler {
 	return newRouter(
 		noteHandlers{store: notes, authorNotes: notes, useful: notes, catalog: catalog},
+		commentHandlers{store: fakeCommentStore{}, notes: notes},
 		authHandlers{
 			users:                 users,
 			publicAuthors:         users,
@@ -101,12 +139,28 @@ func TestNewRouterRequiresMediaDependencies(t *testing.T) {
 			}()
 			NewRouter(
 				NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
+				CommentDependencies{Store: fakeCommentStore{}},
 				AuthDependencies{Users: fakeUserStore{}, Limits: DefaultAuthLimits()},
 				test.media,
 				SystemDependencies{Readiness: fakeReadiness{}},
 			)
 		})
 	}
+}
+
+func TestNewRouterRequiresCommentStore(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("NewRouter did not panic")
+		}
+	}()
+	NewRouter(
+		NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
+		CommentDependencies{},
+		AuthDependencies{Users: fakeUserStore{}, Limits: DefaultAuthLimits()},
+		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
+		SystemDependencies{Readiness: fakeReadiness{}},
+	)
 }
 
 func newTestRouter(notes fakeNoteStore) http.Handler {

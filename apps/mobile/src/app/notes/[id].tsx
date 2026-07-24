@@ -1,4 +1,10 @@
-import { useCallback, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
@@ -6,6 +12,14 @@ import {
   FoundationButton,
   FoundationScreen,
 } from '@/components/foundation-screen';
+import { CommentsSection } from '@/features/comments/comments-section';
+import {
+  canDeleteComment,
+  canSubmitComment,
+  commentThreadReducer,
+  createCommentThreadState,
+  validateCommentDraft,
+} from '@/features/comments/comment-thread';
 import { NoteDetailContent } from '@/features/notes/note-detail-content';
 import { buildNoteCatalog, labelNote } from '@/features/notes/catalog';
 import type { LabelledNote } from '@/features/notes/catalog';
@@ -25,6 +39,7 @@ type NoteDetailState =
 
 type AuthenticatedNoteDetailScreenProps = {
   apiClient: APIClient;
+  currentAuthorID: string;
   noteID: string;
   onSessionExpired: () => Promise<void>;
 };
@@ -59,6 +74,7 @@ export default function NoteDetailScreen() {
       <AuthenticatedNoteDetailScreen
         key={`${state.user.id}:${noteID}`}
         apiClient={apiClient}
+        currentAuthorID={state.user.author.id}
         noteID={noteID}
         onSessionExpired={logout}
       />
@@ -90,12 +106,220 @@ export default function NoteDetailScreen() {
 
 function AuthenticatedNoteDetailScreen({
   apiClient,
+  currentAuthorID,
   noteID,
   onSessionExpired,
 }: AuthenticatedNoteDetailScreenProps) {
   const router = useRouter();
   const detailGenerationRef = useRef(0);
+  const detailActiveRef = useRef(false);
+  const commentRequestIDRef = useRef(0);
+  const commentListRequestRef = useRef<number | null>(null);
+  const commentCreateRequestRef = useRef<number | null>(null);
+  const commentDeleteRequestRefs = useRef(new Map<string, number>());
   const [state, setState] = useState<NoteDetailState>({ status: 'loading' });
+  const [commentThread, dispatchCommentThread] = useReducer(
+    commentThreadReducer,
+    undefined,
+    createCommentThreadState,
+  );
+
+  const handleCommentSessionExpired = useCallback(async () => {
+    const expiredGeneration = ++detailGenerationRef.current;
+    try {
+      await onSessionExpired();
+    } catch {
+      if (detailGenerationRef.current === expiredGeneration) {
+        setState({ status: 'error' });
+      }
+    }
+  }, [onSessionExpired]);
+
+  const loadCommentPage = useCallback(
+    (cursor?: string) => {
+      if (commentListRequestRef.current !== null) {
+        return;
+      }
+
+      const generation = detailGenerationRef.current;
+      const requestID = ++commentRequestIDRef.current;
+      commentListRequestRef.current = requestID;
+      dispatchCommentThread({
+        type:
+          cursor === undefined ? 'initial_load_started' : 'load_more_started',
+      });
+
+      void apiClient
+        .listNoteComments({
+          noteID,
+          ...(cursor === undefined ? {} : { cursor }),
+        })
+        .then((page) => {
+          if (
+            detailGenerationRef.current !== generation ||
+            commentListRequestRef.current !== requestID
+          ) {
+            return;
+          }
+          dispatchCommentThread(
+            cursor === undefined
+              ? { type: 'initial_load_succeeded', page }
+              : { type: 'load_more_succeeded', page },
+          );
+        })
+        .catch((error: unknown) => {
+          if (
+            detailGenerationRef.current !== generation ||
+            commentListRequestRef.current !== requestID
+          ) {
+            return;
+          }
+
+          const status = requestStatus(error);
+          if (status === unauthorizedStatus) {
+            void handleCommentSessionExpired();
+            return;
+          }
+          if (status === notFoundStatus) {
+            setState({ status: 'notFound' });
+            return;
+          }
+          dispatchCommentThread({
+            type:
+              cursor === undefined
+                ? 'initial_load_failed'
+                : 'load_more_failed',
+          });
+        })
+        .finally(() => {
+          if (commentListRequestRef.current === requestID) {
+            commentListRequestRef.current = null;
+          }
+        });
+    },
+    [apiClient, handleCommentSessionExpired, noteID],
+  );
+
+  const handleLoadMoreComments = useCallback(() => {
+    const cursor = commentThread.nextCursor;
+    if (
+      commentThread.initialLoadStatus !== 'ready' ||
+      commentThread.loadMoreStatus === 'pending' ||
+      cursor === null
+    ) {
+      return;
+    }
+    loadCommentPage(cursor);
+  }, [
+    commentThread.initialLoadStatus,
+    commentThread.loadMoreStatus,
+    commentThread.nextCursor,
+    loadCommentPage,
+  ]);
+
+  const handleSubmitComment = useCallback(() => {
+    if (
+      commentCreateRequestRef.current !== null ||
+      !canSubmitComment(commentThread)
+    ) {
+      return;
+    }
+
+    const generation = detailGenerationRef.current;
+    const requestID = ++commentRequestIDRef.current;
+    const body = validateCommentDraft(commentThread.draft).body;
+    commentCreateRequestRef.current = requestID;
+    dispatchCommentThread({ type: 'submit_started' });
+
+    void apiClient
+      .createNoteComment({ body, noteID })
+      .then((comment) => {
+        if (
+          detailGenerationRef.current !== generation ||
+          commentCreateRequestRef.current !== requestID
+        ) {
+          return;
+        }
+        dispatchCommentThread({ type: 'submit_succeeded', comment });
+      })
+      .catch((error: unknown) => {
+        if (
+          detailGenerationRef.current !== generation ||
+          commentCreateRequestRef.current !== requestID
+        ) {
+          return;
+        }
+
+        const status = requestStatus(error);
+        if (status === unauthorizedStatus) {
+          void handleCommentSessionExpired();
+          return;
+        }
+        if (status === notFoundStatus) {
+          setState({ status: 'notFound' });
+          return;
+        }
+        dispatchCommentThread({ type: 'submit_failed' });
+      })
+      .finally(() => {
+        if (commentCreateRequestRef.current === requestID) {
+          commentCreateRequestRef.current = null;
+        }
+      });
+  }, [apiClient, commentThread, handleCommentSessionExpired, noteID]);
+
+  const handleDeleteComment = useCallback(
+    (commentID: string) => {
+      if (
+        commentDeleteRequestRefs.current.has(commentID) ||
+        !canDeleteComment(commentThread, commentID)
+      ) {
+        return;
+      }
+
+      const generation = detailGenerationRef.current;
+      const requestID = ++commentRequestIDRef.current;
+      commentDeleteRequestRefs.current.set(commentID, requestID);
+      dispatchCommentThread({ type: 'delete_started', commentID });
+
+      void apiClient
+        .deleteNoteComment({ commentID, noteID })
+        .then(() => {
+          if (
+            detailGenerationRef.current !== generation ||
+            commentDeleteRequestRefs.current.get(commentID) !== requestID
+          ) {
+            return;
+          }
+          dispatchCommentThread({ type: 'delete_succeeded', commentID });
+        })
+        .catch((error: unknown) => {
+          if (
+            detailGenerationRef.current !== generation ||
+            commentDeleteRequestRefs.current.get(commentID) !== requestID
+          ) {
+            return;
+          }
+
+          const status = requestStatus(error);
+          if (status === unauthorizedStatus) {
+            void handleCommentSessionExpired();
+            return;
+          }
+          if (status === notFoundStatus) {
+            dispatchCommentThread({ type: 'delete_not_found', commentID });
+            return;
+          }
+          dispatchCommentThread({ type: 'delete_failed', commentID });
+        })
+        .finally(() => {
+          if (commentDeleteRequestRefs.current.get(commentID) === requestID) {
+            commentDeleteRequestRefs.current.delete(commentID);
+          }
+        });
+    },
+    [apiClient, commentThread, handleCommentSessionExpired, noteID],
+  );
 
   const { getMutationState, toggleUseful: handleToggleUseful } = useUsefulMutation({
     apiClient,
@@ -103,18 +327,48 @@ function AuthenticatedNoteDetailScreen({
     getGeneration: () => detailGenerationRef.current,
     isStale: (gen) => gen !== detailGenerationRef.current,
     onStaleWrite: () => {
-      detailGenerationRef.current += 1;
+      if (!detailActiveRef.current) {
+        return;
+      }
+
+      const generation = ++detailGenerationRef.current;
+      commentListRequestRef.current = null;
+      commentCreateRequestRef.current = null;
+      commentDeleteRequestRefs.current.clear();
+      dispatchCommentThread({ type: 'reset' });
       void Promise.all([apiClient.listCatalogs(), apiClient.getNote(noteID)])
         .then(([catalogs, note]) => {
+          if (
+            !detailActiveRef.current ||
+            detailGenerationRef.current !== generation
+          ) {
+            return;
+          }
           const labelled = labelNote(buildNoteCatalog(catalogs), note);
-          if (labelled !== null) setState({ status: 'ready', note: labelled });
+          if (labelled === null) {
+            setState({ status: 'error' });
+            return;
+          }
+          setState({ status: 'ready', note: labelled });
+          loadCommentPage();
         })
-        .catch(() => setState({ status: 'error' }));
+        .catch(() => {
+          if (
+            !detailActiveRef.current ||
+            detailGenerationRef.current !== generation
+          ) {
+            return;
+          }
+          setState({ status: 'error' });
+        });
     },
     applyResult: (noteId, updater) => {
       setState((current) => {
         if (current.status !== 'ready') return current;
-        return { status: 'ready', note: updater(current.note) as typeof current.note };
+        return {
+          status: 'ready',
+          note: updater(current.note) as typeof current.note,
+        };
       });
     },
   });
@@ -122,33 +376,34 @@ function AuthenticatedNoteDetailScreen({
   useFocusEffect(
     useCallback(() => {
       const generation = ++detailGenerationRef.current;
+      detailActiveRef.current = true;
       let isActive = true;
+      commentListRequestRef.current = null;
+      commentCreateRequestRef.current = null;
+      commentDeleteRequestRefs.current.clear();
+      dispatchCommentThread({ type: 'reset' });
       setState({ status: 'loading' });
 
-      Promise.all([apiClient.listCatalogs(), apiClient.getNote(noteID)])
+      void Promise.all([apiClient.listCatalogs(), apiClient.getNote(noteID)])
         .then(([catalogs, note]) => {
           if (!isActive || detailGenerationRef.current !== generation) {
             return;
           }
           const catalog = buildNoteCatalog(catalogs);
           const labelledNote = labelNote(catalog, note);
-          setState(
-            labelledNote === null
-              ? { status: 'error' }
-              : { status: 'ready', note: labelledNote },
-          );
+          if (labelledNote === null) {
+            setState({ status: 'error' });
+            return;
+          }
+          setState({ status: 'ready', note: labelledNote });
+          loadCommentPage();
         })
-        .catch(async (error: unknown) => {
+        .catch((error: unknown) => {
           if (!isActive || detailGenerationRef.current !== generation) {
             return;
           }
           if (requestStatus(error) === unauthorizedStatus) {
-            detailGenerationRef.current += 1;
-            try {
-              await onSessionExpired();
-            } catch {
-              setState({ status: 'error' });
-            }
+            void handleCommentSessionExpired();
             return;
           }
           setState(
@@ -160,13 +415,21 @@ function AuthenticatedNoteDetailScreen({
 
       return () => {
         isActive = false;
+        detailActiveRef.current = false;
         detailGenerationRef.current += 1;
+        commentListRequestRef.current = null;
+        commentCreateRequestRef.current = null;
+        commentDeleteRequestRefs.current.clear();
       };
-    }, [apiClient, noteID, onSessionExpired]),
+    }, [
+      apiClient,
+      handleCommentSessionExpired,
+      loadCommentPage,
+      noteID,
+    ]),
   );
 
-
-  let content: React.ReactNode;
+  let content: ReactNode;
   if (state.status === 'loading') {
     content = (
       <EmptyStateCard
@@ -190,17 +453,33 @@ function AuthenticatedNoteDetailScreen({
     );
   } else {
     content = (
-      <NoteDetailContent
-        note={state.note}
-        onPressAuthor={(authorID) =>
-          router.push({ pathname: '/authors/[id]', params: { id: authorID } })
-        }
-        onPressUseful={() => {
-          void handleToggleUseful(state.note);
-        }}
-        usefulError={getMutationState(state.note.id) === 'error'}
-        usefulPending={getMutationState(state.note.id) === 'pending'}
-      />
+      <>
+        <NoteDetailContent
+          note={state.note}
+          onPressAuthor={(authorID) =>
+            router.push({ pathname: '/authors/[id]', params: { id: authorID } })
+          }
+          onPressUseful={() => {
+            void handleToggleUseful(state.note);
+          }}
+          usefulError={getMutationState(state.note.id) === 'error'}
+          usefulPending={getMutationState(state.note.id) === 'pending'}
+        />
+        <CommentsSection
+          currentAuthorID={currentAuthorID}
+          onDeleteComment={handleDeleteComment}
+          onDraftChange={(draft) =>
+            dispatchCommentThread({ type: 'draft_changed', draft })
+          }
+          onLoadMore={handleLoadMoreComments}
+          onPressAuthor={(authorID) =>
+            router.push({ pathname: '/authors/[id]', params: { id: authorID } })
+          }
+          onRetryInitial={() => loadCommentPage()}
+          onSubmit={handleSubmitComment}
+          thread={commentThread}
+        />
+      </>
     );
   }
 

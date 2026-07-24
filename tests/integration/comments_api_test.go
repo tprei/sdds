@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -79,6 +80,52 @@ func TestCommentAPIRuntimeBoundaries(t *testing.T) {
 	}
 	requireRuntimeField(t, *invalidList.JSON400, "limit", "invalid")
 
+	validEmoji := createRuntimeComment(t, firstClient, note.Id, strings.Repeat("😀", 1000))
+	requireRuntimeComment(t, validEmoji, strings.Repeat("😀", 1000), firstSession.User.Author)
+	assertRuntimeCommentError(t, firstClient, note.Id, openapi.CreateNoteCommentJSONRequestBody{Body: strings.Repeat("😀", 1001)}, http.StatusBadRequest, openapi.ErrorCodeInvalidComment, "body", "too_long")
+
+	pageLimit := 50
+	beforeOversized := listRuntimeComments(t, firstClient, note.Id, &openapi.ListNoteCommentsParams{Limit: &pageLimit})
+	oversized, err := firstClient.CreateNoteCommentWithResponse(context.Background(), note.Id, openapi.CreateNoteCommentJSONRequestBody{Body: strings.Repeat("x", 8192)})
+	if err != nil {
+		t.Fatalf("POST /v1/notes/{note_id}/comments oversized body: %v", err)
+	}
+	requireStatus(t, "POST /v1/notes/{note_id}/comments oversized body", oversized.StatusCode(), http.StatusRequestEntityTooLarge, oversized.Body)
+	if oversized.JSON413 == nil || oversized.JSON413.Code != openapi.ErrorCodeRequestTooLarge {
+		t.Fatalf("oversized comment response = %#v, want request_too_large", oversized.JSON413)
+	}
+	afterOversized := listRuntimeComments(t, firstClient, note.Id, &openapi.ListNoteCommentsParams{Limit: &pageLimit})
+	if len(afterOversized.Comments) != len(beforeOversized.Comments) {
+		t.Fatalf("oversized comment changed row count: got %d, want %d", len(afterOversized.Comments), len(beforeOversized.Comments))
+	}
+
+	injectionBody := `'); DROP TABLE note_comments; --`
+	injection := createRuntimeComment(t, firstClient, note.Id, injectionBody)
+	requireRuntimeComment(t, injection, injectionBody, firstSession.User.Author)
+
+	unauthenticatedDelete, err := publicClient.DeleteNoteCommentWithResponse(context.Background(), note.Id, first.Id)
+	if err != nil {
+		t.Fatalf("DELETE /v1/notes/{note_id}/comments/{comment_id} unauthenticated: %v", err)
+	}
+	requireStatus(t, "DELETE unauthenticated comment", unauthenticatedDelete.StatusCode(), http.StatusUnauthorized, unauthenticatedDelete.Body)
+	if unauthenticatedDelete.JSON401 == nil || unauthenticatedDelete.JSON401.Code != openapi.ErrorCodeUnauthenticated {
+		t.Fatalf("unauthenticated delete response = %#v, want unauthenticated", unauthenticatedDelete.JSON401)
+	}
+
+	injectionPage := listRuntimeComments(t, firstClient, note.Id, &openapi.ListNoteCommentsParams{Limit: &pageLimit})
+	if !containsRuntimeComment(injectionPage.Comments, injection.Id, injectionBody) {
+		t.Fatalf("SQL-injection comment did not round-trip: %#v", injectionPage.Comments)
+	}
+
+	missingDelete, err := firstClient.DeleteNoteCommentWithResponse(context.Background(), note.Id, "missing-comment")
+	if err != nil {
+		t.Fatalf("DELETE /v1/notes/{note_id}/comments/{comment_id} missing comment: %v", err)
+	}
+	requireStatus(t, "DELETE missing comment", missingDelete.StatusCode(), http.StatusNotFound, missingDelete.Body)
+	if missingDelete.JSON404 == nil || missingDelete.JSON404.Code != openapi.ErrorCodeNotFound {
+		t.Fatalf("missing delete response = %#v, want not_found", missingDelete.JSON404)
+	}
+
 	forbiddenDelete, err := secondClient.DeleteNoteCommentWithResponse(context.Background(), note.Id, first.Id)
 	if err != nil {
 		t.Fatalf("DELETE /v1/notes/{note_id}/comments/{comment_id} non-owner: %v", err)
@@ -144,6 +191,15 @@ func requireRuntimeComment(t *testing.T, comment openapi.Comment, body string, a
 	if comment.CreatedAt <= 0 {
 		t.Fatalf("comment created_at = %d, want positive timestamp", comment.CreatedAt)
 	}
+}
+
+func containsRuntimeComment(comments []openapi.Comment, id string, body string) bool {
+	for _, comment := range comments {
+		if comment.Id == id && comment.Body == body {
+			return true
+		}
+	}
+	return false
 }
 
 func assertRuntimeCommentError(t *testing.T, client *openapi.ClientWithResponses, noteID string, body openapi.CreateNoteCommentJSONRequestBody, status int, code openapi.ErrorCode, field string, fieldCode string) {

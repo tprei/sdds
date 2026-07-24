@@ -58,6 +58,13 @@ type NoteResponse = {
   useful_count: number;
   useful_by_current_user: boolean;
 };
+
+type CommentResponse = {
+  author: AuthorSummary;
+  body: string;
+  created_at: number;
+  id: string;
+};
 type PublicAuthorResponse = {
   display_name: string;
   id: string;
@@ -86,6 +93,7 @@ type ValidationProblem = {
 const authSessionResponseKeys = ['expires_at', 'token', 'user'] as const;
 const authorSummaryKeys = ['display_name', 'id'] as const;
 const currentUserKeys = ['author', 'id', 'username'] as const;
+const commentResponseKeys = ['author', 'body', 'created_at', 'id'] as const;
 const listNotesResponseKeys = ['notes'] as const;
 const noteImageResponseKeys = [
   'byte_size',
@@ -689,6 +697,81 @@ test('filters note discovery by category through the public API', async ({
     },
   );
 });
+
+test('paginates, creates, and deletes an owned note comment', async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(120000);
+  const timestamp = Date.now();
+  const owner = await createAuthUser(request, {
+    display_name: `Autor dos comentários ${timestamp}`,
+    password: syntheticPassword,
+    username: `comment-owner-${timestamp}`,
+  });
+  const viewerName = `Leitora dos comentários ${timestamp}`;
+  const viewerUsername = `comment-viewer-${timestamp}`;
+  await createAuthUser(request, {
+    display_name: viewerName,
+    password: syntheticPassword,
+    username: viewerUsername,
+  });
+  const title = `Nota comentada ${timestamp}`;
+  const note = await createNote(request, owner.token, {
+    body: `Uma nota com uma conversa longa ${timestamp}.`,
+    category_slug: 'food',
+    client_request_id: `synthetic-comment-note-${timestamp}`,
+    place_slug: 'sao-paulo',
+    title,
+  });
+  const seededBodies = Array.from(
+    { length: 21 },
+    (_, index) => `Comentário ${String(index + 1).padStart(2, '0')} ${timestamp}`,
+  );
+  for (const body of seededBodies) {
+    await createComment(request, owner.token, note.id, body);
+  }
+
+  await loginUser(page, viewerUsername, `/notes/${note.id}`);
+  await expect(page.getByRole('heading', { name: title })).toBeVisible();
+
+  const firstPagePositions = await Promise.all(
+    seededBodies.slice(0, 20).map(async (body) => {
+      const comment = page.getByText(body, { exact: true }).last();
+      await expect(comment).toBeVisible();
+      return comment.evaluate((element) =>
+        Array.from(document.querySelectorAll('*')).indexOf(element),
+      );
+    }),
+  );
+  expect(firstPagePositions).toEqual(
+    [...firstPagePositions].sort((left, right) => left - right),
+  );
+  await expect(page.getByText(seededBodies[20], { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Excluir comentário' }),
+  ).toHaveCount(0);
+
+  await page.getByTestId('comments-load-more').click();
+  await expect(page.getByText(seededBodies[20], { exact: true })).toBeVisible();
+
+  const createdBody = `Comentário da ${viewerName}`;
+  await page.getByTestId('comment-draft').fill(`  ${createdBody}  `);
+  await page.getByTestId('comment-submit').click();
+  await expect(page.getByText(createdBody, { exact: true })).toBeVisible();
+  const deleteControl = page.getByRole('button', {
+    name: 'Excluir comentário',
+  });
+  await expect(deleteControl).toHaveCount(1);
+  await deleteControl.click();
+  await expect(page.getByText(createdBody, { exact: true })).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.getByRole('heading', { name: title })).toBeVisible();
+  await page.getByTestId('comments-load-more').click();
+  await expect(page.getByText(seededBodies[20], { exact: true })).toBeVisible();
+  await expect(page.getByText(createdBody, { exact: true })).toHaveCount(0);
+});
 test('opens a public author profile and appends paginated notes', async ({
   page,
   request,
@@ -895,6 +978,22 @@ async function createNote(
   return parseNoteResponse(await response.json());
 }
 
+async function createComment(
+  request: APIRequestContext,
+  token: string,
+  noteID: string,
+  body: string,
+): Promise<CommentResponse> {
+  const response = await request.post(apiURL(`/v1/notes/${noteID}/comments`), {
+    data: { body },
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  expect(response.status()).toBe(201);
+  return parseCommentResponse(await response.json());
+}
+
 async function createAuthUser(
   request: APIRequestContext,
   input: CreateAuthUserRequest,
@@ -1017,6 +1116,13 @@ function parseNoteResponse(value: unknown): NoteResponse {
   return value;
 }
 
+function parseCommentResponse(value: unknown): CommentResponse {
+  if (!isCommentResponse(value)) {
+    throw new Error('invalid comment response');
+  }
+  return value;
+}
+
 function parseAuthSessionResponse(value: unknown): AuthSessionResponse {
   if (!isAuthSessionResponse(value)) {
     throw new Error('invalid auth session response');
@@ -1057,6 +1163,21 @@ function isNoteResponse(value: unknown): value is NoteResponse {
     value.useful_count >= 0 &&
     typeof value.useful_by_current_user === 'boolean' &&
     isNoteImagesResponse(value.images)
+  );
+}
+
+function isCommentResponse(value: unknown): value is CommentResponse {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, commentResponseKeys) &&
+    typeof value.id === 'string' &&
+    value.id.length > 0 &&
+    typeof value.body === 'string' &&
+    value.body.length > 0 &&
+    isAuthorSummary(value.author) &&
+    typeof value.created_at === 'number' &&
+    Number.isInteger(value.created_at) &&
+    value.created_at >= 0
   );
 }
 

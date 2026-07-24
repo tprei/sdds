@@ -18,6 +18,13 @@ type AuthStateMock =
   | { status: 'authenticated'; token: string; user: { id: string } };
 
 const mocks = vi.hoisted(() => ({
+  apiClient: {
+    getPublicAuthor: vi.fn(),
+    listAuthorNotes: vi.fn(),
+    listCatalogs: vi.fn(),
+    markNoteUseful: vi.fn(),
+    unmarkNoteUseful: vi.fn(),
+  },
   authState: { status: 'loading' } as AuthStateMock,
   authorProfileContent: vi.fn(),
   back: vi.fn(),
@@ -52,7 +59,7 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ back: mocks.back, push: mocks.push }),
 }));
 vi.mock('@/lib/auth/auth-provider', () => ({
-  useAuth: () => ({ logout: mocks.logout, state: mocks.authState }),
+  useAuth: () => ({ apiClient: mocks.apiClient, logout: mocks.logout, state: mocks.authState }),
 }));
 
 async function settle(): Promise<void> {
@@ -95,9 +102,9 @@ describe('AuthorProfileScreen auth gate', () => {
 
     expect(mocks.authorProfileContent).toHaveBeenCalledWith(
       expect.objectContaining({
+        apiClient: mocks.apiClient,
         authorID: 'author-id',
         onSessionExpired: mocks.logout,
-        token: 'session-token',
       }),
     );
   });

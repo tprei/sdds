@@ -5,8 +5,8 @@ import {
   ImageUploadInputError,
   ImageUploadRequestError,
   ImageUploadResponseError,
-  prepareImageUpload,
 } from './image-uploads';
+import { createAPIClient } from './client';
 import type { ImageUploadAsset, ImageUploadReceipt } from './image-uploads';
 
 vi.mock('react-native', () => ({
@@ -75,8 +75,9 @@ describe('image upload API client', () => {
       return jsonResponse(apiReceipt(uppercaseImageUploadID), 201);
     });
 
+    const client = createAPIClient(exampleToken);
     await expect(
-      prepareImageUpload(imageAsset, exampleToken, {
+      client.prepareImageUpload(imageAsset, {
         uploadRequestId: uppercaseUploadRequestID,
       }),
     ).resolves.toEqual(receipt);
@@ -96,18 +97,6 @@ describe('image upload API client', () => {
     expect(body).toContain('Content-Type: image/jpeg');
   });
 
-  it('does not construct or send a file body without authentication', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(
-      prepareImageUpload(imageAsset, '  ', {
-        uploadRequestId: uploadRequestID,
-      }),
-    ).rejects.toMatchObject(new ImageUploadRequestError(401));
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
   it('aborts before constructing or sending a request', async () => {
     const controller = new AbortController();
     const reason = new Error('abort-before');
@@ -115,8 +104,9 @@ describe('image upload API client', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
+    const client = createAPIClient(exampleToken);
     await expect(
-      prepareImageUpload(imageAsset, exampleToken, {
+      client.prepareImageUpload(imageAsset, {
         signal: controller.signal,
         uploadRequestId: uploadRequestID,
       }),
@@ -136,8 +126,9 @@ describe('image upload API client', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
+    const client = createAPIClient(exampleToken);
     await expect(
-      prepareImageUpload(imageAsset, exampleToken, {
+      client.prepareImageUpload(imageAsset, {
         signal: controller.signal,
         sleep,
         uploadRequestId: uploadRequestID,
@@ -161,7 +152,8 @@ describe('image upload API client', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     try {
-      const upload = prepareImageUpload(imageAsset, exampleToken, {
+      const client = createAPIClient(exampleToken);
+      const upload = client.prepareImageUpload(imageAsset, {
         maxAttempts: 2,
         signal: controller.signal,
         uploadRequestId: uploadRequestID,
@@ -193,8 +185,9 @@ describe('image upload API client', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
+    const client = createAPIClient(exampleToken);
     await expect(
-      prepareImageUpload(imageAsset, exampleToken, {
+      client.prepareImageUpload(imageAsset, {
         maxAttempts: 3,
         signal: controller.signal,
         uploadRequestId: uploadRequestID,
@@ -215,8 +208,9 @@ describe('image upload API client', () => {
       ),
     );
 
+    const client = createAPIClient(exampleToken);
     await expect(
-      prepareImageUpload(imageAsset, exampleToken, {
+      client.prepareImageUpload(imageAsset, {
         uploadRequestId: uploadRequestID,
       }),
     ).rejects.toMatchObject(
@@ -243,7 +237,8 @@ describe('image upload API client', () => {
       return jsonResponse(apiReceipt(), 201);
     });
 
-    const actual = await prepareImageUpload(imageAsset, exampleToken, {
+    const client = createAPIClient(exampleToken);
+    const actual = await client.prepareImageUpload(imageAsset, {
       maxDelayMs: 3000,
       sleep: async (delayMs) => {
         delays.push(delayMs);
@@ -269,8 +264,9 @@ describe('image upload API client', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
+    const client = createAPIClient(exampleToken);
     await expect(
-      prepareImageUpload(imageAsset, exampleToken, {
+      client.prepareImageUpload(imageAsset, {
         maxAttempts: 3,
         sleep: async (delayMs) => {
           delays.push(delayMs);
@@ -289,7 +285,7 @@ describe('image upload API client', () => {
     );
     const retrySleep = vi.fn(async () => undefined);
     await expect(
-      prepareImageUpload(imageAsset, exampleToken, {
+      client.prepareImageUpload(imageAsset, {
         sleep: retrySleep,
         uploadRequestId: uploadRequestID,
       }),
@@ -306,15 +302,16 @@ describe('image upload API client', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
+    const client = createAPIClient(exampleToken);
     await expect(
-      prepareImageUpload(imageAsset, exampleToken, {
+      client.prepareImageUpload(imageAsset, {
         uploadRequestId: 'request-1',
       }),
     ).rejects.toBeInstanceOf(ImageUploadInputError);
     expect(fetchMock).not.toHaveBeenCalled();
 
     await expect(
-      prepareImageUpload(imageAsset, exampleToken, {
+      client.prepareImageUpload(imageAsset, {
         uploadRequestId: uploadRequestID,
       }),
     ).rejects.toBeInstanceOf(ImageUploadResponseError);

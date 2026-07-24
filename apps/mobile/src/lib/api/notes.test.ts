@@ -2,19 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   APIRequestError,
   APIResponseError,
-  createNote,
-  getNote,
-  listNotes,
-  markNoteUseful,
-  searchNotes,
-  unmarkNoteUseful,
 } from './notes';
+import { createAPIClient } from './client';
 import type { components } from './generated/schema';
 
 vi.mock('react-native', () => ({
   Platform: {
     OS: 'ios',
   },
+}));
+
+vi.mock('expo-file-system', () => ({
+  File: class {},
 }));
 
 const configuredAPIBaseURLEnvName = 'EXPO_PUBLIC_SDDS_API_BASE_URL';
@@ -42,7 +41,8 @@ describe('notes API client', () => {
       return jsonResponse(apiNote(), httpStatusCreated);
     });
 
-    await createNote(
+    const client = createAPIClient(exampleToken);
+    await client.createNote(
       {
         body: 'Tem pao de queijo decente.',
         categorySlug: 'food',
@@ -50,7 +50,6 @@ describe('notes API client', () => {
         placeSlug: 'sao-paulo',
         title: 'Cafe bom',
       },
-      exampleToken,
     );
 
     const request = onlyFetchCall(calls);
@@ -74,14 +73,14 @@ describe('notes API client', () => {
       return jsonResponse(apiNote({ place_slug: null }), httpStatusCreated);
     });
 
-    await createNote(
+    const client = createAPIClient(exampleToken);
+    await client.createNote(
       {
         body: 'Tem pao de queijo decente.',
         categorySlug: 'food',
         clientRequestId: 'mobile-create-note-without-place',
         title: 'Cafe bom',
       },
-      exampleToken,
     );
 
     await expect(requestJSON(onlyFetchCall(calls))).resolves.toMatchObject({
@@ -92,7 +91,8 @@ describe('notes API client', () => {
   it('parses created notes from the API wire shape', async () => {
     stubFetch(async () => jsonResponse(apiNote(), httpStatusCreated));
 
-    const note = await createNote(
+    const client = createAPIClient(exampleToken);
+    const note = await client.createNote(
       {
         body: 'Tem pao de queijo decente.',
         categorySlug: 'food',
@@ -100,7 +100,6 @@ describe('notes API client', () => {
         placeSlug: 'sao-paulo',
         title: 'Cafe bom',
       },
-      exampleToken,
     );
 
     expect(note).toEqual({
@@ -124,15 +123,17 @@ describe('notes API client', () => {
   it('parses notes without a place', async () => {
     stubFetch(async () => jsonResponse(apiNote({ place_slug: null })));
 
-    await expect(getNote(exampleNoteID, exampleToken)).resolves.toMatchObject({
+    const client = createAPIClient(exampleToken);
+    await expect(client.getNote(exampleNoteID)).resolves.toMatchObject({
       placeSlug: null,
     });
   });
   it('raises request errors from status even when the error body fails', async () => {
     stubFetch(async () => unreadableResponse(httpStatusBadRequest));
 
+    const client = createAPIClient(exampleToken);
     await expect(
-      createNote(
+      client.createNote(
         {
           body: 'Tem pao de queijo decente.',
           categorySlug: 'food',
@@ -140,7 +141,6 @@ describe('notes API client', () => {
           placeSlug: 'sao-paulo',
           title: 'Cafe bom',
         },
-        exampleToken,
       ),
     ).rejects.toMatchObject(new APIRequestError(httpStatusBadRequest));
   });
@@ -148,7 +148,8 @@ describe('notes API client', () => {
   it('parses listed notes from the API list response shape', async () => {
     stubFetch(async () => jsonResponse(apiListNotesResponse()));
 
-    const notes = await listNotes({}, exampleToken);
+    const client = createAPIClient(exampleToken);
+    const notes = await client.listNotes({});
 
     expect(notes).toEqual([expectedNote()]);
   });
@@ -160,7 +161,8 @@ describe('notes API client', () => {
       return jsonResponse(apiListNotesResponse());
     });
 
-    await listNotes({}, exampleToken);
+    const client = createAPIClient(exampleToken);
+    await client.listNotes({});
 
     const request = onlyFetchCall(calls);
     const url = new URL(request.url);
@@ -176,7 +178,8 @@ describe('notes API client', () => {
       return jsonResponse(apiListNotesResponse());
     });
 
-    await listNotes({ categorySlug: 'food' }, exampleToken);
+    const client = createAPIClient(exampleToken);
+    await client.listNotes({ categorySlug: 'food' });
 
     const request = onlyFetchCall(calls);
     const url = new URL(request.url);
@@ -192,7 +195,8 @@ describe('notes API client', () => {
       return jsonResponse(apiNote());
     });
 
-    await getNote(exampleNoteID, exampleToken);
+    const client = createAPIClient(exampleToken);
+    await client.getNote(exampleNoteID);
 
     const request = onlyFetchCall(calls);
     expect(request.url).toBe(`http://localhost:8080/v1/notes/${exampleNoteID}`);
@@ -202,7 +206,8 @@ describe('notes API client', () => {
   it('parses fetched notes from the API wire shape', async () => {
     stubFetch(async () => jsonResponse(apiNote()));
 
-    const note = await getNote(exampleNoteID, exampleToken);
+    const client = createAPIClient(exampleToken);
+    const note = await client.getNote(exampleNoteID);
 
     expect(note).toEqual(expectedNote());
   });
@@ -214,7 +219,8 @@ describe('notes API client', () => {
       return new Response(null, { status: 204 });
     });
 
-    await markNoteUseful(exampleNoteID, exampleToken);
+    const client = createAPIClient(exampleToken);
+    await client.markNoteUseful(exampleNoteID);
 
     const request = onlyFetchCall(calls);
     expect(request.url).toBe(
@@ -231,7 +237,8 @@ describe('notes API client', () => {
       return new Response(null, { status: 204 });
     });
 
-    await unmarkNoteUseful(exampleNoteID, exampleToken);
+    const client = createAPIClient(exampleToken);
+    await client.unmarkNoteUseful(exampleNoteID);
 
     const request = onlyFetchCall(calls);
     expect(request.url).toBe(
@@ -257,7 +264,8 @@ describe('notes API client', () => {
       ),
     );
 
-    await expect(getNote(exampleNoteID, exampleToken)).resolves.toMatchObject({
+    const client = createAPIClient(exampleToken);
+    await expect(client.getNote(exampleNoteID)).resolves.toMatchObject({
       images: [
         {
           byteSize: 481234,
@@ -290,7 +298,8 @@ describe('notes API client', () => {
       ),
     );
 
-    await expect(getNote(exampleNoteID, exampleToken)).resolves.toMatchObject({
+    const client = createAPIClient(exampleToken);
+    await expect(client.getNote(exampleNoteID)).resolves.toMatchObject({
       images: [{ url: 'https://api.example.com/v1/media/images/image-id' }],
     });
   });
@@ -300,7 +309,8 @@ describe('notes API client', () => {
       jsonResponse(apiNote({ images: [apiImage({ url: 'http://[::1' })] })),
     );
 
-    await expect(getNote(exampleNoteID, exampleToken)).rejects.toThrow(APIResponseError);
+    const client = createAPIClient(exampleToken);
+    await expect(client.getNote(exampleNoteID)).rejects.toThrow(APIResponseError);
   });
 
   it('rejects note responses without required images', async () => {
@@ -308,7 +318,8 @@ describe('notes API client', () => {
     delete note.images;
     stubFetch(async () => jsonResponse({ notes: [note] }));
 
-    await expect(listNotes({}, exampleToken)).rejects.toThrow(APIResponseError);
+    const client = createAPIClient(exampleToken);
+    await expect(client.listNotes({})).rejects.toThrow(APIResponseError);
   });
 
   it('raises request errors for missing fetched notes', async () => {
@@ -316,7 +327,8 @@ describe('notes API client', () => {
       jsonResponse({ code: 'not_found' }, httpStatusNotFound),
     );
 
-    await expect(getNote('missing-note', exampleToken)).rejects.toMatchObject(
+    const client = createAPIClient(exampleToken);
+    await expect(client.getNote('missing-note')).rejects.toMatchObject(
       new APIRequestError(httpStatusNotFound, { code: 'not_found' }),
     );
   });
@@ -331,7 +343,8 @@ describe('notes API client', () => {
       ),
     );
 
-    await expect(getNote(exampleNoteID, exampleToken)).resolves.toMatchObject({
+    const client = createAPIClient(exampleToken);
+    await expect(client.getNote(exampleNoteID)).resolves.toMatchObject({
       categorySlug: 'future-category',
       placeSlug: 'future-place',
     });
@@ -344,7 +357,8 @@ describe('notes API client', () => {
       return jsonResponse(apiListNotesResponse());
     });
 
-    await searchNotes({ query: 'restaurante brasileiro Dublin 12 barato' }, exampleToken);
+    const client = createAPIClient(exampleToken);
+    await client.searchNotes({ query: 'restaurante brasileiro Dublin 12 barato' });
 
     const request = onlyFetchCall(calls);
     const url = new URL(request.url);
@@ -364,7 +378,8 @@ describe('notes API client', () => {
       return jsonResponse(apiListNotesResponse());
     });
 
-    await searchNotes({ categorySlug: 'food', query: 'cafe' }, exampleToken);
+    const client = createAPIClient(exampleToken);
+    await client.searchNotes({ categorySlug: 'food', query: 'cafe' });
 
     const request = onlyFetchCall(calls);
     const url = new URL(request.url);
@@ -381,7 +396,8 @@ describe('notes API client', () => {
       return jsonResponse(apiListNotesResponse());
     });
 
-    await searchNotes({ query: '  cafe bom  ' }, exampleToken);
+    const client = createAPIClient(exampleToken);
+    await client.searchNotes({ query: '  cafe bom  ' });
 
     const request = onlyFetchCall(calls);
     const url = new URL(request.url);
@@ -391,7 +407,8 @@ describe('notes API client', () => {
   it('parses searched notes from the API list response shape', async () => {
     stubFetch(async () => jsonResponse(apiListNotesResponse()));
 
-    const notes = await searchNotes({ query: 'cafe' }, exampleToken);
+    const client = createAPIClient(exampleToken);
+    const notes = await client.searchNotes({ query: 'cafe' });
 
     expect(notes).toEqual([expectedNote()]);
   });
@@ -401,7 +418,8 @@ describe('notes API client', () => {
       jsonResponse({ code: 'invalid_search' }, httpStatusBadRequest),
     );
 
-    await expect(searchNotes({ query: '' }, exampleToken)).rejects.toMatchObject(
+    const client = createAPIClient(exampleToken);
+    await expect(client.searchNotes({ query: '' })).rejects.toMatchObject(
       new APIRequestError(httpStatusBadRequest, { code: 'invalid_search' }),
     );
   });
@@ -418,7 +436,8 @@ describe('notes API client', () => {
       }),
     );
 
-    await expect(searchNotes({ query: 'cafe' }, exampleToken)).rejects.toThrow(
+    const client = createAPIClient(exampleToken);
+    await expect(client.searchNotes({ query: 'cafe' })).rejects.toThrow(
       APIResponseError,
     );
   });
@@ -440,7 +459,8 @@ describe('notes API client', () => {
       }),
     );
 
-    await expect(listNotes({}, exampleToken)).rejects.toThrow(APIResponseError);
+    const client = createAPIClient(exampleToken);
+    await expect(client.listNotes({})).rejects.toThrow(APIResponseError);
   });
 
   it('ignores extra note response fields', async () => {
@@ -455,7 +475,8 @@ describe('notes API client', () => {
       }),
     );
 
-    await expect(listNotes({}, exampleToken)).resolves.toEqual([expectedNote()]);
+    const client = createAPIClient(exampleToken);
+    await expect(client.listNotes({})).resolves.toEqual([expectedNote()]);
   });
 
   it('rejects invalid timestamp values', async () => {
@@ -471,7 +492,8 @@ describe('notes API client', () => {
       }),
     );
 
-    await expect(listNotes({}, exampleToken)).rejects.toThrow(APIResponseError);
+    const client = createAPIClient(exampleToken);
+    await expect(client.listNotes({})).rejects.toThrow(APIResponseError);
   });
 
   it('rejects invalid author response shapes', async () => {
@@ -489,7 +511,8 @@ describe('notes API client', () => {
       }),
     );
 
-    await expect(listNotes({}, exampleToken)).rejects.toThrow(APIResponseError);
+    const client = createAPIClient(exampleToken);
+    await expect(client.listNotes({})).rejects.toThrow(APIResponseError);
   });
 
   it('ignores extra legacy city slug response fields', async () => {
@@ -504,7 +527,8 @@ describe('notes API client', () => {
       }),
     );
 
-    await expect(listNotes({}, exampleToken)).resolves.toEqual([expectedNote()]);
+    const client = createAPIClient(exampleToken);
+    await expect(client.listNotes({})).resolves.toEqual([expectedNote()]);
   });
 });
 

@@ -29,15 +29,17 @@ type AuthStateMock =
     };
 
 const mocks = vi.hoisted(() => ({
+  apiClient: {
+    getNote: vi.fn(),
+    listCatalogs: vi.fn(),
+    markNoteUseful: vi.fn(),
+    unmarkNoteUseful: vi.fn(),
+  },
   authState: { status: 'loading' } as AuthStateMock,
   back: vi.fn(),
-  getNote: vi.fn(),
-  listCatalogs: vi.fn(),
   localParams: { id: 'note-id' },
   logout: vi.fn(async () => undefined),
-  markNoteUseful: vi.fn(),
   push: vi.fn(),
-  unmarkNoteUseful: vi.fn(),
 }));
 
 vi.mock('react-native', () => {
@@ -86,19 +88,19 @@ vi.mock('expo-router', async () => {
 });
 
 vi.mock('@/lib/auth/auth-provider', () => ({
-  useAuth: () => ({ logout: mocks.logout, state: mocks.authState }),
+  useAuth: () => ({
+    apiClient: mocks.apiClient,
+    logout: mocks.logout,
+    state: mocks.authState,
+  }),
 }));
 
-vi.mock('@/lib/api/catalogs', () => ({ listCatalogs: mocks.listCatalogs }));
 vi.mock('@/lib/api/notes', () => ({
   APIRequestError: class APIRequestError extends Error {
     constructor(readonly status: number) {
       super('api_request_failed');
     }
   },
-  getNote: mocks.getNote,
-  markNoteUseful: mocks.markNoteUseful,
-  unmarkNoteUseful: mocks.unmarkNoteUseful,
 }));
 
 vi.mock('@/features/notes/catalog', () => ({
@@ -183,10 +185,10 @@ describe('NoteDetailScreen route', () => {
       user: { author: { displayName: 'Thiago', id: 'author-id' }, id: 'user-id' },
     };
     mocks.localParams = { id: 'note-id' };
-    mocks.listCatalogs.mockResolvedValue({ categories: [], places: [] });
-    mocks.getNote.mockResolvedValue(note);
-    mocks.markNoteUseful.mockReset();
-    mocks.unmarkNoteUseful.mockReset();
+    mocks.apiClient.listCatalogs.mockResolvedValue({ categories: [], places: [] });
+    mocks.apiClient.getNote.mockResolvedValue(note);
+    mocks.apiClient.markNoteUseful.mockReset();
+    mocks.apiClient.unmarkNoteUseful.mockReset();
     mocks.logout.mockClear();
     mocks.back.mockClear();
     mocks.push.mockClear();
@@ -205,8 +207,8 @@ describe('NoteDetailScreen route', () => {
       await settle();
     });
 
-    expect(mocks.listCatalogs).not.toHaveBeenCalled();
-    expect(mocks.getNote).not.toHaveBeenCalled();
+    expect(mocks.apiClient.listCatalogs).not.toHaveBeenCalled();
+    expect(mocks.apiClient.getNote).not.toHaveBeenCalled();
     expect(
       renderer.root.findByProps({ title: 'Entre para continuar' }),
     ).toBeDefined();
@@ -214,7 +216,7 @@ describe('NoteDetailScreen route', () => {
 
   it('disables the useful button while pending and flips state after 204', async () => {
     const pending = deferred<void>();
-    mocks.markNoteUseful.mockReturnValueOnce(pending.promise);
+    mocks.apiClient.markNoteUseful.mockReturnValueOnce(pending.promise);
 
     let renderer!: ReactTestRenderer;
     await act(async () => {
@@ -239,11 +241,11 @@ describe('NoteDetailScreen route', () => {
     expect(renderer.root.findByProps({ testID: 'useful-state' }).props.children).toBe(
       '1:true',
     );
-    expect(mocks.markNoteUseful).toHaveBeenCalledWith('note-id', 'session-token');
+    expect(mocks.apiClient.markNoteUseful).toHaveBeenCalledWith('note-id');
   });
 
   it('keeps prior state and shows inline error on non-401 useful failure', async () => {
-    mocks.markNoteUseful.mockRejectedValueOnce({ status: 500 });
+    mocks.apiClient.markNoteUseful.mockRejectedValueOnce({ status: 500 });
 
     let renderer!: ReactTestRenderer;
     await act(async () => {
@@ -266,7 +268,7 @@ describe('NoteDetailScreen route', () => {
   });
 
   it('logs out on useful 401', async () => {
-    mocks.markNoteUseful.mockRejectedValueOnce({ status: 401 });
+    mocks.apiClient.markNoteUseful.mockRejectedValueOnce({ status: 401 });
 
     let renderer!: ReactTestRenderer;
     await act(async () => {

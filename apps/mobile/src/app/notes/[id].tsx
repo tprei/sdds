@@ -9,11 +9,11 @@ import {
 import { NoteDetailContent } from '@/features/notes/note-detail-content';
 import { buildNoteCatalog, labelNote } from '@/features/notes/catalog';
 import type { LabelledNote } from '@/features/notes/catalog';
-import { listCatalogs } from '@/lib/api/catalogs';
-import { APIRequestError, getNote } from '@/lib/api/notes';
+import { APIRequestError } from '@/lib/api/notes';
 import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
 import { useAuth } from '@/lib/auth/auth-provider';
+import type { APIClient } from '@/lib/api/client';
 import { useUsefulMutation } from '@/features/notes/use-useful-mutation';
 import { ReadAuthGate } from '@/components/read-auth-gate';
 
@@ -24,9 +24,9 @@ type NoteDetailState =
   | { status: 'error' };
 
 type AuthenticatedNoteDetailScreenProps = {
+  apiClient: APIClient;
   noteID: string;
   onSessionExpired: () => Promise<void>;
-  token: string;
 };
 
 
@@ -34,7 +34,7 @@ const notFoundStatus = 404;
 
 export default function NoteDetailScreen() {
   const router = useRouter();
-  const { logout, state } = useAuth();
+  const { apiClient, logout, state } = useAuth();
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const noteID = typeof id === 'string' ? id : undefined;
 
@@ -58,9 +58,9 @@ export default function NoteDetailScreen() {
     return (
       <AuthenticatedNoteDetailScreen
         key={`${state.user.id}:${noteID}`}
+        apiClient={apiClient}
         noteID={noteID}
         onSessionExpired={logout}
-        token={state.token}
       />
     );
   }
@@ -89,22 +89,22 @@ export default function NoteDetailScreen() {
 }
 
 function AuthenticatedNoteDetailScreen({
+  apiClient,
   noteID,
   onSessionExpired,
-  token,
 }: AuthenticatedNoteDetailScreenProps) {
   const router = useRouter();
   const detailGenerationRef = useRef(0);
   const [state, setState] = useState<NoteDetailState>({ status: 'loading' });
 
   const { getMutationState, toggleUseful: handleToggleUseful } = useUsefulMutation({
-    token,
+    apiClient,
     onSessionExpired,
     getGeneration: () => detailGenerationRef.current,
     isStale: (gen) => gen !== detailGenerationRef.current,
     onStaleWrite: () => {
       detailGenerationRef.current += 1;
-      void Promise.all([listCatalogs(token), getNote(noteID, token)])
+      void Promise.all([apiClient.listCatalogs(), apiClient.getNote(noteID)])
         .then(([catalogs, note]) => {
           const labelled = labelNote(buildNoteCatalog(catalogs), note);
           if (labelled !== null) setState({ status: 'ready', note: labelled });
@@ -125,7 +125,7 @@ function AuthenticatedNoteDetailScreen({
       let isActive = true;
       setState({ status: 'loading' });
 
-      Promise.all([listCatalogs(token), getNote(noteID, token)])
+      Promise.all([apiClient.listCatalogs(), apiClient.getNote(noteID)])
         .then(([catalogs, note]) => {
           if (!isActive || detailGenerationRef.current !== generation) {
             return;
@@ -162,7 +162,7 @@ function AuthenticatedNoteDetailScreen({
         isActive = false;
         detailGenerationRef.current += 1;
       };
-    }, [noteID, onSessionExpired, token]),
+    }, [apiClient, noteID, onSessionExpired]),
   );
 
 

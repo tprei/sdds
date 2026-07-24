@@ -9,10 +9,13 @@ import {
   useState,
 } from 'react';
 
+import type { APIClient } from '@/lib/api/client';
+import { createAPIClient } from '@/lib/api/client';
 import type { AuthState, LoginInput, SignupInput } from './session';
 import { createAuthController } from './session';
 
 type AuthContextValue = {
+  apiClient: APIClient;
   login(input: LoginInput): Promise<void>;
   logout(): Promise<void>;
   signup(input: SignupInput): Promise<void>;
@@ -87,9 +90,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     await enqueueAuthMutation(() => controller.logout(stateRef.current));
   }, [controller, enqueueAuthMutation]);
 
+  const token = state.status === 'authenticated' ? state.token : undefined;
+  const apiClient = useMemo(() => createAPIClient(token), [token]);
+
   const value = useMemo(
-    () => ({ login, logout, signup, state }),
-    [login, logout, signup, state],
+    () => ({ apiClient, login, logout, signup, state }),
+    [apiClient, login, logout, signup, state],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

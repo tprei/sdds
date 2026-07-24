@@ -1,18 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { APIRequestError } from './request-error';
-import {
-  CatalogAPIResponseError,
-  listCatalogs,
-  listCategories,
-  listPlaces,
-} from './catalogs';
+import { CatalogAPIResponseError } from './catalogs';
+import { createAPIClient } from './client';
 import type { components } from './generated/schema';
 
 vi.mock('react-native', () => ({
   Platform: {
     OS: 'ios',
   },
+}));
+
+vi.mock('expo-file-system', () => ({
+  File: class {},
 }));
 
 const configuredAPIBaseURLEnvName = 'EXPO_PUBLIC_SDDS_API_BASE_URL';
@@ -44,7 +44,8 @@ describe('catalogs API client', () => {
       });
     });
 
-    await expect(listCategories(exampleToken)).resolves.toEqual([
+    const client = createAPIClient(exampleToken);
+    await expect(client.listCategories()).resolves.toEqual([
       {
         active: true,
         displayOrder: 20,
@@ -67,7 +68,8 @@ describe('catalogs API client', () => {
       });
     });
 
-    await expect(listPlaces(exampleToken)).resolves.toEqual([
+    const client = createAPIClient(exampleToken);
+    await expect(client.listPlaces()).resolves.toEqual([
       {
         active: true,
         displayOrder: 10,
@@ -101,7 +103,8 @@ describe('catalogs API client', () => {
       return jsonResponse({ code: 'not_found' }, httpStatusNotFound);
     });
 
-    await expect(listCatalogs(exampleToken)).resolves.toEqual({
+    const client = createAPIClient(exampleToken);
+    await expect(client.listCatalogs()).resolves.toEqual({
       categories: [
         {
           active: true,
@@ -126,7 +129,8 @@ describe('catalogs API client', () => {
     stubFetch(async () =>
       jsonResponse({ code: 'internal_error' }, httpStatusInternalServerError),
     );
-    await expect(listCategories(exampleToken)).rejects.toMatchObject(
+    const client = createAPIClient(exampleToken);
+    await expect(client.listCategories()).rejects.toMatchObject(
       new APIRequestError(httpStatusInternalServerError, {
         code: 'internal_error',
       }),
@@ -144,7 +148,8 @@ describe('catalogs API client', () => {
       }),
     );
 
-    await expect(listCategories(exampleToken)).rejects.toThrow(CatalogAPIResponseError);
+    const client = createAPIClient(exampleToken);
+    await expect(client.listCategories()).rejects.toThrow(CatalogAPIResponseError);
   });
 
   it('ignores extra place response fields', async () => {
@@ -159,7 +164,8 @@ describe('catalogs API client', () => {
       }),
     );
 
-    await expect(listPlaces(exampleToken)).resolves.toEqual([
+    const client = createAPIClient(exampleToken);
+    await expect(client.listPlaces()).resolves.toEqual([
       {
         active: true,
         displayOrder: 10,

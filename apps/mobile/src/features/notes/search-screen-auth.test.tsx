@@ -18,8 +18,13 @@ type AuthStateMock =
   | { status: 'authenticated'; token: string; user: { id: string } };
 
 const mocks = vi.hoisted(() => ({
+  apiClient: {
+    listCatalogs: vi.fn(),
+    searchNotes: vi.fn(),
+    markNoteUseful: vi.fn(),
+    unmarkNoteUseful: vi.fn(),
+  },
   authState: { status: 'loading' } as AuthStateMock,
-  listCatalogs: vi.fn(),
   logout: vi.fn(async () => undefined),
   push: vi.fn(),
 }));
@@ -67,9 +72,7 @@ vi.mock('expo-router', async () => {
     useRouter: () => ({ push: mocks.push }),
   };
 });
-vi.mock('@/lib/auth/auth-provider', () => ({ useAuth: () => ({ logout: mocks.logout, state: mocks.authState }) }));
-vi.mock('@/lib/api/catalogs', () => ({ listCatalogs: mocks.listCatalogs }));
-vi.mock('@/lib/api/notes', () => ({ searchNotes: vi.fn() }));
+vi.mock('@/lib/auth/auth-provider', () => ({ useAuth: () => ({ apiClient: mocks.apiClient, logout: mocks.logout, state: mocks.authState }) }));
 
 async function settle(): Promise<void> {
   await Promise.resolve();
@@ -79,7 +82,7 @@ async function settle(): Promise<void> {
 describe('SearchScreen auth gate', () => {
   beforeEach(() => {
     mocks.authState = { status: 'authenticated', token: 'session-token', user: { id: 'user-id' } };
-    mocks.listCatalogs.mockResolvedValue({ categories: [], places: [] });
+    mocks.apiClient.listCatalogs.mockResolvedValue({ categories: [], places: [] });
     mocks.logout.mockClear();
   });
 
@@ -95,7 +98,7 @@ describe('SearchScreen auth gate', () => {
       await settle();
     });
 
-    expect(mocks.listCatalogs).not.toHaveBeenCalled();
+    expect(mocks.apiClient.listCatalogs).not.toHaveBeenCalled();
   });
 
   it('passes the bearer token to catalog reads', async () => {
@@ -104,11 +107,11 @@ describe('SearchScreen auth gate', () => {
       await settle();
     });
 
-    expect(mocks.listCatalogs).toHaveBeenCalledWith('session-token');
+    expect(mocks.apiClient.listCatalogs).toHaveBeenCalledWith();
   });
 
   it('logs out on a catalog 401', async () => {
-    mocks.listCatalogs.mockRejectedValueOnce({ status: 401 });
+    mocks.apiClient.listCatalogs.mockRejectedValueOnce({ status: 401 });
 
     await act(async () => {
       create(createElement(SearchScreen));

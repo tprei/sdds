@@ -1,14 +1,14 @@
 import { useCallback, useState } from 'react';
 
-import { markNoteUseful, unmarkNoteUseful } from '@/lib/api/notes';
 import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
+import type { APIClient } from '@/lib/api/client';
 import type { Note } from '@/lib/api/notes';
 
 type MutationState = 'idle' | 'pending' | 'error';
 
 type UseUsefulMutationOptions = {
-  token: string;
+  apiClient: APIClient;
   onSessionExpired: () => Promise<void>;
   /** Returns the caller's current generation value. */
   getGeneration: () => number;
@@ -25,7 +25,7 @@ export type UseUsefulMutation = {
 };
 
 export function useUsefulMutation({
-  token,
+  apiClient,
   onSessionExpired,
   getGeneration,
   isStale,
@@ -58,9 +58,9 @@ export function useUsefulMutation({
 
       try {
         if (note.usefulByCurrentUser) {
-          await unmarkNoteUseful(note.id, token);
+          await apiClient.unmarkNoteUseful(note.id);
         } else {
-          await markNoteUseful(note.id, token);
+          await apiClient.markNoteUseful(note.id);
         }
 
         if (isStale(gen)) {
@@ -108,7 +108,7 @@ export function useUsefulMutation({
       mutations,
       onSessionExpired,
       onStaleWrite,
-      token,
+      apiClient,
     ],
   );
 

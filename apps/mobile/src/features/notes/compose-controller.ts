@@ -25,25 +25,24 @@ export type ComposeImagePickerResult = {
   assets: readonly ImageUploadAsset[] | null; canceled: boolean;
 };
 export type ComposeControllerPorts = {
-  createNote: (input: CreateNoteInput, token: string) => Promise<unknown>;
-  loadCatalogs: (token: string) => Promise<Catalogs>;
+  createNote: (input: CreateNoteInput) => Promise<unknown>;
+  loadCatalogs: () => Promise<Catalogs>;
   onPublished: () => void;
   onSessionExpired: () => Promise<void>;
   pickImage: () => Promise<ComposeImagePickerResult>;
   prepareImageUpload: (
     asset: ImageUploadAsset,
-    token: string,
     options: PrepareImageUploadOptions,
   ) => Promise<ImageUploadReceipt>;
 };
 export type CreateComposeControllerInput = {
-  draftStore: ComposeDraftStore; ownerID: string; ports: ComposeControllerPorts; token: string;
+  draftStore: ComposeDraftStore; ownerID: string; ports: ComposeControllerPorts;
 };
 export type ComposeController = {
   activate: () => void; blur: () => void; cancel: () => void; deactivate: () => void;
   focus: () => void; getState: () => ComposeControllerState; pickImage: () => Promise<void>;
   removeImage: () => void; selectCategorySlug: (value: string | null) => void;
-  selectPlaceSlug: (value: string | null) => void; setSessionToken: (token: string) => void;
+  selectPlaceSlug: (value: string | null) => void;
   submit: () => Promise<void>;
   subscribe: (listener: (state: ComposeControllerState) => void) => () => void;
   updateBody: (value: string) => void; updateTitle: (value: string) => void;
@@ -83,7 +82,6 @@ export function createComposeController(
   let submission: Submission | null = null;
   let submitState: ComposeSubmitState = { status: 'idle' };
   let hasPublished = false;
-  let token = input.token;
   let unsubscribe: (() => void) | null = null;
   let state = snapshot();
 
@@ -272,7 +270,7 @@ export function createComposeController(
     catalogState = { status: 'loading' };
     publish();
     try {
-      void ports.loadCatalogs(token).then(
+      void ports.loadCatalogs().then(
         (catalogs) => {
           completeCatalog({ ...intent, catalogs });
         },
@@ -396,7 +394,7 @@ export function createComposeController(
         body: draft.body, categorySlug: draft.categorySlug, clientRequestId: context.clientRequestID,
         imageUploadIds: uploadedReceipt === null || uploadedReceipt === undefined ? undefined : [uploadedReceipt.imageUploadId],
         placeSlug: draft.placeSlug, title: draft.title,
-      }, token);
+      });
       if (!currentSubmission(context)) {
         settleStale(context);
         return;
@@ -416,7 +414,7 @@ export function createComposeController(
   async function uploadImage(context: Submission, draft: ComposeDraft): Promise<ComposeDraft | null> {
     const image = draft.image;
     if (image === null || image.imageReceipt !== null) return draft;
-    const receipt = await ports.prepareImageUpload(image.asset, token, {
+    const receipt = await ports.prepareImageUpload(image.asset, {
       signal: context.abortController.signal,
       uploadRequestId: image.uploadRequestId,
     });
@@ -481,7 +479,6 @@ export function createComposeController(
     getState: () => state, pickImage, removeImage,
     selectCategorySlug: (value) => updateFields({ ...fields, categorySlug: value }),
     selectPlaceSlug: (value) => updateFields({ ...fields, placeSlug: value }),
-    setSessionToken: (nextToken) => { token = nextToken; },
     submit,
     subscribe: (listener) => {
       listeners.add(listener);

@@ -7,18 +7,13 @@ import {
 } from '@/components/foundation-screen';
 import { NoteCard } from '@/components/note-card';
 import { useAuth } from '@/lib/auth/auth-provider';
+import type { APIClient } from '@/lib/api/client';
 import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
 import { CategoryFilterControls } from '@/features/notes/category-filter-controls';
 import { resolveCategoryFilterSlug } from '@/features/notes/category-filter';
 import { buildNoteCatalog, labelNotes } from '@/features/notes/catalog';
 import type { LabelledNote, NoteCatalog } from '@/features/notes/catalog';
-import { listCatalogs } from '@/lib/api/catalogs';
-import {
-  listNotes,
-  markNoteUseful,
-  unmarkNoteUseful,
-} from '@/lib/api/notes';
 import type { ListNotesInput, Note } from '@/lib/api/notes';
 import { ReadAuthGate } from '@/components/read-auth-gate';
 
@@ -34,22 +29,22 @@ type FeedState =
   | { status: 'error' };
 
 type AuthenticatedHomeScreenProps = {
+  apiClient: APIClient;
   onSessionExpired: () => Promise<void>;
-  token: string;
 };
 
 type UsefulMutationState = 'error' | 'pending';
 
 export default function HomeScreen() {
-  const { logout, state } = useAuth();
+  const { apiClient, logout, state } = useAuth();
   const router = useRouter();
 
   if (state.status === 'authenticated') {
     return (
       <AuthenticatedHomeScreen
         key={state.user.id}
+        apiClient={apiClient}
         onSessionExpired={logout}
-        token={state.token}
       />
     );
   }
@@ -80,8 +75,8 @@ export default function HomeScreen() {
 }
 
 function AuthenticatedHomeScreen({
+  apiClient,
   onSessionExpired,
-  token,
 }: AuthenticatedHomeScreenProps) {
   const router = useRouter();
   const requestIDRef = useRef(0);
@@ -105,7 +100,7 @@ function AuthenticatedHomeScreen({
       setFeedState({ status: 'loading' });
       setUsefulMutations({});
 
-      listNotes(noteListInput(categorySlug), token)
+      apiClient.listNotes(noteListInput(categorySlug))
         .then((notes) => {
           if (requestIDRef.current !== requestID) {
             return;
@@ -134,7 +129,7 @@ function AuthenticatedHomeScreen({
           setFeedState({ status: 'error' });
         });
     },
-    [onSessionExpired, token],
+    [apiClient, onSessionExpired],
   );
 
   const loadCatalogAndFeed = useCallback(() => {
@@ -144,7 +139,7 @@ function AuthenticatedHomeScreen({
     setFeedState({ status: 'loading' });
     setUsefulMutations({});
 
-    listCatalogs(token)
+    apiClient.listCatalogs()
       .then((catalogs) => {
         if (requestIDRef.current !== requestID) {
           return;
@@ -159,7 +154,7 @@ function AuthenticatedHomeScreen({
         setSelectedCategorySlug(categorySlug);
         setCatalogState({ status: 'ready', catalog });
 
-        listNotes(noteListInput(categorySlug), token)
+        apiClient.listNotes(noteListInput(categorySlug))
           .then((notes) => {
             if (requestIDRef.current !== requestID) {
               return;
@@ -202,7 +197,7 @@ function AuthenticatedHomeScreen({
         setCatalogState({ status: 'error' });
         setFeedState({ status: 'error' });
       });
-  }, [onSessionExpired, token]);
+  }, [apiClient, onSessionExpired]);
 
   const selectCategorySlug = useCallback(
     (categorySlug: string | null) => {
@@ -233,9 +228,9 @@ function AuthenticatedHomeScreen({
       }));
       try {
         if (target.usefulByCurrentUser) {
-          await unmarkNoteUseful(target.id, token);
+          await apiClient.unmarkNoteUseful(target.id);
         } else {
-          await markNoteUseful(target.id, token);
+          await apiClient.markNoteUseful(target.id);
         }
         if (requestIDRef.current !== generation) {
           return;
@@ -279,7 +274,7 @@ function AuthenticatedHomeScreen({
         }));
       }
     },
-    [onSessionExpired, token, usefulMutations],
+    [apiClient, onSessionExpired, usefulMutations],
   );
 
   useFocusEffect(

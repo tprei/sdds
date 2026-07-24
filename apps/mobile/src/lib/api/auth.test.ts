@@ -3,17 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AuthAPIRequestError,
   AuthAPIResponseError,
-  createAuthSession,
-  createAuthUser,
-  deleteAuthSession,
-  getAuthSession,
 } from './auth';
+import { createAPIClient } from './client';
 import type { components } from './generated/schema';
 
 vi.mock('react-native', () => ({
   Platform: {
     OS: 'ios',
   },
+}));
+
+vi.mock('expo-file-system', () => ({
+  File: class {},
 }));
 
 const configuredAPIBaseURLEnvName = 'EXPO_PUBLIC_SDDS_API_BASE_URL';
@@ -45,7 +46,8 @@ describe('auth API client', () => {
       return jsonResponse(apiAuthSession(), httpStatusCreated);
     });
 
-    await createAuthUser({
+    const client = createAPIClient();
+    await client.createAuthUser({
       displayName: 'Thiago',
       password: 'senha-secreta',
       username: 'thiago',
@@ -69,7 +71,8 @@ describe('auth API client', () => {
       return jsonResponse(apiAuthSession(), httpStatusCreated);
     });
 
-    await createAuthSession({
+    const client = createAPIClient();
+    await client.createAuthSession({
       password: 'senha-secreta',
       username: 'thiago',
     });
@@ -87,7 +90,8 @@ describe('auth API client', () => {
   it('parses created auth sessions from the API wire shape', async () => {
     stubFetch(async () => jsonResponse(apiAuthSession(), httpStatusCreated));
 
-    const session = await createAuthSession({
+    const client = createAPIClient();
+    const session = await client.createAuthSession({
       password: 'senha-secreta',
       username: 'thiago',
     });
@@ -113,7 +117,8 @@ describe('auth API client', () => {
       return jsonResponse(apiCurrentSession());
     });
 
-    const session = await getAuthSession(exampleToken);
+    const client = createAPIClient(exampleToken);
+    const session = await client.getAuthSession();
 
     const request = onlyFetchCall(calls);
     expect(request.url).toBe('http://localhost:8080/v1/auth/session');
@@ -139,7 +144,8 @@ describe('auth API client', () => {
       return new Response(null, { status: httpStatusNoContent });
     });
 
-    await deleteAuthSession(exampleToken);
+    const client = createAPIClient(exampleToken);
+    await client.deleteAuthSession();
 
     const request = onlyFetchCall(calls);
     expect(request.url).toBe('http://localhost:8080/v1/auth/session');
@@ -150,7 +156,8 @@ describe('auth API client', () => {
   it('raises request errors from status even when the error body fails', async () => {
     stubFetch(async () => unreadableResponse(httpStatusUnauthorized));
 
-    await expect(getAuthSession(exampleToken)).rejects.toMatchObject(
+    const client = createAPIClient(exampleToken);
+    await expect(client.getAuthSession()).rejects.toMatchObject(
       new AuthAPIRequestError(httpStatusUnauthorized),
     );
   });
@@ -169,8 +176,9 @@ describe('auth API client', () => {
       ),
     );
 
+    const client = createAPIClient();
     await expect(
-      createAuthUser({
+      client.createAuthUser({
         displayName: '',
         password: 'short',
         username: 'thiago',
@@ -198,8 +206,9 @@ describe('auth API client', () => {
       ),
     );
 
+    const client = createAPIClient();
     await expect(
-      createAuthSession({
+      client.createAuthSession({
         password: 'short',
         username: 'thiago',
       }),
@@ -222,8 +231,9 @@ describe('auth API client', () => {
       ),
     );
 
+    const client = createAPIClient();
     await expect(
-      createAuthUser({
+      client.createAuthUser({
         displayName: 'Thiago',
         password: 'secret-password',
         username: 'thiago',
@@ -244,8 +254,9 @@ describe('auth API client', () => {
     response.headers.set('Retry-After', '4');
     stubFetch(async () => response);
 
+    const client = createAPIClient();
     await expect(
-      createAuthSession({
+      client.createAuthSession({
         password: 'secret-password',
         username: 'thiago',
       }),
@@ -268,8 +279,9 @@ describe('auth API client', () => {
       ),
     );
 
+    const client = createAPIClient();
     await expect(
-      createAuthUser({
+      client.createAuthUser({
         displayName: 'Thiago',
         password: 'short',
         username: 'thiago',
@@ -287,8 +299,9 @@ describe('auth API client', () => {
       ),
     );
 
+    const client = createAPIClient();
     await expect(
-      createAuthUser({
+      client.createAuthUser({
         displayName: 'Thiago',
         password: 'senha-secreta',
         username: 'thiago',
@@ -310,7 +323,8 @@ describe('auth API client', () => {
       }),
     );
 
-    await expect(getAuthSession(exampleToken)).rejects.toThrow(
+    const client = createAPIClient(exampleToken);
+    await expect(client.getAuthSession()).rejects.toThrow(
       AuthAPIResponseError,
     );
   });
@@ -323,7 +337,8 @@ describe('auth API client', () => {
       }),
     );
 
-    await expect(getAuthSession(exampleToken)).resolves.toEqual({
+    const client = createAPIClient(exampleToken);
+    await expect(client.getAuthSession()).resolves.toEqual({
       expiresAt: 1782993600000,
       user: {
         author: {

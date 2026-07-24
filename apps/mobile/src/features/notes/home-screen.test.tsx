@@ -18,9 +18,13 @@ type AuthStateMock =
   | { status: 'authenticated'; token: string; user: { id: string } };
 
 const mocks = vi.hoisted(() => ({
+  apiClient: {
+    listNotes: vi.fn(),
+    listCatalogs: vi.fn(),
+    markNoteUseful: vi.fn(),
+    unmarkNoteUseful: vi.fn(),
+  },
   authState: { status: 'loading' } as AuthStateMock,
-  listCatalogs: vi.fn(),
-  listNotes: vi.fn(),
   logout: vi.fn(async () => undefined),
   push: vi.fn(),
 }));
@@ -69,10 +73,8 @@ vi.mock('expo-router', async () => {
   };
 });
 vi.mock('@/lib/auth/auth-provider', () => ({
-  useAuth: () => ({ logout: mocks.logout, state: mocks.authState }),
+  useAuth: () => ({ apiClient: mocks.apiClient, logout: mocks.logout, state: mocks.authState }),
 }));
-vi.mock('@/lib/api/catalogs', () => ({ listCatalogs: mocks.listCatalogs }));
-vi.mock('@/lib/api/notes', () => ({ listNotes: mocks.listNotes }));
 
 async function settle(): Promise<void> {
   await Promise.resolve();
@@ -83,8 +85,8 @@ async function settle(): Promise<void> {
 describe('HomeScreen auth gate', () => {
   beforeEach(() => {
     mocks.authState = { status: 'authenticated', token: 'session-token', user: { id: 'user-id' } };
-    mocks.listCatalogs.mockResolvedValue({ categories: [], places: [] });
-    mocks.listNotes.mockResolvedValue([]);
+    mocks.apiClient.listCatalogs.mockResolvedValue({ categories: [], places: [] });
+    mocks.apiClient.listNotes.mockResolvedValue([]);
     mocks.logout.mockClear();
     mocks.push.mockClear();
   });
@@ -102,8 +104,8 @@ describe('HomeScreen auth gate', () => {
       await settle();
     });
 
-    expect(mocks.listCatalogs).not.toHaveBeenCalled();
-    expect(mocks.listNotes).not.toHaveBeenCalled();
+    expect(mocks.apiClient.listCatalogs).not.toHaveBeenCalled();
+    expect(mocks.apiClient.listNotes).not.toHaveBeenCalled();
     expect(renderer.root.findByProps({ title: 'Entre para continuar' })).toBeDefined();
   });
 
@@ -113,12 +115,12 @@ describe('HomeScreen auth gate', () => {
       await settle();
     });
 
-    expect(mocks.listCatalogs).toHaveBeenCalledWith('session-token');
-    expect(mocks.listNotes).toHaveBeenCalledWith({}, 'session-token');
+    expect(mocks.apiClient.listCatalogs).toHaveBeenCalledWith();
+    expect(mocks.apiClient.listNotes).toHaveBeenCalledWith({});
   });
 
   it('logs out on a read 401', async () => {
-    mocks.listCatalogs.mockRejectedValueOnce({ status: 401 });
+    mocks.apiClient.listCatalogs.mockRejectedValueOnce({ status: 401 });
 
     await act(async () => {
       create(createElement(HomeScreen));

@@ -1,12 +1,7 @@
-import createClient from 'openapi-fetch';
-
-import { apiBaseURL } from './config';
-import { APIRequestError, parseAPIRequestError } from './request-error';
 import {
   listCategoriesResponseSchema,
   listPlacesResponseSchema,
 } from './schema';
-import type { paths } from './generated/schema';
 import type { TypedTransport } from './client';
 
 export type CatalogCategory = {
@@ -27,56 +22,51 @@ export type Catalogs = {
   categories: CatalogCategory[];
   places: CatalogPlace[];
 };
+
 export class CatalogAPIResponseError extends Error {
   constructor() {
     super('catalog_api_response_invalid');
   }
 }
 
-export async function listCatalogs(token: string): Promise<Catalogs> {
-  const [categories, places] = await Promise.all([
-    listCategories(token),
-    listPlaces(token),
-  ]);
+export type CatalogsAPI = {
+  listCatalogs(): Promise<Catalogs>;
+  listCategories(): Promise<CatalogCategory[]>;
+  listPlaces(): Promise<CatalogPlace[]>;
+};
 
-  return { categories, places };
+export function bindCatalogsAPI(transport: TypedTransport): CatalogsAPI {
+  return {
+    async listCatalogs() {
+      const [categories, places] = await Promise.all([
+        listCategoriesImpl(transport),
+        listPlacesImpl(transport),
+      ]);
+      return { categories, places };
+    },
+
+    async listCategories() {
+      return listCategoriesImpl(transport);
+    },
+
+    async listPlaces() {
+      return listPlacesImpl(transport);
+    },
+  };
 }
 
-export async function listCategories(
-  token: string,
+async function listCategoriesImpl(
+  transport: TypedTransport,
 ): Promise<CatalogCategory[]> {
-  const { data } = await apiClient(token).GET('/v1/categories');
-
+  const { data } = await transport.GET('/v1/categories');
   return parseListCategoriesResponse(data);
 }
 
-export async function listPlaces(token: string): Promise<CatalogPlace[]> {
-  const { data } = await apiClient(token).GET('/v1/places');
-
+async function listPlacesImpl(
+  transport: TypedTransport,
+): Promise<CatalogPlace[]> {
+  const { data } = await transport.GET('/v1/places');
   return parseListPlacesResponse(data);
-}
-
-function apiClient(token: string) {
-  return createClient<paths>({
-    baseUrl: apiBaseURL(),
-    fetch: (request) => apiFetch(request, token),
-  });
-}
-
-async function apiFetch(request: Request, token: string): Promise<Response> {
-  const response = await fetch(authenticatedRequest(request, token));
-  if (response.ok) {
-    return response;
-  }
-
-  const error = await parseAPIRequestError(response);
-  throw new APIRequestError(error.status, error.body, error.retryAfter);
-}
-
-function authenticatedRequest(request: Request, token: string): Request {
-  const headers = new Headers(request.headers);
-  headers.set('Authorization', `Bearer ${token}`);
-  return new Request(request, { headers });
 }
 
 function parseListCategoriesResponse(value: unknown): CatalogCategory[] {
@@ -105,33 +95,4 @@ function parseListPlacesResponse(value: unknown): CatalogPlace[] {
     label: value.label,
     slug: value.slug,
   }));
-}
-
-
-export type CatalogsAPI = {
-  listCatalogs(): Promise<Catalogs>;
-  listCategories(): Promise<CatalogCategory[]>;
-  listPlaces(): Promise<CatalogPlace[]>;
-};
-
-export function bindCatalogsAPI(transport: TypedTransport): CatalogsAPI {
-  return {
-    async listCatalogs() {
-      const [categories, places] = await Promise.all([
-        transport.GET('/v1/categories').then(({ data }) => parseListCategoriesResponse(data)),
-        transport.GET('/v1/places').then(({ data }) => parseListPlacesResponse(data)),
-      ]);
-      return { categories, places };
-    },
-
-    async listCategories() {
-      const { data } = await transport.GET('/v1/categories');
-      return parseListCategoriesResponse(data);
-    },
-
-    async listPlaces() {
-      const { data } = await transport.GET('/v1/places');
-      return parseListPlacesResponse(data);
-    },
-  };
 }

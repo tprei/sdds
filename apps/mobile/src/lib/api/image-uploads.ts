@@ -59,63 +59,6 @@ export class ImageUploadResponseError extends Error {
   }
 }
 
-export async function prepareImageUpload(
-  asset: ImageUploadAsset,
-  token: string,
-  options: PrepareImageUploadOptions,
-): Promise<ImageUploadReceipt> {
-  throwIfAborted(options.signal);
-  if (token.trim() === '') {
-    throw new ImageUploadRequestError(401);
-  }
-
-  const uploadRequestId = canonicalUploadRequestId(options.uploadRequestId);
-  const file = asset.file ?? new ExpoFile(asset.uri);
-  const filename = asset.fileName ?? file.name;
-  const headers = new Headers({ Authorization: `Bearer ${token}` });
-  const maxAttempts = boundedPositiveInteger(
-    options.maxAttempts,
-    defaultMaxAttempts,
-  );
-  const maxDelayMs = boundedPositiveInteger(
-    options.maxDelayMs,
-    defaultMaxDelayMs,
-  );
-  const sleep = options.sleep ?? delay;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    throwIfAborted(options.signal);
-    const form = new FormData();
-    form.append('upload_request_id', uploadRequestId);
-    form.append('file', file, filename);
-    const request = new Request(`${apiBaseURL()}/v1/media/image-uploads`, {
-      body: form,
-      headers,
-      method: 'POST',
-      signal: options.signal,
-    });
-    const response = await fetch(request);
-
-    if (response.status === 201) {
-      return parseImageUploadReceipt(await readJSON(response));
-    }
-
-    const sharedError = await parseAPIRequestError(response);
-    throwIfAborted(options.signal);
-    const requestError = new ImageUploadRequestError(
-      sharedError.status,
-      sharedError.body,
-      sharedError.retryAfter,
-    );
-    if (!isRetryableImageUploadError(requestError) || attempt >= maxAttempts) {
-      throw requestError;
-    }
-
-    await sleep(retryDelay(requestError, attempt, maxDelayMs), options.signal);
-  }
-
-  throw new ImageUploadRequestError(503);
-}
 
 function canonicalUploadRequestId(value: string): string {
   if (!canonicalUUIDPattern.test(value)) {

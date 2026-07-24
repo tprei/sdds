@@ -1,14 +1,11 @@
-import createClient from 'openapi-fetch';
-
 import { apiBaseURL } from './config';
 import {
   APIRequestError as SharedAPIRequestError,
-  parseAPIRequestError,
 } from './request-error';
 import { listNotesResponseSchema, noteSchema } from './schema';
-import type { APIErrorResponse } from './request-error';
-import type { components, paths } from './generated/schema';
 import type { TypedTransport } from './client';
+import type { APIErrorResponse } from './request-error';
+import type { components } from './generated/schema';
 
 export type Note = {
   author: NoteAuthor;
@@ -81,70 +78,94 @@ export class APIResponseError extends Error {
   }
 }
 
-export async function listNotes(
-  input: ListNotesInput,
-  token: string,
-): Promise<Note[]> {
-  const query = noteListQuery(input);
-  const { data } = await apiClient(token).GET('/v1/notes', {
-    params: {
-      query,
-    },
-  });
+export type NotesAPI = {
+  listNotes(input: ListNotesInput): Promise<Note[]>;
+  getNote(id: string): Promise<Note>;
+  markNoteUseful(noteID: string): Promise<void>;
+  unmarkNoteUseful(noteID: string): Promise<void>;
+  searchNotes(input: SearchNotesInput): Promise<Note[]>;
+  createNote(input: CreateNoteInput): Promise<Note>;
+};
 
-  return parseListNotesResponse(data);
+function rewrapTransportError(error: unknown): never {
+  if (error instanceof SharedAPIRequestError) {
+    throw new APIRequestError(error.status, error.body, error.retryAfter);
+  }
+  throw error;
 }
 
-export async function getNote(id: string, token: string): Promise<Note> {
-  const { data } = await apiClient(token).GET('/v1/notes/{note_id}', {
-    params: {
-      path: {
-        note_id: id,
-      },
+export function bindNotesAPI(transport: TypedTransport): NotesAPI {
+  return {
+    async listNotes(input) {
+      try {
+        const { data } = await transport.GET('/v1/notes', {
+          params: { query: noteListQuery(input) },
+        });
+        return parseListNotesResponse(data);
+      } catch (error) {
+        rewrapTransportError(error);
+      }
     },
-  });
 
-  return parseNoteResponse(data);
-}
-
-export async function markNoteUseful(
-  noteID: string,
-  token: string,
-): Promise<void> {
-  await apiClient(token).PUT('/v1/notes/{note_id}/useful', {
-    params: {
-      path: {
-        note_id: noteID,
-      },
+    async getNote(id) {
+      try {
+        const { data } = await transport.GET('/v1/notes/{note_id}', {
+          params: { path: { note_id: id } },
+        });
+        return parseNoteResponse(data);
+      } catch (error) {
+        rewrapTransportError(error);
+      }
     },
-  });
-}
 
-export async function unmarkNoteUseful(
-  noteID: string,
-  token: string,
-): Promise<void> {
-  await apiClient(token).DELETE('/v1/notes/{note_id}/useful', {
-    params: {
-      path: {
-        note_id: noteID,
-      },
+    async markNoteUseful(noteID) {
+      try {
+        await transport.PUT('/v1/notes/{note_id}/useful', {
+          params: { path: { note_id: noteID } },
+        });
+      } catch (error) {
+        rewrapTransportError(error);
+      }
     },
-  });
-}
 
-export async function searchNotes(
-  input: SearchNotesInput,
-  token: string,
-): Promise<Note[]> {
-  const query = noteSearchQuery(input);
-  const { data } = await apiClient(token).GET('/v1/search/notes', {
-    params: {
-      query,
+    async unmarkNoteUseful(noteID) {
+      try {
+        await transport.DELETE('/v1/notes/{note_id}/useful', {
+          params: { path: { note_id: noteID } },
+        });
+      } catch (error) {
+        rewrapTransportError(error);
+      }
     },
-  });
 
-  return parseListNotesResponse(data);
+    async searchNotes(input) {
+      try {
+        const { data } = await transport.GET('/v1/search/notes', {
+          params: { query: noteSearchQuery(input) },
+        });
+        return parseListNotesResponse(data);
+      } catch (error) {
+        rewrapTransportError(error);
+      }
+    },
+
+    async createNote(input) {
+      const request: CreateNoteRequest = {
+        body: input.body,
+        category_slug: input.categorySlug,
+        client_request_id: input.clientRequestId,
+        image_upload_ids: input.imageUploadIds,
+        place_slug: input.placeSlug ?? null,
+        title: input.title,
+      };
+      try {
+        const { data } = await transport.POST('/v1/notes', { body: request });
+        return parseNoteResponse(data);
+      } catch (error) {
+        rewrapTransportError(error);
+      }
+    },
+  };
 }
 
 function noteListQuery(input: ListNotesInput): {
@@ -164,49 +185,6 @@ function noteSearchQuery(input: SearchNotesInput): {
     return { q: input.query };
   }
   return { category_slug: input.categorySlug, q: input.query };
-}
-
-export async function createNote(
-  input: CreateNoteInput,
-  token: string,
-): Promise<Note> {
-  const request: CreateNoteRequest = {
-    body: input.body,
-    category_slug: input.categorySlug,
-    client_request_id: input.clientRequestId,
-    image_upload_ids: input.imageUploadIds,
-    place_slug: input.placeSlug ?? null,
-    title: input.title,
-  };
-
-  const { data } = await apiClient(token).POST('/v1/notes', {
-    body: request,
-  });
-
-  return parseNoteResponse(data);
-}
-
-function apiClient(token: string) {
-  return createClient<paths>({
-    baseUrl: apiBaseURL(),
-    fetch: (request) => apiFetch(request, token),
-  });
-}
-
-async function apiFetch(request: Request, token: string): Promise<Response> {
-  const response = await fetch(authenticatedRequest(request, token));
-  if (response.ok) {
-    return response;
-  }
-
-  const error = await parseAPIRequestError(response);
-  throw new APIRequestError(error.status, error.body, error.retryAfter);
-}
-
-function authenticatedRequest(request: Request, token: string): Request {
-  const headers = new Headers(request.headers);
-  headers.set('Authorization', `Bearer ${token}`);
-  return new Request(request, { headers });
 }
 
 function parseListNotesResponse(value: unknown): Note[] {
@@ -282,95 +260,4 @@ function isAbsoluteURL(value: string): boolean {
   } catch {
     return false;
   }
-}
-
-
-export type NotesAPI = {
-  listNotes(input: ListNotesInput): Promise<Note[]>;
-  getNote(id: string): Promise<Note>;
-  markNoteUseful(noteID: string): Promise<void>;
-  unmarkNoteUseful(noteID: string): Promise<void>;
-  searchNotes(input: SearchNotesInput): Promise<Note[]>;
-  createNote(input: CreateNoteInput): Promise<Note>;
-};
-
-function rewrapNotesTransportError(error: unknown): never {
-  if (error instanceof SharedAPIRequestError) {
-    throw new APIRequestError(error.status, error.body, error.retryAfter);
-  }
-  throw error;
-}
-
-export function bindNotesAPI(transport: TypedTransport): NotesAPI {
-  return {
-    async listNotes(input) {
-      try {
-        const { data } = await transport.GET('/v1/notes', {
-          params: { query: noteListQuery(input) },
-        });
-        return parseListNotesResponse(data);
-      } catch (error) {
-        rewrapNotesTransportError(error);
-      }
-    },
-
-    async getNote(id) {
-      try {
-        const { data } = await transport.GET('/v1/notes/{note_id}', {
-          params: { path: { note_id: id } },
-        });
-        return parseNoteResponse(data);
-      } catch (error) {
-        rewrapNotesTransportError(error);
-      }
-    },
-
-    async markNoteUseful(noteID) {
-      try {
-        await transport.PUT('/v1/notes/{note_id}/useful', {
-          params: { path: { note_id: noteID } },
-        });
-      } catch (error) {
-        rewrapNotesTransportError(error);
-      }
-    },
-
-    async unmarkNoteUseful(noteID) {
-      try {
-        await transport.DELETE('/v1/notes/{note_id}/useful', {
-          params: { path: { note_id: noteID } },
-        });
-      } catch (error) {
-        rewrapNotesTransportError(error);
-      }
-    },
-
-    async searchNotes(input) {
-      try {
-        const { data } = await transport.GET('/v1/search/notes', {
-          params: { query: noteSearchQuery(input) },
-        });
-        return parseListNotesResponse(data);
-      } catch (error) {
-        rewrapNotesTransportError(error);
-      }
-    },
-
-    async createNote(input) {
-      const request: CreateNoteRequest = {
-        body: input.body,
-        category_slug: input.categorySlug,
-        client_request_id: input.clientRequestId,
-        image_upload_ids: input.imageUploadIds,
-        place_slug: input.placeSlug ?? null,
-        title: input.title,
-      };
-      try {
-        const { data } = await transport.POST('/v1/notes', { body: request });
-        return parseNoteResponse(data);
-      } catch (error) {
-        rewrapNotesTransportError(error);
-      }
-    },
-  };
 }

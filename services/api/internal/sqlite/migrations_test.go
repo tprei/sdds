@@ -27,6 +27,7 @@ func TestApplyMigrationsCreatesInitialSchema(t *testing.T) {
 		"note_images",
 		"note_create_requests",
 		"note_useful_reactions",
+		"note_comments",
 	}
 	for _, table := range tables {
 		t.Run(table, func(t *testing.T) {
@@ -56,6 +57,8 @@ func TestApplyMigrationsCreatesCatalogIndexes(t *testing.T) {
 		"sessions_user_idx",
 		"sessions_active_expiry_idx",
 		"note_useful_reactions_user_idx",
+		"note_comments_note_page_idx",
+		"note_comments_user_idx",
 	}
 	for _, index := range indexes {
 		t.Run(index, func(t *testing.T) {

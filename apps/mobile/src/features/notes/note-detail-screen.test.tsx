@@ -1,8 +1,15 @@
 import * as React from 'react';
-import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import {
+  act,
+  create,
+  type ReactTestInstance,
+  type ReactTestRenderer,
+} from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import NoteDetailScreen from '@/app/notes/[id]';
+import type { Comment, CommentPage } from '@/lib/api/comments';
+import type { CommentThreadState } from '@/features/comments/comment-thread';
 
 const { createElement } = React;
 type ReactNode = React.ReactNode;
@@ -30,11 +37,15 @@ type AuthStateMock =
 
 const mocks = vi.hoisted(() => ({
   apiClient: {
+    createNoteComment: vi.fn(),
+    deleteNoteComment: vi.fn(),
     getNote: vi.fn(),
     listCatalogs: vi.fn(),
     markNoteUseful: vi.fn(),
+    listNoteComments: vi.fn(),
     unmarkNoteUseful: vi.fn(),
   },
+  focusVersion: 0,
   authState: { status: 'loading' } as AuthStateMock,
   back: vi.fn(),
   localParams: { id: 'note-id' },
@@ -80,7 +91,7 @@ vi.mock('expo-router', async () => {
   const react = (await vi.importActual('react')) as typeof React;
   return {
     useFocusEffect(effect: () => void | (() => void)) {
-      react.useEffect(effect, [effect]);
+      react.useEffect(effect, [effect, mocks.focusVersion]);
     },
     useLocalSearchParams: () => mocks.localParams,
     useRouter: () => ({ back: mocks.back, push: mocks.push }),
@@ -147,6 +158,11 @@ vi.mock('@/features/notes/note-detail-content', () => ({
     ),
 }));
 
+vi.mock('@/features/comments/comments-section', () => ({
+  CommentsSection: (props: NativeProps) =>
+    createElement('div', { ...props, testID: 'comments-section' }),
+}));
+
 async function settle(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
@@ -177,6 +193,10 @@ const note = {
   usefulByCurrentUser: false,
 };
 
+const firstComment = comment('comment-1', 'Primeiro comentário');
+const secondComment = comment('comment-2', 'Segundo comentário');
+const submittedComment = comment('comment-new', 'Comentário novo');
+
 describe('NoteDetailScreen route', () => {
   beforeEach(() => {
     mocks.authState = {
@@ -185,8 +205,15 @@ describe('NoteDetailScreen route', () => {
       user: { author: { displayName: 'Thiago', id: 'author-id' }, id: 'user-id' },
     };
     mocks.localParams = { id: 'note-id' };
+    mocks.focusVersion = 0;
     mocks.apiClient.listCatalogs.mockResolvedValue({ categories: [], places: [] });
     mocks.apiClient.getNote.mockResolvedValue(note);
+    mocks.apiClient.listNoteComments.mockResolvedValue({
+      comments: [],
+      nextCursor: null,
+    });
+    mocks.apiClient.createNoteComment.mockReset();
+    mocks.apiClient.deleteNoteComment.mockReset();
     mocks.apiClient.markNoteUseful.mockReset();
     mocks.apiClient.unmarkNoteUseful.mockReset();
     mocks.logout.mockClear();
@@ -209,6 +236,7 @@ describe('NoteDetailScreen route', () => {
 
     expect(mocks.apiClient.listCatalogs).not.toHaveBeenCalled();
     expect(mocks.apiClient.getNote).not.toHaveBeenCalled();
+    expect(mocks.apiClient.listNoteComments).not.toHaveBeenCalled();
     expect(
       renderer.root.findByProps({ title: 'Entre para continuar' }),
     ).toBeDefined();
@@ -243,6 +271,83 @@ describe('NoteDetailScreen route', () => {
     );
     expect(mocks.apiClient.markNoteUseful).toHaveBeenCalledWith('note-id');
   });
+
+  it('does not refresh an unmounted note after a useful request settles', async () => {
+    const pending = deferred<void>();
+    const nextNote = {
+      ...note,
+      id: 'next-note-id',
+      usefulCount: 7,
+    };
+    mocks.apiClient.markNoteUseful.mockReturnValueOnce(pending.promise);
+
+    const renderer = await renderScreen();
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'useful-button' }).props.onPress();
+      await settle();
+    });
+
+    mocks.localParams = { id: nextNote.id };
+    mocks.apiClient.getNote.mockResolvedValueOnce(nextNote);
+    await act(async () => {
+      renderer.update(createElement(NoteDetailScreen));
+      await settle();
+    });
+    await act(async () => {
+      pending.resolve();
+      await settle();
+    });
+
+    expect(renderer.root.findByProps({ testID: 'useful-state' }).props.children).toBe(
+      '7:false',
+    );
+    expect(mocks.apiClient.getNote).toHaveBeenLastCalledWith(nextNote.id);
+  });
+
+  it('reloads comments after a useful request settles during a refocus', async () => {
+    const pendingUseful = deferred<void>();
+    const refocusedNote = deferred<typeof note>();
+    const refreshedNote = {
+      ...note,
+      usefulByCurrentUser: true,
+      usefulCount: 1,
+    };
+    mocks.apiClient.listNoteComments
+      .mockResolvedValueOnce(commentPage([firstComment]))
+      .mockResolvedValueOnce(commentPage([secondComment]));
+    mocks.apiClient.markNoteUseful.mockReturnValueOnce(pendingUseful.promise);
+
+    const renderer = await renderScreen();
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'useful-button' }).props.onPress();
+      await settle();
+    });
+
+    mocks.apiClient.getNote
+      .mockReturnValueOnce(refocusedNote.promise)
+      .mockResolvedValueOnce(refreshedNote);
+    mocks.focusVersion += 1;
+    await act(async () => {
+      renderer.update(createElement(NoteDetailScreen));
+      await settle();
+    });
+    await act(async () => {
+      pendingUseful.resolve();
+      await settle();
+    });
+
+    expect(renderer.root.findByProps({ testID: 'useful-state' }).props.children).toBe(
+      '1:true',
+    );
+    expect(renderedCommentThread(renderer).comments).toEqual([secondComment]);
+
+    await act(async () => {
+      refocusedNote.resolve(note);
+      await settle();
+    });
+    expect(renderedCommentThread(renderer).comments).toEqual([secondComment]);
+  });
+
 
   it('keeps prior state and shows inline error on non-401 useful failure', async () => {
     mocks.apiClient.markNoteUseful.mockRejectedValueOnce({ status: 500 });
@@ -283,4 +388,290 @@ describe('NoteDetailScreen route', () => {
 
     expect(mocks.logout).toHaveBeenCalledOnce();
   });
+
+  it('loads comments after the note and appends an incremental page', async () => {
+    mocks.apiClient.listNoteComments
+      .mockResolvedValueOnce(commentPage([firstComment], 'cursor-1'))
+      .mockResolvedValueOnce(commentPage([secondComment]));
+
+    const renderer = await renderScreen();
+
+    expect(mocks.apiClient.listNoteComments).toHaveBeenCalledWith({
+      noteID: 'note-id',
+    });
+    expect(commentsSection(renderer).props.currentAuthorID).toBe('author-id');
+    expect(renderedCommentThread(renderer).comments).toEqual([firstComment]);
+
+    await act(async () => {
+      commentsSection(renderer).props.onLoadMore();
+      await settle();
+    });
+
+    expect(mocks.apiClient.listNoteComments).toHaveBeenLastCalledWith({
+      cursor: 'cursor-1',
+      noteID: 'note-id',
+    });
+    expect(renderedCommentThread(renderer).comments).toEqual([
+      firstComment,
+      secondComment,
+    ]);
+  });
+
+  it('fences invalid drafts and keeps a created comment in the local tail', async () => {
+    mocks.apiClient.listNoteComments.mockResolvedValueOnce(
+      commentPage([firstComment], 'cursor-1'),
+    );
+    mocks.apiClient.createNoteComment.mockResolvedValueOnce(submittedComment);
+
+    const renderer = await renderScreen();
+
+    await act(async () => {
+      commentsSection(renderer).props.onDraftChange(' \n ');
+      await settle();
+    });
+    await act(async () => {
+      commentsSection(renderer).props.onSubmit();
+      await settle();
+    });
+    expect(mocks.apiClient.createNoteComment).not.toHaveBeenCalled();
+
+    await act(async () => {
+      commentsSection(renderer).props.onDraftChange('  Comentário novo  ');
+      await settle();
+    });
+    await act(async () => {
+      commentsSection(renderer).props.onSubmit();
+      await settle();
+    });
+
+    expect(mocks.apiClient.createNoteComment).toHaveBeenCalledWith({
+      body: 'Comentário novo',
+      noteID: 'note-id',
+    });
+    expect(renderedCommentThread(renderer).draft).toBe('');
+    expect(renderedCommentThread(renderer).localTailComments).toEqual([
+      submittedComment,
+    ]);
+  });
+
+  it('keeps comment errors local and retries the initial list', async () => {
+    mocks.apiClient.listNoteComments
+      .mockRejectedValueOnce({ status: 500 })
+      .mockResolvedValueOnce(commentPage([firstComment]));
+
+    const renderer = await renderScreen();
+
+    expect(renderedCommentThread(renderer).initialLoadStatus).toBe('error');
+    await act(async () => {
+      commentsSection(renderer).props.onRetryInitial();
+      await settle();
+    });
+    expect(renderedCommentThread(renderer).initialLoadStatus).toBe('ready');
+    expect(renderedCommentThread(renderer).comments).toEqual([firstComment]);
+
+    mocks.apiClient.createNoteComment.mockRejectedValueOnce({ status: 500 });
+    await act(async () => {
+      commentsSection(renderer).props.onDraftChange('Comentário com falha');
+      await settle();
+    });
+    await act(async () => {
+      commentsSection(renderer).props.onSubmit();
+      await settle();
+    });
+    expect(renderedCommentThread(renderer).submitStatus).toBe('error');
+    expect(renderedCommentThread(renderer).draft).toBe('Comentário com falha');
+  });
+
+  it('logs out on a comment-list 401 and replaces the detail for a create 404', async () => {
+    mocks.apiClient.listNoteComments.mockRejectedValueOnce({ status: 401 });
+
+    await renderScreen();
+
+    expect(mocks.logout).toHaveBeenCalledOnce();
+
+    mocks.logout.mockClear();
+    mocks.apiClient.listNoteComments.mockResolvedValueOnce(commentPage([]));
+    mocks.apiClient.createNoteComment.mockRejectedValueOnce({ status: 404 });
+    const renderer = await renderScreen();
+    await act(async () => {
+      commentsSection(renderer).props.onDraftChange('Comentário');
+      await settle();
+    });
+    await act(async () => {
+      commentsSection(renderer).props.onSubmit();
+      await settle();
+    });
+
+    expect(
+      renderer.root.findByProps({ title: 'Nota não encontrada' }),
+    ).toBeDefined();
+  });
+
+  it('removes an owner comment on 204, restores a forbidden comment, and keeps a 404 hidden', async () => {
+    const pendingDelete = deferred<void>();
+    mocks.apiClient.listNoteComments.mockResolvedValueOnce(
+      commentPage([firstComment, secondComment, submittedComment]),
+    );
+    mocks.apiClient.deleteNoteComment
+      .mockReturnValueOnce(pendingDelete.promise)
+      .mockRejectedValueOnce({ status: 403 })
+      .mockRejectedValueOnce({ status: 404 });
+
+    const renderer = await renderScreen();
+
+    await act(async () => {
+      commentsSection(renderer).props.onDeleteComment(firstComment.id);
+      await settle();
+    });
+    expect(mocks.apiClient.deleteNoteComment).toHaveBeenCalledWith({
+      commentID: firstComment.id,
+      noteID: 'note-id',
+    });
+    expect(
+      renderedCommentThread(renderer).deleteStatusByCommentID.get(firstComment.id),
+    ).toBe('pending');
+
+    await act(async () => {
+      commentsSection(renderer).props.onDeleteComment(firstComment.id);
+      await settle();
+    });
+    expect(mocks.apiClient.deleteNoteComment).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      pendingDelete.resolve();
+      await settle();
+    });
+    expect(
+      renderedCommentThread(renderer).deleteStatusByCommentID.get(firstComment.id),
+    ).toBe('deleted');
+
+    await act(async () => {
+      commentsSection(renderer).props.onDeleteComment(secondComment.id);
+      await settle();
+    });
+    expect(
+      renderedCommentThread(renderer).deleteStatusByCommentID.get(secondComment.id),
+    ).toBe('error');
+
+    await act(async () => {
+      commentsSection(renderer).props.onDeleteComment(submittedComment.id);
+      await settle();
+    });
+    expect(
+      renderedCommentThread(renderer).deleteStatusByCommentID.get(
+        submittedComment.id,
+      ),
+    ).toBe('deleted');
+    expect(
+      renderer.root.findAllByProps({ title: 'Nota não encontrada' }),
+    ).toHaveLength(0);
+  });
+
+  it('ignores a comment page that settles after the note route changes', async () => {
+    const stalePage = deferred<CommentPage>();
+    mocks.apiClient.listNoteComments
+      .mockReturnValueOnce(stalePage.promise)
+      .mockResolvedValueOnce(commentPage([secondComment]));
+
+    const renderer = await renderScreen();
+
+    mocks.localParams = { id: 'next-note-id' };
+    mocks.apiClient.getNote.mockResolvedValueOnce({
+      ...note,
+      id: 'next-note-id',
+    });
+    await act(async () => {
+      renderer.update(createElement(NoteDetailScreen));
+      await settle();
+    });
+    expect(renderedCommentThread(renderer).comments).toEqual([secondComment]);
+
+    await act(async () => {
+      stalePage.resolve(commentPage([firstComment]));
+      await settle();
+    });
+    expect(renderedCommentThread(renderer).comments).toEqual([secondComment]);
+  });
+
+  it('ignores create and delete completions after the note route changes', async () => {
+    const staleCreate = deferred<Comment>();
+    const staleDelete = deferred<void>();
+    const nextRouteComment = comment(
+      'next-route-comment',
+      'Comentário da próxima nota',
+    );
+    mocks.apiClient.listNoteComments
+      .mockResolvedValueOnce(commentPage([firstComment, secondComment], 'cursor-2'))
+      .mockResolvedValueOnce(commentPage([nextRouteComment]));
+    mocks.apiClient.createNoteComment.mockReturnValueOnce(staleCreate.promise);
+    mocks.apiClient.deleteNoteComment.mockReturnValueOnce(staleDelete.promise);
+
+    const renderer = await renderScreen();
+    await act(async () => {
+      commentsSection(renderer).props.onDraftChange('Comentário pendente');
+      await settle();
+    });
+    await act(async () => {
+      commentsSection(renderer).props.onSubmit();
+      commentsSection(renderer).props.onDeleteComment(firstComment.id);
+      await settle();
+    });
+
+    mocks.localParams = { id: 'next-note-id' };
+    mocks.apiClient.getNote.mockResolvedValueOnce({
+      ...note,
+      id: 'next-note-id',
+    });
+    await act(async () => {
+      renderer.update(createElement(NoteDetailScreen));
+      await settle();
+    });
+    expect(renderedCommentThread(renderer).comments).toEqual([nextRouteComment]);
+
+    await act(async () => {
+      staleCreate.resolve(submittedComment);
+      staleDelete.resolve();
+      await settle();
+    });
+    expect(renderedCommentThread(renderer).comments).toEqual([nextRouteComment]);
+    expect(renderedCommentThread(renderer).localTailComments).toEqual([]);
+    expect(renderedCommentThread(renderer).deleteStatusByCommentID).toEqual(
+      new Map(),
+    );
+  });
 });
+
+async function renderScreen(): Promise<ReactTestRenderer> {
+  let renderer!: ReactTestRenderer;
+  await act(async () => {
+    renderer = create(createElement(NoteDetailScreen));
+    await settle();
+  });
+  return renderer;
+}
+
+function commentsSection(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.findByProps({ testID: 'comments-section' });
+}
+
+function renderedCommentThread(
+  renderer: ReactTestRenderer,
+): CommentThreadState {
+  return commentsSection(renderer).props.thread as CommentThreadState;
+}
+
+function comment(id: string, body: string): Comment {
+  return {
+    author: { displayName: 'Thiago', id: 'author-id' },
+    body,
+    createdAt: 1782993600000,
+    id,
+  };
+}
+
+function commentPage(
+  comments: Comment[],
+  nextCursor: string | null = null,
+): CommentPage {
+  return { comments, nextCursor };
+}

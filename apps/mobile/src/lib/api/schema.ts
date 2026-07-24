@@ -10,12 +10,14 @@ type AuthorSummaryResponse = GeneratedSchemas['AuthorSummary'];
 type CategorySlug = GeneratedSchemas['CategorySlug'];
 type CatalogCategoryResponse = GeneratedSchemas['CatalogCategory'];
 type CatalogPlaceResponse = GeneratedSchemas['CatalogPlace'];
+type CommentResponse = GeneratedSchemas['Comment'];
 type CurrentSessionResponse = GeneratedSchemas['CurrentSessionResponse'];
 type CurrentUserResponse = GeneratedSchemas['CurrentUser'];
 type ErrorCode = GeneratedSchemas['ErrorCode'];
 type ErrorResponse = GeneratedSchemas['ErrorResponse'];
 type ListCategoriesResponse = GeneratedSchemas['ListCategoriesResponse'];
 type ListNotesResponse = GeneratedSchemas['ListNotesResponse'];
+type ListNoteCommentsResponse = GeneratedSchemas['ListNoteCommentsResponse'];
 type ListPlacesResponse = GeneratedSchemas['ListPlacesResponse'];
 type NoteResponse = GeneratedSchemas['Note'];
 type NoteImageResponse = GeneratedSchemas['NoteImage'];
@@ -28,10 +30,26 @@ const canonicalUUIDPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const categorySlugSchema = z.string() satisfies z.ZodType<CategorySlug>;
 const placeSlugSchema = z.string() satisfies z.ZodType<PlaceSlug>;
+const commentBodySchema = z
+  .string()
+  .min(1)
+  .refine((value) => Array.from(value).length <= 1000);
 export const authorSummarySchema = z.object({
   id: z.string(),
   display_name: z.string(),
 }) satisfies z.ZodType<AuthorSummaryResponse>;
+
+export const commentSchema = z.object({
+  id: z.string(),
+  body: commentBodySchema,
+  author: authorSummarySchema,
+  created_at: z.number().int().nonnegative(),
+}) satisfies z.ZodType<CommentResponse>;
+
+export const listNoteCommentsResponseSchema = z.object({
+  comments: z.array(commentSchema),
+  next_cursor: z.string().min(1).max(512).nullable(),
+}) satisfies z.ZodType<ListNoteCommentsResponse>;
 
 export const publicAuthorSchema = z.object({
   id: z.string(),
@@ -212,6 +230,13 @@ export type SchemaExactnessChecks = [
   Assert<Exact<CategorySlug, z.output<typeof categorySlugSchema>>>,
   Assert<Exact<PlaceSlug, z.output<typeof placeSlugSchema>>>,
   Assert<Exact<AuthorSummaryResponse, z.output<typeof authorSummarySchema>>>,
+  Assert<Exact<CommentResponse, z.output<typeof commentSchema>>>,
+  Assert<
+    Exact<
+      ListNoteCommentsResponse,
+      z.output<typeof listNoteCommentsResponseSchema>
+    >
+  >,
   Assert<Exact<NoteImageResponse, z.output<typeof noteImageSchema>>>,
   Assert<
     Exact<ImageUploadReceiptResponse, z.output<typeof imageUploadReceiptSchema>>

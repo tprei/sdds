@@ -80,6 +80,10 @@ func writeOpenAPIRequestValidationError(w http.ResponseWriter, r *http.Request, 
 		writeError(w, http.StatusRequestEntityTooLarge, openapi.ErrorResponse{Code: openapi.ErrorCodeRequestTooLarge})
 		return
 	}
+	if response, ok := invalidCreateNoteCommentBody(err); ok {
+		writeError(w, http.StatusBadRequest, response)
+		return
+	}
 	if isTooManyCreateNoteImages(err) {
 		writeTooManyCreateNoteImages(w)
 		return
@@ -119,10 +123,16 @@ func requestValidationPolicyForOperation(operationID string) (requestValidationP
 	if policy, ok := noteRequestValidationPolicy(operationID); ok {
 		return policy, true
 	}
+	if policy, ok := commentRequestValidationPolicy(operationID); ok {
+		return policy, true
+	}
 	return mediaRequestValidationPolicy(operationID)
 }
 
 func generatedOpenAPIParameterError(path string, paramName string) (openapi.ErrorResponse, bool) {
+	if response, ok := generatedInvalidCommentParamError(path, paramName); ok {
+		return response, true
+	}
 	if response, ok := generatedInvalidAuthorNotesParamError(path, paramName); ok {
 		return response, true
 	}

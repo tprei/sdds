@@ -60,6 +60,7 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: sdds-ci-${{ github.run_id }}-${{ github.run_attempt }}
       SDDS_HTTP_PORT: 18080-18999
+      SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE: 60
     steps:
       - name: Check out code
         uses: actions/checkout@v4

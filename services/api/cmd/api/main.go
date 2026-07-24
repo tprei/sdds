@@ -147,6 +147,7 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config) (err
 		return fmt.Errorf("verify media readiness: %w", err)
 	}
 	noteStore := sqlite.NewNoteStore(db)
+	commentStore := sqlite.NewCommentStore(db)
 	catalogStore := sqlite.NewCatalogStore(db)
 	userStore := sqlite.NewUserStore(db)
 	uploadStore := sqlite.NewImageUploadStore(db)
@@ -164,6 +165,7 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config) (err
 	readiness := runtimeReadiness{database: db, media: store}
 	server := newServer(config, httpapi.NewRouter(
 		httpapi.NotesDependencies{Stores: noteStore, Catalog: catalogStore},
+		httpapi.CommentDependencies{Store: commentStore},
 		httpapi.AuthDependencies{Users: userStore, Limits: config.authLimits},
 		httpapi.MediaDependencies{ImageUploads: uploadService, AttachedImages: imageReader},
 		httpapi.SystemDependencies{Readiness: readiness},

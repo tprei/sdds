@@ -23,9 +23,11 @@ const (
 
 // Defines values for ErrorCode.
 const (
+	ErrorCodeForbidden                 ErrorCode = "forbidden"
 	ErrorCodeIdempotencyConflict       ErrorCode = "idempotency_conflict"
 	ErrorCodeInternal                  ErrorCode = "internal_error"
 	ErrorCodeInvalidAuth               ErrorCode = "invalid_auth"
+	ErrorCodeInvalidComment            ErrorCode = "invalid_comment"
 	ErrorCodeInvalidJSON               ErrorCode = "invalid_json"
 	ErrorCodeInvalidMedia              ErrorCode = "invalid_media"
 	ErrorCodeInvalidNote               ErrorCode = "invalid_note"
@@ -47,11 +49,15 @@ const (
 // Valid indicates whether the value is a known member of the ErrorCode enum.
 func (e ErrorCode) Valid() bool {
 	switch e {
+	case ErrorCodeForbidden:
+		return true
 	case ErrorCodeIdempotencyConflict:
 		return true
 	case ErrorCodeInternal:
 		return true
 	case ErrorCodeInvalidAuth:
+		return true
+	case ErrorCodeInvalidComment:
 		return true
 	case ErrorCodeInvalidJSON:
 		return true
@@ -249,6 +255,21 @@ type CatalogPlace struct {
 // CategorySlug defines model for CategorySlug.
 type CategorySlug = string
 
+// Comment defines model for Comment.
+type Comment struct {
+	Author AuthorSummary `json:"author"`
+	Body   string        `json:"body"`
+
+	// CreatedAt Unix timestamp in milliseconds.
+	CreatedAt int64  `json:"created_at"`
+	Id        string `json:"id"`
+}
+
+// CreateCommentRequest defines model for CreateCommentRequest.
+type CreateCommentRequest struct {
+	Body string `json:"body"`
+}
+
 // CreateNoteRequest defines model for CreateNoteRequest.
 type CreateNoteRequest struct {
 	Body            string       `json:"body"`
@@ -311,6 +332,12 @@ type ImageUploadReceiptContentType string
 // ListCategoriesResponse defines model for ListCategoriesResponse.
 type ListCategoriesResponse struct {
 	Categories []CatalogCategory `json:"categories"`
+}
+
+// ListNoteCommentsResponse defines model for ListNoteCommentsResponse.
+type ListNoteCommentsResponse struct {
+	Comments   []Comment `json:"comments"`
+	NextCursor *string   `json:"next_cursor"`
 }
 
 // ListNotesResponse defines model for ListNotesResponse.
@@ -408,6 +435,12 @@ type ListNotesParams struct {
 	CategorySlug *CategorySlug `form:"category_slug,omitempty" json:"category_slug,omitempty"`
 }
 
+// ListNoteCommentsParams defines parameters for ListNoteComments.
+type ListNoteCommentsParams struct {
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
 // SearchNotesParams defines parameters for SearchNotes.
 type SearchNotesParams struct {
 	// Q Raw user search text. Missing, blank, or overlong values return invalid_search.
@@ -428,6 +461,9 @@ type PrepareImageUploadMultipartRequestBody = PrepareImageUploadMultipart
 
 // CreateNoteJSONRequestBody defines body for CreateNote for application/json ContentType.
 type CreateNoteJSONRequestBody = CreateNoteRequest
+
+// CreateNoteCommentJSONRequestBody defines body for CreateNoteComment for application/json ContentType.
+type CreateNoteCommentJSONRequestBody = CreateCommentRequest
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -549,6 +585,17 @@ type ClientInterface interface {
 
 	// GetNote request
 	GetNote(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListNoteComments request
+	ListNoteComments(ctx context.Context, noteId string, params *ListNoteCommentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateNoteCommentWithBody request with any body
+	CreateNoteCommentWithBody(ctx context.Context, noteId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateNoteComment(ctx context.Context, noteId string, body CreateNoteCommentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteNoteComment request
+	DeleteNoteComment(ctx context.Context, noteId string, commentId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UnmarkNoteUseful request
 	UnmarkNoteUseful(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -757,6 +804,54 @@ func (c *Client) CreateNote(ctx context.Context, body CreateNoteJSONRequestBody,
 
 func (c *Client) GetNote(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetNoteRequest(c.Server, noteId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListNoteComments(ctx context.Context, noteId string, params *ListNoteCommentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListNoteCommentsRequest(c.Server, noteId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateNoteCommentWithBody(ctx context.Context, noteId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateNoteCommentRequestWithBody(c.Server, noteId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateNoteComment(ctx context.Context, noteId string, body CreateNoteCommentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateNoteCommentRequest(c.Server, noteId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteNoteComment(ctx context.Context, noteId string, commentId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteNoteCommentRequest(c.Server, noteId, commentId)
 	if err != nil {
 		return nil, err
 	}
@@ -1328,6 +1423,167 @@ func NewGetNoteRequest(server string, noteId string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewListNoteCommentsRequest generates requests for ListNoteComments
+func NewListNoteCommentsRequest(server string, noteId string, params *ListNoteCommentsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "note_id", noteId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/notes/%s/comments", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateNoteCommentRequest calls the generic CreateNoteComment builder with application/json body
+func NewCreateNoteCommentRequest(server string, noteId string, body CreateNoteCommentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateNoteCommentRequestWithBody(server, noteId, "application/json", bodyReader)
+}
+
+// NewCreateNoteCommentRequestWithBody generates requests for CreateNoteComment with any type of body
+func NewCreateNoteCommentRequestWithBody(server string, noteId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "note_id", noteId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/notes/%s/comments", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteNoteCommentRequest generates requests for DeleteNoteComment
+func NewDeleteNoteCommentRequest(server string, noteId string, commentId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "note_id", noteId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "comment_id", commentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/notes/%s/comments/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewUnmarkNoteUsefulRequest generates requests for UnmarkNoteUseful
 func NewUnmarkNoteUsefulRequest(server string, noteId string) (*http.Request, error) {
 	var err error
@@ -1579,6 +1835,17 @@ type ClientWithResponsesInterface interface {
 
 	// GetNoteWithResponse request
 	GetNoteWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*GetNoteHTTPResponse, error)
+
+	// ListNoteCommentsWithResponse request
+	ListNoteCommentsWithResponse(ctx context.Context, noteId string, params *ListNoteCommentsParams, reqEditors ...RequestEditorFn) (*ListNoteCommentsHTTPResponse, error)
+
+	// CreateNoteCommentWithBodyWithResponse request with any body
+	CreateNoteCommentWithBodyWithResponse(ctx context.Context, noteId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateNoteCommentHTTPResponse, error)
+
+	CreateNoteCommentWithResponse(ctx context.Context, noteId string, body CreateNoteCommentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateNoteCommentHTTPResponse, error)
+
+	// DeleteNoteCommentWithResponse request
+	DeleteNoteCommentWithResponse(ctx context.Context, noteId string, commentId string, reqEditors ...RequestEditorFn) (*DeleteNoteCommentHTTPResponse, error)
 
 	// UnmarkNoteUsefulWithResponse request
 	UnmarkNoteUsefulWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*UnmarkNoteUsefulHTTPResponse, error)
@@ -2063,6 +2330,108 @@ func (r GetNoteHTTPResponse) ContentType() string {
 	return ""
 }
 
+type ListNoteCommentsHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ListNoteCommentsResponse
+	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r ListNoteCommentsHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListNoteCommentsHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListNoteCommentsHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateNoteCommentHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *Comment
+	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON413      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateNoteCommentHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateNoteCommentHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateNoteCommentHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteNoteCommentHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *ErrorResponse
+	JSON403      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteNoteCommentHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteNoteCommentHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteNoteCommentHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type UnmarkNoteUsefulHTTPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2341,6 +2710,41 @@ func (c *ClientWithResponses) GetNoteWithResponse(ctx context.Context, noteId st
 		return nil, err
 	}
 	return ParseGetNoteHTTPResponse(rsp)
+}
+
+// ListNoteCommentsWithResponse request returning *ListNoteCommentsHTTPResponse
+func (c *ClientWithResponses) ListNoteCommentsWithResponse(ctx context.Context, noteId string, params *ListNoteCommentsParams, reqEditors ...RequestEditorFn) (*ListNoteCommentsHTTPResponse, error) {
+	rsp, err := c.ListNoteComments(ctx, noteId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListNoteCommentsHTTPResponse(rsp)
+}
+
+// CreateNoteCommentWithBodyWithResponse request with arbitrary body returning *CreateNoteCommentHTTPResponse
+func (c *ClientWithResponses) CreateNoteCommentWithBodyWithResponse(ctx context.Context, noteId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateNoteCommentHTTPResponse, error) {
+	rsp, err := c.CreateNoteCommentWithBody(ctx, noteId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateNoteCommentHTTPResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateNoteCommentWithResponse(ctx context.Context, noteId string, body CreateNoteCommentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateNoteCommentHTTPResponse, error) {
+	rsp, err := c.CreateNoteComment(ctx, noteId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateNoteCommentHTTPResponse(rsp)
+}
+
+// DeleteNoteCommentWithResponse request returning *DeleteNoteCommentHTTPResponse
+func (c *ClientWithResponses) DeleteNoteCommentWithResponse(ctx context.Context, noteId string, commentId string, reqEditors ...RequestEditorFn) (*DeleteNoteCommentHTTPResponse, error) {
+	rsp, err := c.DeleteNoteComment(ctx, noteId, commentId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteNoteCommentHTTPResponse(rsp)
 }
 
 // UnmarkNoteUsefulWithResponse request returning *UnmarkNoteUsefulHTTPResponse
@@ -3073,6 +3477,168 @@ func ParseGetNoteHTTPResponse(rsp *http.Response) (*GetNoteHTTPResponse, error) 
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListNoteCommentsHTTPResponse parses an HTTP response from a ListNoteCommentsWithResponse call
+func ParseListNoteCommentsHTTPResponse(rsp *http.Response) (*ListNoteCommentsHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListNoteCommentsHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListNoteCommentsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateNoteCommentHTTPResponse parses an HTTP response from a CreateNoteCommentWithResponse call
+func ParseCreateNoteCommentHTTPResponse(rsp *http.Response) (*CreateNoteCommentHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateNoteCommentHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Comment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteNoteCommentHTTPResponse parses an HTTP response from a DeleteNoteCommentWithResponse call
+func ParseDeleteNoteCommentHTTPResponse(rsp *http.Response) (*DeleteNoteCommentHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteNoteCommentHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest ErrorResponse

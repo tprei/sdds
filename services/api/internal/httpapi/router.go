@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tprei/sdds/services/api/internal/author"
+	"github.com/tprei/sdds/services/api/internal/comment"
 	"github.com/tprei/sdds/services/api/internal/media"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
@@ -33,6 +34,10 @@ type NotesDependencies struct {
 	Catalog note.Catalog
 }
 
+type CommentDependencies struct {
+	Store comment.Store
+}
+
 type AuthDependencies struct {
 	Users  UserStores
 	Limits AuthLimits
@@ -52,6 +57,11 @@ type noteHandlers struct {
 	authorNotes note.AuthorNoteStore
 	useful      note.UsefulStore
 	catalog     note.Catalog
+}
+
+type commentHandlers struct {
+	store comment.Store
+	notes note.Store
 }
 
 type authHandlers struct {
@@ -76,10 +86,11 @@ type systemHandlers struct {
 }
 
 type server struct {
-	notes  noteHandlers
-	auth   authHandlers
-	media  mediaHandlers
-	system systemHandlers
+	notes    noteHandlers
+	auth     authHandlers
+	comments commentHandlers
+	media    mediaHandlers
+	system   systemHandlers
 }
 
 var _ openapi.ServerInterface = server{}
@@ -111,10 +122,11 @@ func DefaultAuthLimits() AuthLimits {
 	}
 }
 
-func NewRouter(notes NotesDependencies, auth AuthDependencies, media MediaDependencies, system SystemDependencies) http.Handler {
+func NewRouter(notes NotesDependencies, comments CommentDependencies, auth AuthDependencies, media MediaDependencies, system SystemDependencies) http.Handler {
 	hasher := newBoundedPasswordHasher(user.NewPasswordHasher(), auth.Limits.PasswordHashConcurrency)
 	return newRouter(
 		noteHandlers{store: notes.Stores, authorNotes: notes.Stores, useful: notes.Stores, catalog: notes.Catalog},
+		commentHandlers{store: comments.Store, notes: notes.Stores},
 		authHandlers{
 			users:                 auth.Users,
 			publicAuthors:         auth.Users,
@@ -129,7 +141,10 @@ func NewRouter(notes NotesDependencies, auth AuthDependencies, media MediaDepend
 	)
 }
 
-func newRouter(notes noteHandlers, auth authHandlers, media mediaHandlers, system systemHandlers) http.Handler {
+func newRouter(notes noteHandlers, comments commentHandlers, auth authHandlers, media mediaHandlers, system systemHandlers) http.Handler {
+	if comments.store == nil {
+		panic("comment store is required")
+	}
 	if media.imageUploads == nil {
 		panic("upload service is required")
 	}
@@ -140,7 +155,7 @@ func newRouter(notes noteHandlers, auth authHandlers, media mediaHandlers, syste
 	router.Use(localBrowserCORS)
 	validateOpenAPIRequest := openAPIRequestValidator()
 	requireCurrentSession := requireAuth(auth.users, auth.clock)
-	handler := server{notes: notes, auth: auth, media: media, system: system}
+	handler := server{notes: notes, comments: comments, auth: auth, media: media, system: system}
 	wrapper := openapi.ServerInterfaceWrapper{
 		Handler:          handler,
 		ErrorHandlerFunc: writeGeneratedOpenAPIError,
@@ -169,6 +184,9 @@ func newRouter(notes noteHandlers, auth authHandlers, media mediaHandlers, syste
 			router.Get("/authors/{author_id}", wrapper.GetAuthor)
 			router.Get("/authors/{author_id}/notes", wrapper.ListAuthorNotes)
 			router.Get("/notes/{note_id}", wrapper.GetNote)
+			router.Get("/notes/{note_id}/comments", wrapper.ListNoteComments)
+			router.Post("/notes/{note_id}/comments", wrapper.CreateNoteComment)
+			router.Delete("/notes/{note_id}/comments/{comment_id}", wrapper.DeleteNoteComment)
 			router.Get("/search/notes", wrapper.SearchNotes)
 			router.Put("/notes/{note_id}/useful", wrapper.MarkNoteUseful)
 			router.Delete("/notes/{note_id}/useful", wrapper.UnmarkNoteUseful)

@@ -3,10 +3,11 @@ import createClient, { type Client } from 'openapi-fetch';
 import { apiBaseURL } from './config';
 import { bindAuthAPI, type AuthAPI } from './auth';
 import { bindAuthorsAPI, type AuthorsAPI } from './authors';
-import { bindCommentsAPI, type CommentsAPI } from './comments';
 import { bindCatalogsAPI, type CatalogsAPI } from './catalogs';
+import { bindCommentsAPI, type CommentsAPI } from './comments';
 import { bindImageUploadsAPI, type ImageUploadsAPI } from './image-uploads';
 import { bindNotesAPI, type NotesAPI } from './notes';
+import { bindReportsAPI, type ReportsAPI } from './reports';
 import { parseAPIRequestError } from './request-error';
 import type { paths } from './generated/schema';
 
@@ -18,6 +19,7 @@ export type APIClient = NotesAPI &
   AuthAPI &
   AuthorsAPI &
   CommentsAPI &
+  ReportsAPI &
   ImageUploadsAPI;
 
 export function createAPIClient(token?: string): APIClient {
@@ -47,6 +49,7 @@ export function createAPIClient(token?: string): APIClient {
     ...bindAuthAPI(transport),
     ...bindAuthorsAPI(transport),
     ...bindCommentsAPI(transport),
+    ...bindReportsAPI(transport),
     ...bindImageUploadsAPI(boundFetch),
   };
 }

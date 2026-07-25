@@ -5,6 +5,8 @@ import {
   useRef,
   useState,
 } from 'react';
+import { StyleSheet, Text } from 'react-native';
+import { semanticColors, typography } from '@sdds/tokens';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
@@ -20,6 +22,12 @@ import {
   createCommentThreadState,
   validateCommentDraft,
 } from '@/features/comments/comment-thread';
+import { ReportDialog } from '@/features/reports/report-dialog';
+import {
+  canSubmitReport,
+  createReportFormState,
+  reportFormReducer,
+} from '@/features/reports/report-form';
 import { NoteDetailContent } from '@/features/notes/note-detail-content';
 import { buildNoteCatalog, labelNote } from '@/features/notes/catalog';
 import type { LabelledNote } from '@/features/notes/catalog';
@@ -122,6 +130,11 @@ function AuthenticatedNoteDetailScreen({
     commentThreadReducer,
     undefined,
     createCommentThreadState,
+  );
+  const reportRequestIDRef = useRef(0);
+  const [reportForm, dispatchReportForm] = useReducer(
+    reportFormReducer,
+    createReportFormState(),
   );
 
   const handleCommentSessionExpired = useCallback(async () => {
@@ -320,6 +333,75 @@ function AuthenticatedNoteDetailScreen({
     },
     [apiClient, commentThread, handleCommentSessionExpired, noteID],
   );
+  const handleReportNote = useCallback(() => {
+    if (state.status !== 'ready') {
+      return;
+    }
+    dispatchReportForm({ type: 'open', target: { type: 'note', id: noteID } });
+  }, [noteID, state.status]);
+
+  const handleReportComment = useCallback(
+    (commentID: string) => {
+      dispatchReportForm({
+        type: 'open',
+        target: { type: 'comment', id: commentID },
+      });
+    },
+    [],
+  );
+
+  const handleSubmitReport = useCallback(() => {
+    if (
+      !canSubmitReport(reportForm) ||
+      reportForm.target === null ||
+      reportForm.reason === null
+    ) {
+      return;
+    }
+
+    const generation = detailGenerationRef.current;
+    const requestID = ++reportRequestIDRef.current;
+    const { target, reason, details } = reportForm;
+    dispatchReportForm({ type: 'submit_started' });
+
+    void apiClient
+      .createReport({
+        targetType: target.type,
+        targetID: target.id,
+        reason,
+        details,
+      })
+      .then(() => {
+        if (
+          detailGenerationRef.current !== generation ||
+          reportRequestIDRef.current !== requestID
+        ) {
+          return;
+        }
+        dispatchReportForm({ type: 'submit_succeeded' });
+      })
+      .catch((error: unknown) => {
+        if (
+          detailGenerationRef.current !== generation ||
+          reportRequestIDRef.current !== requestID
+        ) {
+          return;
+        }
+
+        const status = requestStatus(error);
+        if (status === unauthorizedStatus) {
+          dispatchReportForm({ type: 'session_expired' });
+          void handleCommentSessionExpired();
+          return;
+        }
+        if (status === notFoundStatus) {
+          dispatchReportForm({ type: 'target_missing' });
+          return;
+        }
+        dispatchReportForm({ type: 'submit_failed' });
+      });
+  }, [apiClient, handleCommentSessionExpired, reportForm]);
+
 
   const { getMutationState, toggleUseful: handleToggleUseful } = useUsefulMutation({
     apiClient,
@@ -382,6 +464,7 @@ function AuthenticatedNoteDetailScreen({
       commentCreateRequestRef.current = null;
       commentDeleteRequestRefs.current.clear();
       dispatchCommentThread({ type: 'reset' });
+      dispatchReportForm({ type: 'reset' });
       setState({ status: 'loading' });
 
       void Promise.all([apiClient.listCatalogs(), apiClient.getNote(noteID)])
@@ -464,10 +547,12 @@ function AuthenticatedNoteDetailScreen({
           }}
           usefulError={getMutationState(state.note.id) === 'error'}
           usefulPending={getMutationState(state.note.id) === 'pending'}
+          onReportNote={handleReportNote}
         />
         <CommentsSection
           currentAuthorID={currentAuthorID}
           onDeleteComment={handleDeleteComment}
+          onReportComment={handleReportComment}
           onDraftChange={(draft) =>
             dispatchCommentThread({ type: 'draft_changed', draft })
           }
@@ -490,7 +575,43 @@ function AuthenticatedNoteDetailScreen({
       title="Nota"
     >
       {content}
+      {reportForm.status === 'success' ? (
+        <Text accessibilityRole="alert" style={noticeStyles.notice}>
+          Denúncia recebida. Obrigado por avisar.
+        </Text>
+      ) : null}
+      {reportForm.status === 'missing' ? (
+        <Text accessibilityRole="alert" style={noticeStyles.notice}>
+          Esse conteúdo não está mais disponível.
+        </Text>
+      ) : null}
+      <ReportDialog
+        target={
+          reportForm.target !== null &&
+          reportForm.status !== 'success' &&
+          reportForm.status !== 'missing'
+            ? reportForm.target
+            : null
+        }
+        state={reportForm}
+        onReasonChange={(reason) =>
+          dispatchReportForm({ type: 'reason_changed', reason })
+        }
+        onDetailsChange={(details) =>
+          dispatchReportForm({ type: 'details_changed', details })
+        }
+        onCancel={() => dispatchReportForm({ type: 'close' })}
+        onSubmit={handleSubmitReport}
+      />
       <FoundationButton label="Voltar" onPress={() => router.back()} />
     </FoundationScreen>
   );
 }
+
+const noticeStyles = StyleSheet.create({
+  notice: {
+    color: semanticColors.textMuted,
+    fontSize: typography.sizeBody,
+    lineHeight: 22,
+  },
+});

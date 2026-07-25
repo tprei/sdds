@@ -151,9 +151,11 @@ describe('CommentsSection', () => {
     expect(buttonLabels(idleRenderer)).toEqual([
       'Thiago',
       'Excluir comentário',
+      'Denunciar comentário',
       'Ver mais comentários',
       'Thiago',
       'Excluir comentário',
+      'Denunciar comentário',
       'Comentar',
     ]);
 
@@ -206,6 +208,42 @@ describe('CommentsSection', () => {
       }),
     });
     expect(textNodes(pending, firstComment.body)).toHaveLength(0);
+  });
+
+  it('renders the report control on every comment and forwards the comment id', () => {
+    const onReportComment = vi.fn();
+    const otherComment: Comment = {
+      ...comment('comment-2', 'Comentário de outra pessoa'),
+      author: { displayName: 'Lia', id: 'other-author-id' },
+    };
+    const renderer = renderSection({
+      onReportComment,
+      thread: readyThread({ comments: [firstComment, otherComment] }),
+    });
+
+    expect(
+      renderer.root.findByProps({ testID: `comment-report-${firstComment.id}` })
+        .props.accessibilityLabel,
+    ).toBe('Denunciar comentário');
+    expect(
+      renderer.root.findByProps({
+        testID: `comment-report-${otherComment.id}`,
+      }),
+    ).toBeDefined();
+
+    act(() => {
+      renderer.root
+        .findByProps({ testID: `comment-report-${otherComment.id}` })
+        .props.onPress();
+    });
+    expect(onReportComment).toHaveBeenCalledWith(otherComment.id);
+
+    act(() => {
+      renderer.root
+        .findByProps({ testID: `comment-report-${firstComment.id}` })
+        .props.onPress();
+    });
+    expect(onReportComment).toHaveBeenCalledWith(firstComment.id);
   });
 
   it('trims a valid draft before submitting and disables duplicate presses while pending', () => {

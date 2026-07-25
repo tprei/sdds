@@ -35,3 +35,24 @@ func Open(path string) (*sql.DB, error) {
 
 	return db, nil
 }
+
+// OpenReadOnly opens the database without running migrations or setting a
+// journal mode. It is used by read-only operator tooling such as the
+// inspect-reports subcommand and never mutates production state.
+func OpenReadOnly(path string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
+	if err != nil {
+		return nil, fmt.Errorf("open sqlite read-only: %w", err)
+	}
+
+	db.SetMaxOpenConns(1)
+
+	if _, err := db.Exec(setBusyTimeoutSQL); err != nil {
+		if closeErr := db.Close(); closeErr != nil {
+			return nil, fmt.Errorf("set busy timeout: %w; close sqlite: %v", err, closeErr)
+		}
+		return nil, fmt.Errorf("set busy timeout: %w", err)
+	}
+
+	return db, nil
+}

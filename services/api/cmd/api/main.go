@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -18,6 +21,7 @@ import (
 
 const (
 	commandMigrate          = "migrate"
+	commandInspectReports   = "inspect-reports"
 	serverReadHeaderTimeout = 5 * time.Second
 	serverReadTimeout       = 15 * time.Second
 	startupReadinessTimeout = 5 * time.Second
@@ -72,6 +76,8 @@ var closeDatabase = func(database *sql.DB) error {
 	return database.Close()
 }
 
+var reportOutputStream io.Writer = os.Stdout
+
 func main() {
 	if err := run(); err != nil {
 		slog.Error("api stopped", "error", err)
@@ -81,7 +87,7 @@ func main() {
 
 func run() error {
 	args := os.Args[1:]
-	if len(args) > 0 && (len(args) != 1 || args[0] != commandMigrate) {
+	if len(args) > 0 && (len(args) != 1 || (args[0] != commandMigrate && args[0] != commandInspectReports)) {
 		return runWithArgs(context.Background(), config{}, s3store.Config{}, args)
 	}
 	cfg, err := loadConfig()
@@ -104,6 +110,8 @@ func runWithArgs(ctx context.Context, config config, s3Config s3store.Config, ar
 		return runServer(ctx, config, s3Config)
 	case len(args) == 1 && args[0] == commandMigrate:
 		return runMigrations(ctx, config)
+	case len(args) == 1 && args[0] == commandInspectReports:
+		return runInspectReports(ctx, config)
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
@@ -202,4 +210,70 @@ func newServer(config config, handler http.Handler) *http.Server {
 		ReadHeaderTimeout: serverReadHeaderTimeout,
 		ReadTimeout:       serverReadTimeout,
 	}
+}
+
+// reportOutputRow is the JSON Lines record emitted by inspect-reports. Field
+// declaration order is the emitted JSON key order.
+type reportOutputRow struct {
+	ReportPageKey  int64   `json:"report_page_key"`
+	ID             string  `json:"id"`
+	CreatedAt      int64   `json:"created_at"`
+	ReporterUserID string  `json:"reporter_user_id"`
+	TargetType     string  `json:"target_type"`
+	TargetID       string  `json:"target_id"`
+	Reason         string  `json:"reason"`
+	Details        *string `json:"details"`
+	TargetSummary  *string `json:"target_summary"`
+	TargetMissing  int     `json:"target_missing"`
+}
+
+// runInspectReports opens the database read-only, loads the operator
+// inspection rows from the report store, and prints one compact JSON object
+// per row ordered by report_page_key ascending. It never runs migrations and
+// writes nothing to stdout on failure.
+func runInspectReports(ctx context.Context, config config) error {
+	db, err := sqlite.OpenReadOnly(config.databasePath)
+	if err != nil {
+		return fmt.Errorf("open database read-only: %w", err)
+	}
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil {
+			slog.Error("close read-only database", "error", closeErr)
+		}
+	}()
+
+	rows, err := sqlite.NewReportStore(db).ListInspectionRows(ctx)
+	if err != nil {
+		return fmt.Errorf("load report inspection rows: %w", err)
+	}
+	var output bytes.Buffer
+	encoder := json.NewEncoder(&output)
+	encoder.SetEscapeHTML(false)
+	for _, row := range rows {
+		if err := encoder.Encode(reportOutputRow{
+			ReportPageKey:  row.ReportPageKey,
+			ID:             row.ID,
+			CreatedAt:      row.CreatedAt,
+			ReporterUserID: row.ReporterUserID,
+			TargetType:     string(row.TargetType),
+			TargetID:       row.TargetID,
+			Reason:         string(row.Reason),
+			Details:        row.Details,
+			TargetSummary:  row.TargetSummary,
+			TargetMissing:  boolToInt(row.TargetMissing),
+		}); err != nil {
+			return fmt.Errorf("encode report row: %w", err)
+		}
+	}
+	if _, err := output.WriteTo(reportOutputStream); err != nil {
+		return fmt.Errorf("write report rows: %w", err)
+	}
+	return nil
+}
+
+func boolToInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }

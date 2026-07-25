@@ -163,7 +163,7 @@ SDDS_DATABASE_PATH=/tmp/sdds.db go run ./services/api/cmd/api migrate
 
 ```sh
 # Compose deployment (repository default); reads /data/sdds.db in the api-data volume
-docker compose -f infra/compose/compose.yaml run --rm --no-deps api inspect-reports
+make inspect-reports
 
 # Direct process (host DB path, mirroring the migrate example)
 SDDS_DATABASE_PATH=/tmp/sdds.db go run ./services/api/cmd/api inspect-reports
@@ -185,8 +185,7 @@ export SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE="$HOME/.config/sdds/sdds-media-se
 Copy the matching `infra/compose/secrets/*.example` files to those private paths and replace every placeholder. The examples are placeholders, not defaults; keep the real files outside Git.
 
 ```sh
-docker compose -f infra/compose/compose.yaml up --build -d
-until curl --fail --silent http://127.0.0.1:8080/readyz >/dev/null; do sleep 1; done
+make compose-start
 ```
 
 Compose publishes only the API port (`8080`, or `SDDS_HTTP_PORT`). RustFS stays private on the Compose network with its console disabled. Data uses separate `api-data`, `rustfs-data`, and `rustfs-logs` volumes. Back up `api-data` and `rustfs-data` together; restoring one without the other can leave metadata and bytes out of sync. RustFS is beta, and Compose is not a backup system.
@@ -194,7 +193,7 @@ Compose publishes only the API port (`8080`, or `SDDS_HTTP_PORT`). RustFS stays 
 Stop the stack only when discarding its state is intentional. This command is destructive and removes `api-data`, `rustfs-data`, and `rustfs-logs`:
 
 ```sh
-docker compose -f infra/compose/compose.yaml down --volumes
+make compose-down
 ```
 
 ### Advanced direct API process

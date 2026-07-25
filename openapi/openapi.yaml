@@ -21,6 +21,8 @@ tags:
     description: Public author profile endpoints.
   - name: Notes
     description: Text-first recommendation notes.
+  - name: Reports
+    description: Authenticated report intake endpoints.
 paths:
   /v1/media/images/{image_id}:
     get:
@@ -957,6 +959,63 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/reports:
+    post:
+      operationId: createReport
+      summary: Create a report
+      tags:
+        - Reports
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReportRequest"
+      responses:
+        "201":
+          description: The report was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportReceipt"
+        "200":
+          description: An existing report for this reporter and target was overwritten.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportReceipt"
+        "400":
+          description: Invalid JSON or report fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is missing a valid authenticated session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The reported target was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: The request body exceeds 8 KiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not create the report.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   securitySchemes:
     bearerAuth:
@@ -1139,6 +1198,64 @@ components:
           type: string
           minLength: 1
           maxLength: 1000
+    CreateReportRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - target_type
+        - target_id
+        - reason
+      properties:
+        target_type:
+          $ref: "#/components/schemas/ReportTargetType"
+        target_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        reason:
+          $ref: "#/components/schemas/ReportReason"
+        details:
+          type: string
+          maxLength: 1000
+    ReportReceipt:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - target_type
+        - target_id
+        - reason
+        - details
+        - created_at
+      properties:
+        id:
+          type: string
+        target_type:
+          $ref: "#/components/schemas/ReportTargetType"
+        target_id:
+          type: string
+        reason:
+          $ref: "#/components/schemas/ReportReason"
+        details:
+          type: string
+          nullable: true
+        created_at:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Unix timestamp in milliseconds of the first report for this reporter and target.
+    ReportReason:
+      type: string
+      enum:
+        - spam
+        - harassment
+        - harmful_or_misleading
+        - other
+    ReportTargetType:
+      type: string
+      enum:
+        - note
+        - comment
     CreateNoteRequest:
       type: object
       additionalProperties: false
@@ -1235,6 +1352,7 @@ components:
         - ErrorCodeInvalidComment
         - ErrorCodeInvalidJSON
         - ErrorCodeInvalidNote
+        - ErrorCodeInvalidReport
         - ErrorCodeInvalidSearch
         - ErrorCodeNotFound
         - ErrorCodeRateLimited
@@ -1257,6 +1375,7 @@ components:
         - invalid_comment
         - invalid_json
         - invalid_note
+        - invalid_report
         - invalid_search
         - not_found
         - rate_limited
@@ -1445,6 +1564,10 @@ components:
         - ValidationFieldUploadRequestID
         - ValidationFieldImageUploadIDs
         - ValidationFieldFile
+        - ValidationFieldTargetType
+        - ValidationFieldTargetID
+        - ValidationFieldReason
+        - ValidationFieldDetails
       enum:
         - title
         - body
@@ -1460,6 +1583,10 @@ components:
         - upload_request_id
         - image_upload_ids
         - file
+        - target_type
+        - target_id
+        - reason
+        - details
     ValidationProblem:
       type: object
       additionalProperties: false

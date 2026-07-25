@@ -84,6 +84,10 @@ func writeOpenAPIRequestValidationError(w http.ResponseWriter, r *http.Request, 
 		writeError(w, http.StatusBadRequest, response)
 		return
 	}
+	if response, ok := invalidCreateReportBody(err); ok {
+		writeError(w, http.StatusBadRequest, response)
+		return
+	}
 	if isTooManyCreateNoteImages(err) {
 		writeTooManyCreateNoteImages(w)
 		return
@@ -124,6 +128,9 @@ func requestValidationPolicyForOperation(operationID string) (requestValidationP
 		return policy, true
 	}
 	if policy, ok := commentRequestValidationPolicy(operationID); ok {
+		return policy, true
+	}
+	if policy, ok := reportRequestValidationPolicy(operationID); ok {
 		return policy, true
 	}
 	return mediaRequestValidationPolicy(operationID)

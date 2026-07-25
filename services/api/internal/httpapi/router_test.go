@@ -14,6 +14,7 @@ import (
 	"github.com/tprei/sdds/services/api/internal/comment"
 	"github.com/tprei/sdds/services/api/internal/media"
 	"github.com/tprei/sdds/services/api/internal/note"
+	"github.com/tprei/sdds/services/api/internal/report"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
 
@@ -44,6 +45,7 @@ type fakeCommentStore struct {
 	findComment      func(context.Context, string, string) (comment.Comment, error)
 	listNoteComments func(context.Context, comment.ListInput) (comment.Page, error)
 	deleteComment    func(context.Context, string) error
+	findCommentByID  func(context.Context, string) (comment.Comment, error)
 }
 
 func (fake fakeCommentStore) CreateComment(ctx context.Context, input comment.CreateInput) (comment.Comment, error) {
@@ -74,6 +76,24 @@ func (fake fakeCommentStore) DeleteComment(ctx context.Context, commentID string
 	return fake.deleteComment(ctx, commentID)
 }
 
+func (fake fakeCommentStore) FindCommentByID(ctx context.Context, id string) (comment.Comment, error) {
+	if fake.findCommentByID == nil {
+		return comment.Comment{}, errors.New("comment store not implemented")
+	}
+	return fake.findCommentByID(ctx, id)
+}
+
+type fakeReportStore struct {
+	createReport func(context.Context, report.CreateInput) (report.CreateResult, error)
+}
+
+func (fake fakeReportStore) CreateReport(ctx context.Context, input report.CreateInput) (report.CreateResult, error) {
+	if fake.createReport == nil {
+		return report.CreateResult{}, errors.New("report store not implemented")
+	}
+	return fake.createReport(ctx, input)
+}
+
 func newRouterForTest(
 	notes NoteStores,
 	catalog note.Catalog,
@@ -86,6 +106,7 @@ func newRouterForTest(
 	return NewRouter(
 		NotesDependencies{Stores: notes, Catalog: catalog},
 		CommentDependencies{Store: fakeCommentStore{}},
+		ReportDependencies{Store: fakeReportStore{}, CommentTargets: fakeCommentStore{}},
 		AuthDependencies{Users: users, Limits: authLimits},
 		MediaDependencies{ImageUploads: uploadService, AttachedImages: imageReader},
 		SystemDependencies{Readiness: readiness},
@@ -108,6 +129,7 @@ func newRouterWithAuthSeamsForTest(
 	return newRouter(
 		noteHandlers{store: notes, authorNotes: notes, useful: notes, catalog: catalog},
 		commentHandlers{store: fakeCommentStore{}, notes: notes},
+		reportHandlers{store: fakeReportStore{}, notes: notes, comments: fakeCommentStore{}},
 		authHandlers{
 			users:                 users,
 			publicAuthors:         users,
@@ -140,6 +162,7 @@ func TestNewRouterRequiresMediaDependencies(t *testing.T) {
 			NewRouter(
 				NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
 				CommentDependencies{Store: fakeCommentStore{}},
+				ReportDependencies{Store: fakeReportStore{}},
 				AuthDependencies{Users: fakeUserStore{}, Limits: DefaultAuthLimits()},
 				test.media,
 				SystemDependencies{Readiness: fakeReadiness{}},
@@ -157,6 +180,23 @@ func TestNewRouterRequiresCommentStore(t *testing.T) {
 	NewRouter(
 		NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
 		CommentDependencies{},
+		ReportDependencies{Store: fakeReportStore{}},
+		AuthDependencies{Users: fakeUserStore{}, Limits: DefaultAuthLimits()},
+		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
+		SystemDependencies{Readiness: fakeReadiness{}},
+	)
+}
+
+func TestNewRouterRequiresReportStore(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("NewRouter did not panic")
+		}
+	}()
+	NewRouter(
+		NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
+		CommentDependencies{Store: fakeCommentStore{}},
+		ReportDependencies{},
 		AuthDependencies{Users: fakeUserStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},

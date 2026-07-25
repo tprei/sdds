@@ -11,6 +11,7 @@ import (
 	"github.com/tprei/sdds/services/api/internal/media"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
+	"github.com/tprei/sdds/services/api/internal/report"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
 
@@ -36,6 +37,11 @@ type NotesDependencies struct {
 
 type CommentDependencies struct {
 	Store comment.Store
+}
+
+type ReportDependencies struct {
+	Store          report.Store
+	CommentTargets comment.ReportTargetStore
 }
 
 type AuthDependencies struct {
@@ -64,6 +70,12 @@ type commentHandlers struct {
 	notes note.Store
 }
 
+type reportHandlers struct {
+	store    report.Store
+	notes    note.Store
+	comments comment.ReportTargetStore
+}
+
 type authHandlers struct {
 	users                 user.Store
 	publicAuthors         author.PublicAuthorStore
@@ -89,6 +101,7 @@ type server struct {
 	notes    noteHandlers
 	auth     authHandlers
 	comments commentHandlers
+	reports  reportHandlers
 	media    mediaHandlers
 	system   systemHandlers
 }
@@ -122,11 +135,12 @@ func DefaultAuthLimits() AuthLimits {
 	}
 }
 
-func NewRouter(notes NotesDependencies, comments CommentDependencies, auth AuthDependencies, media MediaDependencies, system SystemDependencies) http.Handler {
+func NewRouter(notes NotesDependencies, comments CommentDependencies, reports ReportDependencies, auth AuthDependencies, media MediaDependencies, system SystemDependencies) http.Handler {
 	hasher := newBoundedPasswordHasher(user.NewPasswordHasher(), auth.Limits.PasswordHashConcurrency)
 	return newRouter(
 		noteHandlers{store: notes.Stores, authorNotes: notes.Stores, useful: notes.Stores, catalog: notes.Catalog},
 		commentHandlers{store: comments.Store, notes: notes.Stores},
+		reportHandlers{store: reports.Store, notes: notes.Stores, comments: reports.CommentTargets},
 		authHandlers{
 			users:                 auth.Users,
 			publicAuthors:         auth.Users,
@@ -141,9 +155,12 @@ func NewRouter(notes NotesDependencies, comments CommentDependencies, auth AuthD
 	)
 }
 
-func newRouter(notes noteHandlers, comments commentHandlers, auth authHandlers, media mediaHandlers, system systemHandlers) http.Handler {
+func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandlers, auth authHandlers, media mediaHandlers, system systemHandlers) http.Handler {
 	if comments.store == nil {
 		panic("comment store is required")
+	}
+	if reports.store == nil {
+		panic("report store is required")
 	}
 	if media.imageUploads == nil {
 		panic("upload service is required")
@@ -155,7 +172,7 @@ func newRouter(notes noteHandlers, comments commentHandlers, auth authHandlers, 
 	router.Use(localBrowserCORS)
 	validateOpenAPIRequest := openAPIRequestValidator()
 	requireCurrentSession := requireAuth(auth.users, auth.clock)
-	handler := server{notes: notes, comments: comments, auth: auth, media: media, system: system}
+	handler := server{notes: notes, comments: comments, reports: reports, auth: auth, media: media, system: system}
 	wrapper := openapi.ServerInterfaceWrapper{
 		Handler:          handler,
 		ErrorHandlerFunc: writeGeneratedOpenAPIError,
@@ -187,6 +204,7 @@ func newRouter(notes noteHandlers, comments commentHandlers, auth authHandlers, 
 			router.Get("/notes/{note_id}/comments", wrapper.ListNoteComments)
 			router.Post("/notes/{note_id}/comments", wrapper.CreateNoteComment)
 			router.Delete("/notes/{note_id}/comments/{comment_id}", wrapper.DeleteNoteComment)
+			router.Post("/reports", wrapper.CreateReport)
 			router.Get("/search/notes", wrapper.SearchNotes)
 			router.Put("/notes/{note_id}/useful", wrapper.MarkNoteUseful)
 			router.Delete("/notes/{note_id}/useful", wrapper.UnmarkNoteUseful)

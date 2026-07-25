@@ -14,6 +14,7 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
 type NoteDetailContentProps = {
   note: LabelledNote;
   onPressAuthor: (authorID: string) => void;
+  onReportNote?: () => void;
   onPressUseful?: () => void;
   usefulError?: boolean;
   usefulPending?: boolean;
@@ -23,6 +24,7 @@ export function NoteDetailContent({
   note,
   onPressAuthor,
   onPressUseful = () => undefined,
+  onReportNote = () => undefined,
   usefulError = false,
   usefulPending = false,
 }: NoteDetailContentProps) {
@@ -94,6 +96,18 @@ export function NoteDetailContent({
             Não deu pra atualizar o Útil. Tenta de novo.
           </Text>
         ) : null}
+        <Pressable
+          accessibilityLabel="Denunciar nota"
+          accessibilityRole="button"
+          onPress={onReportNote}
+          style={({ pressed }) => [
+            styles.reportControl,
+            pressed ? styles.reportPressed : null,
+          ]}
+          testID="note-report"
+        >
+          <Text style={styles.reportText}>Denunciar nota</Text>
+        </Pressable>
       </View>
     </>
   );

@@ -80,4 +80,17 @@ export const styles = StyleSheet.create({
   usefulSection: {
     gap: spacing.sp3,
   },
+  reportControl: {
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  reportPressed: {
+    opacity: 0.7,
+  },
+  reportText: {
+    color: colors.danger500,
+    fontSize: typography.sizeSmall,
+    fontWeight: typography.weightSemibold,
+  },
 });

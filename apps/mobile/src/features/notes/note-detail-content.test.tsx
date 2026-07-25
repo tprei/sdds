@@ -174,3 +174,48 @@ describe('NoteDetailContent media', () => {
     ).toBeDefined();
   });
 });
+
+describe('NoteDetailContent report action', () => {
+  it('renders the report control and forwards presses to onReportNote', () => {
+    const onReportNote = vi.fn();
+    const renderer = render(
+      <NoteDetailContent
+        note={note([])}
+        onPressAuthor={() => undefined}
+        onPressUseful={() => undefined}
+        onReportNote={onReportNote}
+      />,
+    );
+
+    const control = renderer.root.findByProps({ testID: 'note-report' });
+    expect(control.props.accessibilityLabel).toBe('Denunciar nota');
+    expect(
+      renderer.root.findAll(
+        (node) =>
+          typeof node.type === 'string' && node.props.testID === 'note-report',
+      ),
+    ).toHaveLength(1);
+
+    act(() => {
+      control.props.onPress();
+    });
+    expect(onReportNote).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not require onReportNote and stays a no-op when omitted', () => {
+    const renderer = render(
+      <NoteDetailContent
+        note={note([])}
+        onPressAuthor={() => undefined}
+        onPressUseful={() => undefined}
+      />,
+    );
+
+    const control = renderer.root.findByProps({ testID: 'note-report' });
+    expect(() =>
+      act(() => {
+        control.props.onPress();
+      }),
+    ).not.toThrow();
+  });
+});

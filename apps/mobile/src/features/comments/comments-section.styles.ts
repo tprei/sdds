@@ -65,6 +65,20 @@ export const styles = StyleSheet.create({
   deletePressed: {
     opacity: 0.7,
   },
+  reportControl: {
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    minHeight: 44,
+    minWidth: 44,
+  },
+  reportPressed: {
+    opacity: 0.7,
+  },
+  reportText: {
+    color: colors.danger500,
+    fontSize: typography.sizeSmall,
+    fontWeight: typography.weightSemibold,
+  },
   deleteText: {
     color: colors.danger500,
     fontSize: typography.sizeSmall,

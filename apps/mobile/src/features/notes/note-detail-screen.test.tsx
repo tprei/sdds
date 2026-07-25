@@ -44,6 +44,7 @@ const mocks = vi.hoisted(() => ({
     markNoteUseful: vi.fn(),
     listNoteComments: vi.fn(),
     unmarkNoteUseful: vi.fn(),
+    createReport: vi.fn(),
   },
   focusVersion: 0,
   authState: { status: 'loading' } as AuthStateMock,
@@ -66,7 +67,10 @@ vi.mock('react-native', () => {
   }
 
   return {
+    Modal: ({ children }: NativeProps) =>
+      createElement('div', null, typeof children === 'function' ? null : children),
     Pressable: NativePressable,
+    ScrollView: NativeView,
     StyleSheet: { create: (styles: Record<string, unknown>) => styles },
     Text: NativeView,
     View: NativeView,
@@ -79,10 +83,15 @@ vi.mock('@/components/foundation-screen', () => ({
   FoundationButton: ({
     label,
     onPress,
+    testID,
+    disabled,
   }: {
     label: string;
     onPress?: () => void;
-  }) => createElement('button', { onPress, testID: label }, label),
+    testID?: string;
+    disabled?: boolean;
+  }) => createElement('button', { disabled, onPress, testID: testID ?? label }, label),
+  FoundationTextInput: (props: NativeProps) => createElement('input', props),
   FoundationScreen: ({ children }: { children: ReactNode }) =>
     createElement('section', null, children),
 }));
@@ -127,11 +136,13 @@ vi.mock('@/features/notes/note-detail-content', () => ({
   NoteDetailContent: ({
     note,
     onPressUseful,
+    onReportNote,
     usefulError,
     usefulPending,
   }: {
     note: { usefulByCurrentUser: boolean; usefulCount: number };
     onPressUseful: () => void;
+    onReportNote: () => void;
     usefulError?: boolean;
     usefulPending?: boolean;
   }) =>
@@ -147,6 +158,11 @@ vi.mock('@/features/notes/note-detail-content', () => ({
         'button',
         { disabled: usefulPending, onPress: onPressUseful, testID: 'useful-button' },
         'Útil',
+      ),
+      createElement(
+        'button',
+        { onPress: onReportNote, testID: 'note-report' },
+        'Denunciar nota',
       ),
       usefulError
         ? createElement(
@@ -216,6 +232,7 @@ describe('NoteDetailScreen route', () => {
     mocks.apiClient.deleteNoteComment.mockReset();
     mocks.apiClient.markNoteUseful.mockReset();
     mocks.apiClient.unmarkNoteUseful.mockReset();
+    mocks.apiClient.createReport.mockReset();
     mocks.logout.mockClear();
     mocks.back.mockClear();
     mocks.push.mockClear();
@@ -639,6 +656,198 @@ describe('NoteDetailScreen route', () => {
       new Map(),
     );
   });
+
+  it('opens the note report dialog targeting the loaded note', async () => {
+    const renderer = await renderScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'note-report' }).props.onPress();
+      await settle();
+    });
+
+    expect(hostCount(renderer, 'report-backdrop')).toBe(1);
+    expect(
+      renderer.root.findAll(
+        (node) =>
+          typeof node.type === 'string' &&
+          node.props.accessibilityRole === 'header' &&
+          node.props.children === 'Denunciar nota',
+      ),
+    ).toHaveLength(1);
+    expect(mocks.apiClient.createReport).not.toHaveBeenCalled();
+  });
+
+  it('opens a comment report dialog targeting the selected comment', async () => {
+    mocks.apiClient.listNoteComments.mockResolvedValueOnce(
+      commentPage([firstComment]),
+    );
+    const renderer = await renderScreen();
+
+    await act(async () => {
+      commentsSection(renderer).props.onReportComment(firstComment.id);
+      await settle();
+    });
+
+    expect(hostCount(renderer, 'report-backdrop')).toBe(1);
+    expect(hostTextCount(renderer, 'Denunciar comentário')).toBe(1);
+  });
+
+  it('submits a note report, shows the success notice, and closes the dialog', async () => {
+    mocks.apiClient.createReport.mockResolvedValueOnce({
+      createdAt: 1782993600000,
+      details: null,
+      id: 'report-1',
+      reason: 'spam',
+      targetID: 'note-id',
+      targetType: 'note',
+    });
+    const renderer = await renderScreen();
+
+    await openNoteReport(renderer);
+
+    expect(mocks.apiClient.createReport).toHaveBeenCalledWith({
+      targetType: 'note',
+      targetID: 'note-id',
+      reason: 'spam',
+      details: '',
+    });
+    expect(
+      hostTextCount(renderer, 'Denúncia recebida. Obrigado por avisar.'),
+    ).toBe(1);
+    expect(hostCount(renderer, 'report-backdrop')).toBe(0);
+  });
+
+  it('logs out on a report 401', async () => {
+    mocks.apiClient.createReport.mockRejectedValueOnce({ status: 401 });
+    const renderer = await renderScreen();
+
+    await openNoteReport(renderer);
+
+    expect(mocks.logout).toHaveBeenCalledOnce();
+  });
+
+  it('releases the report dialog when logout fails after a report 401', async () => {
+    mocks.apiClient.createReport.mockRejectedValueOnce({ status: 401 });
+    mocks.logout.mockRejectedValueOnce(new Error('logout failed'));
+    const renderer = await renderScreen();
+
+    await openNoteReport(renderer);
+
+    expect(mocks.logout).toHaveBeenCalledOnce();
+    expect(hostByTestID(renderer, 'report-submit').props.disabled).toBe(false);
+  });
+
+  it('shows the missing notice and closes the dialog on a report 404', async () => {
+    mocks.apiClient.createReport.mockRejectedValueOnce({ status: 404 });
+    const renderer = await renderScreen();
+
+    await openNoteReport(renderer);
+
+    expect(
+      hostTextCount(renderer, 'Esse conteúdo não está mais disponível.'),
+    ).toBe(1);
+    expect(hostCount(renderer, 'report-backdrop')).toBe(0);
+  });
+
+  it('preserves the reason and details and shows the retry notice on a retryable failure', async () => {
+    mocks.apiClient.createReport.mockRejectedValueOnce({ status: 500 });
+    const renderer = await renderScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'note-report' }).props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      hostByTestID(renderer, 'report-details').props.onChangeText(
+        'contexto extra',
+      );
+      await settle();
+    });
+    await act(async () => {
+      hostByTestID(renderer, 'report-reason-spam').props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      hostByTestID(renderer, 'report-submit').props.onPress();
+      await settle();
+    });
+
+    expect(hostCount(renderer, 'report-backdrop')).toBe(1);
+    expect(
+      hostTextCount(renderer, 'Não deu pra enviar a denúncia. Tenta de novo.'),
+    ).toBe(1);
+    expect(hostByTestID(renderer, 'report-reason-spam').props.accessibilityState).toEqual(
+      { checked: true },
+    );
+    expect(hostByTestID(renderer, 'report-details').props.value).toBe(
+      'contexto extra',
+    );
+  });
+
+  it('prevents a duplicate report submission while pending', async () => {
+    const pending = deferred<{ id: string }>();
+    mocks.apiClient.createReport.mockReturnValueOnce(pending.promise);
+    const renderer = await renderScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'note-report' }).props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      hostByTestID(renderer, 'report-reason-spam').props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      hostByTestID(renderer, 'report-submit').props.onPress();
+    });
+
+    expect(hostByTestID(renderer, 'report-submit').props.disabled).toBe(true);
+    await act(async () => {
+      hostByTestID(renderer, 'report-submit').props.onPress();
+    });
+    expect(mocks.apiClient.createReport).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      pending.resolve({ id: 'report-1' });
+      await settle();
+    });
+    expect(
+      hostTextCount(renderer, 'Denúncia recebida. Obrigado por avisar.'),
+    ).toBe(1);
+  });
+
+  it('ignores a report completion that settles after the note route changes', async () => {
+    const pending = deferred<{ id: string }>();
+    mocks.apiClient.createReport.mockReturnValueOnce(pending.promise);
+    const renderer = await renderScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'note-report' }).props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      hostByTestID(renderer, 'report-reason-spam').props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      hostByTestID(renderer, 'report-submit').props.onPress();
+    });
+
+    mocks.localParams = { id: 'next-note-id' };
+    mocks.apiClient.getNote.mockResolvedValueOnce({ ...note, id: 'next-note-id' });
+    await act(async () => {
+      renderer.update(createElement(NoteDetailScreen));
+      await settle();
+    });
+
+    await act(async () => {
+      pending.resolve({ id: 'report-1' });
+      await settle();
+    });
+    expect(
+      hostTextCount(renderer, 'Denúncia recebida. Obrigado por avisar.'),
+    ).toBe(0);
+  });
 });
 
 async function renderScreen(): Promise<ReactTestRenderer> {
@@ -674,4 +883,40 @@ function commentPage(
   nextCursor: string | null = null,
 ): CommentPage {
   return { comments, nextCursor };
+}
+
+async function openNoteReport(renderer: ReactTestRenderer): Promise<void> {
+  await act(async () => {
+    renderer.root.findByProps({ testID: 'note-report' }).props.onPress();
+    await settle();
+  });
+  await act(async () => {
+    hostByTestID(renderer, 'report-reason-spam').props.onPress();
+    await settle();
+  });
+  await act(async () => {
+    hostByTestID(renderer, 'report-submit').props.onPress();
+    await settle();
+  });
+}
+
+function hostByTestID(
+  renderer: ReactTestRenderer,
+  testID: string,
+): ReactTestInstance {
+  return renderer.root.findAll(
+    (node) => typeof node.type === 'string' && node.props.testID === testID,
+  )[0];
+}
+
+function hostCount(renderer: ReactTestRenderer, testID: string): number {
+  return renderer.root.findAll(
+    (node) => typeof node.type === 'string' && node.props.testID === testID,
+  ).length;
+}
+
+function hostTextCount(renderer: ReactTestRenderer, text: string): number {
+  return renderer.root.findAll(
+    (node) => typeof node.type === 'string' && node.props.children === text,
+  ).length;
 }

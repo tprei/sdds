@@ -30,6 +30,7 @@ export type CommentsSectionProps = {
   onLoadMore: () => void;
   onPressAuthor: (authorID: string) => void;
   onDeleteComment: (commentID: string) => void;
+  onReportComment?: (commentID: string) => void;
   onRetryInitial: () => void;
   onSubmit: (body: string) => void;
   thread: CommentThreadState;
@@ -41,6 +42,7 @@ export function CommentsSection({
   onLoadMore,
   onPressAuthor,
   onDeleteComment,
+  onReportComment = () => undefined,
   onRetryInitial,
   onSubmit,
   thread,
@@ -60,6 +62,7 @@ export function CommentsSection({
         onPressAuthor={onPressAuthor}
         onRetryInitial={onRetryInitial}
         onDeleteComment={onDeleteComment}
+        onReportComment={onReportComment}
         thread={thread}
       />
       <View style={styles.composer}>
@@ -100,6 +103,7 @@ export function CommentsSection({
 function CommentThread({
   currentAuthorID,
   onDeleteComment,
+  onReportComment = () => undefined,
   onLoadMore,
   onPressAuthor,
   onRetryInitial,
@@ -107,6 +111,7 @@ function CommentThread({
 }: Pick<
   CommentsSectionProps,
   | 'currentAuthorID'
+  | 'onReportComment'
   | 'onDeleteComment'
   | 'onLoadMore'
   | 'onPressAuthor'
@@ -150,6 +155,7 @@ function CommentThread({
         currentAuthorID={currentAuthorID}
         deleteStatusByCommentID={thread.deleteStatusByCommentID}
         onDeleteComment={onDeleteComment}
+        onReportComment={onReportComment}
         onPressAuthor={onPressAuthor}
       />
       <LoadMoreControl onLoadMore={onLoadMore} thread={thread} />
@@ -161,6 +167,7 @@ function CommentThread({
         currentAuthorID={currentAuthorID}
         deleteStatusByCommentID={thread.deleteStatusByCommentID}
         onDeleteComment={onDeleteComment}
+        onReportComment={onReportComment}
         onPressAuthor={onPressAuthor}
       />
     </View>
@@ -231,11 +238,13 @@ function CommentList({
   deleteStatusByCommentID,
   onDeleteComment,
   onPressAuthor,
+  onReportComment,
 }: {
   comments: Comment[];
   currentAuthorID: string;
   deleteStatusByCommentID: ReadonlyMap<string, CommentDeleteStatus>;
   onDeleteComment: (commentID: string) => void;
+  onReportComment: (commentID: string) => void;
   onPressAuthor: (authorID: string) => void;
 }) {
   return comments.map((comment) => (
@@ -269,6 +278,18 @@ function CommentList({
           <Text style={styles.deleteText}>Excluir comentário</Text>
         </Pressable>
       ) : null}
+      <Pressable
+        accessibilityLabel="Denunciar comentário"
+        accessibilityRole="button"
+        onPress={() => onReportComment(comment.id)}
+        style={({ pressed }) => [
+          styles.reportControl,
+          pressed ? styles.reportPressed : null,
+        ]}
+        testID={`comment-report-${comment.id}`}
+      >
+        <Text style={styles.reportText}>Denunciar comentário</Text>
+      </Pressable>
       {deleteStatusByCommentID.get(comment.id) === 'error' ? (
         <Text accessibilityRole="alert" style={styles.deleteError}>
           Não deu pra excluir o comentário. Tenta de novo.

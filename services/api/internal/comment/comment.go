@@ -53,6 +53,7 @@ type Page struct {
 	HasMore  bool
 }
 
+// Store owns note-scoped comment read and write operations.
 type Store interface {
 	CreateComment(ctx context.Context, input CreateInput) (Comment, error)
 	FindComment(ctx context.Context, noteID, id string) (Comment, error)

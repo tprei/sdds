@@ -157,6 +157,20 @@ pnpm install
 SDDS_DATABASE_PATH=/tmp/sdds.db go run ./services/api/cmd/api migrate
 ```
 
+### Inspecting reports
+
+`api inspect-reports` opens the database read-only (it never runs migrations or writes) and prints one compact JSON object per report per line, ordered by insertion key:
+
+```sh
+# Compose deployment (repository default); reads /data/sdds.db in the api-data volume
+docker compose -f infra/compose/compose.yaml run --rm --no-deps api inspect-reports
+
+# Direct process (host DB path, mirroring the migrate example)
+SDDS_DATABASE_PATH=/tmp/sdds.db go run ./services/api/cmd/api inspect-reports
+```
+
+Each row carries the report id, reporter, target, reason, optional details, a `target_summary` (the note title or the start of the comment body), and a `target_missing` flag where `1` means the reported note or comment has since been deleted.
+
 ### Full local runtime through Compose
 
 Compose is the repository-default full API runtime. It provisions RustFS, the private bucket and API identity, the readiness sentinel, secrets, volumes, and startup ordering. Set these four secret-file paths before starting it:

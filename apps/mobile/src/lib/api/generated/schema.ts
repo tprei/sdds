@@ -297,6 +297,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a report */
+        post: operations["createReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -373,6 +390,28 @@ export interface components {
         CreateCommentRequest: {
             body: string;
         };
+        CreateReportRequest: {
+            target_type: components["schemas"]["ReportTargetType"];
+            target_id: string;
+            reason: components["schemas"]["ReportReason"];
+            details?: string;
+        };
+        ReportReceipt: {
+            id: string;
+            target_type: components["schemas"]["ReportTargetType"];
+            target_id: string;
+            reason: components["schemas"]["ReportReason"];
+            details: string | null;
+            /**
+             * Format: int64
+             * @description Unix timestamp in milliseconds of the first report for this reporter and target.
+             */
+            created_at: number;
+        };
+        /** @enum {string} */
+        ReportReason: "spam" | "harassment" | "harmful_or_misleading" | "other";
+        /** @enum {string} */
+        ReportTargetType: "note" | "comment";
         CreateNoteRequest: {
             title: string;
             body: string;
@@ -404,7 +443,7 @@ export interface components {
             author: components["schemas"]["AuthorSummary"];
         };
         /** @enum {string} */
-        ErrorCode: "internal_error" | "forbidden" | "invalid_auth" | "invalid_comment" | "invalid_json" | "invalid_note" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken" | "invalid_media" | "unsupported_media_type" | "idempotency_conflict" | "upload_in_progress" | "upload_expired" | "media_staging_quota_exceeded" | "media_storage_unavailable" | "media_integrity_error" | "too_many_images";
+        ErrorCode: "internal_error" | "forbidden" | "invalid_auth" | "invalid_comment" | "invalid_json" | "invalid_note" | "invalid_report" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken" | "invalid_media" | "unsupported_media_type" | "idempotency_conflict" | "upload_in_progress" | "upload_expired" | "media_staging_quota_exceeded" | "media_storage_unavailable" | "media_integrity_error" | "too_many_images";
         ErrorResponse: {
             code: components["schemas"]["ErrorCode"];
             fields?: components["schemas"]["ValidationProblem"][];
@@ -468,7 +507,7 @@ export interface components {
             useful_by_current_user: boolean;
         };
         /** @enum {string} */
-        ValidationField: "title" | "body" | "category_slug" | "place_slug" | "q" | "username" | "password" | "display_name" | "limit" | "cursor" | "client_request_id" | "upload_request_id" | "image_upload_ids" | "file";
+        ValidationField: "title" | "body" | "category_slug" | "place_slug" | "q" | "username" | "password" | "display_name" | "limit" | "cursor" | "client_request_id" | "upload_request_id" | "image_upload_ids" | "file" | "target_type" | "target_id" | "reason" | "details";
         ValidationProblem: {
             field: components["schemas"]["ValidationField"];
             /** @enum {string} */
@@ -1664,6 +1703,84 @@ export interface operations {
                 };
             };
             /** @description The API could not search notes. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReportRequest"];
+            };
+        };
+        responses: {
+            /** @description An existing report for this reporter and target was overwritten. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportReceipt"];
+                };
+            };
+            /** @description The report was created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportReceipt"];
+                };
+            };
+            /** @description Invalid JSON or report fields. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is missing a valid authenticated session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The reported target was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request body exceeds 8 KiB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not create the report. */
             500: {
                 headers: {
                     [name: string]: unknown;

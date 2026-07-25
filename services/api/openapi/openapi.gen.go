@@ -31,6 +31,7 @@ const (
 	ErrorCodeInvalidJSON               ErrorCode = "invalid_json"
 	ErrorCodeInvalidMedia              ErrorCode = "invalid_media"
 	ErrorCodeInvalidNote               ErrorCode = "invalid_note"
+	ErrorCodeInvalidReport             ErrorCode = "invalid_report"
 	ErrorCodeInvalidSearch             ErrorCode = "invalid_search"
 	ErrorCodeMediaIntegrityError       ErrorCode = "media_integrity_error"
 	ErrorCodeMediaStagingQuotaExceeded ErrorCode = "media_staging_quota_exceeded"
@@ -64,6 +65,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeInvalidMedia:
 		return true
 	case ErrorCodeInvalidNote:
+		return true
+	case ErrorCodeInvalidReport:
 		return true
 	case ErrorCodeInvalidSearch:
 		return true
@@ -132,12 +135,55 @@ func (e NoteImageContentType) Valid() bool {
 	}
 }
 
+// Defines values for ReportReason.
+const (
+	Harassment          ReportReason = "harassment"
+	HarmfulOrMisleading ReportReason = "harmful_or_misleading"
+	Other               ReportReason = "other"
+	Spam                ReportReason = "spam"
+)
+
+// Valid indicates whether the value is a known member of the ReportReason enum.
+func (e ReportReason) Valid() bool {
+	switch e {
+	case Harassment:
+		return true
+	case HarmfulOrMisleading:
+		return true
+	case Other:
+		return true
+	case Spam:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReportTargetType.
+const (
+	ReportTargetTypeComment ReportTargetType = "comment"
+	ReportTargetTypeNote    ReportTargetType = "note"
+)
+
+// Valid indicates whether the value is a known member of the ReportTargetType enum.
+func (e ReportTargetType) Valid() bool {
+	switch e {
+	case ReportTargetTypeComment:
+		return true
+	case ReportTargetTypeNote:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ValidationField.
 const (
 	ValidationFieldBody            ValidationField = "body"
 	ValidationFieldCategorySlug    ValidationField = "category_slug"
 	ValidationFieldClientRequestID ValidationField = "client_request_id"
 	ValidationFieldCursor          ValidationField = "cursor"
+	ValidationFieldDetails         ValidationField = "details"
 	ValidationFieldDisplayName     ValidationField = "display_name"
 	ValidationFieldFile            ValidationField = "file"
 	ValidationFieldImageUploadIDs  ValidationField = "image_upload_ids"
@@ -145,6 +191,9 @@ const (
 	ValidationFieldPassword        ValidationField = "password"
 	ValidationFieldPlaceSlug       ValidationField = "place_slug"
 	ValidationFieldQ               ValidationField = "q"
+	ValidationFieldReason          ValidationField = "reason"
+	ValidationFieldTargetID        ValidationField = "target_id"
+	ValidationFieldTargetType      ValidationField = "target_type"
 	ValidationFieldTitle           ValidationField = "title"
 	ValidationFieldUploadRequestID ValidationField = "upload_request_id"
 	ValidationFieldUsername        ValidationField = "username"
@@ -161,6 +210,8 @@ func (e ValidationField) Valid() bool {
 		return true
 	case ValidationFieldCursor:
 		return true
+	case ValidationFieldDetails:
+		return true
 	case ValidationFieldDisplayName:
 		return true
 	case ValidationFieldFile:
@@ -174,6 +225,12 @@ func (e ValidationField) Valid() bool {
 	case ValidationFieldPlaceSlug:
 		return true
 	case ValidationFieldQ:
+		return true
+	case ValidationFieldReason:
+		return true
+	case ValidationFieldTargetID:
+		return true
+	case ValidationFieldTargetType:
 		return true
 	case ValidationFieldTitle:
 		return true
@@ -278,6 +335,14 @@ type CreateNoteRequest struct {
 	ImageUploadIds  *[]string    `json:"image_upload_ids,omitempty"`
 	PlaceSlug       *PlaceSlug   `json:"place_slug,omitempty"`
 	Title           string       `json:"title"`
+}
+
+// CreateReportRequest defines model for CreateReportRequest.
+type CreateReportRequest struct {
+	Details    *string          `json:"details,omitempty"`
+	Reason     ReportReason     `json:"reason"`
+	TargetId   string           `json:"target_id"`
+	TargetType ReportTargetType `json:"target_type"`
 }
 
 // CreateSessionRequest defines model for CreateSessionRequest.
@@ -405,6 +470,23 @@ type PublicAuthor struct {
 	NoteCount   int64  `json:"note_count"`
 }
 
+// ReportReason defines model for ReportReason.
+type ReportReason string
+
+// ReportReceipt defines model for ReportReceipt.
+type ReportReceipt struct {
+	// CreatedAt Unix timestamp in milliseconds of the first report for this reporter and target.
+	CreatedAt  int64            `json:"created_at"`
+	Details    *string          `json:"details"`
+	Id         string           `json:"id"`
+	Reason     ReportReason     `json:"reason"`
+	TargetId   string           `json:"target_id"`
+	TargetType ReportTargetType `json:"target_type"`
+}
+
+// ReportTargetType defines model for ReportTargetType.
+type ReportTargetType string
+
 // ValidationField defines model for ValidationField.
 type ValidationField string
 
@@ -464,6 +546,9 @@ type CreateNoteJSONRequestBody = CreateNoteRequest
 
 // CreateNoteCommentJSONRequestBody defines body for CreateNoteComment for application/json ContentType.
 type CreateNoteCommentJSONRequestBody = CreateCommentRequest
+
+// CreateReportJSONRequestBody defines body for CreateReport for application/json ContentType.
+type CreateReportJSONRequestBody = CreateReportRequest
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -605,6 +690,11 @@ type ClientInterface interface {
 
 	// ListPlaces request
 	ListPlaces(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateReportWithBody request with any body
+	CreateReportWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateReport(ctx context.Context, body CreateReportJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchNotes request
 	SearchNotes(ctx context.Context, params *SearchNotesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -888,6 +978,30 @@ func (c *Client) MarkNoteUseful(ctx context.Context, noteId string, reqEditors .
 
 func (c *Client) ListPlaces(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListPlacesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateReportWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateReportRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateReport(ctx context.Context, body CreateReportJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateReportRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1679,6 +1793,46 @@ func NewListPlacesRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewCreateReportRequest calls the generic CreateReport builder with application/json body
+func NewCreateReportRequest(server string, body CreateReportJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateReportRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateReportRequestWithBody generates requests for CreateReport with any type of body
+func NewCreateReportRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/reports")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewSearchNotesRequest generates requests for SearchNotes
 func NewSearchNotesRequest(server string, params *SearchNotesParams) (*http.Request, error) {
 	var err error
@@ -1855,6 +2009,11 @@ type ClientWithResponsesInterface interface {
 
 	// ListPlacesWithResponse request
 	ListPlacesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPlacesHTTPResponse, error)
+
+	// CreateReportWithBodyWithResponse request with any body
+	CreateReportWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateReportHTTPResponse, error)
+
+	CreateReportWithResponse(ctx context.Context, body CreateReportJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateReportHTTPResponse, error)
 
 	// SearchNotesWithResponse request
 	SearchNotesWithResponse(ctx context.Context, params *SearchNotesParams, reqEditors ...RequestEditorFn) (*SearchNotesHTTPResponse, error)
@@ -2529,6 +2688,42 @@ func (r ListPlacesHTTPResponse) ContentType() string {
 	return ""
 }
 
+type CreateReportHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ReportReceipt
+	JSON201      *ReportReceipt
+	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON413      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateReportHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateReportHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateReportHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type SearchNotesHTTPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2772,6 +2967,23 @@ func (c *ClientWithResponses) ListPlacesWithResponse(ctx context.Context, reqEdi
 		return nil, err
 	}
 	return ParseListPlacesHTTPResponse(rsp)
+}
+
+// CreateReportWithBodyWithResponse request with arbitrary body returning *CreateReportHTTPResponse
+func (c *ClientWithResponses) CreateReportWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateReportHTTPResponse, error) {
+	rsp, err := c.CreateReportWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateReportHTTPResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateReportWithResponse(ctx context.Context, body CreateReportJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateReportHTTPResponse, error) {
+	rsp, err := c.CreateReport(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateReportHTTPResponse(rsp)
 }
 
 // SearchNotesWithResponse request returning *SearchNotesHTTPResponse
@@ -3773,6 +3985,74 @@ func ParseListPlacesHTTPResponse(rsp *http.Response) (*ListPlacesHTTPResponse, e
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateReportHTTPResponse parses an HTTP response from a CreateReportWithResponse call
+func ParseCreateReportHTTPResponse(rsp *http.Response) (*CreateReportHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateReportHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ReportReceipt
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest ReportReceipt
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse

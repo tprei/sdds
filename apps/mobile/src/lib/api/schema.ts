@@ -161,6 +161,7 @@ export const errorCodeSchema = z.enum([
   'invalid_comment',
   'invalid_json',
   'invalid_note',
+  'invalid_report',
   'invalid_search',
   'not_found',
   'rate_limited',
@@ -193,6 +194,10 @@ export const validationFieldSchema = z.enum([
   'upload_request_id',
   'image_upload_ids',
   'file',
+  'target_type',
+  'target_id',
+  'reason',
+  'details',
 ]) satisfies z.ZodType<ValidationField>;
 
 const validationProblemCodeSchema = z.enum([

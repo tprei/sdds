@@ -29,6 +29,13 @@ const (
 		JOIN authors ON authors.user_id = note_comments.user_id
 		WHERE note_comments.note_id = ? AND note_comments.id = ?
 	`
+	findCommentByIDSQL = `
+		SELECT
+		` + commentProjectionSQL + `
+		FROM note_comments
+		JOIN authors ON authors.user_id = note_comments.user_id
+		WHERE note_comments.id = ?
+	`
 	listNoteCommentsSQL = `
 		SELECT
 			note_comments.comment_page_key,
@@ -106,6 +113,19 @@ func (store *CommentStore) FindComment(ctx context.Context, noteID, id string) (
 		return comment.Comment{}, comment.ErrCommentNotFound
 	}
 	return comment.Comment{}, fmt.Errorf("find comment: %w", err)
+}
+
+// FindCommentByID looks up a single comment by id without a parent note id. It
+// exists for report intake, which receives a generic comment target id.
+func (store *CommentStore) FindCommentByID(ctx context.Context, id string) (comment.Comment, error) {
+	found, err := scanCommentRow(store.db.QueryRowContext(ctx, findCommentByIDSQL, id))
+	if err == nil {
+		return found, nil
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return comment.Comment{}, comment.ErrCommentNotFound
+	}
+	return comment.Comment{}, fmt.Errorf("find comment by id: %w", err)
 }
 
 func (store *CommentStore) ListNoteComments(ctx context.Context, input comment.ListInput) (page comment.Page, err error) {

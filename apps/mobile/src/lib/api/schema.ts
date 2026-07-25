@@ -22,6 +22,7 @@ type ListPlacesResponse = GeneratedSchemas['ListPlacesResponse'];
 type NoteResponse = GeneratedSchemas['Note'];
 type NoteImageResponse = GeneratedSchemas['NoteImage'];
 type PlaceSlug = GeneratedSchemas['PlaceSlug'];
+type ReportReceiptResponse = GeneratedSchemas['ReportReceipt'];
 type ValidationField = GeneratedSchemas['ValidationField'];
 type ValidationProblemResponse = GeneratedSchemas['ValidationProblem'];
 type ValidationProblemCode = ValidationProblemResponse['code'];
@@ -50,6 +51,23 @@ export const listNoteCommentsResponseSchema = z.object({
   comments: z.array(commentSchema),
   next_cursor: z.string().min(1).max(512).nullable(),
 }) satisfies z.ZodType<ListNoteCommentsResponse>;
+const reportReasonSchema = z.enum([
+  'spam',
+  'harassment',
+  'harmful_or_misleading',
+  'other',
+]) satisfies z.ZodType<GeneratedSchemas['ReportReason']>;
+const reportTargetTypeSchema = z.enum(['note', 'comment']) satisfies z.ZodType<
+  GeneratedSchemas['ReportTargetType']
+>;
+export const reportReceiptSchema = z.object({
+  id: z.string(),
+  target_type: reportTargetTypeSchema,
+  target_id: z.string(),
+  reason: reportReasonSchema,
+  details: z.string().nullable(),
+  created_at: z.number().int().nonnegative(),
+}) satisfies z.ZodType<ReportReceiptResponse>;
 
 export const publicAuthorSchema = z.object({
   id: z.string(),
@@ -278,4 +296,5 @@ export type SchemaExactnessChecks = [
     Exact<ValidationProblemResponse, z.output<typeof validationProblemSchema>>
   >,
   Assert<Exact<ErrorResponse, z.output<typeof errorResponseSchema>>>,
+  Assert<Exact<ReportReceiptResponse, z.output<typeof reportReceiptSchema>>>,
 ];

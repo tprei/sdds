@@ -940,7 +940,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListNotesResponse"
+                $ref: "#/components/schemas/SearchNotesResponse"
         "400":
           description: The search query is invalid.
           content:
@@ -1472,10 +1472,10 @@ components:
     EventPlatform:
       type: string
       enum: [ios, android, web]
-    EventSearchVersion:
+    SearchVersion:
       type: string
       enum: [fts5-v1]
-    EventRetrievalSource:
+    RetrievalSource:
       type: string
       enum: [lexical, semantic, hybrid]
     EventAppVersion:
@@ -1518,7 +1518,7 @@ components:
         rank:
           $ref: "#/components/schemas/EventRank"
         retrieval_source:
-          $ref: "#/components/schemas/EventRetrievalSource"
+          $ref: "#/components/schemas/RetrievalSource"
     EventExploreNotesImpressionPayload:
       type: object
       additionalProperties: false
@@ -1559,7 +1559,7 @@ components:
         search_id:
           $ref: "#/components/schemas/EventID"
         search_version:
-          $ref: "#/components/schemas/EventSearchVersion"
+          $ref: "#/components/schemas/SearchVersion"
         query:
           $ref: "#/components/schemas/EventQuery"
         category_slug:
@@ -1575,7 +1575,7 @@ components:
         search_id:
           $ref: "#/components/schemas/EventID"
         search_version:
-          $ref: "#/components/schemas/EventSearchVersion"
+          $ref: "#/components/schemas/SearchVersion"
         query:
           $ref: "#/components/schemas/EventQuery"
         category_slug:
@@ -1599,13 +1599,13 @@ components:
         search_id:
           $ref: "#/components/schemas/EventID"
         search_version:
-          $ref: "#/components/schemas/EventSearchVersion"
+          $ref: "#/components/schemas/SearchVersion"
         note_id:
           $ref: "#/components/schemas/EventID"
         rank:
           $ref: "#/components/schemas/EventRank"
         retrieval_source:
-          $ref: "#/components/schemas/EventRetrievalSource"
+          $ref: "#/components/schemas/RetrievalSource"
     EventSearchReformulatedPayload:
       type: object
       additionalProperties: false
@@ -1614,11 +1614,11 @@ components:
         previous_search_id:
           $ref: "#/components/schemas/EventID"
         previous_search_version:
-          $ref: "#/components/schemas/EventSearchVersion"
+          $ref: "#/components/schemas/SearchVersion"
         search_id:
           $ref: "#/components/schemas/EventID"
         search_version:
-          $ref: "#/components/schemas/EventSearchVersion"
+          $ref: "#/components/schemas/SearchVersion"
         previous_query:
           $ref: "#/components/schemas/EventQuery"
         query:
@@ -1641,7 +1641,7 @@ components:
         search_id:
           $ref: "#/components/schemas/EventID"
         search_version:
-          $ref: "#/components/schemas/EventSearchVersion"
+          $ref: "#/components/schemas/SearchVersion"
         query:
           $ref: "#/components/schemas/EventQuery"
         category_slug:
@@ -1663,11 +1663,11 @@ components:
         search_id:
           $ref: "#/components/schemas/EventID"
         search_version:
-          $ref: "#/components/schemas/EventSearchVersion"
+          $ref: "#/components/schemas/SearchVersion"
         rank:
           $ref: "#/components/schemas/EventRank"
         retrieval_source:
-          $ref: "#/components/schemas/EventRetrievalSource"
+          $ref: "#/components/schemas/RetrievalSource"
     EventExploreUsefulContext:
       type: object
       additionalProperties: false
@@ -2186,6 +2186,30 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Note"
+    SearchNotesResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - search_version
+        - results
+      properties:
+        search_version:
+          $ref: "#/components/schemas/SearchVersion"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchNoteResult"
+    SearchNoteResult:
+      type: object
+      additionalProperties: false
+      required:
+        - note
+        - retrieval_source
+      properties:
+        note:
+          $ref: "#/components/schemas/Note"
+        retrieval_source:
+          $ref: "#/components/schemas/RetrievalSource"
     ListNoteCommentsResponse:
       type: object
       additionalProperties: false

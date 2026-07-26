@@ -55,11 +55,12 @@ vi.mock('@/components/foundation-screen', () => ({
 }));
 vi.mock('@/components/note-card', () => ({ NoteCard: () => createElement('div') }));
 vi.mock('@/features/notes/category-filter-controls', () => ({ CategoryFilterControls: () => createElement('div') }));
-vi.mock('@/features/notes/catalog', () => ({ buildNoteCatalog: () => ({ kind: 'catalog' }), labelNotes: (_catalog: unknown, notes: unknown[]) => notes }));
+vi.mock('@/features/notes/catalog', () => ({ buildNoteCatalog: () => ({ kind: 'catalog' }) }));
 vi.mock('@/features/notes/search-screen', () => ({
   appendRecentSearchQuery: (current: string[], query: string) => [...current, query],
   createSearchRequest: () => null,
   isCurrentSearchRequest: () => true,
+  labelSearchResults: (_catalog: unknown, results: unknown[]) => results,
   searchResultContext: () => ({ categoryLabel: null, query: 'q', resultCount: 0, scopeLabel: 'Mundo todo' }),
   searchResultCountLabel: () => '0 notas',
 }));

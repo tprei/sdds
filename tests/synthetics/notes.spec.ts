@@ -80,6 +80,16 @@ type ListNotesResponse = {
   notes: NoteResponse[];
 };
 
+type SearchNoteResult = {
+  note: NoteResponse;
+  retrieval_source: 'lexical' | 'semantic' | 'hybrid';
+};
+
+type SearchNotesResponse = {
+  results: SearchNoteResult[];
+  search_version: 'fts5-v1';
+};
+
 type ErrorResponse = {
   code: string;
   fields?: ValidationProblem[];
@@ -94,6 +104,8 @@ const authSessionResponseKeys = ['expires_at', 'token', 'user'] as const;
 const authorSummaryKeys = ['display_name', 'id'] as const;
 const currentUserKeys = ['author', 'id', 'username'] as const;
 const commentResponseKeys = ['author', 'body', 'created_at', 'id'] as const;
+const searchNoteResultKeys = ['note', 'retrieval_source'] as const;
+const searchNotesResponseKeys = ['results', 'search_version'] as const;
 const listNotesResponseKeys = ['notes'] as const;
 const noteImageResponseKeys = [
   'byte_size',
@@ -1029,7 +1041,7 @@ async function searchNotes(
   token: string,
   query: string,
   options: { categorySlug: string },
-): Promise<ListNotesResponse> {
+): Promise<SearchNotesResponse> {
   const response = await request.get(
     apiURL(
       `/v1/search/notes?q=${encodeURIComponent(query)}&category_slug=${encodeURIComponent(options.categorySlug)}`,
@@ -1041,7 +1053,7 @@ async function searchNotes(
     },
   );
   expect(response.status()).toBe(200);
-  return parseListNotesResponse(await response.json());
+  return parseSearchNotesResponse(await response.json());
 }
 
 async function expectCategoryFilterError(
@@ -1098,13 +1110,25 @@ async function clickTab(page: Page, name: string): Promise<void> {
   await page.getByRole('tab', { name: new RegExp(name + '$') }).click();
 }
 
-function noteTitles(response: ListNotesResponse): string[] {
-  return response.notes.map((note) => note.title);
+function noteTitles(
+  response: ListNotesResponse | SearchNotesResponse,
+): string[] {
+  if ('notes' in response) {
+    return response.notes.map((note) => note.title);
+  }
+  return response.results.map((result) => result.note.title);
 }
 
 function parseListNotesResponse(value: unknown): ListNotesResponse {
   if (!isListNotesResponse(value)) {
     throw new Error('invalid list notes response');
+  }
+  return value;
+}
+
+function parseSearchNotesResponse(value: unknown): SearchNotesResponse {
+  if (!isSearchNotesResponse(value)) {
+    throw new Error('invalid search notes response');
   }
   return value;
 }
@@ -1143,6 +1167,27 @@ function isListNotesResponse(value: unknown): value is ListNotesResponse {
     hasOnlyKeys(value, listNotesResponseKeys) &&
     Array.isArray(value.notes) &&
     value.notes.every(isNoteResponse)
+  );
+}
+
+function isSearchNotesResponse(value: unknown): value is SearchNotesResponse {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, searchNotesResponseKeys) &&
+    value.search_version === 'fts5-v1' &&
+    Array.isArray(value.results) &&
+    value.results.every(isSearchNoteResult)
+  );
+}
+
+function isSearchNoteResult(value: unknown): value is SearchNoteResult {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, searchNoteResultKeys) &&
+    isNoteResponse(value.note) &&
+    (value.retrieval_source === 'lexical' ||
+      value.retrieval_source === 'semantic' ||
+      value.retrieval_source === 'hybrid')
   );
 }
 

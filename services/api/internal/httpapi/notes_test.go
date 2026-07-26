@@ -236,20 +236,26 @@ func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 
-	var body openapi.ListNotesResponse
+	var body openapi.SearchNotesResponse
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	want := openapi.ListNotesResponse{Notes: []openapi.Note{{
-		Id:           exampleNoteID,
-		Title:        "Café bom",
-		Body:         "Tem pão de queijo decente.",
-		CategorySlug: string(note.CategorySlugFood),
-		PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
-		Images:       []openapi.NoteImage{},
-		CreatedAt:    now.UnixMilli(),
-		UpdatedAt:    now.UnixMilli(),
-	}}}
+	want := openapi.SearchNotesResponse{
+		SearchVersion: openapi.SearchVersion(note.CurrentSearchVersion),
+		Results: []openapi.SearchNoteResult{{
+			Note: openapi.Note{
+				Id:           exampleNoteID,
+				Title:        "Café bom",
+				Body:         "Tem pão de queijo decente.",
+				CategorySlug: string(note.CategorySlugFood),
+				PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
+				Images:       []openapi.NoteImage{},
+				CreatedAt:    now.UnixMilli(),
+				UpdatedAt:    now.UnixMilli(),
+			},
+			RetrievalSource: openapi.RetrievalSource(note.CurrentRetrievalSource),
+		}},
+	}
 	if diff := cmp.Diff(want, body); diff != "" {
 		t.Fatalf("response body mismatch (-want +got):\n%s", diff)
 	}
@@ -281,12 +287,15 @@ func TestSearchNotesReturnsEmptyNotesForPunctuationOnlyQuery(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 
-	var body openapi.ListNotesResponse
+	var body openapi.SearchNotesResponse
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if len(body.Notes) != 0 {
-		t.Fatalf("note count = %d, want 0", len(body.Notes))
+	if body.SearchVersion != openapi.SearchVersion(note.CurrentSearchVersion) {
+		t.Fatalf("search version = %q, want %q", body.SearchVersion, note.CurrentSearchVersion)
+	}
+	if body.Results == nil || len(body.Results) != 0 {
+		t.Fatalf("results = %#v, want non-nil empty slice", body.Results)
 	}
 }
 

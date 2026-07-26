@@ -1,6 +1,14 @@
-import type { NoteCatalog } from './catalog';
+import { labelNote } from './catalog';
+import type {
+  LabelledNote,
+  NoteCatalog,
+} from './catalog';
 import type { CatalogCategory } from '@/lib/api/catalogs';
-import type { SearchNotesInput } from '@/lib/api/notes';
+import type {
+  RetrievalSource,
+  SearchNoteResult,
+  SearchNotesInput,
+} from '@/lib/api/notes';
 
 export const searchScopeLabel = 'Mundo todo';
 export const searchRecentQueryLimit = 5;
@@ -18,6 +26,29 @@ export type SearchResultContext = {
   resultCount: number;
   scopeLabel: typeof searchScopeLabel;
 };
+
+export type LabelledSearchResult = {
+  note: LabelledNote;
+  retrievalSource: RetrievalSource;
+};
+
+export function labelSearchResults(
+  catalog: NoteCatalog,
+  results: readonly SearchNoteResult[],
+): LabelledSearchResult[] | null {
+  const labelledResults: LabelledSearchResult[] = [];
+  for (const result of results) {
+    const labelledNote = labelNote(catalog, result.note);
+    if (labelledNote === null) {
+      return null;
+    }
+    labelledResults.push({
+      note: labelledNote,
+      retrievalSource: result.retrievalSource,
+    });
+  }
+  return labelledResults;
+}
 
 export function createSearchRequest({
   categorySlug,

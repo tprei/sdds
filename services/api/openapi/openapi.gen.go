@@ -397,27 +397,6 @@ func (e EventReportCreatedSchemaVersion) Valid() bool {
 	}
 }
 
-// Defines values for EventRetrievalSource.
-const (
-	Hybrid   EventRetrievalSource = "hybrid"
-	Lexical  EventRetrievalSource = "lexical"
-	Semantic EventRetrievalSource = "semantic"
-)
-
-// Valid indicates whether the value is a known member of the EventRetrievalSource enum.
-func (e EventRetrievalSource) Valid() bool {
-	switch e {
-	case Hybrid:
-		return true
-	case Lexical:
-		return true
-	case Semantic:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for EventSearchNoResultsKind.
 const (
 	SearchNoResults EventSearchNoResultsKind = "search_no_results"
@@ -598,21 +577,6 @@ func (e EventSearchUsefulContextSource) Valid() bool {
 	}
 }
 
-// Defines values for EventSearchVersion.
-const (
-	Fts5V1 EventSearchVersion = "fts5-v1"
-)
-
-// Valid indicates whether the value is a known member of the EventSearchVersion enum.
-func (e EventSearchVersion) Valid() bool {
-	switch e {
-	case Fts5V1:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for ImageUploadReceiptContentType.
 const (
 	ImageUploadReceiptContentTypeImagejpeg ImageUploadReceiptContentType = "image/jpeg"
@@ -715,6 +679,42 @@ func (e ReportTargetType) Valid() bool {
 	case ReportTargetTypeComment:
 		return true
 	case ReportTargetTypeNote:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RetrievalSource.
+const (
+	Hybrid   RetrievalSource = "hybrid"
+	Lexical  RetrievalSource = "lexical"
+	Semantic RetrievalSource = "semantic"
+)
+
+// Valid indicates whether the value is a known member of the RetrievalSource enum.
+func (e RetrievalSource) Valid() bool {
+	switch e {
+	case Hybrid:
+		return true
+	case Lexical:
+		return true
+	case Semantic:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SearchVersion.
+const (
+	Fts5V1 SearchVersion = "fts5-v1"
+)
+
+// Valid indicates whether the value is a known member of the SearchVersion enum.
+func (e SearchVersion) Valid() bool {
+	switch e {
+	case Fts5V1:
 		return true
 	default:
 		return false
@@ -1162,9 +1162,6 @@ type EventReportCreatedPayload struct {
 // EventResultCount defines model for EventResultCount.
 type EventResultCount = int
 
-// EventRetrievalSource defines model for EventRetrievalSource.
-type EventRetrievalSource string
-
 // EventSearchNoResults defines model for EventSearchNoResults.
 type EventSearchNoResults struct {
 	AppVersion     *EventAppVersion                  `json:"app_version"`
@@ -1189,7 +1186,7 @@ type EventSearchNoResultsPayload struct {
 	Query         EventQuery                             `json:"query"`
 	ResultCount   EventSearchNoResultsPayloadResultCount `json:"result_count"`
 	SearchId      EventID                                `json:"search_id"`
-	SearchVersion EventSearchVersion                     `json:"search_version"`
+	SearchVersion SearchVersion                          `json:"search_version"`
 }
 
 // EventSearchNoResultsPayloadResultCount defines model for EventSearchNoResultsPayload.ResultCount.
@@ -1215,21 +1212,21 @@ type EventSearchReformulatedSchemaVersion int
 
 // EventSearchReformulatedPayload defines model for EventSearchReformulatedPayload.
 type EventSearchReformulatedPayload struct {
-	CategorySlug          *CategorySlug      `json:"category_slug"`
-	PreviousCategorySlug  *CategorySlug      `json:"previous_category_slug"`
-	PreviousQuery         EventQuery         `json:"previous_query"`
-	PreviousSearchId      EventID            `json:"previous_search_id"`
-	PreviousSearchVersion EventSearchVersion `json:"previous_search_version"`
-	Query                 EventQuery         `json:"query"`
-	SearchId              EventID            `json:"search_id"`
-	SearchVersion         EventSearchVersion `json:"search_version"`
+	CategorySlug          *CategorySlug `json:"category_slug"`
+	PreviousCategorySlug  *CategorySlug `json:"previous_category_slug"`
+	PreviousQuery         EventQuery    `json:"previous_query"`
+	PreviousSearchId      EventID       `json:"previous_search_id"`
+	PreviousSearchVersion SearchVersion `json:"previous_search_version"`
+	Query                 EventQuery    `json:"query"`
+	SearchId              EventID       `json:"search_id"`
+	SearchVersion         SearchVersion `json:"search_version"`
 }
 
 // EventSearchResult defines model for EventSearchResult.
 type EventSearchResult struct {
-	NoteId          EventID              `json:"note_id"`
-	Rank            EventRank            `json:"rank"`
-	RetrievalSource EventRetrievalSource `json:"retrieval_source"`
+	NoteId          EventID         `json:"note_id"`
+	Rank            EventRank       `json:"rank"`
+	RetrievalSource RetrievalSource `json:"retrieval_source"`
 }
 
 // EventSearchResultOpened defines model for EventSearchResultOpened.
@@ -1252,11 +1249,11 @@ type EventSearchResultOpenedSchemaVersion int
 
 // EventSearchResultOpenedPayload defines model for EventSearchResultOpenedPayload.
 type EventSearchResultOpenedPayload struct {
-	NoteId          EventID              `json:"note_id"`
-	Rank            EventRank            `json:"rank"`
-	RetrievalSource EventRetrievalSource `json:"retrieval_source"`
-	SearchId        EventID              `json:"search_id"`
-	SearchVersion   EventSearchVersion   `json:"search_version"`
+	NoteId          EventID         `json:"note_id"`
+	Rank            EventRank       `json:"rank"`
+	RetrievalSource RetrievalSource `json:"retrieval_source"`
+	SearchId        EventID         `json:"search_id"`
+	SearchVersion   SearchVersion   `json:"search_version"`
 }
 
 // EventSearchResultsImpression defines model for EventSearchResultsImpression.
@@ -1284,7 +1281,7 @@ type EventSearchResultsImpressionPayload struct {
 	ResultCount   EventResultCount    `json:"result_count"`
 	Results       []EventSearchResult `json:"results"`
 	SearchId      EventID             `json:"search_id"`
-	SearchVersion EventSearchVersion  `json:"search_version"`
+	SearchVersion SearchVersion       `json:"search_version"`
 }
 
 // EventSearchSubmitted defines model for EventSearchSubmitted.
@@ -1307,26 +1304,23 @@ type EventSearchSubmittedSchemaVersion int
 
 // EventSearchSubmittedPayload defines model for EventSearchSubmittedPayload.
 type EventSearchSubmittedPayload struct {
-	CategorySlug  *CategorySlug      `json:"category_slug"`
-	Query         EventQuery         `json:"query"`
-	SearchId      EventID            `json:"search_id"`
-	SearchVersion EventSearchVersion `json:"search_version"`
+	CategorySlug  *CategorySlug `json:"category_slug"`
+	Query         EventQuery    `json:"query"`
+	SearchId      EventID       `json:"search_id"`
+	SearchVersion SearchVersion `json:"search_version"`
 }
 
 // EventSearchUsefulContext defines model for EventSearchUsefulContext.
 type EventSearchUsefulContext struct {
 	Rank            EventRank                      `json:"rank"`
-	RetrievalSource EventRetrievalSource           `json:"retrieval_source"`
+	RetrievalSource RetrievalSource                `json:"retrieval_source"`
 	SearchId        EventID                        `json:"search_id"`
-	SearchVersion   EventSearchVersion             `json:"search_version"`
+	SearchVersion   SearchVersion                  `json:"search_version"`
 	Source          EventSearchUsefulContextSource `json:"source"`
 }
 
 // EventSearchUsefulContextSource defines model for EventSearchUsefulContext.Source.
 type EventSearchUsefulContextSource string
-
-// EventSearchVersion defines model for EventSearchVersion.
-type EventSearchVersion string
 
 // EventUsefulContext defines model for EventUsefulContext.
 type EventUsefulContext struct {
@@ -1454,6 +1448,24 @@ type ReportReceipt struct {
 
 // ReportTargetType defines model for ReportTargetType.
 type ReportTargetType string
+
+// RetrievalSource defines model for RetrievalSource.
+type RetrievalSource string
+
+// SearchNoteResult defines model for SearchNoteResult.
+type SearchNoteResult struct {
+	Note            Note            `json:"note"`
+	RetrievalSource RetrievalSource `json:"retrieval_source"`
+}
+
+// SearchNotesResponse defines model for SearchNotesResponse.
+type SearchNotesResponse struct {
+	Results       []SearchNoteResult `json:"results"`
+	SearchVersion SearchVersion      `json:"search_version"`
+}
+
+// SearchVersion defines model for SearchVersion.
+type SearchVersion string
 
 // ValidationField defines model for ValidationField.
 type ValidationField string
@@ -4412,7 +4424,7 @@ func (r CreateReportHTTPResponse) ContentType() string {
 type SearchNotesHTTPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *ListNotesResponse
+	JSON200      *SearchNotesResponse
 	JSON400      *ErrorResponse
 	JSON401      *ErrorResponse
 	JSON500      *ErrorResponse
@@ -5844,7 +5856,7 @@ func ParseSearchNotesHTTPResponse(rsp *http.Response) (*SearchNotesHTTPResponse,
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ListNotesResponse
+		var dest SearchNotesResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

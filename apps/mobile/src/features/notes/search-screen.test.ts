@@ -5,6 +5,7 @@ import {
   appendRecentSearchQuery,
   createSearchRequest,
   isCurrentSearchRequest,
+  labelSearchResults,
   resolveSearchCategorySlug,
   searchNotesInput,
   searchRecentQueryLimit,
@@ -14,6 +15,7 @@ import {
   submittedSearchQuery,
 } from './search-screen';
 import type { Catalogs } from '@/lib/api/catalogs';
+import type { Note } from '@/lib/api/notes';
 
 describe('search screen helpers', () => {
   it('normalizes submitted search text', () => {
@@ -140,12 +142,52 @@ describe('search screen helpers', () => {
     });
   });
 
+  it('labels ordered search results without losing retrieval provenance', () => {
+    const labelledResults = labelSearchResults(
+      buildNoteCatalog(catalogs()),
+      [
+        {
+          note: searchNote('first'),
+          retrievalSource: 'semantic',
+        },
+        {
+          note: searchNote('second'),
+          retrievalSource: 'lexical',
+        },
+      ],
+    );
+
+    expect(
+      labelledResults?.map((result) => ({
+        id: result.note.id,
+        retrievalSource: result.retrievalSource,
+      })),
+    ).toEqual([
+      { id: 'first', retrievalSource: 'semantic' },
+      { id: 'second', retrievalSource: 'lexical' },
+    ]);
+  });
   it('labels singular and plural result counts', () => {
     expect(searchResultCountLabel(1)).toBe('1 nota');
     expect(searchResultCountLabel(2)).toBe('2 notas');
   });
 });
 
+function searchNote(id: string): Note {
+  return {
+    author: { displayName: 'Thiago', id: 'author-id' },
+    body: 'Tem pao.',
+    categorySlug: 'food',
+    createdAt: 1782993600000,
+    id,
+    images: [],
+    placeSlug: null,
+    title: 'Cafe bom',
+    updatedAt: 1782993600000,
+    usefulCount: 0,
+    usefulByCurrentUser: false,
+  };
+}
 function catalogs(): Catalogs {
   return {
     categories: [

@@ -15,20 +15,22 @@ import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
 import { CategoryFilterControls } from '@/features/notes/category-filter-controls';
 import { resolveCategoryFilterSlug } from '@/features/notes/category-filter';
-import { buildNoteCatalog, labelNotes } from '@/features/notes/catalog';
-import type { LabelledNote, NoteCatalog } from '@/features/notes/catalog';
+import { buildNoteCatalog } from '@/features/notes/catalog';
 import {
   appendRecentSearchQuery,
   createSearchRequest,
   isCurrentSearchRequest,
+  labelSearchResults,
   searchResultContext,
   searchResultCountLabel,
 } from '@/features/notes/search-screen';
 import type {
+  LabelledSearchResult,
   SearchRequest,
   SearchResultContext,
 } from '@/features/notes/search-screen';
-import type { Note } from '@/lib/api/notes';
+import type { NoteCatalog } from '@/features/notes/catalog';
+import type { Note, SearchVersion } from '@/lib/api/notes';
 
 import { styles } from '@/features/notes/search-screen.styles';
 import { ReadAuthGate } from '@/components/read-auth-gate';
@@ -43,13 +45,15 @@ type SearchScreenState =
   | { request: SearchRequest; status: 'loading' }
   | {
       context: SearchResultContext;
-      notes: LabelledNote[];
       request: SearchRequest;
+      results: LabelledSearchResult[];
+      searchVersion: SearchVersion;
       status: 'ready';
     }
   | {
       context: SearchResultContext;
       request: SearchRequest;
+      searchVersion: SearchVersion;
       status: 'empty';
     }
   | { request: SearchRequest; status: 'error' };
@@ -167,7 +171,7 @@ function AuthenticatedSearchScreen({
       setUsefulMutations({});
 
       apiClient.searchNotes(request.input)
-        .then((notes) => {
+        .then((searchResult) => {
           if (
             !isCurrentSearchRequest({
               activeRequestID: searchRequestIDRef.current,
@@ -177,8 +181,11 @@ function AuthenticatedSearchScreen({
             return;
           }
 
-          const labelledNotes = labelNotes(catalog, notes);
-          if (labelledNotes === null) {
+          const labelledResults = labelSearchResults(
+            catalog,
+            searchResult.results,
+          );
+          if (labelledResults === null) {
             setSearchState({ request, status: 'error' });
             return;
           }
@@ -187,12 +194,23 @@ function AuthenticatedSearchScreen({
             catalog,
             categorySlug: request.categorySlug,
             query: request.query,
-            resultCount: labelledNotes.length,
+            resultCount: labelledResults.length,
           });
           setSearchState(
-            labelledNotes.length > 0
-              ? { context, notes: labelledNotes, request, status: 'ready' }
-              : { context, request, status: 'empty' },
+            labelledResults.length > 0
+              ? {
+                  context,
+                  request,
+                  results: labelledResults,
+                  searchVersion: searchResult.searchVersion,
+                  status: 'ready',
+                }
+              : {
+                  context,
+                  request,
+                  searchVersion: searchResult.searchVersion,
+                  status: 'empty',
+                },
           );
         })
         .catch(async (error: unknown) => {
@@ -274,20 +292,21 @@ function AuthenticatedSearchScreen({
   }, [apiClient, onSessionExpired, runSearch]);
 
   const toggleUseful = useCallback(
-    async (target: LabelledNote) => {
-      if (usefulMutations[target.id] === 'pending') {
+    async (target: LabelledSearchResult) => {
+      const targetNote = target.note;
+      if (usefulMutations[targetNote.id] === 'pending') {
         return;
       }
       const generation = `${catalogRequestIDRef.current}:${searchRequestIDRef.current}`;
       setUsefulMutations((current) => ({
         ...current,
-        [target.id]: 'pending',
+        [targetNote.id]: 'pending',
       }));
       try {
-        if (target.usefulByCurrentUser) {
-          await apiClient.unmarkNoteUseful(target.id);
+        if (targetNote.usefulByCurrentUser) {
+          await apiClient.unmarkNoteUseful(targetNote.id);
         } else {
-          await apiClient.markNoteUseful(target.id);
+          await apiClient.markNoteUseful(targetNote.id);
         }
         if (
           generation !==
@@ -301,21 +320,24 @@ function AuthenticatedSearchScreen({
           }
           return {
             ...current,
-            notes: current.notes.map((note) =>
-              note.id === target.id
+            results: current.results.map((result) =>
+              result.note.id === targetNote.id
                 ? {
-                    ...note,
-                    usefulByCurrentUser: !note.usefulByCurrentUser,
-                    usefulCount: note.usefulByCurrentUser
-                      ? note.usefulCount - 1
-                      : note.usefulCount + 1,
+                    ...result,
+                    note: {
+                      ...result.note,
+                      usefulByCurrentUser: !result.note.usefulByCurrentUser,
+                      usefulCount: result.note.usefulByCurrentUser
+                        ? result.note.usefulCount - 1
+                        : result.note.usefulCount + 1,
+                    },
                   }
-                : note,
+                : result,
             ),
           };
         });
         setUsefulMutations((current) => {
-          const { [target.id]: _removed, ...rest } = current;
+          const { [targetNote.id]: _removed, ...rest } = current;
           return rest;
         });
       } catch (error: unknown) {
@@ -333,7 +355,7 @@ function AuthenticatedSearchScreen({
         }
         setUsefulMutations((current) => ({
           ...current,
-          [target.id]: 'error',
+          [targetNote.id]: 'error',
         }));
       }
     },
@@ -459,7 +481,7 @@ function SearchStateContent({
   onOpenAuthor: (authorID: string) => void;
   onOpenNote: (note: Note) => void;
   onSelectRecentQuery: (query: string) => void;
-  onToggleUseful: (note: LabelledNote) => Promise<void>;
+  onToggleUseful: (result: LabelledSearchResult) => Promise<void>;
   recentQueries: string[];
   state: SearchScreenState;
   usefulMutations: Partial<Record<string, UsefulMutationState>>;
@@ -512,21 +534,24 @@ function SearchStateContent({
   return (
     <>
       <ResultHeader context={state.context} />
-      {state.notes.map((labelledNote) => (
-        <NoteCard
-          categoryLabel={labelledNote.categoryLabel}
-          key={labelledNote.id}
-          note={labelledNote}
-          onPress={() => onOpenNote(labelledNote)}
-          onPressAuthor={onOpenAuthor}
-          onPressUseful={() => {
-            void onToggleUseful(labelledNote);
-          }}
-          placeLabel={labelledNote.placeLabel}
-          usefulError={usefulMutations[labelledNote.id] === 'error'}
-          usefulPending={usefulMutations[labelledNote.id] === 'pending'}
-        />
-      ))}
+      {state.results.map((result) => {
+        const labelledNote = result.note;
+        return (
+          <NoteCard
+            categoryLabel={labelledNote.categoryLabel}
+            key={labelledNote.id}
+            note={labelledNote}
+            onPress={() => onOpenNote(labelledNote)}
+            onPressAuthor={onOpenAuthor}
+            onPressUseful={() => {
+              void onToggleUseful(result);
+            }}
+            placeLabel={labelledNote.placeLabel}
+            usefulError={usefulMutations[labelledNote.id] === 'error'}
+            usefulPending={usefulMutations[labelledNote.id] === 'pending'}
+          />
+        );
+      })}
     </>
   );
 }

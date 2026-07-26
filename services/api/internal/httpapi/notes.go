@@ -190,7 +190,7 @@ func (handler server) SearchNotes(w http.ResponseWriter, r *http.Request, params
 		return
 	}
 
-	writeJSON(w, http.StatusOK, newListNotesResponse(notes))
+	writeJSON(w, http.StatusOK, newSearchNotesResponse(notes))
 }
 
 func validationErrorResponse(code openapi.ErrorCode, problems []note.ValidationProblem) openapi.ErrorResponse {
@@ -269,6 +269,19 @@ func newListNotesResponse(notes []note.Note) openapi.ListNotesResponse {
 	response := openapi.ListNotesResponse{Notes: make([]openapi.Note, 0, len(notes))}
 	for _, found := range notes {
 		response.Notes = append(response.Notes, newNoteResponse(found))
+	}
+	return response
+}
+func newSearchNotesResponse(notes []note.Note) openapi.SearchNotesResponse {
+	response := openapi.SearchNotesResponse{
+		SearchVersion: openapi.SearchVersion(note.CurrentSearchVersion),
+		Results:       make([]openapi.SearchNoteResult, 0, len(notes)),
+	}
+	for _, found := range notes {
+		response.Results = append(response.Results, openapi.SearchNoteResult{
+			Note:            newNoteResponse(found),
+			RetrievalSource: openapi.RetrievalSource(note.CurrentRetrievalSource),
+		})
 	}
 	return response
 }

@@ -2,7 +2,11 @@ import { apiBaseURL } from './config';
 import {
   APIRequestError as SharedAPIRequestError,
 } from './request-error';
-import { listNotesResponseSchema, noteSchema } from './schema';
+import {
+  listNotesResponseSchema,
+  noteSchema,
+  searchNotesResponseSchema,
+} from './schema';
 import type { TypedTransport } from './client';
 import type { APIErrorResponse } from './request-error';
 import type { components } from './generated/schema';
@@ -55,6 +59,18 @@ export type SearchNotesInput = {
   categorySlug?: string;
   query: string;
 };
+export type SearchVersion = components['schemas']['SearchVersion'];
+export type RetrievalSource = components['schemas']['RetrievalSource'];
+
+export type SearchNoteResult = {
+  note: Note;
+  retrievalSource: RetrievalSource;
+};
+
+export type SearchNotesResult = {
+  results: readonly SearchNoteResult[];
+  searchVersion: SearchVersion;
+};
 
 type GeneratedSchemas = components['schemas'];
 type AuthorSummaryResponse = GeneratedSchemas['AuthorSummary'];
@@ -83,7 +99,7 @@ export type NotesAPI = {
   getNote(id: string): Promise<Note>;
   markNoteUseful(noteID: string): Promise<void>;
   unmarkNoteUseful(noteID: string): Promise<void>;
-  searchNotes(input: SearchNotesInput): Promise<Note[]>;
+  searchNotes(input: SearchNotesInput): Promise<SearchNotesResult>;
   createNote(input: CreateNoteInput): Promise<Note>;
 };
 
@@ -143,7 +159,7 @@ export function bindNotesAPI(transport: TypedTransport): NotesAPI {
         const { data } = await transport.GET('/v1/search/notes', {
           params: { query: noteSearchQuery(input) },
         });
-        return parseListNotesResponse(data);
+        return parseSearchNotesResponse(data);
       } catch (error) {
         rewrapTransportError(error);
       }
@@ -194,6 +210,20 @@ function parseListNotesResponse(value: unknown): Note[] {
   }
 
   return listNotesResponse.data.notes.map(mapNoteResponse);
+}
+export function parseSearchNotesResponse(value: unknown): SearchNotesResult {
+  const searchNotesResponse = searchNotesResponseSchema.safeParse(value);
+  if (!searchNotesResponse.success) {
+    throw new APIResponseError();
+  }
+
+  return {
+    results: searchNotesResponse.data.results.map((result) => ({
+      note: mapNoteResponse(result.note),
+      retrievalSource: result.retrieval_source,
+    })),
+    searchVersion: searchNotesResponse.data.search_version,
+  };
 }
 
 export function parseNoteResponse(value: unknown): Note {

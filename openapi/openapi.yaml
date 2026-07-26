@@ -1016,6 +1016,65 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/events:
+    post:
+      operationId: createEvents
+      summary: Record product events
+      tags:
+        - Operations
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEventsRequest"
+      responses:
+        "200":
+          description: Events accepted or already stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateEventsReceipt"
+        "400":
+          description: Invalid JSON, event batch, or indexed event.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/EventErrorResponse"
+                  - $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is missing a valid authenticated session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: The request body exceeds 256 KiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: The event rate limit was exceeded.
+          headers:
+            Retry-After:
+              required: true
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The event batch could not be stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   securitySchemes:
     bearerAuth:
@@ -1368,6 +1427,8 @@ components:
         - ErrorCodeMediaStorageUnavailable
         - ErrorCodeMediaIntegrityError
         - ErrorCodeTooManyImages
+        - ErrorCodeInvalidEvent
+        - ErrorCodeInvalidEventBatch
       enum:
         - internal_error
         - forbidden
@@ -1391,6 +1452,8 @@ components:
         - media_storage_unavailable
         - media_integrity_error
         - too_many_images
+        - invalid_event
+        - invalid_event_batch
     ErrorResponse:
       type: object
       additionalProperties: false
@@ -1403,6 +1466,716 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ValidationProblem"
+    EventID:
+      type: string
+      format: uuid
+    EventPlatform:
+      type: string
+      enum: [ios, android, web]
+    EventSearchVersion:
+      type: string
+      enum: [fts5-v1]
+    EventRetrievalSource:
+      type: string
+      enum: [lexical, semantic, hybrid]
+    EventAppVersion:
+      type: string
+      minLength: 1
+      maxLength: 64
+    EventOccurredAt:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 253402300799999
+    EventRank:
+      type: integer
+      minimum: 1
+      maximum: 50
+    EventResultCount:
+      type: integer
+      minimum: 0
+      maximum: 50
+    EventQuery:
+      type: string
+      minLength: 1
+      maxLength: 120
+    EventExploreResult:
+      type: object
+      additionalProperties: false
+      required: [note_id, rank]
+      properties:
+        note_id:
+          $ref: "#/components/schemas/EventID"
+        rank:
+          $ref: "#/components/schemas/EventRank"
+    EventSearchResult:
+      type: object
+      additionalProperties: false
+      required: [note_id, rank, retrieval_source]
+      properties:
+        note_id:
+          $ref: "#/components/schemas/EventID"
+        rank:
+          $ref: "#/components/schemas/EventRank"
+        retrieval_source:
+          $ref: "#/components/schemas/EventRetrievalSource"
+    EventExploreNotesImpressionPayload:
+      type: object
+      additionalProperties: false
+      required: [category_slug, result_count, results]
+      properties:
+        category_slug:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/CategorySlug"
+          nullable: true
+        result_count:
+          $ref: "#/components/schemas/EventResultCount"
+        results:
+          type: array
+          minItems: 0
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/EventExploreResult"
+    EventExploreNoteOpenedPayload:
+      type: object
+      additionalProperties: false
+      required: [note_id, rank, category_slug]
+      properties:
+        note_id:
+          $ref: "#/components/schemas/EventID"
+        rank:
+          $ref: "#/components/schemas/EventRank"
+        category_slug:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/CategorySlug"
+          nullable: true
+    EventSearchSubmittedPayload:
+      type: object
+      additionalProperties: false
+      required: [search_id, search_version, query, category_slug]
+      properties:
+        search_id:
+          $ref: "#/components/schemas/EventID"
+        search_version:
+          $ref: "#/components/schemas/EventSearchVersion"
+        query:
+          $ref: "#/components/schemas/EventQuery"
+        category_slug:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/CategorySlug"
+          nullable: true
+    EventSearchResultsImpressionPayload:
+      type: object
+      additionalProperties: false
+      required: [search_id, search_version, query, category_slug, result_count, results]
+      properties:
+        search_id:
+          $ref: "#/components/schemas/EventID"
+        search_version:
+          $ref: "#/components/schemas/EventSearchVersion"
+        query:
+          $ref: "#/components/schemas/EventQuery"
+        category_slug:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/CategorySlug"
+          nullable: true
+        result_count:
+          $ref: "#/components/schemas/EventResultCount"
+        results:
+          type: array
+          minItems: 0
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/EventSearchResult"
+    EventSearchResultOpenedPayload:
+      type: object
+      additionalProperties: false
+      required: [search_id, search_version, note_id, rank, retrieval_source]
+      properties:
+        search_id:
+          $ref: "#/components/schemas/EventID"
+        search_version:
+          $ref: "#/components/schemas/EventSearchVersion"
+        note_id:
+          $ref: "#/components/schemas/EventID"
+        rank:
+          $ref: "#/components/schemas/EventRank"
+        retrieval_source:
+          $ref: "#/components/schemas/EventRetrievalSource"
+    EventSearchReformulatedPayload:
+      type: object
+      additionalProperties: false
+      required: [previous_search_id, previous_search_version, search_id, search_version, previous_query, query, previous_category_slug, category_slug]
+      properties:
+        previous_search_id:
+          $ref: "#/components/schemas/EventID"
+        previous_search_version:
+          $ref: "#/components/schemas/EventSearchVersion"
+        search_id:
+          $ref: "#/components/schemas/EventID"
+        search_version:
+          $ref: "#/components/schemas/EventSearchVersion"
+        previous_query:
+          $ref: "#/components/schemas/EventQuery"
+        query:
+          $ref: "#/components/schemas/EventQuery"
+        previous_category_slug:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/CategorySlug"
+          nullable: true
+        category_slug:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/CategorySlug"
+          nullable: true
+    EventSearchNoResultsPayload:
+      type: object
+      additionalProperties: false
+      required: [search_id, search_version, query, category_slug, result_count]
+      properties:
+        search_id:
+          $ref: "#/components/schemas/EventID"
+        search_version:
+          $ref: "#/components/schemas/EventSearchVersion"
+        query:
+          $ref: "#/components/schemas/EventQuery"
+        category_slug:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/CategorySlug"
+          nullable: true
+        result_count:
+          type: integer
+          enum: [0]
+    EventSearchUsefulContext:
+      type: object
+      additionalProperties: false
+      required: [source, search_id, search_version, rank, retrieval_source]
+      properties:
+        source:
+          type: string
+          enum: [search]
+        search_id:
+          $ref: "#/components/schemas/EventID"
+        search_version:
+          $ref: "#/components/schemas/EventSearchVersion"
+        rank:
+          $ref: "#/components/schemas/EventRank"
+        retrieval_source:
+          $ref: "#/components/schemas/EventRetrievalSource"
+    EventExploreUsefulContext:
+      type: object
+      additionalProperties: false
+      required: [source, rank, category_slug]
+      properties:
+        source:
+          type: string
+          enum: [explore]
+        rank:
+          $ref: "#/components/schemas/EventRank"
+        category_slug:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/CategorySlug"
+          nullable: true
+    EventNoteDetailUsefulContext:
+      type: object
+      additionalProperties: false
+      required: [source]
+      properties:
+        source:
+          type: string
+          enum: [note_detail]
+    EventAuthorProfileUsefulContext:
+      type: object
+      additionalProperties: false
+      required: [source]
+      properties:
+        source:
+          type: string
+          enum: [author_profile]
+    EventUsefulContext:
+      oneOf:
+        - $ref: "#/components/schemas/EventSearchUsefulContext"
+        - $ref: "#/components/schemas/EventExploreUsefulContext"
+        - $ref: "#/components/schemas/EventNoteDetailUsefulContext"
+        - $ref: "#/components/schemas/EventAuthorProfileUsefulContext"
+      discriminator:
+        propertyName: source
+        mapping:
+          search: "#/components/schemas/EventSearchUsefulContext"
+          explore: "#/components/schemas/EventExploreUsefulContext"
+          note_detail: "#/components/schemas/EventNoteDetailUsefulContext"
+          author_profile: "#/components/schemas/EventAuthorProfileUsefulContext"
+    EventUsefulPayload:
+      type: object
+      additionalProperties: false
+      required: [note_id, context]
+      properties:
+        note_id:
+          $ref: "#/components/schemas/EventID"
+        context:
+          $ref: "#/components/schemas/EventUsefulContext"
+    EventCommentCreatedPayload:
+      type: object
+      additionalProperties: false
+      required: [note_id, comment_id]
+      properties:
+        note_id:
+          $ref: "#/components/schemas/EventID"
+        comment_id:
+          $ref: "#/components/schemas/EventID"
+    EventReportCreatedPayload:
+      type: object
+      additionalProperties: false
+      required: [report_id, target_type, target_id]
+      properties:
+        report_id:
+          $ref: "#/components/schemas/EventID"
+        target_type:
+          $ref: "#/components/schemas/ReportTargetType"
+        target_id:
+          $ref: "#/components/schemas/EventID"
+    EventNotePublishedPayload:
+      type: object
+      additionalProperties: false
+      required: [note_id, category_slug]
+      properties:
+        note_id:
+          $ref: "#/components/schemas/EventID"
+        category_slug:
+          $ref: "#/components/schemas/CategorySlug"
+    EventExploreNotesImpression:
+      type: object
+      additionalProperties: false
+      required: [id, kind, occurred_at, installation_id, platform, app_version, schema_version, payload]
+      properties:
+        id:
+          $ref: "#/components/schemas/EventID"
+        kind:
+          type: string
+          enum: [explore_notes_impression]
+        occurred_at:
+          $ref: "#/components/schemas/EventOccurredAt"
+        installation_id:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventID"
+          nullable: true
+        platform:
+          $ref: "#/components/schemas/EventPlatform"
+        app_version:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventAppVersion"
+          nullable: true
+        schema_version:
+          type: integer
+          enum: [1]
+        payload:
+          $ref: "#/components/schemas/EventExploreNotesImpressionPayload"
+    EventExploreNoteOpened:
+      type: object
+      additionalProperties: false
+      required: [id, kind, occurred_at, installation_id, platform, app_version, schema_version, payload]
+      properties:
+        id:
+          $ref: "#/components/schemas/EventID"
+        kind:
+          type: string
+          enum: [explore_note_opened]
+        occurred_at:
+          $ref: "#/components/schemas/EventOccurredAt"
+        installation_id:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventID"
+          nullable: true
+        platform:
+          $ref: "#/components/schemas/EventPlatform"
+        app_version:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventAppVersion"
+          nullable: true
+        schema_version:
+          type: integer
+          enum: [1]
+        payload:
+          $ref: "#/components/schemas/EventExploreNoteOpenedPayload"
+    EventSearchSubmitted:
+      type: object
+      additionalProperties: false
+      required: [id, kind, occurred_at, installation_id, platform, app_version, schema_version, payload]
+      properties:
+        id:
+          $ref: "#/components/schemas/EventID"
+        kind:
+          type: string
+          enum: [search_submitted]
+        occurred_at:
+          $ref: "#/components/schemas/EventOccurredAt"
+        installation_id:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventID"
+          nullable: true
+        platform:
+          $ref: "#/components/schemas/EventPlatform"
+        app_version:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventAppVersion"
+          nullable: true
+        schema_version:
+          type: integer
+          enum: [1]
+        payload:
+          $ref: "#/components/schemas/EventSearchSubmittedPayload"
+    EventSearchResultsImpression:
+      type: object
+      additionalProperties: false
+      required: [id, kind, occurred_at, installation_id, platform, app_version, schema_version, payload]
+      properties:
+        id:
+          $ref: "#/components/schemas/EventID"
+        kind:
+          type: string
+          enum: [search_results_impression]
+        occurred_at:
+          $ref: "#/components/schemas/EventOccurredAt"
+        installation_id:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventID"
+          nullable: true
+        platform:
+          $ref: "#/components/schemas/EventPlatform"
+        app_version:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventAppVersion"
+          nullable: true
+        schema_version:
+          type: integer
+          enum: [1]
+        payload:
+          $ref: "#/components/schemas/EventSearchResultsImpressionPayload"
+    EventSearchResultOpened:
+      type: object
+      additionalProperties: false
+      required: [id, kind, occurred_at, installation_id, platform, app_version, schema_version, payload]
+      properties:
+        id:
+          $ref: "#/components/schemas/EventID"
+        kind:
+          type: string
+          enum: [search_result_opened]
+        occurred_at:
+          $ref: "#/components/schemas/EventOccurredAt"
+        installation_id:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventID"
+          nullable: true
+        platform:
+          $ref: "#/components/schemas/EventPlatform"
+        app_version:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventAppVersion"
+          nullable: true
+        schema_version:
+          type: integer
+          enum: [1]
+        payload:
+          $ref: "#/components/schemas/EventSearchResultOpenedPayload"
+    EventSearchReformulated:
+      type: object
+      additionalProperties: false
+      required: [id, kind, occurred_at, installation_id, platform, app_version, schema_version, payload]
+      properties:
+        id:
+          $ref: "#/components/schemas/EventID"
+        kind:
+          type: string
+          enum: [search_reformulated]
+        occurred_at:
+          $ref: "#/components/schemas/EventOccurredAt"
+        installation_id:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventID"
+          nullable: true
+        platform:
+          $ref: "#/components/schemas/EventPlatform"
+        app_version:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventAppVersion"
+          nullable: true
+        schema_version:
+          type: integer
+          enum: [1]
+        payload:
+          $ref: "#/components/schemas/EventSearchReformulatedPayload"
+    EventSearchNoResults:
+      type: object
+      additionalProperties: false
+      required: [id, kind, occurred_at, installation_id, platform, app_version, schema_version, payload]
+      properties:
+        id:
+          $ref: "#/components/schemas/EventID"
+        kind:
+          type: string
+          enum: [search_no_results]
+        occurred_at:
+          $ref: "#/components/schemas/EventOccurredAt"
+        installation_id:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventID"
+          nullable: true
+        platform:
+          $ref: "#/components/schemas/EventPlatform"
+        app_version:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventAppVersion"
+          nullable: true
+        schema_version:
+          type: integer
+          enum: [1]
+        payload:
+          $ref: "#/components/schemas/EventSearchNoResultsPayload"
+    EventNoteMarkedUseful:
+      type: object
+      additionalProperties: false
+      required: [id, kind, occurred_at, installation_id, platform, app_version, schema_version, payload]
+      properties:
+        id:
+          $ref: "#/components/schemas/EventID"
+        kind:
+          type: string
+          enum: [note_marked_useful]
+        occurred_at:
+          $ref: "#/components/schemas/EventOccurredAt"
+        installation_id:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventID"
+          nullable: true
+        platform:
+          $ref: "#/components/schemas/EventPlatform"
+        app_version:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventAppVersion"
+          nullable: true
+        schema_version:
+          type: integer
+          enum: [1]
+        payload:
+          $ref: "#/components/schemas/EventUsefulPayload"
+    EventNoteUnmarkedUseful:
+      type: object
+      additionalProperties: false
+      required: [id, kind, occurred_at, installation_id, platform, app_version, schema_version, payload]
+      properties:
+        id:
+          $ref: "#/components/schemas/EventID"
+        kind:
+          type: string
+          enum: [note_unmarked_useful]
+        occurred_at:
+          $ref: "#/components/schemas/EventOccurredAt"
+        installation_id:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventID"
+          nullable: true
+        platform:
+          $ref: "#/components/schemas/EventPlatform"
+        app_version:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventAppVersion"
+          nullable: true
+        schema_version:
+          type: integer
+          enum: [1]
+        payload:
+          $ref: "#/components/schemas/EventUsefulPayload"
+    EventCommentCreated:
+      type: object
+      additionalProperties: false
+      required: [id, kind, occurred_at, installation_id, platform, app_version, schema_version, payload]
+      properties:
+        id:
+          $ref: "#/components/schemas/EventID"
+        kind:
+          type: string
+          enum: [comment_created]
+        occurred_at:
+          $ref: "#/components/schemas/EventOccurredAt"
+        installation_id:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventID"
+          nullable: true
+        platform:
+          $ref: "#/components/schemas/EventPlatform"
+        app_version:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventAppVersion"
+          nullable: true
+        schema_version:
+          type: integer
+          enum: [1]
+        payload:
+          $ref: "#/components/schemas/EventCommentCreatedPayload"
+    EventReportCreated:
+      type: object
+      additionalProperties: false
+      required: [id, kind, occurred_at, installation_id, platform, app_version, schema_version, payload]
+      properties:
+        id:
+          $ref: "#/components/schemas/EventID"
+        kind:
+          type: string
+          enum: [report_created]
+        occurred_at:
+          $ref: "#/components/schemas/EventOccurredAt"
+        installation_id:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventID"
+          nullable: true
+        platform:
+          $ref: "#/components/schemas/EventPlatform"
+        app_version:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventAppVersion"
+          nullable: true
+        schema_version:
+          type: integer
+          enum: [1]
+        payload:
+          $ref: "#/components/schemas/EventReportCreatedPayload"
+    EventNotePublished:
+      type: object
+      additionalProperties: false
+      required: [id, kind, occurred_at, installation_id, platform, app_version, schema_version, payload]
+      properties:
+        id:
+          $ref: "#/components/schemas/EventID"
+        kind:
+          type: string
+          enum: [note_published]
+        occurred_at:
+          $ref: "#/components/schemas/EventOccurredAt"
+        installation_id:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventID"
+          nullable: true
+        platform:
+          $ref: "#/components/schemas/EventPlatform"
+        app_version:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventAppVersion"
+          nullable: true
+        schema_version:
+          type: integer
+          enum: [1]
+        payload:
+          $ref: "#/components/schemas/EventNotePublishedPayload"
+    EventInput:
+      oneOf:
+        - $ref: "#/components/schemas/EventExploreNotesImpression"
+        - $ref: "#/components/schemas/EventExploreNoteOpened"
+        - $ref: "#/components/schemas/EventSearchSubmitted"
+        - $ref: "#/components/schemas/EventSearchResultsImpression"
+        - $ref: "#/components/schemas/EventSearchResultOpened"
+        - $ref: "#/components/schemas/EventSearchReformulated"
+        - $ref: "#/components/schemas/EventSearchNoResults"
+        - $ref: "#/components/schemas/EventNoteMarkedUseful"
+        - $ref: "#/components/schemas/EventNoteUnmarkedUseful"
+        - $ref: "#/components/schemas/EventCommentCreated"
+        - $ref: "#/components/schemas/EventReportCreated"
+        - $ref: "#/components/schemas/EventNotePublished"
+      discriminator:
+        propertyName: kind
+        mapping:
+          explore_notes_impression: "#/components/schemas/EventExploreNotesImpression"
+          explore_note_opened: "#/components/schemas/EventExploreNoteOpened"
+          search_submitted: "#/components/schemas/EventSearchSubmitted"
+          search_results_impression: "#/components/schemas/EventSearchResultsImpression"
+          search_result_opened: "#/components/schemas/EventSearchResultOpened"
+          search_reformulated: "#/components/schemas/EventSearchReformulated"
+          search_no_results: "#/components/schemas/EventSearchNoResults"
+          note_marked_useful: "#/components/schemas/EventNoteMarkedUseful"
+          note_unmarked_useful: "#/components/schemas/EventNoteUnmarkedUseful"
+          comment_created: "#/components/schemas/EventCommentCreated"
+          report_created: "#/components/schemas/EventReportCreated"
+          note_published: "#/components/schemas/EventNotePublished"
+    CreateEventsRequest:
+      type: object
+      additionalProperties: false
+      required: [events]
+      properties:
+        events:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/EventInput"
+    CreateEventsReceipt:
+      type: object
+      additionalProperties: false
+      required: [accepted_count, duplicate_count]
+      properties:
+        accepted_count:
+          type: integer
+          minimum: 0
+        duplicate_count:
+          type: integer
+          minimum: 0
+    InvalidEventProblem:
+      type: object
+      additionalProperties: false
+      required: [index, field, code]
+      properties:
+        index:
+          type: integer
+          minimum: 0
+        field:
+          type: string
+          minLength: 1
+        code:
+          type: string
+          enum: [required, invalid, unknown, unsupported, too_long, too_large]
+    EventErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, problems]
+      properties:
+        code:
+          type: string
+          enum: [invalid_event]
+        problems:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/InvalidEventProblem"
     ListNotesResponse:
       type: object
       additionalProperties: false

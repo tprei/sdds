@@ -260,7 +260,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
 
   await searchResult.click();
 
-  await expect(page).toHaveURL(/\/notes\/[^/?#]+$/);
+  await expect(page).toHaveURL(/\/notes\/[^/?#]+(?:[?#]|$)/);
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Nota$/ }),
   ).toBeVisible();

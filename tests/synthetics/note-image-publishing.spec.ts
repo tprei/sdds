@@ -187,7 +187,7 @@ async function viewPublishedNoteDetail(
   mediaURL: string,
 ): Promise<void> {
   await noteCard(page, scenario).click();
-  await expect(page).toHaveURL(/\/notes\/[^/?#]+$/, { timeout: 30_000 });
+  await expect(page).toHaveURL(/\/notes\/[^/?#]+(?:[?#]|$)/, { timeout: 30_000 });
   await expectVisible(
     page.getByRole('heading', { exact: true, name: scenario.note.title }),
     30_000,

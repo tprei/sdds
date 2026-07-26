@@ -6,10 +6,12 @@ import type { APIClient } from '@/lib/api/client';
 import type { Note } from '@/lib/api/notes';
 
 type MutationState = 'idle' | 'pending' | 'error';
+export type UsefulMutationAction = 'marked' | 'unmarked';
 
 type UseUsefulMutationOptions = {
   apiClient: APIClient;
   onSessionExpired: () => Promise<void>;
+  onSuccess?: (note: Note, action: UsefulMutationAction) => void;
   /** Returns the caller's current generation value. */
   getGeneration: () => number;
   /** True if the captured generation still matches the caller's current. */
@@ -27,6 +29,7 @@ export type UseUsefulMutation = {
 export function useUsefulMutation({
   apiClient,
   onSessionExpired,
+  onSuccess,
   getGeneration,
   isStale,
   applyResult,
@@ -53,15 +56,21 @@ export function useUsefulMutation({
       if (mutations[note.id] === 'pending') return;
 
       const gen = getGeneration();
-      // capture generation
       setMutations((current) => ({ ...current, [note.id]: 'pending' }));
 
       try {
+        const action: UsefulMutationAction = note.usefulByCurrentUser
+          ? 'unmarked'
+          : 'marked';
         if (note.usefulByCurrentUser) {
           await apiClient.unmarkNoteUseful(note.id);
         } else {
           await apiClient.markNoteUseful(note.id);
         }
+
+        try {
+          onSuccess?.(note, action);
+        } catch {}
 
         if (isStale(gen)) {
           onStaleWrite();
@@ -101,6 +110,7 @@ export function useUsefulMutation({
       }
     },
     [
+      apiClient,
       applyResult,
       clearMutation,
       getGeneration,
@@ -108,7 +118,7 @@ export function useUsefulMutation({
       mutations,
       onSessionExpired,
       onStaleWrite,
-      apiClient,
+      onSuccess,
     ],
   );
 

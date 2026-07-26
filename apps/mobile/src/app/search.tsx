@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
+import * as Crypto from 'expo-crypto';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
@@ -21,16 +22,20 @@ import {
   createSearchRequest,
   isCurrentSearchRequest,
   labelSearchResults,
+  presentSearchResults,
   searchResultContext,
   searchResultCountLabel,
 } from '@/features/notes/search-screen';
 import type {
-  LabelledSearchResult,
+  PresentedSearchResult,
+  SearchDispatchedContext,
   SearchRequest,
   SearchResultContext,
 } from '@/features/notes/search-screen';
 import type { NoteCatalog } from '@/features/notes/catalog';
-import type { Note, SearchVersion } from '@/lib/api/notes';
+import type { SearchVersion } from '@/lib/api/notes';
+import { useProductEvents } from '@/lib/events/product-event-provider';
+import { registerPresentedNoteOrigin } from '@/features/notes/presented-note-origin';
 
 import { styles } from '@/features/notes/search-screen.styles';
 import { ReadAuthGate } from '@/components/read-auth-gate';
@@ -46,7 +51,7 @@ type SearchScreenState =
   | {
       context: SearchResultContext;
       request: SearchRequest;
-      results: LabelledSearchResult[];
+      results: PresentedSearchResult[];
       searchVersion: SearchVersion;
       status: 'ready';
     }
@@ -64,6 +69,11 @@ type AuthenticatedSearchScreenProps = {
 };
 
 type UsefulMutationState = 'error' | 'pending';
+type SearchExecution = {
+  request: SearchRequest;
+  searchVersion?: SearchVersion;
+  reformulationEmitted: boolean;
+};
 
 const idleSearchState: SearchScreenState = { status: 'idle' };
 
@@ -105,12 +115,16 @@ function AuthenticatedSearchScreen({
   onSessionExpired,
 }: AuthenticatedSearchScreenProps) {
   const router = useRouter();
+  const productEvents = useProductEvents();
   const catalogRequestIDRef = useRef(0);
   const searchRequestIDRef = useRef(0);
   const catalogRef = useRef<NoteCatalog | null>(null);
   const selectedCategorySlugRef = useRef<string | null>(null);
   const stateRef = useRef<SearchScreenState>(idleSearchState);
   const submittedQueryRef = useRef<string | null>(null);
+  const previousSearchRef = useRef<SearchDispatchedContext | null>(null);
+  const searchExecutionsRef = useRef(new Map<string, SearchExecution>());
+  const impressionSearchIDRef = useRef<string | null>(null);
   const [query, setQuery] = useState('');
   const [selectedCategorySlug, setSelectedCategorySlug] = useState<
     string | null
@@ -131,27 +145,153 @@ function AuthenticatedSearchScreen({
     [router],
   );
   const openNote = useCallback(
-    (note: Note) => {
-      router.push({ pathname: '/notes/[id]', params: { id: note.id } });
+    (result: PresentedSearchResult) => {
+      const originNonce = registerPresentedNoteOrigin(result.note.id, {
+        retrievalSource: result.retrievalSource,
+        rank: result.rank,
+        searchID: result.searchID,
+        searchVersion: result.searchVersion,
+        source: 'search',
+      });
+      try {
+        productEvents.record('search_result_opened', {
+          noteID: result.note.id,
+          rank: result.rank,
+          retrievalSource: result.retrievalSource,
+          searchID: result.searchID,
+          searchVersion: result.searchVersion,
+        });
+      } catch {}
+      const params: { id: string; origin?: string } = { id: result.note.id };
+      if (originNonce !== '') {
+        params.origin = originNonce;
+      }
+      router.push({ pathname: '/notes/[id]', params });
     },
-    [router],
+    [productEvents, router],
   );
   const setSearchState = useCallback((nextState: SearchScreenState) => {
     stateRef.current = nextState;
     setState(nextState);
   }, []);
+  const resetSearchLineage = useCallback(() => {
+    previousSearchRef.current = null;
+    searchExecutionsRef.current.clear();
+    impressionSearchIDRef.current = null;
+  }, []);
+
+  const recordSuccessfulSearch = useCallback(
+    (request: SearchRequest, searchVersion: SearchVersion) => {
+      try {
+        productEvents.record(
+          'search_submitted',
+          {
+            categorySlug: request.categorySlug,
+            query: request.query,
+            searchID: request.searchID,
+            searchVersion,
+          },
+          { occurredAt: request.occurredAt },
+        );
+      } catch {}
+
+      const execution = searchExecutionsRef.current.get(request.searchID);
+      if (execution === undefined) {
+        return;
+      }
+      execution.searchVersion = searchVersion;
+
+      for (const successor of searchExecutionsRef.current.values()) {
+        const previous = successor.request.previousSearch;
+        if (
+          successor.reformulationEmitted ||
+          previous === null ||
+          previous.searchID !== request.searchID ||
+          successor.searchVersion === undefined ||
+          (previous.query === successor.request.query &&
+            previous.categorySlug === successor.request.categorySlug)
+        ) {
+          continue;
+        }
+
+        successor.reformulationEmitted = true;
+        try {
+          productEvents.record(
+            'search_reformulated',
+            {
+              categorySlug: successor.request.categorySlug,
+              previousCategorySlug: previous.categorySlug,
+              previousQuery: previous.query,
+              previousSearchID: previous.searchID,
+              previousSearchVersion: searchVersion,
+              query: successor.request.query,
+              searchID: successor.request.searchID,
+              searchVersion: successor.searchVersion,
+            },
+            { occurredAt: successor.request.occurredAt },
+          );
+        } catch {}
+      }
+    },
+    [productEvents],
+  );
+
+  useEffect(() => {
+    if (state.status !== 'ready' && state.status !== 'empty') {
+      return;
+    }
+    const searchID = state.request.searchID;
+    if (impressionSearchIDRef.current === searchID) {
+      return;
+    }
+    impressionSearchIDRef.current = searchID;
+
+    try {
+      if (state.status === 'empty') {
+        productEvents.record('search_no_results', {
+          categorySlug: state.request.categorySlug,
+          query: state.request.query,
+          resultCount: 0,
+          searchID,
+          searchVersion: state.searchVersion,
+        });
+      } else {
+        productEvents.record('search_results_impression', {
+          categorySlug: state.request.categorySlug,
+          query: state.request.query,
+          resultCount: state.results.length,
+          results: state.results.map((result) => ({
+            noteID: result.note.id,
+            rank: result.rank,
+            retrievalSource: result.retrievalSource,
+          })),
+          searchID,
+          searchVersion: state.searchVersion,
+        });
+      }
+    } catch {}
+  }, [productEvents, state]);
+
 
   const runSearch = useCallback(
     (queryValue: string, categorySlug: string | null) => {
+      let searchID = '';
+      try {
+        searchID = Crypto.randomUUID();
+      } catch {}
       const request = createSearchRequest({
         categorySlug,
         nextRequestID: searchRequestIDRef.current + 1,
+        occurredAt: Date.now(),
+        previousSearch: previousSearchRef.current,
         query: queryValue,
+        searchID,
       });
       searchRequestIDRef.current += 1;
 
       if (request === null) {
         submittedQueryRef.current = null;
+        resetSearchLineage();
         setSearchState(idleSearchState);
         return;
       }
@@ -162,6 +302,15 @@ function AuthenticatedSearchScreen({
         return;
       }
 
+      previousSearchRef.current = {
+        categorySlug: request.categorySlug,
+        query: request.query,
+        searchID: request.searchID,
+      };
+      searchExecutionsRef.current.set(request.searchID, {
+        request,
+        reformulationEmitted: false,
+      });
       submittedQueryRef.current = request.query;
       setQuery(request.query);
       setRecentQueries((current) =>
@@ -172,6 +321,7 @@ function AuthenticatedSearchScreen({
 
       apiClient.searchNotes(request.input)
         .then((searchResult) => {
+          recordSuccessfulSearch(request, searchResult.searchVersion);
           if (
             !isCurrentSearchRequest({
               activeRequestID: searchRequestIDRef.current,
@@ -201,7 +351,11 @@ function AuthenticatedSearchScreen({
               ? {
                   context,
                   request,
-                  results: labelledResults,
+                  results: presentSearchResults({
+                    request,
+                    results: labelledResults,
+                    searchVersion: searchResult.searchVersion,
+                  }),
                   searchVersion: searchResult.searchVersion,
                   status: 'ready',
                 }
@@ -231,7 +385,13 @@ function AuthenticatedSearchScreen({
           setSearchState({ request, status: 'error' });
         });
     },
-    [apiClient, onSessionExpired, setSearchState],
+    [
+      apiClient,
+      onSessionExpired,
+      recordSuccessfulSearch,
+      resetSearchLineage,
+      setSearchState,
+    ],
   );
 
   const loadCatalogs = useCallback(() => {
@@ -292,7 +452,7 @@ function AuthenticatedSearchScreen({
   }, [apiClient, onSessionExpired, runSearch]);
 
   const toggleUseful = useCallback(
-    async (target: LabelledSearchResult) => {
+    async (target: PresentedSearchResult) => {
       const targetNote = target.note;
       if (usefulMutations[targetNote.id] === 'pending') {
         return;
@@ -308,6 +468,23 @@ function AuthenticatedSearchScreen({
         } else {
           await apiClient.markNoteUseful(targetNote.id);
         }
+        try {
+          productEvents.record(
+            targetNote.usefulByCurrentUser
+              ? 'note_unmarked_useful'
+              : 'note_marked_useful',
+            {
+              context: {
+                rank: target.rank,
+                retrievalSource: target.retrievalSource,
+                searchID: target.searchID,
+                searchVersion: target.searchVersion,
+                source: 'search',
+              },
+              noteID: targetNote.id,
+            },
+          );
+        } catch {}
         if (
           generation !==
           `${catalogRequestIDRef.current}:${searchRequestIDRef.current}`
@@ -359,18 +536,19 @@ function AuthenticatedSearchScreen({
         }));
       }
     },
-    [apiClient, onSessionExpired, usefulMutations],
+    [apiClient, onSessionExpired, productEvents, usefulMutations],
   );
-
   useFocusEffect(
     useCallback(() => {
+      resetSearchLineage();
       loadCatalogs();
 
       return () => {
         catalogRequestIDRef.current += 1;
         searchRequestIDRef.current += 1;
+        resetSearchLineage();
       };
-    }, [loadCatalogs]),
+    }, [loadCatalogs, resetSearchLineage]),
   );
 
   function handleQueryChange(value: string) {
@@ -391,6 +569,7 @@ function AuthenticatedSearchScreen({
 
   function handleClear() {
     searchRequestIDRef.current += 1;
+    resetSearchLineage();
     submittedQueryRef.current = null;
     setUsefulMutations({});
     setQuery('');
@@ -479,9 +658,9 @@ function SearchStateContent({
   usefulMutations,
 }: {
   onOpenAuthor: (authorID: string) => void;
-  onOpenNote: (note: Note) => void;
+  onOpenNote: (result: PresentedSearchResult) => void;
   onSelectRecentQuery: (query: string) => void;
-  onToggleUseful: (result: LabelledSearchResult) => Promise<void>;
+  onToggleUseful: (result: PresentedSearchResult) => Promise<void>;
   recentQueries: string[];
   state: SearchScreenState;
   usefulMutations: Partial<Record<string, UsefulMutationState>>;
@@ -541,7 +720,7 @@ function SearchStateContent({
             categoryLabel={labelledNote.categoryLabel}
             key={labelledNote.id}
             note={labelledNote}
-            onPress={() => onOpenNote(labelledNote)}
+            onPress={() => onOpenNote(result)}
             onPressAuthor={onOpenAuthor}
             onPressUseful={() => {
               void onToggleUseful(result);

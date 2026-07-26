@@ -26,7 +26,14 @@ const mocks = vi.hoisted(() => ({
   },
   authState: { status: 'loading' } as AuthStateMock,
   logout: vi.fn(async () => undefined),
+  productEvents: { record: vi.fn() },
   push: vi.fn(),
+}));
+vi.mock('expo-crypto', () => ({
+  randomUUID: () => '018ff5b8-0000-7000-8000-000000000001',
+}));
+vi.mock('@/lib/events/product-event-provider', () => ({
+  useProductEvents: () => mocks.productEvents,
 }));
 
 vi.mock('react-native', () => {
@@ -85,6 +92,7 @@ describe('SearchScreen auth gate', () => {
     mocks.authState = { status: 'authenticated', token: 'session-token', user: { id: 'user-id' } };
     mocks.apiClient.listCatalogs.mockResolvedValue({ categories: [], places: [] });
     mocks.logout.mockClear();
+    mocks.productEvents.record.mockClear();
   });
 
   afterEach(() => {

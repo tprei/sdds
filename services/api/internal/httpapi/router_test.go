@@ -12,6 +12,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/comment"
+	"github.com/tprei/sdds/services/api/internal/event"
 	"github.com/tprei/sdds/services/api/internal/media"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/report"
@@ -94,6 +95,17 @@ func (fake fakeReportStore) CreateReport(ctx context.Context, input report.Creat
 	return fake.createReport(ctx, input)
 }
 
+type fakeEventStore struct {
+	appendBatch func(context.Context, []event.Record, time.Time) (event.AppendBatchResult, error)
+}
+
+func (fake fakeEventStore) AppendBatch(ctx context.Context, records []event.Record, receivedAt time.Time) (event.AppendBatchResult, error) {
+	if fake.appendBatch == nil {
+		return event.AppendBatchResult{}, errors.New("event store not implemented")
+	}
+	return fake.appendBatch(ctx, records, receivedAt)
+}
+
 func newRouterForTest(
 	notes NoteStores,
 	catalog note.Catalog,
@@ -107,6 +119,7 @@ func newRouterForTest(
 		NotesDependencies{Stores: notes, Catalog: catalog},
 		CommentDependencies{Store: fakeCommentStore{}},
 		ReportDependencies{Store: fakeReportStore{}, CommentTargets: fakeCommentStore{}},
+		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
 		AuthDependencies{Users: users, Limits: authLimits},
 		MediaDependencies{ImageUploads: uploadService, AttachedImages: imageReader},
 		SystemDependencies{Readiness: readiness},
@@ -130,6 +143,7 @@ func newRouterWithAuthSeamsForTest(
 		noteHandlers{store: notes, authorNotes: notes, useful: notes, catalog: catalog},
 		commentHandlers{store: fakeCommentStore{}, notes: notes},
 		reportHandlers{store: fakeReportStore{}, notes: notes, comments: fakeCommentStore{}},
+		eventHandlers{store: fakeEventStore{}, limits: newEventRateLimiters(DefaultEventLimits(), clock), clock: clock},
 		authHandlers{
 			users:                 users,
 			publicAuthors:         users,
@@ -163,6 +177,7 @@ func TestNewRouterRequiresMediaDependencies(t *testing.T) {
 				NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
 				CommentDependencies{Store: fakeCommentStore{}},
 				ReportDependencies{Store: fakeReportStore{}},
+				EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
 				AuthDependencies{Users: fakeUserStore{}, Limits: DefaultAuthLimits()},
 				test.media,
 				SystemDependencies{Readiness: fakeReadiness{}},
@@ -181,6 +196,7 @@ func TestNewRouterRequiresCommentStore(t *testing.T) {
 		NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
 		CommentDependencies{},
 		ReportDependencies{Store: fakeReportStore{}},
+		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
 		AuthDependencies{Users: fakeUserStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
@@ -197,6 +213,7 @@ func TestNewRouterRequiresReportStore(t *testing.T) {
 		NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
 		CommentDependencies{Store: fakeCommentStore{}},
 		ReportDependencies{},
+		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
 		AuthDependencies{Users: fakeUserStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},

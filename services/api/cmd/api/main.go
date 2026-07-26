@@ -175,6 +175,7 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config) (err
 		httpapi.NotesDependencies{Stores: noteStore, Catalog: catalogStore},
 		httpapi.CommentDependencies{Store: commentStore},
 		httpapi.ReportDependencies{Store: sqlite.NewReportStore(db), CommentTargets: commentStore},
+		httpapi.EventDependencies{Store: sqlite.NewEventStore(db), Limits: httpapi.DefaultEventLimits()},
 		httpapi.AuthDependencies{Users: userStore, Limits: config.authLimits},
 		httpapi.MediaDependencies{ImageUploads: uploadService, AttachedImages: imageReader},
 		httpapi.SystemDependencies{Readiness: readiness},

@@ -102,6 +102,7 @@ type server struct {
 	auth     authHandlers
 	comments commentHandlers
 	reports  reportHandlers
+	events   eventHandlers
 	media    mediaHandlers
 	system   systemHandlers
 }
@@ -135,12 +136,17 @@ func DefaultAuthLimits() AuthLimits {
 	}
 }
 
-func NewRouter(notes NotesDependencies, comments CommentDependencies, reports ReportDependencies, auth AuthDependencies, media MediaDependencies, system SystemDependencies) http.Handler {
+func NewRouter(notes NotesDependencies, comments CommentDependencies, reports ReportDependencies, events EventDependencies, auth AuthDependencies, media MediaDependencies, system SystemDependencies) http.Handler {
 	hasher := newBoundedPasswordHasher(user.NewPasswordHasher(), auth.Limits.PasswordHashConcurrency)
+	eventLimits := events.Limits
+	if eventLimits.UserEventsPerMinute == 0 || eventLimits.GlobalEventsPerMinute == 0 {
+		eventLimits = DefaultEventLimits()
+	}
 	return newRouter(
 		noteHandlers{store: notes.Stores, authorNotes: notes.Stores, useful: notes.Stores, catalog: notes.Catalog},
 		commentHandlers{store: comments.Store, notes: notes.Stores},
 		reportHandlers{store: reports.Store, notes: notes.Stores, comments: reports.CommentTargets},
+		eventHandlers{store: events.Store, limits: newEventRateLimiters(eventLimits, time.Now), clock: time.Now},
 		authHandlers{
 			users:                 auth.Users,
 			publicAuthors:         auth.Users,
@@ -155,12 +161,15 @@ func NewRouter(notes NotesDependencies, comments CommentDependencies, reports Re
 	)
 }
 
-func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandlers, auth authHandlers, media mediaHandlers, system systemHandlers) http.Handler {
+func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandlers, events eventHandlers, auth authHandlers, media mediaHandlers, system systemHandlers) http.Handler {
 	if comments.store == nil {
 		panic("comment store is required")
 	}
 	if reports.store == nil {
 		panic("report store is required")
+	}
+	if events.store == nil {
+		panic("event store is required")
 	}
 	if media.imageUploads == nil {
 		panic("upload service is required")
@@ -172,7 +181,7 @@ func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandl
 	router.Use(localBrowserCORS)
 	validateOpenAPIRequest := openAPIRequestValidator()
 	requireCurrentSession := requireAuth(auth.users, auth.clock)
-	handler := server{notes: notes, comments: comments, reports: reports, auth: auth, media: media, system: system}
+	handler := server{notes: notes, comments: comments, reports: reports, events: events, auth: auth, media: media, system: system}
 	wrapper := openapi.ServerInterfaceWrapper{
 		Handler:          handler,
 		ErrorHandlerFunc: writeGeneratedOpenAPIError,
@@ -205,6 +214,7 @@ func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandl
 			router.Post("/notes/{note_id}/comments", wrapper.CreateNoteComment)
 			router.Delete("/notes/{note_id}/comments/{comment_id}", wrapper.DeleteNoteComment)
 			router.Post("/reports", wrapper.CreateReport)
+			router.Post("/events", wrapper.CreateEvents)
 			router.Get("/search/notes", wrapper.SearchNotes)
 			router.Put("/notes/{note_id}/useful", wrapper.MarkNoteUseful)
 			router.Delete("/notes/{note_id}/useful", wrapper.UnmarkNoteUseful)

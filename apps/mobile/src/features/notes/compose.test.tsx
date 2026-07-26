@@ -47,6 +47,7 @@ const mocks = vi.hoisted(() => {
     },
     launchImageLibraryAsync: vi.fn(),
     logout: vi.fn(),
+    record: vi.fn(),
     router: { navigate: vi.fn(), push: vi.fn() },
   };
 });
@@ -87,6 +88,12 @@ vi.mock('expo-router', () => ({
 vi.mock('@/lib/auth/auth-provider', () => ({
   useAuth: () => ({ apiClient: mocks.apiClient, logout: mocks.logout, state: mocks.authState }),
 }));
+vi.mock('@/lib/events/product-event-provider', () => {
+  const productEvents = { record: mocks.record };
+  return {
+    useProductEvents: () => productEvents,
+  };
+});
 
 type NativeProps = {
   children?: React.ReactNode;
@@ -176,7 +183,10 @@ beforeEach(() => {
     assets: null,
   });
   mocks.apiClient.prepareImageUpload.mockResolvedValue(receipt);
-  mocks.apiClient.createNote.mockResolvedValue(undefined);
+  mocks.apiClient.createNote.mockResolvedValue({
+    categorySlug: 'food',
+    id: 'published-note',
+  });
   mocks.logout.mockResolvedValue(undefined);
 });
 
@@ -235,6 +245,42 @@ describe('ComposeScreen', () => {
     ).toBeDefined();
     expect(input(renderer, 'Título da nota').props.value).toBe('  Título  ');
     expect(input(renderer, 'Texto da nota').props.value).toBe('  Corpo  ');
+    renderer.unmount();
+  });
+  it('records a successful publication with the stable client request ID', async () => {
+    const createdNote = { categorySlug: 'food', id: 'published-note' };
+    mocks.apiClient.createNote.mockResolvedValueOnce(createdNote);
+    const store = createComposeDraftStore(uuidSequence('client-request'));
+    const renderer = await renderCompose(store);
+    fill(renderer, 'Título', 'Corpo');
+
+    await press(renderer, 'compose-submit');
+
+    const request = mocks.apiClient.createNote.mock.calls[0]?.[0];
+    expect(mocks.record).toHaveBeenCalledWith(
+      'note_published',
+      { categorySlug: 'food', noteID: createdNote.id },
+      { eventID: request?.clientRequestId },
+    );
+    expect(store.get('owner-1')).toBeNull();
+    expect(mocks.router.navigate).toHaveBeenCalledWith('/');
+    renderer.unmount();
+  });
+
+  it('keeps publishing successful when event recording fails', async () => {
+    mocks.record.mockImplementationOnce(() => {
+      throw new Error('event_transport_failed');
+    });
+    const store = createComposeDraftStore(
+      uuidSequence('client-request-failure'),
+    );
+    const renderer = await renderCompose(store);
+    fill(renderer, 'Título', 'Corpo');
+
+    await press(renderer, 'compose-submit');
+
+    expect(store.get('owner-1')).toBeNull();
+    expect(mocks.router.navigate).toHaveBeenCalledWith('/');
     renderer.unmount();
   });
 
@@ -329,6 +375,7 @@ describe('ComposeScreen', () => {
       })
       .mockImplementationOnce(async () => {
         events.push('create');
+        return { categorySlug: 'food', id: 'published-note' };
       });
     const store = createComposeDraftStore(
       uuidSequence('upload-1', 'request-1'),
@@ -369,7 +416,7 @@ describe('ComposeScreen', () => {
     );
     mocks.apiClient.createNote
       .mockRejectedValueOnce(new Error('server'))
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce({ categorySlug: 'food', id: 'published-note' });
     const store = createComposeDraftStore(
       uuidSequence(
         'request-catalog',
@@ -492,7 +539,7 @@ describe('ComposeScreen', () => {
   it('rotates IDs after note association expiry and retries the preserved receipt', async () => {
     mocks.apiClient.createNote
       .mockRejectedValueOnce(new mocks.APIRequestError(409, 'upload_expired'))
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce({ categorySlug: 'food', id: 'published-note' });
     const store = createComposeDraftStore(
       uuidSequence('request-1', 'upload-1'),
     );
@@ -623,7 +670,7 @@ describe('ComposeScreen', () => {
     );
     mocks.apiClient.createNote
       .mockRejectedValueOnce(new mocks.APIRequestError(401))
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce({ categorySlug: 'food', id: 'published-note' });
     const renderer = await renderCompose(store);
     await selectImage(renderer, asset);
     fill(renderer, 'Título', 'Corpo');

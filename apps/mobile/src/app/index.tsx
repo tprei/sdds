@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import {
@@ -15,6 +15,8 @@ import { resolveCategoryFilterSlug } from '@/features/notes/category-filter';
 import { buildNoteCatalog, labelNotes } from '@/features/notes/catalog';
 import type { LabelledNote, NoteCatalog } from '@/features/notes/catalog';
 import type { ListNotesInput, Note } from '@/lib/api/notes';
+import { useProductEvents } from '@/lib/events/product-event-provider';
+import { registerPresentedNoteOrigin } from '@/features/notes/presented-note-origin';
 import { ReadAuthGate } from '@/components/read-auth-gate';
 
 type CatalogState =
@@ -24,8 +26,17 @@ type CatalogState =
 
 type FeedState =
   | { status: 'loading' }
-  | { status: 'empty' }
-  | { status: 'ready'; notes: LabelledNote[] }
+  | {
+      categorySlug: string | null;
+      generation: number;
+      status: 'empty';
+    }
+  | {
+      categorySlug: string | null;
+      generation: number;
+      notes: PresentedExploreNote[];
+      status: 'ready';
+    }
   | { status: 'error' };
 
 type AuthenticatedHomeScreenProps = {
@@ -34,6 +45,26 @@ type AuthenticatedHomeScreenProps = {
 };
 
 type UsefulMutationState = 'error' | 'pending';
+type PresentedExploreNote = {
+  categorySlug: string | null;
+  note: LabelledNote;
+  rank: number;
+};
+function presentExploreNotes(
+  catalog: NoteCatalog,
+  notes: Note[],
+  categorySlug: string | null,
+): PresentedExploreNote[] | null {
+  const labelledNotes = labelNotes(catalog, notes);
+  if (labelledNotes === null) {
+    return null;
+  }
+  return labelledNotes.map((note, index) => ({
+    categorySlug,
+    note,
+    rank: index + 1,
+  }));
+}
 
 export default function HomeScreen() {
   const { apiClient, logout, state } = useAuth();
@@ -92,6 +123,30 @@ function AuthenticatedHomeScreen({
   const [usefulMutations, setUsefulMutations] = useState<
     Partial<Record<string, UsefulMutationState>>
   >({});
+  const productEvents = useProductEvents();
+  const impressionGenerationRef = useRef<number | null>(null);
+  const usefulPendingRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (
+      (feedState.status !== 'ready' && feedState.status !== 'empty') ||
+      impressionGenerationRef.current === feedState.generation
+    ) {
+      return;
+    }
+    impressionGenerationRef.current = feedState.generation;
+    const notes = feedState.status === 'ready' ? feedState.notes : [];
+    try {
+      productEvents.record('explore_notes_impression', {
+        categorySlug: feedState.categorySlug,
+        resultCount: notes.length,
+        results: notes.map((presented) => ({
+          noteID: presented.note.id,
+          rank: presented.rank,
+        })),
+      });
+    } catch {}
+  }, [feedState, productEvents]);
 
   const loadFeed = useCallback(
     (catalog: NoteCatalog, categorySlug: string | null) => {
@@ -105,15 +160,24 @@ function AuthenticatedHomeScreen({
           if (requestIDRef.current !== requestID) {
             return;
           }
-          const labelledNotes = labelNotes(catalog, notes);
-          if (labelledNotes === null) {
+          const presentedNotes = presentExploreNotes(catalog, notes, categorySlug);
+          if (presentedNotes === null) {
             setFeedState({ status: 'error' });
             return;
           }
           setFeedState(
-            labelledNotes.length > 0
-              ? { status: 'ready', notes: labelledNotes }
-              : { status: 'empty' },
+            presentedNotes.length > 0
+              ? {
+                  categorySlug,
+                  generation: requestID,
+                  notes: presentedNotes,
+                  status: 'ready',
+                }
+              : {
+                  categorySlug,
+                  generation: requestID,
+                  status: 'empty',
+                },
           );
         })
         .catch(async (error: unknown) => {
@@ -159,15 +223,24 @@ function AuthenticatedHomeScreen({
             if (requestIDRef.current !== requestID) {
               return;
             }
-            const labelledNotes = labelNotes(catalog, notes);
-            if (labelledNotes === null) {
+            const presentedNotes = presentExploreNotes(catalog, notes, categorySlug);
+            if (presentedNotes === null) {
               setFeedState({ status: 'error' });
               return;
             }
             setFeedState(
-              labelledNotes.length > 0
-                ? { status: 'ready', notes: labelledNotes }
-                : { status: 'empty' },
+              presentedNotes.length > 0
+                ? {
+                    categorySlug,
+                    generation: requestID,
+                    notes: presentedNotes,
+                    status: 'ready',
+                  }
+                : {
+                    categorySlug,
+                    generation: requestID,
+                    status: 'empty',
+                  },
             );
           })
           .catch(async (error: unknown) => {
@@ -217,21 +290,42 @@ function AuthenticatedHomeScreen({
   );
 
   const toggleUseful = useCallback(
-    async (target: LabelledNote) => {
-      if (usefulMutations[target.id] === 'pending') {
+    async (target: PresentedExploreNote) => {
+      const note = target.note;
+      if (
+        usefulMutations[note.id] === 'pending' ||
+        usefulPendingRef.current.has(note.id)
+      ) {
         return;
       }
+      usefulPendingRef.current.add(note.id);
       const generation = requestIDRef.current;
+      const action = note.usefulByCurrentUser ? 'unmarked' : 'marked';
       setUsefulMutations((current) => ({
         ...current,
-        [target.id]: 'pending',
+        [note.id]: 'pending',
       }));
       try {
-        if (target.usefulByCurrentUser) {
-          await apiClient.unmarkNoteUseful(target.id);
+        if (note.usefulByCurrentUser) {
+          await apiClient.unmarkNoteUseful(note.id);
         } else {
-          await apiClient.markNoteUseful(target.id);
+          await apiClient.markNoteUseful(note.id);
         }
+        try {
+          productEvents.record(
+            action === 'marked'
+              ? 'note_marked_useful'
+              : 'note_unmarked_useful',
+            {
+              noteID: note.id,
+              context: {
+                categorySlug: target.categorySlug,
+                rank: target.rank,
+                source: 'explore',
+              },
+            },
+          );
+        } catch {}
         if (requestIDRef.current !== generation) {
           return;
         }
@@ -240,22 +334,25 @@ function AuthenticatedHomeScreen({
             return current;
           }
           return {
-            status: 'ready',
-            notes: current.notes.map((note) =>
-              note.id === target.id
+            ...current,
+            notes: current.notes.map((presented) =>
+              presented.note.id === note.id
                 ? {
-                    ...note,
-                    usefulByCurrentUser: !note.usefulByCurrentUser,
-                    usefulCount: note.usefulByCurrentUser
-                      ? note.usefulCount - 1
-                      : note.usefulCount + 1,
+                    ...presented,
+                    note: {
+                      ...presented.note,
+                      usefulByCurrentUser: !presented.note.usefulByCurrentUser,
+                      usefulCount: presented.note.usefulByCurrentUser
+                        ? presented.note.usefulCount - 1
+                        : presented.note.usefulCount + 1,
+                    },
                   }
-                : note,
+                : presented,
             ),
           };
         });
         setUsefulMutations((current) => {
-          const { [target.id]: _removed, ...rest } = current;
+          const { [note.id]: _removed, ...rest } = current;
           return rest;
         });
       } catch (error: unknown) {
@@ -270,11 +367,13 @@ function AuthenticatedHomeScreen({
         }
         setUsefulMutations((current) => ({
           ...current,
-          [target.id]: 'error',
+          [note.id]: 'error',
         }));
+      } finally {
+        usefulPendingRef.current.delete(note.id);
       }
     },
-    [apiClient, onSessionExpired, usefulMutations],
+    [apiClient, onSessionExpired, productEvents, usefulMutations],
   );
 
   useFocusEffect(
@@ -306,11 +405,26 @@ function AuthenticatedHomeScreen({
           onOpenAuthor={(authorID) => {
             router.push({ pathname: '/authors/[id]', params: { id: authorID } });
           }}
-          onOpenNote={(note) => {
-            router.push({
-              pathname: '/notes/[id]',
-              params: { id: note.id },
+          onOpenNote={(presented) => {
+            const origin = registerPresentedNoteOrigin(presented.note.id, {
+              categorySlug: presented.categorySlug,
+              rank: presented.rank,
+              source: 'explore',
             });
+            try {
+              productEvents.record('explore_note_opened', {
+                categorySlug: presented.categorySlug,
+                noteID: presented.note.id,
+                rank: presented.rank,
+              });
+            } catch {}
+            const params: { id: string; origin?: string } = {
+              id: presented.note.id,
+            };
+            if (origin !== '') {
+              params.origin = origin;
+            }
+            router.push({ pathname: '/notes/[id]', params });
           }}
           onToggleUseful={toggleUseful}
           selectedCategorySlug={selectedCategorySlug}
@@ -341,8 +455,8 @@ function FeedContent({
 }: {
   catalogState: CatalogState;
   onOpenAuthor: (authorID: string) => void;
-  onOpenNote: (note: Note) => void;
-  onToggleUseful: (note: LabelledNote) => Promise<void>;
+  onOpenNote: (presented: PresentedExploreNote) => void;
+  onToggleUseful: (presented: PresentedExploreNote) => Promise<void>;
   selectedCategorySlug: string | null;
   state: FeedState;
   usefulMutations: Partial<Record<string, UsefulMutationState>>;
@@ -374,21 +488,24 @@ function FeedContent({
     );
   }
 
-  return state.notes.map((labelledNote) => (
-    <NoteCard
-      categoryLabel={labelledNote.categoryLabel}
-      key={labelledNote.id}
-      note={labelledNote}
-      onPress={() => onOpenNote(labelledNote)}
-      onPressAuthor={onOpenAuthor}
-      onPressUseful={() => {
-        void onToggleUseful(labelledNote);
-      }}
-      placeLabel={labelledNote.placeLabel}
-      usefulError={usefulMutations[labelledNote.id] === 'error'}
-      usefulPending={usefulMutations[labelledNote.id] === 'pending'}
-    />
-  ));
+  return state.notes.map((presented) => {
+    const labelledNote = presented.note;
+    return (
+      <NoteCard
+        categoryLabel={labelledNote.categoryLabel}
+        key={labelledNote.id}
+        note={labelledNote}
+        onPress={() => onOpenNote(presented)}
+        onPressAuthor={onOpenAuthor}
+        onPressUseful={() => {
+          void onToggleUseful(presented);
+        }}
+        placeLabel={labelledNote.placeLabel}
+        usefulError={usefulMutations[labelledNote.id] === 'error'}
+        usefulPending={usefulMutations[labelledNote.id] === 'pending'}
+      />
+    );
+  });
 }
 
 function emptyBody(

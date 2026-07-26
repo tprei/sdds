@@ -73,6 +73,35 @@ describe('useUsefulMutation', () => {
     expect(rendered.get().getMutationState('note-1')).toBe('idle');
     expect(applyResult).toHaveBeenCalledOnce();
   });
+  it('ignores a synchronous duplicate useful press while the request is pending', async () => {
+    let resolveRequest!: () => void;
+    const request = new Promise<void>((resolve) => {
+      resolveRequest = resolve;
+    });
+    mockClient.markNoteUseful.mockReset();
+    mockClient.unmarkNoteUseful.mockReset();
+    mockClient.markNoteUseful.mockReturnValueOnce(request);
+    const rendered = renderUsefulMutation({
+      apiClient: mockClient as unknown as APIClient,
+      onSessionExpired: vi.fn(),
+      getGeneration: () => 1,
+      isStale: () => false,
+      applyResult: vi.fn(),
+      onStaleWrite: vi.fn(),
+    });
+
+    let first: Promise<void>;
+    let second: Promise<void>;
+    await act(async () => {
+      first = rendered.get().toggleUseful(baseNote);
+      second = rendered.get().toggleUseful(baseNote);
+      expect(mockClient.markNoteUseful).toHaveBeenCalledOnce();
+      resolveRequest();
+      await first;
+      await second;
+      await settle();
+    });
+  });
   it('calls the success seam without letting recorder failure change the UI result', async () => {
     mockClient.markNoteUseful.mockResolvedValue(undefined);
     const applyResult = vi.fn();

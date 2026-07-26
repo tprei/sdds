@@ -161,6 +161,7 @@ function AuthenticatedNoteDetailScreen({
     createCommentThreadState,
   );
   const reportRequestIDRef = useRef(0);
+  const reportPendingTargetRef = useRef<string | null>(null);
   const [reportForm, dispatchReportForm] = useReducer(
     reportFormReducer,
     createReportFormState(),
@@ -276,6 +277,12 @@ function AuthenticatedNoteDetailScreen({
     void apiClient
       .createNoteComment({ body, noteID })
       .then((comment) => {
+        try {
+          productEvents.record('comment_created', {
+            commentID: comment.id,
+            noteID,
+          });
+        } catch {}
         if (
           detailGenerationRef.current !== generation ||
           commentCreateRequestRef.current !== requestID
@@ -308,7 +315,13 @@ function AuthenticatedNoteDetailScreen({
           commentCreateRequestRef.current = null;
         }
       });
-  }, [apiClient, commentThread, handleCommentSessionExpired, noteID]);
+  }, [
+    apiClient,
+    commentThread,
+    handleCommentSessionExpired,
+    noteID,
+    productEvents,
+  ]);
 
   const handleDeleteComment = useCallback(
     (commentID: string) => {
@@ -387,6 +400,11 @@ function AuthenticatedNoteDetailScreen({
     ) {
       return;
     }
+    const targetKey = `${reportForm.target.type}:${reportForm.target.id}`;
+    if (reportPendingTargetRef.current === targetKey) {
+      return;
+    }
+    reportPendingTargetRef.current = targetKey;
 
     const generation = detailGenerationRef.current;
     const requestID = ++reportRequestIDRef.current;
@@ -400,7 +418,14 @@ function AuthenticatedNoteDetailScreen({
         reason,
         details,
       })
-      .then(() => {
+      .then((receipt) => {
+        try {
+          productEvents.record('report_created', {
+            reportID: receipt.id,
+            targetID: receipt.targetID,
+            targetType: receipt.targetType,
+          });
+        } catch {}
         if (
           detailGenerationRef.current !== generation ||
           reportRequestIDRef.current !== requestID
@@ -428,20 +453,30 @@ function AuthenticatedNoteDetailScreen({
           return;
         }
         dispatchReportForm({ type: 'submit_failed' });
+      })
+      .finally(() => {
+        if (
+          reportRequestIDRef.current === requestID &&
+          reportPendingTargetRef.current === targetKey
+        ) {
+          reportPendingTargetRef.current = null;
+        }
       });
-  }, [apiClient, handleCommentSessionExpired, reportForm]);
+  }, [apiClient, handleCommentSessionExpired, productEvents, reportForm]);
 
   const recordUsefulSuccess = useCallback(
     (note: Note, action: UsefulMutationAction) => {
-      productEvents.record(
-        action === 'marked'
-          ? 'note_marked_useful'
-          : 'note_unmarked_useful',
-        {
-          context: presentedUsefulContext ?? noteDetailUsefulContext,
-          noteID: note.id,
-        },
-      );
+      try {
+        productEvents.record(
+          action === 'marked'
+            ? 'note_marked_useful'
+            : 'note_unmarked_useful',
+          {
+            context: presentedUsefulContext ?? noteDetailUsefulContext,
+            noteID: note.id,
+          },
+        );
+      } catch {}
     },
     [presentedUsefulContext, productEvents],
   );
@@ -545,6 +580,8 @@ function AuthenticatedNoteDetailScreen({
         isActive = false;
         detailActiveRef.current = false;
         detailGenerationRef.current += 1;
+        reportRequestIDRef.current += 1;
+        reportPendingTargetRef.current = null;
         commentListRequestRef.current = null;
         commentCreateRequestRef.current = null;
         commentDeleteRequestRefs.current.clear();

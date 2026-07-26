@@ -1,0 +1,24 @@
+name: sdds
+
+services:
+  rustfs-init:
+    build:
+      context: ./rustfs-init
+      dockerfile: Dockerfile
+    user: "10001:10001"
+    secrets:
+      - rustfs_root_access_key
+      - rustfs_root_secret_key
+      - sdds_media_access_key
+      - sdds_media_secret_key
+    network_mode: none
+
+secrets:
+  rustfs_root_access_key:
+    file: "${SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE:-/dev/null}"
+  rustfs_root_secret_key:
+    file: "${SDDS_COMPOSE_RUSTFS_ROOT_SECRET_KEY_FILE:-/dev/null}"
+  sdds_media_access_key:
+    file: "${SDDS_COMPOSE_SDDS_MEDIA_ACCESS_KEY_FILE:-/dev/null}"
+  sdds_media_secret_key:
+    file: "${SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE:-/dev/null}"

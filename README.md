@@ -183,6 +183,7 @@ export SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE="$HOME/.config/sdds/sdds-media-se
 ```
 
 Copy the matching `infra/compose/secrets/*.example` files to those private paths and replace every placeholder. The examples are placeholders, not defaults; keep the real files outside Git.
+Each file must contain one printable ASCII, whitespace-free credential and be readable by UID `10001` after Docker mounts it.
 
 ```sh
 make compose-start

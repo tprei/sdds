@@ -1,9 +1,11 @@
 COMPOSE := docker compose -f infra/compose/compose.yaml
+PREFLIGHT_COMPOSE := docker compose -f infra/compose/compose-preflight.yaml
 API_READY_URL ?= http://127.0.0.1:8080/readyz
 
 .PHONY: compose-up compose-start compose-down inspect-reports
 
 compose-up:
+	COMPOSE_IGNORE_ORPHANS=1 $(PREFLIGHT_COMPOSE) run --build --rm --no-deps --entrypoint /usr/local/bin/validate-compose-secrets rustfs-init
 	$(COMPOSE) up --build -d
 
 compose-start: compose-up

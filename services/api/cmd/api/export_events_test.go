@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/tprei/sdds/services/api/internal/event"
+	"github.com/tprei/sdds/services/api/internal/eventexport"
 	"github.com/tprei/sdds/services/api/internal/s3store"
 	"github.com/tprei/sdds/services/api/internal/sqlite"
 	"github.com/tprei/sdds/services/api/internal/user"
@@ -42,7 +43,7 @@ func TestRunExportEventsStreamsRowsAsNDJSON(t *testing.T) {
 	seedExportEventsDatabase(t, databasePath)
 	output := captureEventOutput(t)
 
-	if err := runExportEvents(ctx, config{databasePath: databasePath}); err != nil {
+	if err := eventexport.Run(ctx, databasePath, eventOutputStream); err != nil {
 		t.Fatalf("run export events: %v", err)
 	}
 
@@ -66,7 +67,7 @@ func TestRunExportEventsStreamsRowsAsNDJSON(t *testing.T) {
 		rows[1].EventPageKey != 2 || rows[1].ID != exportEventIDTwo {
 		t.Fatalf("export order = %+v", rows)
 	}
-	if rows[0].UserID != exportUserID || rows[0].ReceivedAt != 1700000000000 {
+	if rows[0].UserID != exportUserID || rows[0].ReceivedAt != exportTestTime().UnixMilli() {
 		t.Fatalf("export identity/timestamp = %+v", rows[0])
 	}
 	if rows[0].InstallationID != nil || rows[0].AppVersion != nil {
@@ -117,25 +118,29 @@ func seedExportEventsDatabase(t *testing.T, databasePath string) {
 	if err := sqlite.ApplyMigrations(ctx, db); err != nil {
 		t.Fatalf("apply migrations: %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `INSERT INTO users (id, state, created_at, updated_at) VALUES (?, 'active', ?, ?)`, exportUserID, 1700000000000, 1700000000000); err != nil {
+	if _, err := db.ExecContext(ctx, `INSERT INTO users (id, state, created_at, updated_at) VALUES (?, 'active', ?, ?)`, exportUserID, exportTestTime().UnixMilli(), exportTestTime().UnixMilli()); err != nil {
 		t.Fatalf("insert export user: %v", err)
 	}
 
 	first := normalizeExportEvent(t, event.Input{
-		ID: exportEventID, Kind: event.KindNotePublished, OccurredAt: 1699999999000,
+		ID: exportEventID, Kind: event.KindNotePublished, OccurredAt: exportTestTime().Add(-100 * time.Millisecond).UnixMilli(),
 		UserID: user.UserID(exportUserID), Platform: event.PlatformWeb,
 		SchemaVersion: event.SchemaVersion1,
 		Payload:       event.NotePublishedPayload{NoteID: exportEventIDTwo, CategorySlug: "food"},
 	})
 	second := normalizeExportEvent(t, event.Input{
-		ID: exportEventIDTwo, Kind: event.KindSearchSubmitted, OccurredAt: 1699999999001,
+		ID: exportEventIDTwo, Kind: event.KindSearchSubmitted, OccurredAt: exportTestTime().Add(-99 * time.Millisecond).UnixMilli(),
 		UserID: user.UserID(exportUserID), InstallationID: stringPointer("018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d25"),
 		Platform: event.PlatformWeb, AppVersion: stringPointer("0.0.1"), SchemaVersion: event.SchemaVersion1,
 		Payload: event.SearchSubmittedPayload{SearchID: exportSearchID, SearchVersion: event.SearchVersionFTS5V1, Query: "evento"},
 	})
-	if _, err := sqlite.NewEventStore(db).AppendBatch(ctx, []event.Record{first, second}, time.UnixMilli(1700000000000)); err != nil {
+	if _, err := sqlite.NewEventStore(db).AppendBatch(ctx, []event.Record{first, second}, exportTestTime()); err != nil {
 		t.Fatalf("append export events: %v", err)
 	}
+}
+
+func exportTestTime() time.Time {
+	return time.Date(2023, time.November, 14, 22, 13, 20, 0, time.UTC)
 }
 
 func normalizeExportEvent(t *testing.T, input event.Input) event.Record {

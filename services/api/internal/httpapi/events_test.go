@@ -183,6 +183,34 @@ func TestCreateEventsAcceptsValidEnvelopeAndDerivesUser(t *testing.T) {
 		t.Fatalf("received_at = %v, want %v", gotReceivedAt, wantReceivedAt)
 	}
 }
+func TestCreateEventsRejectsUnknownNestedContextKeysWithContractPath(t *testing.T) {
+	store := fakeEventStore{appendBatch: func(context.Context, []event.Record, time.Time) (event.AppendBatchResult, error) {
+		t.Fatal("event store must not be called")
+		return event.AppendBatchResult{}, nil
+	}}
+	value := validNotePublishedEvent(eventTestID(13))
+	value["kind"] = string(event.KindNoteMarkedUseful)
+	value["payload"] = map[string]any{
+		"note_id": eventTestID(100),
+		"context": map[string]any{
+			"source":     "note_detail",
+			"unexpected": true,
+		},
+	}
+	router := newEventHTTPRouter(t, store, DefaultEventLimits(), time.Now, true)
+	request := eventRequest(t, eventRequestBody(t, value))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	requireOpenAPIResponse(t, request, response)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+	result := eventErrorResponse(t, response)
+	if len(result.Problems) != 1 || result.Problems[0].Field != "payload.context.unexpected" {
+		t.Fatalf("problems = %+v, want payload.context.unexpected", result.Problems)
+	}
+}
 
 func TestCreateEventsRejectsSpoofedUserAndInsertsNothing(t *testing.T) {
 	called := false

@@ -22,6 +22,7 @@ import {
   type NoteCatalog,
 } from '../notes/catalog';
 import { useProductEvents } from '../../lib/events/product-event-provider';
+import { productEventKinds } from '../../lib/events/event-types';
 import { styles } from './author-profile-content.styles';
 
 type Props = {
@@ -328,8 +329,8 @@ export function AuthorProfileContent({
         try {
           productEvents.record(
             action === 'marked'
-              ? 'note_marked_useful'
-              : 'note_unmarked_useful',
+              ? productEventKinds.noteMarkedUseful
+              : productEventKinds.noteUnmarkedUseful,
             {
               noteID: target.id,
               context: { source: 'author_profile' },

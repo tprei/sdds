@@ -1,16 +1,19 @@
+export const productEventKinds = {
+  exploreNotesImpression: 'explore_notes_impression',
+  exploreNoteOpened: 'explore_note_opened',
+  searchSubmitted: 'search_submitted',
+  searchResultsImpression: 'search_results_impression',
+  searchResultOpened: 'search_result_opened',
+  searchReformulated: 'search_reformulated',
+  searchNoResults: 'search_no_results',
+  noteMarkedUseful: 'note_marked_useful',
+  noteUnmarkedUseful: 'note_unmarked_useful',
+  commentCreated: 'comment_created',
+  reportCreated: 'report_created',
+  notePublished: 'note_published',
+} as const;
 export type ProductEventKind =
-  | 'explore_notes_impression'
-  | 'explore_note_opened'
-  | 'search_submitted'
-  | 'search_results_impression'
-  | 'search_result_opened'
-  | 'search_reformulated'
-  | 'search_no_results'
-  | 'note_marked_useful'
-  | 'note_unmarked_useful'
-  | 'comment_created'
-  | 'report_created'
-  | 'note_published';
+  (typeof productEventKinds)[keyof typeof productEventKinds];
 export type EventPlatform = 'ios' | 'android' | 'web';
 export type SearchVersion = 'fts5-v1';
 export type RetrievalSource = 'lexical' | 'semantic' | 'hybrid';

@@ -13,6 +13,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/tprei/sdds/services/api/internal/eventexport"
 	"github.com/tprei/sdds/services/api/internal/httpapi"
 	"github.com/tprei/sdds/services/api/internal/media"
 	"github.com/tprei/sdds/services/api/internal/s3store"
@@ -115,7 +116,7 @@ func runWithArgs(ctx context.Context, config config, s3Config s3store.Config, ar
 	case len(args) == 1 && args[0] == commandInspectReports:
 		return runInspectReports(ctx, config)
 	case len(args) == 1 && args[0] == commandExportEvents:
-		return runExportEvents(ctx, config)
+		return eventexport.Run(ctx, config.databasePath, eventOutputStream)
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
@@ -233,22 +234,6 @@ type reportOutputRow struct {
 	TargetMissing  int     `json:"target_missing"`
 }
 
-// eventOutputRow is the JSON Lines record emitted by export-events. Field
-// declaration order is the emitted JSON key order.
-type eventOutputRow struct {
-	EventPageKey   int64           `json:"event_page_key"`
-	ID             string          `json:"id"`
-	Kind           string          `json:"kind"`
-	OccurredAt     int64           `json:"occurred_at"`
-	ReceivedAt     int64           `json:"received_at"`
-	UserID         string          `json:"user_id"`
-	InstallationID *string         `json:"installation_id"`
-	Platform       string          `json:"platform"`
-	AppVersion     *string         `json:"app_version"`
-	SchemaVersion  int             `json:"schema_version"`
-	Payload        json.RawMessage `json:"payload"`
-}
-
 // runInspectReports opens the database read-only, loads the operator
 // inspection rows from the report store, and prints one compact JSON object
 // per row ordered by report_page_key ascending. It never runs migrations and
@@ -289,45 +274,6 @@ func runInspectReports(ctx context.Context, config config) error {
 	}
 	if _, err := output.WriteTo(reportOutputStream); err != nil {
 		return fmt.Errorf("write report rows: %w", err)
-	}
-	return nil
-}
-
-// runExportEvents opens the database read-only and streams one compact JSON
-// object per event ordered by event_page_key ascending. It never runs
-// migrations or loads media configuration.
-func runExportEvents(ctx context.Context, config config) error {
-	db, err := sqlite.OpenReadOnly(config.databasePath)
-	if err != nil {
-		return fmt.Errorf("open database read-only: %w", err)
-	}
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			slog.Error("close read-only database", "error", closeErr)
-		}
-	}()
-
-	encoder := json.NewEncoder(eventOutputStream)
-	encoder.SetEscapeHTML(false)
-	if err := sqlite.NewEventStore(db).StreamExportRows(
-		ctx,
-		func(row sqlite.EventExportRow) error {
-			return encoder.Encode(eventOutputRow{
-				EventPageKey:   row.EventPageKey,
-				ID:             row.ID,
-				Kind:           row.Kind,
-				OccurredAt:     row.OccurredAt,
-				ReceivedAt:     row.ReceivedAt,
-				UserID:         row.UserID,
-				InstallationID: row.InstallationID,
-				Platform:       row.Platform,
-				AppVersion:     row.AppVersion,
-				SchemaVersion:  row.SchemaVersion,
-				Payload:        row.Payload,
-			})
-		},
-	); err != nil {
-		return fmt.Errorf("export events: %w", err)
 	}
 	return nil
 }

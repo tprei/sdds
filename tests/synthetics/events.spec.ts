@@ -1,26 +1,18 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 
 import { expect, test } from '@playwright/test';
-import type { APIRequestContext, Page, Response } from '@playwright/test';
-
-const execFileAsync = promisify(execFile);
-const apiBaseURL =
-  process.env.SDDS_SYNTHETICS_API_BASE_URL ?? 'http://127.0.0.1:18080';
-const syntheticPassword = 'secret-password';
-
-type AuthSessionResponse = {
-  token: string;
-  user: { id: string; username: string };
-};
-
-type NoteResponse = {
-  id: string;
-  title: string;
-};
+import type { Page, Response } from '@playwright/test';
+import {
+  createAuthUser,
+  createNote,
+  isRecord,
+  loginUser,
+  runComposeAPICommand,
+  syntheticPassword,
+} from './support';
 
 type CapturedEvent = Record<string, unknown>;
 type CapturedBatch = { events: CapturedEvent[] };
+
 type ExportRow = {
   kind: string;
   payload: Record<string, unknown>;
@@ -131,23 +123,8 @@ test('exports the authenticated search event lineage', async ({
     )
     .toBe(true);
 
-  const exportResult = await execFileAsync(
-    'docker',
-    [
-      'compose',
-      '-p',
-      'sdds-synthetics',
-      '-f',
-      'infra/compose/compose.yaml',
-      'run',
-      '--rm',
-      '--no-deps',
-      'api',
-      'export-events',
-    ],
-    { cwd: process.cwd(), maxBuffer: 16 * 1024 * 1024 },
-  );
-  const rows = parseExportRows(exportResult.stdout);
+  const exportOutput = await runComposeAPICommand('export-events');
+  const rows = parseExportRows(exportOutput);
   const markerRows = rows.filter((row) => row.payload.query === marker);
   const submitted = markerRows.find(
     (row) => row.kind === 'search_submitted',
@@ -211,52 +188,6 @@ test('exports the authenticated search event lineage', async ({
     }
   }
 });
-
-async function createAuthUser(
-  request: APIRequestContext,
-  input: {
-    display_name: string;
-    password: string;
-    username: string;
-  },
-): Promise<AuthSessionResponse> {
-  const response = await request.post(apiURL('/v1/auth/users'), { data: input });
-  expect(response.status()).toBe(201);
-  return (await response.json()) as AuthSessionResponse;
-}
-
-async function createNote(
-  request: APIRequestContext,
-  token: string,
-  input: {
-    body: string;
-    category_slug: string;
-    client_request_id: string;
-    place_slug: string | null;
-    title: string;
-  },
-): Promise<NoteResponse> {
-  const response = await request.post(apiURL('/v1/notes'), {
-    data: input,
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  expect(response.status()).toBe(201);
-  return (await response.json()) as NoteResponse;
-}
-
-async function loginUser(
-  page: Page,
-  username: string,
-  next: '/search',
-): Promise<void> {
-  await page.goto(`/login?next=${encodeURIComponent(next)}`);
-  await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Entrar$/ }),
-  ).toBeVisible();
-  await page.getByLabel('Nome de usuário').fill(username);
-  await page.getByLabel('Senha').fill(syntheticPassword);
-  await page.getByRole('button', { name: 'Entrar' }).click();
-}
 
 function waitForEventsResponse(page: Page): Promise<Response> {
   return page.waitForResponse((response) => {
@@ -327,12 +258,4 @@ function arrayField(
     throw new Error(`missing event array field ${field}`);
   }
   return value;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function apiURL(path: string): string {
-  return new URL(path, apiBaseURL).toString();
 }

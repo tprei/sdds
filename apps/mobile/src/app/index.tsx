@@ -16,6 +16,7 @@ import { buildNoteCatalog, labelNotes } from '@/features/notes/catalog';
 import type { LabelledNote, NoteCatalog } from '@/features/notes/catalog';
 import type { ListNotesInput, Note } from '@/lib/api/notes';
 import { useProductEvents } from '@/lib/events/product-event-provider';
+import { productEventKinds } from '@/lib/events/event-types';
 import { registerPresentedNoteOrigin } from '@/features/notes/presented-note-origin';
 import { ReadAuthGate } from '@/components/read-auth-gate';
 
@@ -129,6 +130,7 @@ function AuthenticatedHomeScreen({
 
   useEffect(() => {
     if (
+      productEvents.ready === false ||
       (feedState.status !== 'ready' && feedState.status !== 'empty') ||
       impressionGenerationRef.current === feedState.generation
     ) {
@@ -137,7 +139,7 @@ function AuthenticatedHomeScreen({
     impressionGenerationRef.current = feedState.generation;
     const notes = feedState.status === 'ready' ? feedState.notes : [];
     try {
-      productEvents.record('explore_notes_impression', {
+      productEvents.record(productEventKinds.exploreNotesImpression, {
         categorySlug: feedState.categorySlug,
         resultCount: notes.length,
         results: notes.map((presented) => ({
@@ -314,8 +316,8 @@ function AuthenticatedHomeScreen({
         try {
           productEvents.record(
             action === 'marked'
-              ? 'note_marked_useful'
-              : 'note_unmarked_useful',
+              ? productEventKinds.noteMarkedUseful
+              : productEventKinds.noteUnmarkedUseful,
             {
               noteID: note.id,
               context: {
@@ -412,7 +414,7 @@ function AuthenticatedHomeScreen({
               source: 'explore',
             });
             try {
-              productEvents.record('explore_note_opened', {
+              productEvents.record(productEventKinds.exploreNoteOpened, {
                 categorySlug: presented.categorySlug,
                 noteID: presented.note.id,
                 rank: presented.rank,

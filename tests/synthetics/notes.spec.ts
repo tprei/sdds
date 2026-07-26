@@ -1,9 +1,14 @@
 import { expect, test } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
-
-const apiBaseURL =
-  process.env.SDDS_SYNTHETICS_API_BASE_URL ?? 'http://127.0.0.1:18080';
-const syntheticPassword = 'secret-password';
+import {
+  apiBaseURL,
+  apiURL,
+  createAuthUser,
+  isRecord,
+  loginUser,
+  syntheticPassword,
+} from './support';
+import type { AuthorSummary } from './support';
 
 type CreateNoteRequest = {
   body: string;
@@ -13,16 +18,6 @@ type CreateNoteRequest = {
   title: string;
 };
 
-type CreateAuthUserRequest = {
-  display_name: string;
-  password: string;
-  username: string;
-};
-
-type AuthorSummary = {
-  display_name: string;
-  id: string;
-};
 type NoteImageResponse = {
   byte_size: number;
   content_type: 'image/jpeg' | 'image/png';
@@ -35,15 +30,6 @@ type NoteImageResponse = {
   width: number;
 };
 
-type AuthSessionResponse = {
-  expires_at: number;
-  token: string;
-  user: {
-    author: AuthorSummary;
-    id: string;
-    username: string;
-  };
-};
 
 type NoteResponse = {
   author: AuthorSummary;
@@ -100,9 +86,7 @@ type ValidationProblem = {
   field: string;
 };
 
-const authSessionResponseKeys = ['expires_at', 'token', 'user'] as const;
 const authorSummaryKeys = ['display_name', 'id'] as const;
-const currentUserKeys = ['author', 'id', 'username'] as const;
 const commentResponseKeys = ['author', 'body', 'created_at', 'id'] as const;
 const searchNoteResultKeys = ['note', 'retrieval_source'] as const;
 const searchNotesResponseKeys = ['results', 'search_version'] as const;
@@ -1006,16 +990,6 @@ async function createComment(
   return parseCommentResponse(await response.json());
 }
 
-async function createAuthUser(
-  request: APIRequestContext,
-  input: CreateAuthUserRequest,
-): Promise<AuthSessionResponse> {
-  const response = await request.post(apiURL('/v1/auth/users'), {
-    data: input,
-  });
-  expect(response.status()).toBe(201);
-  return parseAuthSessionResponse(await response.json());
-}
 
 async function listNotes(
   request: APIRequestContext,
@@ -1077,9 +1051,6 @@ async function expectCategoryFilterError(
   expect(body.fields).toEqual([{ code: 'unknown', field: 'category_slug' }]);
 }
 
-function apiURL(path: string): string {
-  return new URL(path, apiBaseURL).toString();
-}
 
 function visibleGlobalScope(page: Page) {
   return page.locator('[aria-label="Escopo atual: Mundo todo"]:visible').last();
@@ -1092,19 +1063,6 @@ function visibleScreenTitle(page: Page, name: string) {
     .last();
 }
 
-async function loginUser(
-  page: Page,
-  username: string,
-  next: '/' | '/search' | `/notes/${string}` | `/authors/${string}`,
-): Promise<void> {
-  await page.goto(`/login?next=${encodeURIComponent(next)}`);
-  await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Entrar$/ }),
-  ).toBeVisible();
-  await page.getByLabel('Nome de usuário').fill(username);
-  await page.getByLabel('Senha').fill(syntheticPassword);
-  await page.getByRole('button', { name: 'Entrar' }).click();
-}
 
 async function clickTab(page: Page, name: string): Promise<void> {
   await page.getByRole('tab', { name: new RegExp(name + '$') }).click();
@@ -1147,12 +1105,6 @@ function parseCommentResponse(value: unknown): CommentResponse {
   return value;
 }
 
-function parseAuthSessionResponse(value: unknown): AuthSessionResponse {
-  if (!isAuthSessionResponse(value)) {
-    throw new Error('invalid auth session response');
-  }
-  return value;
-}
 
 function parseErrorResponse(value: unknown): ErrorResponse {
   if (!isErrorResponse(value)) {
@@ -1267,19 +1219,6 @@ function isNoteImageResponse(value: unknown): value is NoteImageResponse {
   );
 }
 
-function isAuthSessionResponse(value: unknown): value is AuthSessionResponse {
-  return (
-    isRecord(value) &&
-    hasOnlyKeys(value, authSessionResponseKeys) &&
-    typeof value.token === 'string' &&
-    typeof value.expires_at === 'number' &&
-    isRecord(value.user) &&
-    hasOnlyKeys(value.user, currentUserKeys) &&
-    typeof value.user.id === 'string' &&
-    typeof value.user.username === 'string' &&
-    isAuthorSummary(value.user.author)
-  );
-}
 
 function isAuthorSummary(value: unknown): value is AuthorSummary {
   return (
@@ -1305,10 +1244,6 @@ function isValidationProblem(value: unknown): value is ValidationProblem {
     typeof value.code === 'string' &&
     typeof value.field === 'string'
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function hasOnlyKeys(

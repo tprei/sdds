@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   logout: vi.fn(async () => undefined),
   push: vi.fn(),
   record: vi.fn(),
+  productEventsReady: true,
 }));
 vi.mock('expo-crypto', () => ({
   randomUUID: () => '018ff5b8-0000-7000-8000-000000000001',
@@ -81,12 +82,14 @@ vi.mock('expo-router', async () => {
 vi.mock('@/lib/auth/auth-provider', () => ({
   useAuth: () => ({ apiClient: mocks.apiClient, logout: mocks.logout, state: mocks.authState }),
 }));
-vi.mock('@/lib/events/product-event-provider', () => {
-  const productEvents = { record: mocks.record };
-  return {
-    useProductEvents: () => productEvents,
-  };
-});
+vi.mock('@/lib/events/product-event-provider', () => ({
+  useProductEvents: () => ({
+    record: mocks.record,
+    get ready() {
+      return mocks.productEventsReady;
+    },
+  }),
+}));
 
 async function settle(): Promise<void> {
   await Promise.resolve();
@@ -113,6 +116,7 @@ describe('HomeScreen auth gate', () => {
     mocks.apiClient.listNotes.mockResolvedValue([]);
     mocks.logout.mockClear();
     mocks.push.mockClear();
+    mocks.productEventsReady = true;
   });
 
   afterEach(() => {
@@ -164,6 +168,27 @@ describe('HomeScreen auth gate', () => {
       resultCount: 0,
       results: [],
     });
+  });
+  it('retries an Explore impression when event recording becomes ready', async () => {
+    mocks.productEventsReady = false;
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(createElement(HomeScreen));
+      await settle();
+    });
+    expect(mocks.record).not.toHaveBeenCalled();
+
+    mocks.productEventsReady = true;
+    await act(async () => {
+      renderer.update(createElement(HomeScreen));
+      await settle();
+    });
+    expect(mocks.record).toHaveBeenCalledWith('explore_notes_impression', {
+      categorySlug: null,
+      resultCount: 0,
+      results: [],
+    });
+    renderer.unmount();
   });
   it('records the rendered Explore set and provenance before interactions', async () => {
     const note = {

@@ -203,7 +203,8 @@ func TestEventStoreStreamsExportRowsInInsertionOrder(t *testing.T) {
 	second := makeEventRecord(t, storeEventIDTwo, storeUserID, event.KindSearchSubmitted, event.SearchSubmittedPayload{
 		SearchID: storeSearchID, SearchVersion: event.SearchVersionFTS5V1, Query: "evento",
 	})
-	if _, err := store.AppendBatch(ctx, []event.Record{first, second}, time.UnixMilli(200)); err != nil {
+	receivedAt := storeReceivedAt(time.Millisecond)
+	if _, err := store.AppendBatch(ctx, []event.Record{first, second}, receivedAt); err != nil {
 		t.Fatalf("append events: %v", err)
 	}
 
@@ -227,8 +228,8 @@ func TestEventStoreStreamsExportRowsInInsertionOrder(t *testing.T) {
 	if rows[1].InstallationID == nil || rows[1].AppVersion == nil {
 		t.Fatal("non-null event fields were lost")
 	}
-	if rows[0].ReceivedAt != 200 || rows[1].ReceivedAt != 200 {
-		t.Fatalf("received_at = %d/%d, want 200", rows[0].ReceivedAt, rows[1].ReceivedAt)
+	if rows[0].ReceivedAt != receivedAt.UnixMilli() || rows[1].ReceivedAt != receivedAt.UnixMilli() {
+		t.Fatalf("received_at = %d/%d, want %d", rows[0].ReceivedAt, rows[1].ReceivedAt, receivedAt.UnixMilli())
 	}
 	if len(rows[0].Payload) == 0 || rows[0].Payload[0] != '{' {
 		t.Fatalf("payload = %q, want JSON object", rows[0].Payload)

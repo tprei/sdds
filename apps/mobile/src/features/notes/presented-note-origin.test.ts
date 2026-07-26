@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  consumePresentedNoteOrigin,
+  readPresentedNoteOrigin,
   registerPresentedNoteOrigin,
-  takePresentedNoteOrigin,
 } from './presented-note-origin';
 
 const cryptoState = vi.hoisted(() => ({ nextID: 0 }));
@@ -21,29 +22,33 @@ const searchContext = {
 };
 
 describe('presented note origins', () => {
-  it('takes a matching origin exactly once', () => {
+  it('reads a matching origin and consumes it exactly once', () => {
     const nonce = registerPresentedNoteOrigin('note-1', searchContext);
 
-    expect(takePresentedNoteOrigin(nonce, 'note-1')).toEqual(searchContext);
-    expect(takePresentedNoteOrigin(nonce, 'note-1')).toBeUndefined();
+    expect(readPresentedNoteOrigin(nonce, 'note-1')).toEqual(searchContext);
+    expect(readPresentedNoteOrigin(nonce, 'note-1')).toEqual(searchContext);
+    consumePresentedNoteOrigin(nonce, 'note-1');
+    expect(readPresentedNoteOrigin(nonce, 'note-1')).toBeUndefined();
   });
 
-  it('consumes mismatched and array-like route values without provenance', () => {
+  it('keeps mismatched and array-like route values without provenance', () => {
     const nonce = registerPresentedNoteOrigin('note-2', searchContext);
 
     expect(
-      takePresentedNoteOrigin(
+      readPresentedNoteOrigin(
         [nonce] as unknown as string,
         'note-2',
       ),
     ).toBeUndefined();
-    expect(takePresentedNoteOrigin(nonce, 'note-3')).toBeUndefined();
-    expect(takePresentedNoteOrigin(nonce, 'note-2')).toBeUndefined();
+    expect(readPresentedNoteOrigin(nonce, 'note-3')).toBeUndefined();
+    expect(readPresentedNoteOrigin(nonce, 'note-2')).toEqual(searchContext);
+    consumePresentedNoteOrigin(nonce, 'note-2');
+    expect(readPresentedNoteOrigin(nonce, 'note-2')).toBeUndefined();
   });
 
   it('rejects forged nonces', () => {
     expect(
-      takePresentedNoteOrigin(
+      readPresentedNoteOrigin(
         '018ff5b8-0000-7000-8000-999999999999',
         'note-1',
       ),
@@ -57,8 +62,8 @@ describe('presented note origins', () => {
       newestNonce = registerPresentedNoteOrigin(`note-${index}`, searchContext);
     }
 
-    expect(takePresentedNoteOrigin(firstNonce, 'oldest')).toBeUndefined();
-    expect(takePresentedNoteOrigin(newestNonce, 'note-99')).toEqual(
+    expect(readPresentedNoteOrigin(firstNonce, 'oldest')).toBeUndefined();
+    expect(readPresentedNoteOrigin(newestNonce, 'note-99')).toEqual(
       searchContext,
     );
   });

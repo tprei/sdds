@@ -160,11 +160,6 @@ func validInput(kind Kind, payload Payload) Input {
 		Payload:       payload,
 	}
 }
-
-func categoryPtr(value note.CategorySlug) *note.CategorySlug {
-	return &value
-}
-
 func kindForPayload(payload Payload) Kind {
 	switch payload.(type) {
 	case ExploreNotesImpressionPayload:
@@ -174,6 +169,10 @@ func kindForPayload(payload Payload) Kind {
 	default:
 		panic("unknown test payload")
 	}
+}
+
+func categoryPtr(value note.CategorySlug) *note.CategorySlug {
+	return &value
 }
 
 func hasProblem(problems []ValidationProblem, field, code string) bool {

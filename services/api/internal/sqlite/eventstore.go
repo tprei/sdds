@@ -45,6 +45,8 @@ const streamEventsSQL = `
 	ORDER BY event_page_key ASC
 `
 
+// StreamExportRows passes each scanned row by value so callers cannot mutate
+// store-owned scan state or retain a pointer into the iteration.
 func (store *EventStore) StreamExportRows(
 	ctx context.Context,
 	visit func(EventExportRow) error,

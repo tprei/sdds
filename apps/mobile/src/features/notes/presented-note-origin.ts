@@ -71,25 +71,3 @@ function findPresentedNoteOrigin(
   return origin?.noteID === noteID ? origin : undefined;
 }
 
-export function takePresentedNoteOrigin(
-  nonce: string,
-  noteID: string,
-): UsefulContext | undefined {
-  if (
-    typeof nonce !== 'string' ||
-    typeof noteID !== 'string' ||
-    !canonicalUUIDPattern.test(nonce)
-  ) {
-    return undefined;
-  }
-
-  const origin = origins.get(nonce);
-  if (origin === undefined) {
-    return undefined;
-  }
-  origins.delete(nonce);
-  if (origin.noteID !== noteID) {
-    return undefined;
-  }
-  return { ...origin.context };
-}

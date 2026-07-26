@@ -1,29 +1,12 @@
 import { expect, test } from '@playwright/test';
-import type { APIRequestContext, Page } from '@playwright/test';
-
-const apiBaseURL =
-  process.env.SDDS_SYNTHETICS_API_BASE_URL ?? 'http://127.0.0.1:18080';
-const syntheticPassword = 'secret-password';
-
-type AuthorSummary = {
-  id: string;
-  display_name: string;
-};
-
-type AuthSessionResponse = {
-  token: string;
-  user: {
-    id: string;
-    username: string;
-    author: AuthorSummary;
-  };
-};
-
-type NoteResponse = {
-  id: string;
-  title: string;
-  author: AuthorSummary;
-};
+import type { APIRequestContext } from '@playwright/test';
+import {
+  apiURL,
+  createAuthUser,
+  createNote,
+  loginUser,
+  syntheticPassword,
+} from './support';
 
 type CommentResponse = {
   id: string;
@@ -99,25 +82,6 @@ test('reports a note and a comment, then keeps the content visible', async ({
   await expect(page.getByText(/denúncias\b/i)).toHaveCount(0);
 });
 
-async function createNote(
-  request: APIRequestContext,
-  token: string,
-  input: {
-    body: string;
-    category_slug: string;
-    client_request_id: string;
-    place_slug: string | null;
-    title: string;
-  },
-): Promise<NoteResponse> {
-  const response = await request.post(apiURL('/v1/notes'), {
-    data: input,
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  expect(response.status()).toBe(201);
-  return (await response.json()) as NoteResponse;
-}
-
 async function createComment(
   request: APIRequestContext,
   token: string,
@@ -132,29 +96,3 @@ async function createComment(
   return (await response.json()) as CommentResponse;
 }
 
-async function createAuthUser(
-  request: APIRequestContext,
-  input: { display_name: string; password: string; username: string },
-): Promise<AuthSessionResponse> {
-  const response = await request.post(apiURL('/v1/auth/users'), { data: input });
-  expect(response.status()).toBe(201);
-  return (await response.json()) as AuthSessionResponse;
-}
-
-async function loginUser(
-  page: Page,
-  username: string,
-  next: `/notes/${string}`,
-): Promise<void> {
-  await page.goto(`/login?next=${encodeURIComponent(next)}`);
-  await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Entrar$/ }),
-  ).toBeVisible();
-  await page.getByLabel('Nome de usuário').fill(username);
-  await page.getByLabel('Senha').fill(syntheticPassword);
-  await page.getByRole('button', { name: 'Entrar' }).click();
-}
-
-function apiURL(path: string): string {
-  return new URL(path, apiBaseURL).toString();
-}

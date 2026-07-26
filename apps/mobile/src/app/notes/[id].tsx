@@ -39,7 +39,7 @@ import { unauthorizedStatus } from '@/lib/api/status';
 import { useAuth } from '@/lib/auth/auth-provider';
 import type { APIClient } from '@/lib/api/client';
 import { useProductEvents } from '@/lib/events/product-event-provider';
-import type { UsefulContext } from '@/lib/events/event-types';
+import { productEventKinds, type UsefulContext } from '@/lib/events/event-types';
 import {
   consumePresentedNoteOrigin,
   readPresentedNoteOrigin,
@@ -278,7 +278,7 @@ function AuthenticatedNoteDetailScreen({
       .createNoteComment({ body, noteID })
       .then((comment) => {
         try {
-          productEvents.record('comment_created', {
+          productEvents.record(productEventKinds.commentCreated, {
             commentID: comment.id,
             noteID,
           });
@@ -420,7 +420,7 @@ function AuthenticatedNoteDetailScreen({
       })
       .then((receipt) => {
         try {
-          productEvents.record('report_created', {
+          productEvents.record(productEventKinds.reportCreated, {
             reportID: receipt.id,
             targetID: receipt.targetID,
             targetType: receipt.targetType,
@@ -469,8 +469,8 @@ function AuthenticatedNoteDetailScreen({
       try {
         productEvents.record(
           action === 'marked'
-            ? 'note_marked_useful'
-            : 'note_unmarked_useful',
+            ? productEventKinds.noteMarkedUseful
+            : productEventKinds.noteUnmarkedUseful,
           {
             context: presentedUsefulContext ?? noteDetailUsefulContext,
             noteID: note.id,

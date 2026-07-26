@@ -5,7 +5,11 @@ import { bindAuthAPI, type AuthAPI } from './auth';
 import { bindAuthorsAPI, type AuthorsAPI } from './authors';
 import { bindCatalogsAPI, type CatalogsAPI } from './catalogs';
 import { bindCommentsAPI, type CommentsAPI } from './comments';
-import { bindImageUploadsAPI, type ImageUploadsAPI } from './image-uploads';
+import { bindEventsAPI, type EventsAPI } from './events';
+import {
+  bindImageUploadsAPI,
+  type ImageUploadsAPI,
+} from './image-uploads';
 import { bindNotesAPI, type NotesAPI } from './notes';
 import { bindReportsAPI, type ReportsAPI } from './reports';
 import { parseAPIRequestError } from './request-error';
@@ -13,14 +17,14 @@ import type { paths } from './generated/schema';
 
 export type TypedTransport = Client<paths>;
 export type BoundFetch = (request: Request) => Promise<Response>;
-
 export type APIClient = NotesAPI &
   CatalogsAPI &
   AuthAPI &
   AuthorsAPI &
   CommentsAPI &
-  ReportsAPI &
-  ImageUploadsAPI;
+  EventsAPI &
+  ImageUploadsAPI &
+  ReportsAPI;
 
 export function createAPIClient(token?: string): APIClient {
   const boundFetch: BoundFetch = (request) => {
@@ -49,6 +53,7 @@ export function createAPIClient(token?: string): APIClient {
     ...bindAuthAPI(transport),
     ...bindAuthorsAPI(transport),
     ...bindCommentsAPI(transport),
+    ...bindEventsAPI(transport),
     ...bindReportsAPI(transport),
     ...bindImageUploadsAPI(boundFetch),
   };

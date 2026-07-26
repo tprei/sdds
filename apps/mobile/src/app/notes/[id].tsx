@@ -1,6 +1,7 @@
 import {
   type ReactNode,
   useCallback,
+  useEffect,
   useReducer,
   useRef,
   useState,
@@ -40,7 +41,8 @@ import type { APIClient } from '@/lib/api/client';
 import { useProductEvents } from '@/lib/events/product-event-provider';
 import type { UsefulContext } from '@/lib/events/event-types';
 import {
-  takePresentedNoteOrigin,
+  consumePresentedNoteOrigin,
+  readPresentedNoteOrigin,
 } from '@/features/notes/presented-note-origin';
 import {
   useUsefulMutation,
@@ -139,8 +141,13 @@ function AuthenticatedNoteDetailScreen({
   const [presentedUsefulContext] = useState<UsefulContext | null>(() =>
     originNonce === undefined
       ? null
-      : (takePresentedNoteOrigin(originNonce, noteID) ?? null),
+      : (readPresentedNoteOrigin(originNonce, noteID) ?? null),
   );
+  useEffect(() => {
+    if (originNonce !== undefined && presentedUsefulContext !== null) {
+      consumePresentedNoteOrigin(originNonce, noteID);
+    }
+  }, [noteID, originNonce, presentedUsefulContext]);
   const detailGenerationRef = useRef(0);
   const detailActiveRef = useRef(false);
   const commentRequestIDRef = useRef(0);

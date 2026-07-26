@@ -42,6 +42,35 @@ export function registerPresentedNoteOrigin(
   return nonce;
 }
 
+export function readPresentedNoteOrigin(
+  nonce: string,
+  noteID: string,
+): UsefulContext | undefined {
+  const origin = findPresentedNoteOrigin(nonce, noteID);
+  return origin === undefined ? undefined : { ...origin.context };
+}
+
+export function consumePresentedNoteOrigin(nonce: string, noteID: string): void {
+  if (findPresentedNoteOrigin(nonce, noteID) !== undefined) {
+    origins.delete(nonce);
+  }
+}
+
+function findPresentedNoteOrigin(
+  nonce: string,
+  noteID: string,
+): PresentedNoteOrigin | undefined {
+  if (
+    typeof nonce !== 'string' ||
+    typeof noteID !== 'string' ||
+    !canonicalUUIDPattern.test(nonce)
+  ) {
+    return undefined;
+  }
+  const origin = origins.get(nonce);
+  return origin?.noteID === noteID ? origin : undefined;
+}
+
 export function takePresentedNoteOrigin(
   nonce: string,
   noteID: string,

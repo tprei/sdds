@@ -211,12 +211,12 @@ const note = {
   author: { displayName: 'Thiago', id: 'author-id' },
   body: 'Tem pão de queijo decente.',
   categorySlug: 'food',
-  createdAt: 1782993600000,
+  createdAt: testTimestamp(),
   id: 'note-id',
   images: [],
   placeSlug: null,
   title: 'Café bom',
-  updatedAt: 1782993600000,
+  updatedAt: testTimestamp(),
   usefulCount: 0,
   usefulByCurrentUser: false,
 };
@@ -733,7 +733,7 @@ describe('NoteDetailScreen route', () => {
 
   it('submits a note report, shows the success notice, and closes the dialog', async () => {
     mocks.apiClient.createReport.mockResolvedValueOnce({
-      createdAt: 1782993600000,
+      createdAt: testTimestamp(),
       details: null,
       id: 'report-1',
       reason: 'spam',
@@ -912,7 +912,7 @@ function comment(id: string, body: string): Comment {
   return {
     author: { displayName: 'Thiago', id: 'author-id' },
     body,
-    createdAt: 1782993600000,
+    createdAt: testTimestamp(),
     id,
   };
 }
@@ -922,6 +922,10 @@ function commentPage(
   nextCursor: string | null = null,
 ): CommentPage {
   return { comments, nextCursor };
+}
+
+function testTimestamp(): number {
+  return Date.UTC(2026, 6, 2, 12, 0, 0);
 }
 
 async function openNoteReport(renderer: ReactTestRenderer): Promise<void> {

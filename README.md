@@ -97,6 +97,7 @@ The current product endpoints are:
 - `GET /v1/authors/{author_id}` and `GET /v1/authors/{author_id}/notes` require authentication and return an author plus that author’s paginated notes.
 - `GET /v1/notes` requires authentication and returns a bounded list of up to 50 recent/category-filtered notes; `GET /v1/notes/{note_id}` requires authentication and returns one note; `GET /v1/search/notes` requires authentication and searches notes.
 - `PUT /v1/notes/{note_id}/useful` and `DELETE /v1/notes/{note_id}/useful` require authentication and idempotently mark or unmark a note as useful.
+- `POST /v1/events` requires authentication and accepts one bounded batch of 1 to 50 product events; it returns only accepted and duplicate counts and never stored rows or user identity.
 - `POST /v1/media/image-uploads` requires authentication and stages exactly one private JPEG or PNG with a stable `upload_request_id`; its receipt is not public media.
 - `GET /v1/media/images/{image_id}` publicly streams bytes only for an attached image through the stable API URL; it never redirects to or exposes RustFS.
 
@@ -106,11 +107,57 @@ SQLite remains the metadata and search database and requires no database server.
 
 The schema stays portable enough that we can later migrate to Postgres if product needs justify it. Do not add SQLite-specific cleverness to core domain logic unless it buys a real product advantage.
 
+The `events` table is append-only SQLite in the same database. It is operator-only: there is no public event-read route, and export and deletion happen through operator commands or direct SQL. The `user_id` column is `REFERENCES users(id) ON DELETE CASCADE` and the API opens every connection with `PRAGMA foreign_keys = ON`, so deleting a user automatically removes that user's events; rows can also be purged by `installation_id`. Event rows never foreign-key payload entity IDs, so historical content events survive note and comment deletion. Initial retention is 90 days by `received_at`.
+
 ### Search
 
 Search starts with SQLite FTS5. This is enough to build and tune the first product loop.
 
 Long-term social search will depend less on the engine and more on ranking signals: note text, saves, usefulness, freshness, category, author trust, place context, and Brazilian vocabulary. When those signals become clearer, we can evaluate a dedicated search engine such as Meilisearch, Typesense, OpenSearch, or Postgres full-text search.
+
+### Events
+
+sdds records a small, first-party set of product and search events to evaluate search quality and corpus gaps. Events are internal product-learning records, not a public activity feed, and they never block a product action. There is exactly one event route, `POST /v1/events` (`operationId: createEvents`), in the same `requireCurrentSession` group as every other product route. The app is users-only, so every event carries a non-null `user_id` derived from the session on the server, never from the request body; anonymous ingestion is not supported. The request envelope carries `id`, `kind`, `occurred_at`, nullable `installation_id`, `platform` (`ios`, `android`, or `web`), nullable `app_version`, `schema_version`, and the typed `payload`. It never carries a bearer/session token, a client-supplied user ID, an advertising ID, a device fingerprint, precise location, contacts, vectors, or note/comment/report text.
+
+A batch holds 1 to 50 events, the HTTP body is capped at 256 KiB before decoding, and each serialized `payload` is capped at 8 KiB. Validation is atomic: any invalid item returns `400 invalid_event` with indexed problems and inserts nothing; malformed top-level JSON returns `400 invalid_json`; an empty or oversized array returns `400 invalid_event_batch`; an oversized body returns `413 request_too_large`; a store failure rolls back and returns `500`. The event `id` is the idempotency boundary: a replay, including a changed payload or auth context, is a duplicate that never overwrites the stored row, and `200` returns `{accepted_count, duplicate_count}` whose sum equals the submitted count. Mobile drops indexed poison items after `invalid_event` and retries the remaining entries within its retry budget.
+
+Flooding is bounded by a per-user and a global token bucket, both charged by `len(events)` rather than request count: 600 events/user/minute and 6000 events/minute global. These are fixed defaults, not environment-configured. When either bucket is empty the response is `429 rate_limited` with a `Retry-After` header. There is no client signing: a mobile app cannot hold an extractable HMAC secret, and `installation_id` is a resettable, spoofable random UUID rather than a security identity, so a valid bearer is the only defensible control.
+
+Delivery is best-effort from the product's perspective. Mobile keeps an in-memory buffer only (no disk queue, background worker, third-party SDK, or product-visible analytics error), so a recording failure, transport failure, or full buffer never makes reading, searching, reacting, commenting, or publishing fail. On auth client replacement the buffer cancels its timers and drops pending entries rather than risk attribution to a new user; an already in-flight request completes with the token captured at dispatch.
+
+**Vocabulary (schema version 1).** `schema_version` is constrained to `1`, and `kind` is constrained to exactly these twelve literals; unknown kinds and future versions are rejected:
+
+| Kind | Payload fields |
+| --- | --- |
+| `explore_notes_impression` | `category_slug` (string\|null), `result_count`, `results: [{note_id, rank}]` |
+| `explore_note_opened` | `note_id`, `rank`, `category_slug` (string\|null) |
+| `search_submitted` | `search_id`, `search_version`, `query`, `category_slug` (string\|null) |
+| `search_results_impression` | `search_id`, `search_version`, `query`, `category_slug` (string\|null), `result_count`, `results: [{note_id, rank, retrieval_source}]` |
+| `search_result_opened` | `search_id`, `search_version`, `note_id`, `rank`, `retrieval_source` |
+| `search_reformulated` | `previous_search_id`, `previous_search_version`, `search_id`, `search_version`, `previous_query`, `query`, `previous_category_slug` (string\|null), `category_slug` (string\|null) |
+| `search_no_results` | `search_id`, `search_version`, `query`, `category_slug` (string\|null), `result_count: 0` |
+| `note_marked_useful` | `note_id`, `context: UsefulContext` |
+| `note_unmarked_useful` | `note_id`, `context: UsefulContext` |
+| `comment_created` | `note_id`, `comment_id` |
+| `report_created` | `report_id`, `target_type`, `target_id` |
+| `note_published` | `note_id`, `category_slug` |
+
+**`UsefulContext` variants.** `context` is a closed union keyed by `source`; only the whole tuple is valid, and partial provenance is rejected:
+
+| `source` | Additional fields |
+| --- | --- |
+| `search` | `search_id`, `search_version`, `rank`, `retrieval_source` |
+| `explore` | `rank`, `category_slug` (string\|null) |
+| `note_detail` | none |
+| `author_profile` | none |
+
+Search provenance is server-owned: `search_version` is the current literal `fts5-v1`; `retrieval_source` is the constrained enum `lexical`, `semantic`, or `hybrid`, and every current FTS5 result is `lexical`; `rank` is one-based rendered order; and `search_id` is a client-generated UUID stable for one execution. Search-origin useful context repeats the immutable ID/version/rank/source attached to the rendered result and is never recomputed later.
+
+**Impression semantics.** An "impression" is the complete current result set committed and rendered by the eager `ScrollView`, not an HTTP response and not pixel-level viewport exposure. Both impression kinds require `result_count === results.length`, cap the list at 50 items, keep note IDs and ranks unique, and use contiguous one-based ranks in array order. `search_no_results.result_count` is exactly `0` and records a committed empty result set. A stale successful response can record submission evidence but can never set render state or emit an impression, so it cannot produce a false impression.
+
+**Query and identity.** The store keeps only the trimmed submitted search `query`, preserving case, accents, and internal whitespace; it does not also keep raw text or the FTS expression, and the query is sensitive operator-only data never returned through a public API. `user_id` is always the server-derived authenticated user. `installation_id` is an optional self-asserted random UUID that lets the operator see one user across devices; it carries no device information and the user can rotate it by clearing app data, so it is not a fingerprint.
+
+**Internal, versioned contracts.** Event schemas are internal versioned contracts owned by the operator, not a public surface. Changing a payload field, adding a kind, or relaxing validation requires an explicit `schema_version`/domain/OpenAPI migration with focused tests; the domain never decodes payloads permissively, and the table rejects any `schema_version` other than `1`. There is no public event-read API, no analytics UI, no dashboard, no background worker, and no separate analytics database (the event store is the same SQLite database as the rest of the product), and no third-party analytics SDK, advertising identifier, device fingerprinting, or client request signing is present.
 
 ### Deployment
 
@@ -170,6 +217,32 @@ SDDS_DATABASE_PATH=/tmp/sdds.db go run ./services/api/cmd/api inspect-reports
 ```
 
 Each row carries the report id, reporter, target, reason, optional details, a `target_summary` (the note title or the start of the comment body), and a `target_missing` flag where `1` means the reported note or comment has since been deleted.
+
+### Exporting events
+
+`api export-events` opens the database read-only (it never runs migrations, writes, or loads media configuration) and streams one compact NDJSON object per event row ordered by `event_page_key ASC`, so it does not accumulate the whole table in memory:
+
+```sh
+# Compose deployment (repository default); reads /data/sdds.db in the api-data volume
+make export-events
+
+# Direct process (host DB path, mirroring the migrate example)
+SDDS_DATABASE_PATH=/tmp/sdds.db go run ./services/api/cmd/api export-events
+```
+
+Each row is one JSON object with `event_page_key` (the integer insertion key), the envelope `id`, `kind`, `occurred_at` (client Unix milliseconds), and `received_at` (server Unix milliseconds), the non-null server-derived `user_id`, nullable `installation_id`, `platform`, nullable `app_version`, `schema_version`, and `payload` as an embedded JSON object rather than a quoted string. Select rows by the unique search marker (`query`) rather than global counts.
+
+Export is read-only and does not delete. Initial retention is 90 days by `received_at`, so export before a manual purge. To purge manually, run against the same database the API uses:
+
+```sql
+-- time window: rows received before the cutoff (Unix milliseconds)
+DELETE FROM events WHERE received_at < :cutoff_ms;
+
+-- one installation across one or more devices
+DELETE FROM events WHERE installation_id = :installation_id;
+```
+
+Account deletion is automatic: `user_id` is declared `REFERENCES users(id) ON DELETE CASCADE` and the API opens every connection with `PRAGMA foreign_keys = ON`, so deleting the user row removes every event that user produced and no separate event purge is needed for account deletion.
 
 ### Full local runtime through Compose
 

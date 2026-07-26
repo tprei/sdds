@@ -14,6 +14,94 @@ type EventStore struct {
 	db *sql.DB
 }
 
+type EventExportRow struct {
+	EventPageKey   int64
+	ID             string
+	Kind           string
+	OccurredAt     int64
+	ReceivedAt     int64
+	UserID         string
+	InstallationID *string
+	Platform       string
+	AppVersion     *string
+	SchemaVersion  int
+	Payload        json.RawMessage
+}
+
+const streamEventsSQL = `
+	SELECT
+		event_page_key,
+		id,
+		kind,
+		occurred_at,
+		received_at,
+		user_id,
+		installation_id,
+		app_platform,
+		app_version,
+		schema_version,
+		payload_json
+	FROM events
+	ORDER BY event_page_key ASC
+`
+
+func (store *EventStore) StreamExportRows(
+	ctx context.Context,
+	visit func(EventExportRow) error,
+) error {
+	if visit == nil {
+		return fmt.Errorf("stream event export rows: nil visitor")
+	}
+	rows, err := store.db.QueryContext(ctx, streamEventsSQL)
+	if err != nil {
+		return fmt.Errorf("query event export rows: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var (
+			row            EventExportRow
+			installationID sql.NullString
+			appVersion     sql.NullString
+			payload        []byte
+		)
+		if err := rows.Scan(
+			&row.EventPageKey,
+			&row.ID,
+			&row.Kind,
+			&row.OccurredAt,
+			&row.ReceivedAt,
+			&row.UserID,
+			&installationID,
+			&row.Platform,
+			&appVersion,
+			&row.SchemaVersion,
+			&payload,
+		); err != nil {
+			return fmt.Errorf("scan event export row: %w", err)
+		}
+		if installationID.Valid {
+			value := installationID.String
+			row.InstallationID = &value
+		}
+		if appVersion.Valid {
+			value := appVersion.String
+			row.AppVersion = &value
+		}
+		if !json.Valid(payload) {
+			return fmt.Errorf("event export row %d has invalid payload JSON", row.EventPageKey)
+		}
+		row.Payload = append(json.RawMessage(nil), payload...)
+		if err := visit(row); err != nil {
+			return fmt.Errorf("visit event export row %d: %w", row.EventPageKey, err)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("read event export rows: %w", err)
+	}
+	return nil
+}
+
 func NewEventStore(db *sql.DB) *EventStore {
 	return &EventStore{db: db}
 }

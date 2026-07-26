@@ -3,6 +3,7 @@ set -eu
 umask 077
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 COMPOSE_FILE=$ROOT/infra/compose/compose.yaml
+PREFLIGHT_COMPOSE_FILE=$ROOT/infra/compose/compose-preflight.yaml
 PROJECT=sdds-rustfs-$(date +%s)-$$
 TMP=
 API_URL=
@@ -35,6 +36,83 @@ create_test_credentials() {
   media_secret=$(tr -d '\r\n' <"$create_credentials_work_dir/media-secret")
   export SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE=$create_credentials_work_dir/root-access SDDS_COMPOSE_RUSTFS_ROOT_SECRET_KEY_FILE=$create_credentials_work_dir/root-secret
   export SDDS_COMPOSE_SDDS_MEDIA_ACCESS_KEY_FILE=$create_credentials_work_dir/media-access SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE=$create_credentials_work_dir/media-secret SDDS_HTTP_PORT=0
+}
+verify_preflight_runs_as_service_user() {
+  output=$(docker compose --env-file /dev/null -f "$PREFLIGHT_COMPOSE_FILE" -p "$PROJECT" run --build --rm --no-deps --entrypoint id rustfs-init 2>&1) || { printf '%s\n' "$output" >&2; die 'preflight identity check failed'; }
+  case "$output" in *'uid=10001 gid=10001'*) ;; *) printf '%s\n' "$output" >&2; die 'preflight did not run as the service user';; esac
+}
+run_preflight_without_secret() {
+  (
+    unset "$1"
+    docker compose --env-file /dev/null -f "$PREFLIGHT_COMPOSE_FILE" -p "$PROJECT" run --build --rm --no-deps --entrypoint /usr/local/bin/validate-compose-secrets rustfs-init
+  )
+}
+run_make_preflight_without_secret() {
+  (
+    unset "$1"
+    make -C "$ROOT" "PREFLIGHT_COMPOSE=docker compose --env-file /dev/null -f $PREFLIGHT_COMPOSE_FILE -p $PROJECT" COMPOSE=false compose-up
+  )
+}
+verify_compose_start_requires_secret_paths() {
+  for required_secret_variable in SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE SDDS_COMPOSE_RUSTFS_ROOT_SECRET_KEY_FILE SDDS_COMPOSE_SDDS_MEDIA_ACCESS_KEY_FILE SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE; do
+    output=$(run_preflight_without_secret "$required_secret_variable" 2>&1) && die "$required_secret_variable is optional"
+    case "$output" in *"$required_secret_variable"*) ;; *) printf '%s\n' "$output" >&2; die "$required_secret_variable diagnostic drift";; esac
+  done
+}
+verify_preflight_ignores_orphans() {
+  orphan_check_variable=SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE
+  output=$(run_make_preflight_without_secret "$orphan_check_variable" 2>&1) && die "$orphan_check_variable is optional"
+  case "$output" in
+    *'orphan containers'*) die "$orphan_check_variable emitted an orphan warning";;
+    *"$orphan_check_variable"*) ;;
+    *) printf '%s\n' "$output" >&2; die "$orphan_check_variable diagnostic drift";;
+  esac
+}
+verify_preflight_rejects_invalid_media_secret() {
+  invalid_secret_file=$1
+  invalid_secret_label=$2
+  output=$(SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE="$invalid_secret_file" docker compose --env-file /dev/null -f "$PREFLIGHT_COMPOSE_FILE" -p "$PROJECT" run --build --rm --no-deps --entrypoint /usr/local/bin/validate-compose-secrets rustfs-init 2>&1) && die "$invalid_secret_label secret was accepted"
+  case "$output" in *'SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE contains an invalid character'*) ;; *) printf '%s\n' "$output" >&2; die "$invalid_secret_label secret diagnostic drift";; esac
+}
+verify_preflight_rejects_whitespace_secret() {
+  whitespace_secret=$TMP/media-secret-whitespace
+  printf 'invalid secret\n' >"$whitespace_secret"
+  chmod 0444 "$whitespace_secret"
+  verify_preflight_rejects_invalid_media_secret "$whitespace_secret" whitespace
+}
+verify_preflight_rejects_embedded_newline_secret() {
+  embedded_newline_secret=$TMP/media-secret-embedded-newline
+  printf 'first\nsecond\n' >"$embedded_newline_secret"
+  chmod 0444 "$embedded_newline_secret"
+  verify_preflight_rejects_invalid_media_secret "$embedded_newline_secret" embedded-newline
+}
+verify_preflight_rejects_nul_secret() {
+  nul_secret=$TMP/media-secret-nul
+  printf 'first\000second\n' >"$nul_secret"
+  chmod 0444 "$nul_secret"
+  verify_preflight_rejects_invalid_media_secret "$nul_secret" nul
+}
+verify_secret_reader_cleans_snapshot_on_signal() {
+  snapshot_copy_bin=$TMP/snapshot-copy-bin
+  mkdir -p "$snapshot_copy_bin"
+  printf '%s\n' '#!/bin/sh' 'touch /tmp/sdds-test/snapshot-copy-started' 'while [ ! -e /tmp/sdds-test/snapshot-copy-release ]; do sleep 1; done' 'exec /bin/cat "$@"' >"$snapshot_copy_bin/cat"
+  chmod 0555 "$snapshot_copy_bin/cat"
+  output=$(compose run --rm --no-deps --volume "$TMP:/tmp/sdds-test" --entrypoint /bin/sh rustfs-init -ec '
+    PATH=/tmp/sdds-test/snapshot-copy-bin:$PATH
+    export PATH
+    (
+      die() { exit 1; }
+      . /usr/local/lib/rustfs-init/secret-file.sh
+      read_secret /tmp/sdds-test/media-secret snapshot-cleanup >/dev/null
+    ) &
+    reader_pid=$!
+    while [ ! -e /tmp/sdds-test/snapshot-copy-started ]; do sleep 1; done
+    kill -TERM "$reader_pid"
+    touch /tmp/sdds-test/snapshot-copy-release
+    if wait "$reader_pid"; then exit 1; fi
+    set -- /tmp/rustfs-secret.*
+    [ "$1" = "/tmp/rustfs-secret.*" ]
+  ' 2>&1) || { printf '%s\n' "$output" >&2; die 'credential snapshot survived interruption'; }
 }
 aws_with_credentials() {
   aws_credentials_access_key=$1
@@ -170,12 +248,22 @@ verify_api_restart_outage_recovery() {
   pnpm test:rustfs:api-runtime-boundaries
 }
 verify_migrate_without_media_dependencies() {
-  compose run --build --rm --no-deps api migrate >/dev/null
+  (
+    unset SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE SDDS_COMPOSE_RUSTFS_ROOT_SECRET_KEY_FILE SDDS_COMPOSE_SDDS_MEDIA_ACCESS_KEY_FILE SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE
+    docker compose --env-file /dev/null -f "$COMPOSE_FILE" -p "$PROJECT" run --build --rm --no-deps api migrate >/dev/null
+  )
 }
 run_rustfs_integration() {
   TMP=$(mktemp -d "${TMPDIR:-/tmp}/sdds-rustfs.XXXXXX")
   create_test_credentials "$TMP" "$PROJECT"
+  verify_preflight_runs_as_service_user
+  verify_preflight_rejects_whitespace_secret
+  verify_preflight_rejects_embedded_newline_secret
+  verify_preflight_rejects_nul_secret
+  verify_secret_reader_cleans_snapshot_on_signal
+  verify_compose_start_requires_secret_paths
   start_compose_runtime
+  verify_preflight_ignores_orphans
   verify_bootstrap_idempotency
   verify_bootstrap_drift_recovery
   prepare_sentinel_fixture

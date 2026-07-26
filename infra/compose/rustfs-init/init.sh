@@ -3,13 +3,7 @@ set -eu
 umask 077
 
 die() { printf 'rustfs-init: %s\n' "$1" >&2; exit 1; }
-read_secret() {
-  [ -r "$1" ] || die "secret file is unreadable"
-  value=$(tr -d '\r\n' <"$1") || die "secret file cannot be read"
-  [ -n "$value" ] || die "secret file is empty"
-  case "$value" in *[![:graph:]]*) die "secret contains whitespace";; esac
-  printf '%s' "$value"
-}
+. /usr/local/lib/rustfs-init/secret-file.sh
 
 ENDPOINT=${RUSTFS_ENDPOINT:-http://rustfs:9000}
 REGION=${AWS_REGION:-us-east-1}
@@ -24,10 +18,10 @@ SENTINEL_SHA256=5aff33ce5e386989939a8a504923897432db5b5a818518ccd876dadf2ad7398f
 SENTINEL_CHECKSUM=Wv8zzl44aYmTmopQSSOJdDLbW1qBhRjM2Hba3yrXOY8=
 case "$ENDPOINT" in http://*|https://*) ;; *) die "endpoint must use HTTP or HTTPS";; esac
 [ -r "$POLICY" ] || die "policy file is unreadable"
-ROOT_ACCESS=$(read_secret "$ROOT_ACCESS_FILE")
-ROOT_SECRET=$(read_secret "$ROOT_SECRET_FILE")
-API_ACCESS=$(read_secret "$API_ACCESS_FILE")
-API_SECRET=$(read_secret "$API_SECRET_FILE")
+ROOT_ACCESS=$(read_secret "$ROOT_ACCESS_FILE" 'secret file')
+ROOT_SECRET=$(read_secret "$ROOT_SECRET_FILE" 'secret file')
+API_ACCESS=$(read_secret "$API_ACCESS_FILE" 'secret file')
+API_SECRET=$(read_secret "$API_SECRET_FILE" 'secret file')
 export AWS_REGION="$REGION" AWS_EC2_METADATA_DISABLED=true AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null
 unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_PROFILE
 

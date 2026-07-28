@@ -6,6 +6,7 @@ import {
   createSearchRequest,
   isCurrentSearchRequest,
   labelSearchResults,
+  presentSearchResults,
   resolveSearchCategorySlug,
   searchNotesInput,
   searchRecentQueryLimit,
@@ -30,13 +31,19 @@ describe('search screen helpers', () => {
       createSearchRequest({
         categorySlug: null,
         nextRequestID: 3,
+        occurredAt: 1782993600000,
+        previousSearch: null,
         query: '  café brasileiro  ',
+        searchID: '018ff5b8-0000-7000-8000-000000000001',
       }),
     ).toEqual({
       categorySlug: null,
       id: 3,
       input: { query: 'café brasileiro' },
+      occurredAt: 1782993600000,
+      previousSearch: null,
       query: 'café brasileiro',
+      searchID: '018ff5b8-0000-7000-8000-000000000001',
     });
   });
 
@@ -52,7 +59,10 @@ describe('search screen helpers', () => {
       createSearchRequest({
         categorySlug: 'food',
         nextRequestID: 4,
+        occurredAt: 1782993600000,
+        previousSearch: null,
         query: '   ',
+        searchID: '018ff5b8-0000-7000-8000-000000000002',
       }),
     ).toBeNull();
   });
@@ -165,6 +175,65 @@ describe('search screen helpers', () => {
     ).toEqual([
       { id: 'first', retrievalSource: 'semantic' },
       { id: 'second', retrievalSource: 'lexical' },
+    ]);
+  });
+  it('keeps immutable search lineage on rendered results', () => {
+    const request = createSearchRequest({
+      categorySlug: 'food',
+      nextRequestID: 2,
+      occurredAt: 1782993600000,
+      previousSearch: {
+        categorySlug: null,
+        query: 'café',
+        searchID: '018ff5b8-0000-7000-8000-000000000001',
+      },
+      query: 'pão',
+      searchID: '018ff5b8-0000-7000-8000-000000000002',
+    });
+    if (request === null) {
+      throw new Error('request_missing');
+    }
+
+    const labelledResults = labelSearchResults(
+      buildNoteCatalog(catalogs()),
+      [
+        { note: searchNote('first'), retrievalSource: 'lexical' },
+        { note: searchNote('second'), retrievalSource: 'semantic' },
+      ],
+    );
+    if (labelledResults === null) {
+      throw new Error('results_missing');
+    }
+
+    const presented = presentSearchResults({
+      request,
+      results: labelledResults,
+      searchVersion: 'fts5-v1',
+    });
+
+    expect(
+      presented.map((result) => ({
+        id: result.note.id,
+        rank: result.rank,
+        searchID: result.searchID,
+        searchVersion: result.searchVersion,
+        retrievalSource: result.retrievalSource,
+      })),
+    ).toEqual([
+      {
+        id: 'first',
+        rank: 1,
+        searchID: request.searchID,
+        searchVersion: 'fts5-v1',
+        retrievalSource: 'lexical',
+      },
+      {
+        id: 'second',
+        rank: 2,
+        searchID: request.searchID,
+        searchVersion: 'fts5-v1',
+        retrievalSource: 'semantic',
+      },
     ]);
   });
   it('labels singular and plural result counts', () => {

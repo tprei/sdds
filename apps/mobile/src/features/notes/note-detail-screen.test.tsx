@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import NoteDetailScreen from '@/app/notes/[id]';
 import type { Comment, CommentPage } from '@/lib/api/comments';
 import type { CommentThreadState } from '@/features/comments/comment-thread';
+import { registerPresentedNoteOrigin } from './presented-note-origin';
 
 const { createElement } = React;
 type ReactNode = React.ReactNode;
@@ -34,6 +35,10 @@ type AuthStateMock =
       token: string;
       user: { author: { displayName: string; id: string }; id: string };
     };
+type LocalParams = {
+  id?: string | string[];
+  origin?: string | string[];
+};
 
 const mocks = vi.hoisted(() => ({
   apiClient: {
@@ -49,9 +54,16 @@ const mocks = vi.hoisted(() => ({
   focusVersion: 0,
   authState: { status: 'loading' } as AuthStateMock,
   back: vi.fn(),
-  localParams: { id: 'note-id' },
+  localParams: { id: 'note-id' } as LocalParams,
   logout: vi.fn(async () => undefined),
   push: vi.fn(),
+  record: vi.fn(),
+}));
+vi.mock('expo-crypto', () => ({
+  randomUUID: () => '018ff5b8-0000-7000-8000-000000000001',
+}));
+vi.mock('@/lib/events/product-event-provider', () => ({
+  useProductEvents: () => ({ record: mocks.record }),
 }));
 
 vi.mock('react-native', () => {
@@ -199,12 +211,12 @@ const note = {
   author: { displayName: 'Thiago', id: 'author-id' },
   body: 'Tem pão de queijo decente.',
   categorySlug: 'food',
-  createdAt: 1782993600000,
+  createdAt: testTimestamp(),
   id: 'note-id',
   images: [],
   placeSlug: null,
   title: 'Café bom',
-  updatedAt: 1782993600000,
+  updatedAt: testTimestamp(),
   usefulCount: 0,
   usefulByCurrentUser: false,
 };
@@ -236,6 +248,7 @@ describe('NoteDetailScreen route', () => {
     mocks.logout.mockClear();
     mocks.back.mockClear();
     mocks.push.mockClear();
+    mocks.record.mockClear();
   });
 
   afterEach(() => {
@@ -283,10 +296,36 @@ describe('NoteDetailScreen route', () => {
       await settle();
     });
 
-    expect(renderer.root.findByProps({ testID: 'useful-state' }).props.children).toBe(
-      '1:true',
-    );
+    expect(
+      renderer.root.findByProps({ testID: 'useful-state' }).props.children,
+    ).toBe('1:true');
+    expect(mocks.record).toHaveBeenCalledWith('note_marked_useful', {
+      context: { source: 'note_detail' },
+      noteID: 'note-id',
+    });
     expect(mocks.apiClient.markNoteUseful).toHaveBeenCalledWith('note-id');
+  });
+  it('uses a one-shot search origin for useful provenance', async () => {
+    const searchContext = {
+      retrievalSource: 'lexical' as const,
+      rank: 1,
+      searchID: '018ff5b8-0000-7000-8000-000000000001',
+      searchVersion: 'fts5-v1' as const,
+      source: 'search' as const,
+    };
+    const origin = registerPresentedNoteOrigin('note-id', searchContext);
+    mocks.localParams = { id: 'note-id', origin };
+
+    const renderer = await renderScreen();
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'useful-button' }).props.onPress();
+      await settle();
+    });
+
+    expect(mocks.record).toHaveBeenCalledWith('note_marked_useful', {
+      context: searchContext,
+      noteID: 'note-id',
+    });
   });
 
   it('does not refresh an unmounted note after a useful request settles', async () => {
@@ -694,7 +733,7 @@ describe('NoteDetailScreen route', () => {
 
   it('submits a note report, shows the success notice, and closes the dialog', async () => {
     mocks.apiClient.createReport.mockResolvedValueOnce({
-      createdAt: 1782993600000,
+      createdAt: testTimestamp(),
       details: null,
       id: 'report-1',
       reason: 'spam',
@@ -873,7 +912,7 @@ function comment(id: string, body: string): Comment {
   return {
     author: { displayName: 'Thiago', id: 'author-id' },
     body,
-    createdAt: 1782993600000,
+    createdAt: testTimestamp(),
     id,
   };
 }
@@ -883,6 +922,10 @@ function commentPage(
   nextCursor: string | null = null,
 ): CommentPage {
   return { comments, nextCursor };
+}
+
+function testTimestamp(): number {
+  return Date.UTC(2026, 6, 2, 12, 0, 0);
 }
 
 async function openNoteReport(renderer: ReactTestRenderer): Promise<void> {

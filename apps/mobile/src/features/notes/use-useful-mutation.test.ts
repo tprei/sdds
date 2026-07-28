@@ -73,6 +73,32 @@ describe('useUsefulMutation', () => {
     expect(rendered.get().getMutationState('note-1')).toBe('idle');
     expect(applyResult).toHaveBeenCalledOnce();
   });
+  it('calls the success seam without letting recorder failure change the UI result', async () => {
+    mockClient.markNoteUseful.mockResolvedValue(undefined);
+    const applyResult = vi.fn();
+    const onSuccess = vi.fn(() => {
+      throw new Error('recorder_failed');
+    });
+
+    const rendered = renderUsefulMutation({
+      apiClient: mockClient as unknown as APIClient,
+      onSessionExpired: vi.fn(),
+      onSuccess,
+      getGeneration: () => 1,
+      isStale: () => false,
+      applyResult,
+      onStaleWrite: vi.fn(),
+    });
+
+    await act(async () => {
+      await rendered.get().toggleUseful(baseNote);
+      await settle();
+    });
+
+    expect(onSuccess).toHaveBeenCalledWith(baseNote, 'marked');
+    expect(rendered.get().getMutationState('note-1')).toBe('idle');
+    expect(applyResult).toHaveBeenCalledOnce();
+  });
 
   it('calls onStaleWrite and clears pending on stale success', async () => {
     mockClient.markNoteUseful.mockResolvedValue(undefined);

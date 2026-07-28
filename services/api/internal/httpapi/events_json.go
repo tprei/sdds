@@ -179,17 +179,21 @@ func requiredInt(fields map[string]json.RawMessage, name string, index int, prob
 
 func requiredIntAt(fields map[string]json.RawMessage, name string, index int, prefix string, problems *[]openapi.InvalidEventProblem) (int, bool) {
 	value, ok := fields[name]
+	field := name
+	if prefix != "" {
+		field = prefix + "." + name
+	}
 	if !ok {
-		*problems = append(*problems, invalidEventProblem(index, prefix+"."+name, "required"))
+		*problems = append(*problems, invalidEventProblem(index, field, "required"))
 		return 0, false
 	}
 	if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
-		*problems = append(*problems, invalidEventProblem(index, prefix+"."+name, "invalid"))
+		*problems = append(*problems, invalidEventProblem(index, field, "invalid"))
 		return 0, false
 	}
 	var result int
 	if err := json.Unmarshal(value, &result); err != nil {
-		*problems = append(*problems, invalidEventProblem(index, prefix+"."+name, "invalid"))
+		*problems = append(*problems, invalidEventProblem(index, field, "invalid"))
 		return 0, false
 	}
 	return result, true

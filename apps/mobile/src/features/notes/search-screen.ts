@@ -8,16 +8,25 @@ import type {
   RetrievalSource,
   SearchNoteResult,
   SearchNotesInput,
+  SearchVersion,
 } from '@/lib/api/notes';
 
 export const searchScopeLabel = 'Mundo todo';
 export const searchRecentQueryLimit = 5;
 
+export type SearchDispatchedContext = {
+  categorySlug: string | null;
+  query: string;
+  searchID: string;
+};
 export type SearchRequest = {
   categorySlug: string | null;
   id: number;
   input: SearchNotesInput;
+  occurredAt: number;
+  previousSearch: SearchDispatchedContext | null;
   query: string;
+  searchID: string;
 };
 
 export type SearchResultContext = {
@@ -30,6 +39,11 @@ export type SearchResultContext = {
 export type LabelledSearchResult = {
   note: LabelledNote;
   retrievalSource: RetrievalSource;
+};
+export type PresentedSearchResult = LabelledSearchResult & {
+  rank: number;
+  searchID: string;
+  searchVersion: SearchVersion;
 };
 
 export function labelSearchResults(
@@ -50,14 +64,37 @@ export function labelSearchResults(
   return labelledResults;
 }
 
+export function presentSearchResults({
+  request,
+  results,
+  searchVersion,
+}: {
+  request: SearchRequest;
+  results: readonly LabelledSearchResult[];
+  searchVersion: SearchVersion;
+}): PresentedSearchResult[] {
+  return results.map((result, index) => ({
+    ...result,
+    rank: index + 1,
+    searchID: request.searchID,
+    searchVersion,
+  }));
+}
+
 export function createSearchRequest({
   categorySlug,
   nextRequestID,
+  occurredAt,
+  previousSearch,
   query,
+  searchID,
 }: {
   categorySlug: string | null;
   nextRequestID: number;
+  occurredAt: number;
+  previousSearch: SearchDispatchedContext | null;
   query: string;
+  searchID: string;
 }): SearchRequest | null {
   const submittedQuery = submittedSearchQuery(query);
   if (submittedQuery === null) {
@@ -68,7 +105,10 @@ export function createSearchRequest({
     categorySlug,
     id: nextRequestID,
     input: searchNotesInput(submittedQuery, categorySlug),
+    occurredAt,
+    previousSearch,
     query: submittedQuery,
+    searchID,
   };
 }
 

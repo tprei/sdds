@@ -1,6 +1,7 @@
 import {
   type ReactNode,
   useCallback,
+  useEffect,
   useReducer,
   useRef,
   useState,
@@ -32,11 +33,21 @@ import { NoteDetailContent } from '@/features/notes/note-detail-content';
 import { buildNoteCatalog, labelNote } from '@/features/notes/catalog';
 import type { LabelledNote } from '@/features/notes/catalog';
 import { APIRequestError } from '@/lib/api/notes';
+import type { Note } from '@/lib/api/notes';
 import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
 import { useAuth } from '@/lib/auth/auth-provider';
 import type { APIClient } from '@/lib/api/client';
-import { useUsefulMutation } from '@/features/notes/use-useful-mutation';
+import { useProductEvents } from '@/lib/events/product-event-provider';
+import type { UsefulContext } from '@/lib/events/event-types';
+import {
+  consumePresentedNoteOrigin,
+  readPresentedNoteOrigin,
+} from '@/features/notes/presented-note-origin';
+import {
+  useUsefulMutation,
+  type UsefulMutationAction,
+} from '@/features/notes/use-useful-mutation';
 import { ReadAuthGate } from '@/components/read-auth-gate';
 
 type NoteDetailState =
@@ -50,16 +61,21 @@ type AuthenticatedNoteDetailScreenProps = {
   currentAuthorID: string;
   noteID: string;
   onSessionExpired: () => Promise<void>;
+  originNonce: string | undefined;
 };
 
-
+const noteDetailUsefulContext: UsefulContext = { source: 'note_detail' };
 const notFoundStatus = 404;
 
 export default function NoteDetailScreen() {
   const router = useRouter();
   const { apiClient, logout, state } = useAuth();
-  const { id } = useLocalSearchParams<{ id?: string | string[] }>();
+  const { id, origin } = useLocalSearchParams<{
+    id?: string | string[];
+    origin?: string | string[];
+  }>();
   const noteID = typeof id === 'string' ? id : undefined;
+  const originNonce = typeof origin === 'string' ? origin : undefined;
 
   if (!noteID?.trim()) {
     return (
@@ -80,11 +96,12 @@ export default function NoteDetailScreen() {
   if (state.status === 'authenticated') {
     return (
       <AuthenticatedNoteDetailScreen
-        key={`${state.user.id}:${noteID}`}
+        key={`${state.user.id}:${noteID}:${originNonce ?? ''}`}
         apiClient={apiClient}
         currentAuthorID={state.user.author.id}
         noteID={noteID}
         onSessionExpired={logout}
+        originNonce={originNonce}
       />
     );
   }
@@ -117,8 +134,20 @@ function AuthenticatedNoteDetailScreen({
   currentAuthorID,
   noteID,
   onSessionExpired,
+  originNonce,
 }: AuthenticatedNoteDetailScreenProps) {
   const router = useRouter();
+  const productEvents = useProductEvents();
+  const [presentedUsefulContext] = useState<UsefulContext | null>(() =>
+    originNonce === undefined
+      ? null
+      : (readPresentedNoteOrigin(originNonce, noteID) ?? null),
+  );
+  useEffect(() => {
+    if (originNonce !== undefined && presentedUsefulContext !== null) {
+      consumePresentedNoteOrigin(originNonce, noteID);
+    }
+  }, [noteID, originNonce, presentedUsefulContext]);
   const detailGenerationRef = useRef(0);
   const detailActiveRef = useRef(false);
   const commentRequestIDRef = useRef(0);
@@ -402,9 +431,25 @@ function AuthenticatedNoteDetailScreen({
       });
   }, [apiClient, handleCommentSessionExpired, reportForm]);
 
+  const recordUsefulSuccess = useCallback(
+    (note: Note, action: UsefulMutationAction) => {
+      productEvents.record(
+        action === 'marked'
+          ? 'note_marked_useful'
+          : 'note_unmarked_useful',
+        {
+          context: presentedUsefulContext ?? noteDetailUsefulContext,
+          noteID: note.id,
+        },
+      );
+    },
+    [presentedUsefulContext, productEvents],
+  );
+
 
   const { getMutationState, toggleUseful: handleToggleUseful } = useUsefulMutation({
     apiClient,
+    onSuccess: recordUsefulSuccess,
     onSessionExpired,
     getGeneration: () => detailGenerationRef.current,
     isStale: (gen) => gen !== detailGenerationRef.current,

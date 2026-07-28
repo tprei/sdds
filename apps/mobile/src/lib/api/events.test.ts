@@ -30,7 +30,7 @@ describe('events API client', () => {
         expect.objectContaining({
           id: eventID,
           kind: 'search_submitted',
-          occurred_at: 1782993600000,
+          occurred_at: eventOccurredAt(),
           installation_id: installationID,
           platform: 'web',
           app_version: '0.0.1',
@@ -61,6 +61,18 @@ describe('events API client', () => {
     });
   });
 
+  it('rejects an event error with no indexed problems', async () => {
+    stubFetch(async () =>
+      jsonResponse({ code: 'invalid_event', problems: [] }, 400),
+    );
+
+    await expect(createAPIClient().createEvents([event()])).rejects.toMatchObject({
+      status: 400,
+      body: { code: 'invalid_event' },
+      eventProblems: undefined,
+    });
+  });
+
   it('rejects a malformed receipt', async () => {
     stubFetch(async () => jsonResponse({ accepted_count: 1 }));
     await expect(createAPIClient().createEvents([event()])).rejects.toBeInstanceOf(
@@ -73,7 +85,7 @@ function event(): ProductEvent {
   return {
     id: eventID,
     kind: 'search_submitted',
-    occurredAt: 1782993600000,
+    occurredAt: eventOccurredAt(),
     installationID,
     platform: 'web',
     appVersion: '0.0.1',
@@ -81,6 +93,10 @@ function event(): ProductEvent {
     payload: { searchID, searchVersion: 'fts5-v1', query: 'cafe bom', categorySlug: 'food' },
   };
 }
+function eventOccurredAt(): number {
+  return Date.UTC(2026, 6, 2, 12, 0, 0);
+}
+
 function stubFetch(handler: (request: Request) => Promise<Response>): void {
   vi.stubGlobal('fetch', handler);
 }

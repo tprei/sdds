@@ -288,7 +288,7 @@ const invalidEventProblemSchema = z
 export const eventErrorResponseSchema = z
   .object({
     code: z.literal('invalid_event'),
-    problems: z.array(invalidEventProblemSchema),
+    problems: z.array(invalidEventProblemSchema).min(1),
   })
   .strict() satisfies z.ZodType<EventErrorResponse>;
 

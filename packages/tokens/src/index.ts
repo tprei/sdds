@@ -1,27 +1,27 @@
 export const colors = {
-  paper0: '#F7F2E3',
-  paper1: '#EFE9D6',
-  paper2: '#E6DEC6',
-  paper3: '#DAD0B4',
-  line: '#E9E2CC',
-  lineStrong: '#D7CFB3',
+  paper0: '#FBF1DC',
+  paper1: '#F5E7C8',
+  paper2: '#ECD9AE',
+  paper3: '#DFC791',
+  line: '#EFE2C1',
+  lineStrong: '#DECBA0',
   white: '#FFFFFF',
   ink900: '#25342B',
   ink700: '#45544A',
   ink500: '#6E7A70',
   ink400: '#99A39A',
   ink300: '#B6BEB4',
-  green700: '#245F3F',
-  green600: '#2A7049',
-  green500: '#2F7C52',
-  green400: '#579B76',
-  green200: '#BFDECB',
-  green100: '#E6F0E9',
-  yellow600: '#C9992A',
-  yellow500: '#F2C230',
-  yellow400: '#F6D25E',
-  yellow200: '#FAE49C',
-  yellow100: '#FFF0BC',
+  green700: '#06552C',
+  green600: '#086B37',
+  green500: '#0B8043',
+  green400: '#2FA163',
+  green200: '#ADE3C4',
+  green100: '#E1F5E8',
+  yellow600: '#C79417',
+  yellow500: '#F5C51C',
+  yellow400: '#F8D44E',
+  yellow200: '#FBE79B',
+  yellow100: '#FFF3C4',
   blue700: '#2C4478',
   blue600: '#33508D',
   blue500: '#3A5A9E',
@@ -31,6 +31,7 @@ export const colors = {
   dangerBg: '#F6E0D8',
   textOnAccent: '#F3FAF5',
   selectionInk: '#3A2E10',
+  scrim: 'rgba(35, 33, 28, 0.45)',
 } as const;
 
 export const semanticColors = {
@@ -59,11 +60,20 @@ export const semanticColors = {
   saved: colors.yellow500,
   savedTint: colors.yellow100,
   focusRing: colors.green400,
+  success: colors.green500,
+  successBg: colors.green100,
+  warning: colors.yellow600,
+  warningBg: colors.yellow200,
+  danger: colors.danger500,
+  dangerBg: colors.dangerBg,
+  info: colors.blue500,
+  infoBg: colors.blue100,
+  scrim: colors.scrim,
 } as const;
 
 export const categoryColors = {
   beauty: { ink: '#C0577F', background: '#F8E2EC' },
-  food: { ink: '#2A7049', background: '#E6F0E9' },
+  food: { ink: '#086B37', background: '#E1F5E8' },
   travel: { ink: '#33508D', background: '#E8EDF6' },
   finds: { ink: '#4B57A8', background: '#E6E7F6' },
 } as const;
@@ -95,6 +105,7 @@ export const radius = {
   xl: 24,
   xxl: 30,
   pill: 999,
+  fab: 13,
 } as const;
 
 export const typography = {
@@ -122,6 +133,10 @@ export const typography = {
   lineHeightSnug: 1.22,
   lineHeightNormal: 1.45,
   lineHeightRelaxed: 1.6,
+  letterSpacingTight: -0.02,
+  letterSpacingSnug: -0.01,
+  letterSpacingNormal: 0,
+  letterSpacingWide: 0.04,
 } as const;
 
 export const shadows = {
@@ -147,12 +162,45 @@ export const shadows = {
     elevation: 4,
   },
   fab: {
-    shadowColor: '#245F3F',
+    shadowColor: '#06552C',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 6,
   },
+  lg: {
+    shadowColor: '#4A3620',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.12,
+    shadowRadius: 34,
+    elevation: 9,
+  },
+  xl: {
+    shadowColor: '#4A3620',
+    shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.16,
+    shadowRadius: 56,
+    elevation: 14,
+  },
 } as const;
 
 export type CategorySlug = keyof typeof categoryColors;
+
+export const fontFamilies = {
+  light: 'PlusJakartaSans_300Light',
+  regular: 'PlusJakartaSans_400Regular',
+  medium: 'PlusJakartaSans_500Medium',
+  semibold: 'PlusJakartaSans_600SemiBold',
+  bold: 'PlusJakartaSans_700Bold',
+  extraBold: 'PlusJakartaSans_800ExtraBold',
+  hand: 'Caveat_600SemiBold',
+} as const;
+
+export const motion = {
+  durationFast: 120,
+  durationBase: 160,
+  durationSheet: 200,
+  pressButtonScale: 0.97,
+  pressCardScale: 0.98,
+  pressIconScale: 0.92,
+} as const;

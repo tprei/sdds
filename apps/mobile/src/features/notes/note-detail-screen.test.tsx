@@ -62,9 +62,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock('expo-crypto', () => ({
   randomUUID: () => '018ff5b8-0000-7000-8000-000000000001',
 }));
-vi.mock('@/lib/events/product-event-provider', () => ({
-  useProductEvents: () => ({ record: mocks.record }),
-}));
+vi.mock('@/lib/events/product-event-provider', () => {
+  const productEvents = { record: mocks.record };
+  return {
+    useProductEvents: () => productEvents,
+  };
+});
 
 vi.mock('react-native', () => {
   function NativeView({ children, ...props }: NativeProps) {
@@ -508,6 +511,10 @@ describe('NoteDetailScreen route', () => {
     expect(renderedCommentThread(renderer).localTailComments).toEqual([
       submittedComment,
     ]);
+    expect(mocks.record).toHaveBeenCalledWith('comment_created', {
+      commentID: submittedComment.id,
+      noteID: 'note-id',
+    });
   });
 
   it('keeps comment errors local and retries the initial list', async () => {
@@ -536,6 +543,7 @@ describe('NoteDetailScreen route', () => {
     });
     expect(renderedCommentThread(renderer).submitStatus).toBe('error');
     expect(renderedCommentThread(renderer).draft).toBe('Comentário com falha');
+    expect(mocks.record).not.toHaveBeenCalled();
   });
 
   it('logs out on a comment-list 401 and replaces the detail for a create 404', async () => {
@@ -690,6 +698,10 @@ describe('NoteDetailScreen route', () => {
       await settle();
     });
     expect(renderedCommentThread(renderer).comments).toEqual([nextRouteComment]);
+    expect(mocks.record).toHaveBeenCalledWith('comment_created', {
+      commentID: submittedComment.id,
+      noteID: 'note-id',
+    });
     expect(renderedCommentThread(renderer).localTailComments).toEqual([]);
     expect(renderedCommentThread(renderer).deleteStatusByCommentID).toEqual(
       new Map(),
@@ -750,6 +762,11 @@ describe('NoteDetailScreen route', () => {
       reason: 'spam',
       details: '',
     });
+    expect(mocks.record).toHaveBeenCalledWith('report_created', {
+      reportID: 'report-1',
+      targetID: 'note-id',
+      targetType: 'note',
+    });
     expect(
       hostTextCount(renderer, 'Denúncia recebida. Obrigado por avisar.'),
     ).toBe(1);
@@ -763,6 +780,7 @@ describe('NoteDetailScreen route', () => {
     await openNoteReport(renderer);
 
     expect(mocks.logout).toHaveBeenCalledOnce();
+    expect(mocks.record).not.toHaveBeenCalled();
   });
 
   it('releases the report dialog when logout fails after a report 401', async () => {
@@ -837,12 +855,9 @@ describe('NoteDetailScreen route', () => {
       await settle();
     });
     await act(async () => {
-      hostByTestID(renderer, 'report-submit').props.onPress();
-    });
-
-    expect(hostByTestID(renderer, 'report-submit').props.disabled).toBe(true);
-    await act(async () => {
-      hostByTestID(renderer, 'report-submit').props.onPress();
+      const submit = hostByTestID(renderer, 'report-submit');
+      submit.props.onPress();
+      submit.props.onPress();
     });
     expect(mocks.apiClient.createReport).toHaveBeenCalledTimes(1);
 
@@ -856,7 +871,15 @@ describe('NoteDetailScreen route', () => {
   });
 
   it('ignores a report completion that settles after the note route changes', async () => {
-    const pending = deferred<{ id: string }>();
+    const receipt = {
+      createdAt: 1782993600000,
+      details: null,
+      id: 'report-1',
+      reason: 'spam',
+      targetID: 'note-id',
+      targetType: 'note',
+    } as const;
+    const pending = deferred<typeof receipt>();
     mocks.apiClient.createReport.mockReturnValueOnce(pending.promise);
     const renderer = await renderScreen();
 
@@ -880,8 +903,13 @@ describe('NoteDetailScreen route', () => {
     });
 
     await act(async () => {
-      pending.resolve({ id: 'report-1' });
+      pending.resolve(receipt);
       await settle();
+    });
+    expect(mocks.record).toHaveBeenCalledWith('report_created', {
+      reportID: 'report-1',
+      targetID: 'note-id',
+      targetType: 'note',
     });
     expect(
       hostTextCount(renderer, 'Denúncia recebida. Obrigado por avisar.'),

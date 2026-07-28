@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
@@ -36,6 +36,7 @@ export function useUsefulMutation({
   onStaleWrite,
 }: UseUsefulMutationOptions): UseUsefulMutation {
   const [mutations, setMutations] = useState<Record<string, MutationState>>({});
+  const pendingNoteIDsRef = useRef(new Set<string>());
 
   const getMutationState = useCallback(
     (noteId: string): MutationState => mutations[noteId] ?? 'idle',
@@ -53,8 +54,13 @@ export function useUsefulMutation({
 
   const toggleUseful = useCallback(
     async (note: Note) => {
-      if (mutations[note.id] === 'pending') return;
-
+      if (
+        mutations[note.id] === 'pending' ||
+        pendingNoteIDsRef.current.has(note.id)
+      ) {
+        return;
+      }
+      pendingNoteIDsRef.current.add(note.id);
       const gen = getGeneration();
       setMutations((current) => ({ ...current, [note.id]: 'pending' }));
 
@@ -107,6 +113,8 @@ export function useUsefulMutation({
         } else {
           setMutations((current) => ({ ...current, [note.id]: 'error' }));
         }
+      } finally {
+        pendingNoteIDsRef.current.delete(note.id);
       }
     },
     [

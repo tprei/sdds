@@ -19,6 +19,8 @@ import {
 } from '@/features/notes/compose-draft';
 import { useAuth } from '@/lib/auth/auth-provider';
 import type { APIClient } from '@/lib/api/client';
+import type { CreateNoteInput } from '@/lib/api/notes';
+import { useProductEvents } from '@/lib/events/product-event-provider';
 
 import { styles } from '@/features/notes/compose-screen.styles';
 
@@ -83,14 +85,32 @@ function AuthenticatedComposeScreen({
   ownerID,
 }: AuthenticatedComposeScreenProps) {
   const router = useRouter();
+  const productEvents = useProductEvents();
   const onPublished = useCallback(() => router.navigate('/'), [router]);
+  const createNote = useCallback(
+    async (input: CreateNoteInput) => {
+      const note = await apiClient.createNote(input);
+      try {
+        productEvents.record(
+          'note_published',
+          {
+            categorySlug: note.categorySlug,
+            noteID: note.id,
+          },
+          { eventID: input.clientRequestId },
+        );
+      } catch {}
+      return note;
+    },
+    [apiClient, productEvents],
+  );
   const controller = useMemo(
     () =>
       createComposeController({
         draftStore,
         ownerID,
         ports: {
-          createNote: (input) => apiClient.createNote(input),
+          createNote,
           loadCatalogs: () => apiClient.listCatalogs(),
           onPublished,
           onSessionExpired: logout,
@@ -106,7 +126,7 @@ function AuthenticatedComposeScreen({
           prepareImageUpload: (asset, options) => apiClient.prepareImageUpload(asset, options),
         },
       }),
-    [apiClient, draftStore, logout, onPublished, ownerID],
+    [apiClient, createNote, draftStore, logout, onPublished, ownerID],
   );
   useEffect(() => {
     controller.activate();

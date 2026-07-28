@@ -21,6 +21,7 @@ import {
   type LabelledNote,
   type NoteCatalog,
 } from '../notes/catalog';
+import { useProductEvents } from '../../lib/events/product-event-provider';
 import { styles } from './author-profile-content.styles';
 
 type Props = {
@@ -167,6 +168,7 @@ export function AuthorProfileContent({
   onPressNote,
   onSessionExpired,
 }: Props) {
+  const productEvents = useProductEvents();
   const [author, setAuthor] = useState<PublicAuthor | null>(null);
   const [catalog, setCatalog] = useState<NoteCatalog | null>(null);
   const [notes, setNotes] = useState<LabelledNote[]>([]);
@@ -181,6 +183,7 @@ export function AuthorProfileContent({
   const pendingCursor = useRef<string | null | undefined>(undefined);
   const requestVersion = useRef(0);
   const usefulMutationGenerationRef = useRef(0);
+  const usefulPendingRef = useRef(new Set<string>());
   const [activeAuthorID, setActiveAuthorID] = useState<string | null>(null);
   const currentAuthorID = useRef(authorID);
 
@@ -301,13 +304,17 @@ export function AuthorProfileContent({
     },
     [apiClient, authorID, isCurrentRequest, onSessionExpired],
   );
-
   const toggleUseful = useCallback(
     async (target: LabelledNote) => {
-      if (usefulMutations[target.id] === 'pending') {
+      if (
+        usefulMutations[target.id] === 'pending' ||
+        usefulPendingRef.current.has(target.id)
+      ) {
         return;
       }
+      usefulPendingRef.current.add(target.id);
       const generation = usefulMutationGenerationRef.current;
+      const action = target.usefulByCurrentUser ? 'unmarked' : 'marked';
       setUsefulMutations((current) => ({
         ...current,
         [target.id]: 'pending',
@@ -318,6 +325,17 @@ export function AuthorProfileContent({
         } else {
           await apiClient.markNoteUseful(target.id);
         }
+        try {
+          productEvents.record(
+            action === 'marked'
+              ? 'note_marked_useful'
+              : 'note_unmarked_useful',
+            {
+              noteID: target.id,
+              context: { source: 'author_profile' },
+            },
+          );
+        } catch {}
         if (usefulMutationGenerationRef.current !== generation) {
           return;
         }
@@ -350,9 +368,11 @@ export function AuthorProfileContent({
           ...current,
           [target.id]: 'error',
         }));
+      } finally {
+        usefulPendingRef.current.delete(target.id);
       }
     },
-    [apiClient, onSessionExpired, usefulMutations],
+    [apiClient, onSessionExpired, productEvents, usefulMutations],
   );
 
   useFocusEffect(

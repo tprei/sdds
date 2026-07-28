@@ -27,6 +27,10 @@ const mocks = vi.hoisted(() => ({
   authState: { status: 'loading' } as AuthStateMock,
   logout: vi.fn(async () => undefined),
   push: vi.fn(),
+  record: vi.fn(),
+}));
+vi.mock('expo-crypto', () => ({
+  randomUUID: () => '018ff5b8-0000-7000-8000-000000000001',
 }));
 
 vi.mock('react-native', () => {
@@ -54,10 +58,12 @@ vi.mock('@/components/foundation-screen', () => ({
     createElement('section', null, children),
 }));
 vi.mock('@/components/note-card', () => ({
-  NoteCard: () => createElement('div', { testID: 'note-card' }),
+  NoteCard: (props: NativeProps) =>
+    createElement('div', { ...props, testID: 'note-card' }),
 }));
 vi.mock('@/features/notes/category-filter-controls', () => ({
-  CategoryFilterControls: () => createElement('div', { testID: 'filters' }),
+  CategoryFilterControls: (props: NativeProps) =>
+    createElement('div', { ...props, testID: 'filters' }),
 }));
 vi.mock('@/features/notes/catalog', () => ({
   buildNoteCatalog: () => ({ kind: 'catalog' }),
@@ -75,11 +81,29 @@ vi.mock('expo-router', async () => {
 vi.mock('@/lib/auth/auth-provider', () => ({
   useAuth: () => ({ apiClient: mocks.apiClient, logout: mocks.logout, state: mocks.authState }),
 }));
+vi.mock('@/lib/events/product-event-provider', () => {
+  const productEvents = { record: mocks.record };
+  return {
+    useProductEvents: () => productEvents,
+  };
+});
 
 async function settle(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
+}
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve(value: T): void;
+};
+
+function deferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
 }
 
 describe('HomeScreen auth gate', () => {
@@ -128,5 +152,124 @@ describe('HomeScreen auth gate', () => {
     });
 
     expect(mocks.logout).toHaveBeenCalledOnce();
+  });
+  it('records an impression for an empty Explore result set', async () => {
+    await act(async () => {
+      create(createElement(HomeScreen));
+      await settle();
+    });
+
+    expect(mocks.record).toHaveBeenCalledWith('explore_notes_impression', {
+      categorySlug: null,
+      resultCount: 0,
+      results: [],
+    });
+  });
+  it('records the rendered Explore set and provenance before interactions', async () => {
+    const note = {
+      author: { displayName: 'Ana', id: 'author-id' },
+      body: 'Corpo',
+      categorySlug: 'food',
+      createdAt: 1782993600000,
+      id: 'note-id',
+      images: [],
+      placeSlug: null,
+      title: 'Título',
+      updatedAt: 1782993600000,
+      usefulByCurrentUser: false,
+      usefulCount: 0,
+    };
+    mocks.apiClient.listNotes.mockResolvedValueOnce([note]);
+    mocks.apiClient.markNoteUseful.mockResolvedValueOnce(undefined);
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(createElement(HomeScreen));
+      await settle();
+    });
+
+    const card = renderer.root.findByProps({ testID: 'note-card' });
+    expect(mocks.record).toHaveBeenCalledWith('explore_notes_impression', {
+      categorySlug: null,
+      resultCount: 1,
+      results: [{ noteID: 'note-id', rank: 1 }],
+    });
+
+    await act(async () => {
+      card.props.onPress();
+      await settle();
+    });
+    expect(mocks.record).toHaveBeenCalledWith('explore_note_opened', {
+      categorySlug: null,
+      noteID: 'note-id',
+      rank: 1,
+    });
+    expect(mocks.push).toHaveBeenCalledWith({
+      pathname: '/notes/[id]',
+      params: {
+        id: 'note-id',
+        origin: '018ff5b8-0000-7000-8000-000000000001',
+      },
+    });
+
+    await act(async () => {
+      await card.props.onPressUseful();
+      await settle();
+    });
+    expect(mocks.record).toHaveBeenCalledWith('note_marked_useful', {
+      context: { categorySlug: null, rank: 1, source: 'explore' },
+      noteID: 'note-id',
+    });
+  });
+  it('ignores stale Explore responses and deduplicates a committed impression', async () => {
+    const first = deferred<unknown[]>();
+    const second = deferred<unknown[]>();
+    const note = (id: string) => ({
+      author: { displayName: 'Ana', id: 'author-id' },
+      body: 'Corpo',
+      categorySlug: 'food',
+      createdAt: 1782993600000,
+      id,
+      images: [],
+      placeSlug: null,
+      title: id,
+      updatedAt: 1782993600000,
+      usefulByCurrentUser: false,
+      usefulCount: 0,
+    });
+    mocks.apiClient.listNotes
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(createElement(HomeScreen));
+      await settle();
+    });
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'filters' }).props.onSelectCategorySlug('food');
+      await settle();
+    });
+
+    await act(async () => {
+      second.resolve([note('current-note')]);
+      await settle();
+    });
+    await act(async () => {
+      first.resolve([note('stale-note')]);
+      await settle();
+      renderer.update(createElement(HomeScreen));
+      await settle();
+    });
+
+    const impressions = mocks.record.mock.calls.filter(
+      ([kind]) => kind === 'explore_notes_impression',
+    );
+    expect(impressions).toHaveLength(1);
+    expect(impressions[0]?.[1]).toEqual({
+      categorySlug: 'food',
+      resultCount: 1,
+      results: [{ noteID: 'current-note', rank: 1 }],
+    });
   });
 });

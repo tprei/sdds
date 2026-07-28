@@ -137,6 +137,7 @@ function AuthenticatedSearchScreen({
   const [usefulMutations, setUsefulMutations] = useState<
     Partial<Record<string, UsefulMutationState>>
   >({});
+  const usefulPendingRef = useRef(new Set<string>());
 
   const openAuthor = useCallback(
     (authorID: string) => {
@@ -454,9 +455,13 @@ function AuthenticatedSearchScreen({
   const toggleUseful = useCallback(
     async (target: PresentedSearchResult) => {
       const targetNote = target.note;
-      if (usefulMutations[targetNote.id] === 'pending') {
+      if (
+        usefulMutations[targetNote.id] === 'pending' ||
+        usefulPendingRef.current.has(targetNote.id)
+      ) {
         return;
       }
+      usefulPendingRef.current.add(targetNote.id);
       const generation = `${catalogRequestIDRef.current}:${searchRequestIDRef.current}`;
       setUsefulMutations((current) => ({
         ...current,
@@ -534,6 +539,8 @@ function AuthenticatedSearchScreen({
           ...current,
           [targetNote.id]: 'error',
         }));
+      } finally {
+        usefulPendingRef.current.delete(targetNote.id);
       }
     },
     [apiClient, onSessionExpired, productEvents, usefulMutations],

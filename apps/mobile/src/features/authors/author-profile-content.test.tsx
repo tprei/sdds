@@ -53,6 +53,14 @@ vi.mock('../../components/foundation-screen', () => ({
       createElement('span', null, label),
     ),
 }));
+vi.mock('../../components/note-card', () => ({
+  NoteCard: (props: { note: Note; [key: string]: unknown }) =>
+    createElement(
+      'note-card',
+      { ...props, testID: 'author-note-card' },
+      props.note.title,
+    ),
+}));
 
 type FocusEffect = () => void | (() => void);
 
@@ -64,6 +72,12 @@ vi.mock('expo-router', async () => {
     },
   };
 });
+vi.mock('../../lib/events/product-event-provider', () => {
+  const productEvents = { record: mocks.record };
+  return {
+    useProductEvents: () => productEvents,
+  };
+});
 
 const onSessionExpired = vi.fn(async () => undefined);
 
@@ -73,6 +87,7 @@ const mocks = vi.hoisted(() => ({
     vi.fn<(input: { authorID: string; cursor?: string }) => Promise<AuthorNotesPage>>(),
   listCatalogs: vi.fn<() => Promise<Catalogs>>(),
   markNoteUseful: vi.fn<(noteID: string) => Promise<void>>(),
+  record: vi.fn(),
   unmarkNoteUseful: vi.fn<(noteID: string) => Promise<void>>(),
 }));
 
@@ -311,6 +326,71 @@ describe('AuthorProfileContent', () => {
     expect(textNodes(renderer!, 'Segunda nota')).not.toHaveLength(0);
 
     renderer!.unmount();
+  });
+  it('records useful changes with author-profile provenance', async () => {
+    mocks.getPublicAuthor.mockResolvedValue(author);
+    mocks.listCatalogs.mockResolvedValue(catalogs);
+    mocks.listAuthorNotes.mockResolvedValue({
+      notes: [note('author-note', 'Nota do perfil')],
+      nextCursor: null,
+    });
+    mocks.markNoteUseful.mockResolvedValue(undefined);
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <AuthorProfileContent
+          authorID="author-id"
+          onPressNote={() => undefined}
+          onSessionExpired={onSessionExpired}
+          apiClient={mockClient}
+        />,
+      );
+      await flushPromises();
+    });
+
+    const card = renderer.root.findByProps({ testID: 'author-note-card' });
+    await act(async () => {
+      await card.props.onPressUseful();
+      await flushPromises();
+    });
+
+    expect(mocks.markNoteUseful).toHaveBeenCalledWith('author-note');
+    expect(mocks.record).toHaveBeenCalledWith('note_marked_useful', {
+      context: { source: 'author_profile' },
+      noteID: 'author-note',
+    });
+    renderer.unmount();
+  });
+  it('does not record a failed author-profile useful request', async () => {
+    mocks.getPublicAuthor.mockResolvedValue(author);
+    mocks.listCatalogs.mockResolvedValue(catalogs);
+    mocks.listAuthorNotes.mockResolvedValue({
+      notes: [note('failed-note', 'Falha')],
+      nextCursor: null,
+    });
+    mocks.markNoteUseful.mockRejectedValueOnce(new Error('useful_failed'));
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <AuthorProfileContent
+          authorID="author-id"
+          onPressNote={() => undefined}
+          onSessionExpired={onSessionExpired}
+          apiClient={mockClient}
+        />,
+      );
+      await flushPromises();
+    });
+    const card = renderer.root.findByProps({ testID: 'author-note-card' });
+    await act(async () => {
+      await card.props.onPressUseful();
+      await flushPromises();
+    });
+
+    expect(mocks.record).not.toHaveBeenCalled();
+    renderer.unmount();
   });
 });
 

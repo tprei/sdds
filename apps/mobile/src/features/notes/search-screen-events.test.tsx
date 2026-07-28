@@ -16,10 +16,9 @@ type Deferred<T> = {
   resolve: (value: T) => void;
 };
 
-type AuthStateMock = {
-  status: 'authenticated';
-  user: { id: string };
-};
+type AuthStateMock =
+  | { status: 'authenticated'; user: { id: string } }
+  | { status: 'anonymous' };
 
 const mocks = vi.hoisted(() => ({
   apiClient: {
@@ -117,6 +116,7 @@ const noteB = note('note-b', 'B');
 let renderer!: ReactTestRenderer;
 describe('SearchScreen product events', () => {
   beforeEach(() => {
+    mocks.authState = { status: 'authenticated', user: { id: 'user-id' } };
     mocks.uuid = 0;
     mocks.apiClient.listCatalogs.mockResolvedValue({
       categories: [
@@ -224,6 +224,39 @@ describe('SearchScreen product events', () => {
       },
       noteID: 'note-b',
     });
+  });
+
+  it('drops an in-flight search after logout and login', async () => {
+    const response = deferred<{
+      searchVersion: 'fts5-v1';
+      results: [];
+    }>();
+    mocks.apiClient.searchNotes.mockReturnValueOnce(response.promise);
+
+    await renderSearch();
+    await submit('café');
+
+    mocks.authState = { status: 'anonymous' };
+    await act(async () => {
+      renderer.update(createElement(SearchScreen));
+      await settle();
+    });
+
+    mocks.authState = {
+      status: 'authenticated',
+      user: { id: 'user-b' },
+    };
+    await act(async () => {
+      renderer.update(createElement(SearchScreen));
+      await settle();
+    });
+
+    await act(async () => {
+      response.resolve({ results: [], searchVersion: 'fts5-v1' });
+      await settle();
+    });
+
+    expect(mocks.events.record).not.toHaveBeenCalled();
   });
 
   it('suppresses reformulation when the predecessor fails', async () => {

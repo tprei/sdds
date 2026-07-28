@@ -9,8 +9,8 @@ import {
   fixtureName,
   fixturePath,
 } from './note-image-visual';
+import { syntheticPassword } from './support';
 
-const syntheticPassword = 'secret-password';
 test.use({ viewport: { height: 720, width: 1280 } });
 
 type SyntheticUser = { displayName: string; username: string };

@@ -35,6 +35,7 @@ import type {
 import type { NoteCatalog } from '@/features/notes/catalog';
 import type { SearchVersion } from '@/lib/api/notes';
 import { useProductEvents } from '@/lib/events/product-event-provider';
+import { productEventKinds } from '@/lib/events/event-types';
 import { registerPresentedNoteOrigin } from '@/features/notes/presented-note-origin';
 
 import { styles } from '@/features/notes/search-screen.styles';
@@ -125,6 +126,7 @@ function AuthenticatedSearchScreen({
   const previousSearchRef = useRef<SearchDispatchedContext | null>(null);
   const searchExecutionsRef = useRef(new Map<string, SearchExecution>());
   const impressionSearchIDRef = useRef<string | null>(null);
+  const isMountedRef = useRef(false);
   const [query, setQuery] = useState('');
   const [selectedCategorySlug, setSelectedCategorySlug] = useState<
     string | null
@@ -139,6 +141,12 @@ function AuthenticatedSearchScreen({
   >({});
   const usefulPendingRef = useRef(new Set<string>());
 
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   const openAuthor = useCallback(
     (authorID: string) => {
       router.push({ pathname: '/authors/[id]', params: { id: authorID } });
@@ -154,15 +162,13 @@ function AuthenticatedSearchScreen({
         searchVersion: result.searchVersion,
         source: 'search',
       });
-      try {
-        productEvents.record('search_result_opened', {
-          noteID: result.note.id,
-          rank: result.rank,
-          retrievalSource: result.retrievalSource,
-          searchID: result.searchID,
-          searchVersion: result.searchVersion,
-        });
-      } catch {}
+      productEvents.record(productEventKinds.searchResultOpened, {
+        noteID: result.note.id,
+        rank: result.rank,
+        retrievalSource: result.retrievalSource,
+        searchID: result.searchID,
+        searchVersion: result.searchVersion,
+      });
       const params: { id: string; origin?: string } = { id: result.note.id };
       if (originNonce !== '') {
         params.origin = originNonce;
@@ -183,9 +189,14 @@ function AuthenticatedSearchScreen({
 
   const recordSuccessfulSearch = useCallback(
     (request: SearchRequest, searchVersion: SearchVersion) => {
+      // A search resolving after the screen unmounts must not emit; the user
+      // has already left the search journey.
+      if (!isMountedRef.current) {
+        return;
+      }
       try {
         productEvents.record(
-          'search_submitted',
+          productEventKinds.searchSubmitted,
           {
             categorySlug: request.categorySlug,
             query: request.query,
@@ -218,7 +229,7 @@ function AuthenticatedSearchScreen({
         successor.reformulationEmitted = true;
         try {
           productEvents.record(
-            'search_reformulated',
+            productEventKinds.searchReformulated,
             {
               categorySlug: successor.request.categorySlug,
               previousCategorySlug: previous.categorySlug,
@@ -245,32 +256,32 @@ function AuthenticatedSearchScreen({
     if (impressionSearchIDRef.current === searchID) {
       return;
     }
+    if (productEvents.ready === false) {
+      return;
+    }
+    if (state.status === 'empty') {
+      productEvents.record(productEventKinds.searchNoResults, {
+        categorySlug: state.request.categorySlug,
+        query: state.request.query,
+        resultCount: 0,
+        searchID,
+        searchVersion: state.searchVersion,
+      });
+    } else {
+      productEvents.record(productEventKinds.searchResultsImpression, {
+        categorySlug: state.request.categorySlug,
+        query: state.request.query,
+        resultCount: state.results.length,
+        results: state.results.map((result) => ({
+          noteID: result.note.id,
+          rank: result.rank,
+          retrievalSource: result.retrievalSource,
+        })),
+        searchID,
+        searchVersion: state.searchVersion,
+      });
+    }
     impressionSearchIDRef.current = searchID;
-
-    try {
-      if (state.status === 'empty') {
-        productEvents.record('search_no_results', {
-          categorySlug: state.request.categorySlug,
-          query: state.request.query,
-          resultCount: 0,
-          searchID,
-          searchVersion: state.searchVersion,
-        });
-      } else {
-        productEvents.record('search_results_impression', {
-          categorySlug: state.request.categorySlug,
-          query: state.request.query,
-          resultCount: state.results.length,
-          results: state.results.map((result) => ({
-            noteID: result.note.id,
-            rank: result.rank,
-            retrievalSource: result.retrievalSource,
-          })),
-          searchID,
-          searchVersion: state.searchVersion,
-        });
-      }
-    } catch {}
   }, [productEvents, state]);
 
 
@@ -476,8 +487,8 @@ function AuthenticatedSearchScreen({
         try {
           productEvents.record(
             targetNote.usefulByCurrentUser
-              ? 'note_unmarked_useful'
-              : 'note_marked_useful',
+              ? productEventKinds.noteUnmarkedUseful
+              : productEventKinds.noteMarkedUseful,
             {
               context: {
                 rank: target.rank,

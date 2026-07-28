@@ -21,6 +21,7 @@ import { useAuth } from '@/lib/auth/auth-provider';
 import type { APIClient } from '@/lib/api/client';
 import type { CreateNoteInput } from '@/lib/api/notes';
 import { useProductEvents } from '@/lib/events/product-event-provider';
+import { productEventKinds } from '@/lib/events/event-types';
 
 import { styles } from '@/features/notes/compose-screen.styles';
 
@@ -92,7 +93,7 @@ function AuthenticatedComposeScreen({
       const note = await apiClient.createNote(input);
       try {
         productEvents.record(
-          'note_published',
+          productEventKinds.notePublished,
           {
             categorySlug: note.categorySlug,
             noteID: note.id,

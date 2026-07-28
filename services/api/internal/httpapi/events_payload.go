@@ -128,23 +128,23 @@ func decodeUsefulContext(raw json.RawMessage, index int) (event.UsefulContext, [
 	}
 	switch source {
 	case "search":
-		checkAllowedContextKeys(fields, []string{"source", "search_id", "search_version", "rank", "retrieval_source"}, index, &problemsWithPrefix{problems: &problems, prefix: "payload.context"})
+		checkAllowedContextKeys(fields, []string{"source", "search_id", "search_version", "rank", "retrieval_source"}, index, "payload.context", &problems)
 		searchID, _ := requiredStringAt(fields, "search_id", index, "payload.context.", &problems)
 		version, _ := requiredStringAt(fields, "search_version", index, "payload.context.", &problems)
 		rank, _ := requiredIntAt(fields, "rank", index, "payload.context", &problems)
 		retrievalSource, _ := requiredStringAt(fields, "retrieval_source", index, "payload.context.", &problems)
 		return event.SearchUsefulContext{Source: source, SearchID: searchID, SearchVersion: event.SearchVersion(version), Rank: rank, RetrievalSource: event.RetrievalSource(retrievalSource)}, problems
 	case "explore":
-		checkAllowedContextKeys(fields, []string{"source", "rank", "category_slug"}, index, &problemsWithPrefix{problems: &problems, prefix: "payload.context"})
+		checkAllowedContextKeys(fields, []string{"source", "rank", "category_slug"}, index, "payload.context", &problems)
 		rank, _ := requiredIntAt(fields, "rank", index, "payload.context", &problems)
 		category, categoryProblems := nullableCategoryAt(fields, "category_slug", index, "payload.context.")
 		problems = append(problems, categoryProblems...)
 		return event.ExploreUsefulContext{Source: source, Rank: rank, CategorySlug: category}, problems
 	case "note_detail":
-		checkAllowedContextKeys(fields, []string{"source"}, index, &problemsWithPrefix{problems: &problems, prefix: "payload.context"})
+		checkAllowedContextKeys(fields, []string{"source"}, index, "payload.context", &problems)
 		return event.NoteDetailUsefulContext{Source: source}, problems
 	case "author_profile":
-		checkAllowedContextKeys(fields, []string{"source"}, index, &problemsWithPrefix{problems: &problems, prefix: "payload.context"})
+		checkAllowedContextKeys(fields, []string{"source"}, index, "payload.context", &problems)
 		return event.AuthorProfileUsefulContext{Source: source}, problems
 	default:
 		problems = append(problems, invalidEventProblem(index, "payload.context.source", "invalid"))
@@ -173,7 +173,7 @@ func decodeExploreResults(fields map[string]json.RawMessage, name string, index 
 			problems = append(problems, invalidEventProblem(index, field, "invalid"))
 			continue
 		}
-		checkAllowedContextKeys(resultFields, []string{"note_id", "rank"}, index, &problemsWithPrefix{problems: &problems, prefix: field})
+		checkAllowedContextKeys(resultFields, []string{"note_id", "rank"}, index, field, &problems)
 		noteID, _ := requiredStringAt(resultFields, "note_id", index, field+".", &problems)
 		rank, _ := requiredIntAt(resultFields, "rank", index, field, &problems)
 		results = append(results, event.ExploreResult{NoteID: noteID, Rank: rank})
@@ -202,7 +202,7 @@ func decodeSearchResults(fields map[string]json.RawMessage, name string, index i
 			problems = append(problems, invalidEventProblem(index, field, "invalid"))
 			continue
 		}
-		checkAllowedContextKeys(resultFields, []string{"note_id", "rank", "retrieval_source"}, index, &problemsWithPrefix{problems: &problems, prefix: field})
+		checkAllowedContextKeys(resultFields, []string{"note_id", "rank", "retrieval_source"}, index, field, &problems)
 		noteID, _ := requiredStringAt(resultFields, "note_id", index, field+".", &problems)
 		rank, _ := requiredIntAt(resultFields, "rank", index, field, &problems)
 		source, _ := requiredStringAt(resultFields, "retrieval_source", index, field+".", &problems)

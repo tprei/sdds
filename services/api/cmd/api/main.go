@@ -13,6 +13,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/tprei/sdds/services/api/internal/eventexport"
 	"github.com/tprei/sdds/services/api/internal/httpapi"
 	"github.com/tprei/sdds/services/api/internal/media"
 	"github.com/tprei/sdds/services/api/internal/s3store"
@@ -22,6 +23,7 @@ import (
 const (
 	commandMigrate          = "migrate"
 	commandInspectReports   = "inspect-reports"
+	commandExportEvents     = "export-events"
 	serverReadHeaderTimeout = 5 * time.Second
 	serverReadTimeout       = 15 * time.Second
 	startupReadinessTimeout = 5 * time.Second
@@ -77,6 +79,7 @@ var closeDatabase = func(database *sql.DB) error {
 }
 
 var reportOutputStream io.Writer = os.Stdout
+var eventOutputStream io.Writer = os.Stdout
 
 func main() {
 	if err := run(); err != nil {
@@ -87,7 +90,7 @@ func main() {
 
 func run() error {
 	args := os.Args[1:]
-	if len(args) > 0 && (len(args) != 1 || (args[0] != commandMigrate && args[0] != commandInspectReports)) {
+	if len(args) > 0 && (len(args) != 1 || (args[0] != commandMigrate && args[0] != commandInspectReports && args[0] != commandExportEvents)) {
 		return runWithArgs(context.Background(), config{}, s3store.Config{}, args)
 	}
 	cfg, err := loadConfig()
@@ -112,6 +115,8 @@ func runWithArgs(ctx context.Context, config config, s3Config s3store.Config, ar
 		return runMigrations(ctx, config)
 	case len(args) == 1 && args[0] == commandInspectReports:
 		return runInspectReports(ctx, config)
+	case len(args) == 1 && args[0] == commandExportEvents:
+		return eventexport.Run(ctx, config.databasePath, eventOutputStream)
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}

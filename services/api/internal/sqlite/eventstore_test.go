@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -186,6 +187,59 @@ func TestEventStoreDeleteUserCascadesEvents(t *testing.T) {
 	}
 	if count != 0 {
 		t.Fatalf("event count after user delete = %d, want 0", count)
+	}
+}
+func TestEventStoreStreamsExportRowsInInsertionOrder(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	insertEventTestUser(t, db, storeUserID)
+	store := NewEventStore(db)
+
+	first := makeEventRecord(t, storeEventID, storeUserID, event.KindNotePublished, event.NotePublishedPayload{
+		NoteID: storeEventID, CategorySlug: "food",
+	})
+	first.InstallationID = nil
+	first.AppVersion = nil
+	second := makeEventRecord(t, storeEventIDTwo, storeUserID, event.KindSearchSubmitted, event.SearchSubmittedPayload{
+		SearchID: storeSearchID, SearchVersion: event.SearchVersionFTS5V1, Query: "evento",
+	})
+	receivedAt := storeReceivedAt(time.Millisecond)
+	if _, err := store.AppendBatch(ctx, []event.Record{first, second}, receivedAt); err != nil {
+		t.Fatalf("append events: %v", err)
+	}
+
+	rows := make([]EventExportRow, 0, 2)
+	if err := store.StreamExportRows(ctx, func(row EventExportRow) error {
+		rows = append(rows, row)
+		return nil
+	}); err != nil {
+		t.Fatalf("stream export rows: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("export rows = %d, want 2", len(rows))
+	}
+	if rows[0].EventPageKey != 1 || rows[0].ID != storeEventID ||
+		rows[1].EventPageKey != 2 || rows[1].ID != storeEventIDTwo {
+		t.Fatalf("export order = %+v", rows)
+	}
+	if rows[0].InstallationID != nil || rows[0].AppVersion != nil {
+		t.Fatalf("nullable fields = installation %v app %v, want nil", rows[0].InstallationID, rows[0].AppVersion)
+	}
+	if rows[1].InstallationID == nil || rows[1].AppVersion == nil {
+		t.Fatal("non-null event fields were lost")
+	}
+	if rows[0].ReceivedAt != receivedAt.UnixMilli() || rows[1].ReceivedAt != receivedAt.UnixMilli() {
+		t.Fatalf("received_at = %d/%d, want %d", rows[0].ReceivedAt, rows[1].ReceivedAt, receivedAt.UnixMilli())
+	}
+	if len(rows[0].Payload) == 0 || rows[0].Payload[0] != '{' {
+		t.Fatalf("payload = %q, want JSON object", rows[0].Payload)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(rows[1].Payload, &payload); err != nil {
+		t.Fatalf("decode payload: %v", err)
+	}
+	if payload["query"] != "evento" {
+		t.Fatalf("query payload = %#v", payload["query"])
 	}
 }
 

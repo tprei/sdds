@@ -1,6 +1,8 @@
 -- The allowlist mirrors event.Kind. Adding a kind requires a versioned migration
 -- so old readers never silently accept an event they cannot interpret.
 
+-- Domain validation owns the closed vocabularies; SQLite keeps these values as
+-- bounded TEXT so event storage remains append-only and queryable.
 CREATE TABLE events (
     event_page_key INTEGER PRIMARY KEY AUTOINCREMENT,
     id            TEXT NOT NULL UNIQUE CHECK (typeof(id) = 'text' AND length(trim(id)) > 0),

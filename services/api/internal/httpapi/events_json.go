@@ -11,11 +11,6 @@ import (
 	"github.com/tprei/sdds/services/api/internal/openapi"
 )
 
-type problemsWithPrefix struct {
-	problems *[]openapi.InvalidEventProblem
-	prefix   string
-}
-
 func objectFields(raw json.RawMessage) (map[string]json.RawMessage, bool) {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil || fields == nil {
@@ -75,20 +70,8 @@ func checkEventKeys(fields map[string]json.RawMessage, index int, problems *[]op
 	checkAllowedKeys(fields, []string{"id", "kind", "occurred_at", "installation_id", "platform", "app_version", "schema_version", "payload"}, index, "", problems)
 }
 
-func checkAllowedContextKeys(fields map[string]json.RawMessage, allowed []string, index int, problems interface{}) {
-	prefix := ""
-	var target *[]openapi.InvalidEventProblem
-	switch value := problems.(type) {
-	case *[]openapi.InvalidEventProblem:
-		target = value
-	case *problemsWithPrefix:
-		target = value.problems
-		prefix = value.prefix + "."
-	}
-	if target == nil {
-		return
-	}
-	checkAllowedKeys(fields, allowed, index, prefix, target)
+func checkAllowedContextKeys(fields map[string]json.RawMessage, allowed []string, index int, prefix string, problems *[]openapi.InvalidEventProblem) {
+	checkAllowedKeys(fields, allowed, index, prefix+".", problems)
 }
 
 func checkAllowedKeys(fields map[string]json.RawMessage, allowed []string, index int, prefix string, problems *[]openapi.InvalidEventProblem) {

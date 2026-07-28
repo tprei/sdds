@@ -1,13 +1,17 @@
+import appConfig from '../../app.json';
+
 import { semanticColors, spacing, typography } from '@sdds/tokens';
 import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
 
 import { AuthProvider } from '@/lib/auth/auth-provider';
+import { ProductEventProvider } from '@/lib/events/product-event-provider';
 
 export default function RootLayout() {
   return (
     <AuthProvider>
+      <ProductEventProvider appVersion={appConfig.expo.version}>
       <Tabs
         screenOptions={{
           headerStyle: { backgroundColor: semanticColors.appBackground },
@@ -53,6 +57,7 @@ export default function RootLayout() {
         />
       </Tabs>
       <StatusBar style="dark" />
+      </ProductEventProvider>
     </AuthProvider>
   );
 }

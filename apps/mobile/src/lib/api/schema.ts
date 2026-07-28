@@ -22,6 +22,9 @@ type ListPlacesResponse = GeneratedSchemas['ListPlacesResponse'];
 type NoteResponse = GeneratedSchemas['Note'];
 type NoteImageResponse = GeneratedSchemas['NoteImage'];
 type SearchNotesResponse = GeneratedSchemas['SearchNotesResponse'];
+type CreateEventsReceipt = GeneratedSchemas['CreateEventsReceipt'];
+type EventErrorResponse = GeneratedSchemas['EventErrorResponse'];
+type InvalidEventProblem = GeneratedSchemas['InvalidEventProblem'];
 type SearchNoteResult = GeneratedSchemas['SearchNoteResult'];
 type SearchVersion = GeneratedSchemas['SearchVersion'];
 type RetrievalSource = GeneratedSchemas['RetrievalSource'];
@@ -265,6 +268,37 @@ export const errorResponseSchema = z.object({
   fields: z.array(validationProblemSchema).optional(),
 }) satisfies z.ZodType<ErrorResponse>;
 
+const invalidEventProblemCodeSchema = z.enum([
+  'required',
+  'invalid',
+  'unknown',
+  'unsupported',
+  'too_long',
+  'too_large',
+]);
+
+const invalidEventProblemSchema = z
+  .object({
+    index: z.number().int().nonnegative(),
+    field: z.string(),
+    code: invalidEventProblemCodeSchema,
+  })
+  .strict() satisfies z.ZodType<InvalidEventProblem>;
+
+export const eventErrorResponseSchema = z
+  .object({
+    code: z.literal('invalid_event'),
+    problems: z.array(invalidEventProblemSchema),
+  })
+  .strict() satisfies z.ZodType<EventErrorResponse>;
+
+export const createEventsReceiptSchema = z
+  .object({
+    accepted_count: z.number().int().nonnegative(),
+    duplicate_count: z.number().int().nonnegative(),
+  })
+  .strict() satisfies z.ZodType<CreateEventsReceipt>;
+
 export type Exact<Expected, Actual> =
   (<T>() => T extends Expected ? 1 : 2) extends <T>() => T extends Actual
     ? 1
@@ -331,4 +365,6 @@ export type SchemaExactnessChecks = [
   >,
   Assert<Exact<ErrorResponse, z.output<typeof errorResponseSchema>>>,
   Assert<Exact<ReportReceiptResponse, z.output<typeof reportReceiptSchema>>>,
+  Assert<Exact<CreateEventsReceipt, z.output<typeof createEventsReceiptSchema>>>,
+  Assert<Exact<EventErrorResponse, z.output<typeof eventErrorResponseSchema>>>,
 ];

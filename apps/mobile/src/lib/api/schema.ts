@@ -21,6 +21,10 @@ type ListNoteCommentsResponse = GeneratedSchemas['ListNoteCommentsResponse'];
 type ListPlacesResponse = GeneratedSchemas['ListPlacesResponse'];
 type NoteResponse = GeneratedSchemas['Note'];
 type NoteImageResponse = GeneratedSchemas['NoteImage'];
+type SearchNotesResponse = GeneratedSchemas['SearchNotesResponse'];
+type SearchNoteResult = GeneratedSchemas['SearchNoteResult'];
+type SearchVersion = GeneratedSchemas['SearchVersion'];
+type RetrievalSource = GeneratedSchemas['RetrievalSource'];
 type PlaceSlug = GeneratedSchemas['PlaceSlug'];
 type ReportReceiptResponse = GeneratedSchemas['ReportReceipt'];
 type ValidationField = GeneratedSchemas['ValidationField'];
@@ -137,6 +141,28 @@ export const catalogPlaceSchema = z.object({
 export const listNotesResponseSchema = z.object({
   notes: z.array(noteSchema),
 }) satisfies z.ZodType<ListNotesResponse>;
+const searchVersionSchema = z.literal(
+  'fts5-v1',
+) satisfies z.ZodType<SearchVersion>;
+const retrievalSourceSchema = z.enum([
+  'lexical',
+  'semantic',
+  'hybrid',
+]) satisfies z.ZodType<RetrievalSource>;
+
+export const searchNoteResultSchema = z
+  .object({
+    note: noteSchema,
+    retrieval_source: retrievalSourceSchema,
+  })
+  .strict() satisfies z.ZodType<SearchNoteResult>;
+
+export const searchNotesResponseSchema = z
+  .object({
+    search_version: searchVersionSchema,
+    results: z.array(searchNoteResultSchema),
+  })
+  .strict() satisfies z.ZodType<SearchNotesResponse>;
 
 export const listCategoriesResponseSchema = z.object({
   categories: z.array(catalogCategorySchema),
@@ -278,6 +304,12 @@ export type SchemaExactnessChecks = [
   >,
   Assert<Exact<CatalogPlaceResponse, z.output<typeof catalogPlaceSchema>>>,
   Assert<Exact<ListNotesResponse, z.output<typeof listNotesResponseSchema>>>,
+  Assert<
+    Exact<SearchNoteResult, z.output<typeof searchNoteResultSchema>>
+  >,
+  Assert<
+    Exact<SearchNotesResponse, z.output<typeof searchNotesResponseSchema>>
+  >,
   Assert<
     Exact<ListCategoriesResponse, z.output<typeof listCategoriesResponseSchema>>
   >,

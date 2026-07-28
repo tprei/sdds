@@ -26,6 +26,7 @@ type FetchHandler = (request: Request) => Promise<Response>;
 type NoteResponse = components['schemas']['Note'];
 type NoteImageResponse = components['schemas']['NoteImage'];
 type ListNotesResponse = components['schemas']['ListNotesResponse'];
+type SearchNotesResponse = components['schemas']['SearchNotesResponse'];
 
 describe('notes API client', () => {
   beforeEach(() => {
@@ -354,7 +355,7 @@ describe('notes API client', () => {
     const calls: FetchCall[] = [];
     stubFetch(async (request) => {
       calls.push({ request });
-      return jsonResponse(apiListNotesResponse());
+      return jsonResponse(apiSearchNotesResponse());
     });
 
     const client = createAPIClient(exampleToken);
@@ -375,7 +376,7 @@ describe('notes API client', () => {
     const calls: FetchCall[] = [];
     stubFetch(async (request) => {
       calls.push({ request });
-      return jsonResponse(apiListNotesResponse());
+      return jsonResponse(apiSearchNotesResponse());
     });
 
     const client = createAPIClient(exampleToken);
@@ -393,7 +394,7 @@ describe('notes API client', () => {
     const calls: FetchCall[] = [];
     stubFetch(async (request) => {
       calls.push({ request });
-      return jsonResponse(apiListNotesResponse());
+      return jsonResponse(apiSearchNotesResponse());
     });
 
     const client = createAPIClient(exampleToken);
@@ -405,12 +406,57 @@ describe('notes API client', () => {
   });
 
   it('parses searched notes from the API list response shape', async () => {
-    stubFetch(async () => jsonResponse(apiListNotesResponse()));
+    stubFetch(async () => jsonResponse(apiSearchNotesResponse()));
 
     const client = createAPIClient(exampleToken);
     const notes = await client.searchNotes({ query: 'cafe' });
+    expect(notes).toEqual({
+      results: [
+        {
+          note: expectedNote(),
+          retrievalSource: 'lexical',
+        },
+      ],
+      searchVersion: 'fts5-v1',
+    });
+  });
+  it('rejects missing search response wrapper fields', async () => {
+    const { search_version: _searchVersion, ...response } =
+      apiSearchNotesResponse();
+    stubFetch(async () => jsonResponse(response));
 
-    expect(notes).toEqual([expectedNote()]);
+    const client = createAPIClient(exampleToken);
+    await expect(client.searchNotes({ query: 'cafe' })).rejects.toThrow(
+      APIResponseError,
+    );
+  });
+
+  it('rejects extra search response wrapper fields', async () => {
+    stubFetch(async () =>
+      jsonResponse({ ...apiSearchNotesResponse(), extra: true }),
+    );
+
+    const client = createAPIClient(exampleToken);
+    await expect(client.searchNotes({ query: 'cafe' })).rejects.toThrow(
+      APIResponseError,
+    );
+  });
+
+  it('rejects unknown search version and retrieval source', async () => {
+    stubFetch(async () =>
+      jsonResponse({
+        ...apiSearchNotesResponse(),
+        search_version: 'future-v2',
+        results: [
+          { note: apiNote(), retrieval_source: 'unknown-source' },
+        ],
+      }),
+    );
+
+    const client = createAPIClient(exampleToken);
+    await expect(client.searchNotes({ query: 'cafe' })).rejects.toThrow(
+      APIResponseError,
+    );
   });
 
   it('raises request errors from search status codes', async () => {
@@ -538,6 +584,12 @@ const httpStatusNotFound = 404;
 
 function apiListNotesResponse(): ListNotesResponse {
   return { notes: [apiNote()] };
+}
+function apiSearchNotesResponse(): SearchNotesResponse {
+  return {
+    results: [{ note: apiNote(), retrieval_source: 'lexical' }],
+    search_version: 'fts5-v1',
+  };
 }
 
 function apiNote(overrides: Partial<NoteResponse> = {}): NoteResponse {

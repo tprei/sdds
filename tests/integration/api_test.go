@@ -134,37 +134,37 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	}
 
 	searchResults := searchNotes(t, client, "balcao")
-	if len(searchResults.Notes) != 1 {
-		t.Fatalf("search note count = %d, want 1", len(searchResults.Notes))
+	if len(searchResults.Results) != 1 {
+		t.Fatalf("search note count = %d, want 1", len(searchResults.Results))
 	}
-	requireCreatedNote(t, searchResults.Notes[0], request)
-	if searchResults.Notes[0].Id != created.Id {
-		t.Fatalf("search note id = %q, want %q", searchResults.Notes[0].Id, created.Id)
+	requireCreatedNote(t, searchResults.Results[0].Note, request)
+	if searchResults.Results[0].Note.Id != created.Id {
+		t.Fatalf("search note id = %q, want %q", searchResults.Results[0].Note.Id, created.Id)
 	}
 
 	searchResultsWithoutPlace := searchNotes(t, client, "mundial")
-	if len(searchResultsWithoutPlace.Notes) != 1 {
-		t.Fatalf("search note without place count = %d, want 1", len(searchResultsWithoutPlace.Notes))
+	if len(searchResultsWithoutPlace.Results) != 1 {
+		t.Fatalf("search note without place count = %d, want 1", len(searchResultsWithoutPlace.Results))
 	}
-	requireCreatedNote(t, searchResultsWithoutPlace.Notes[0], requestWithoutPlace)
-	if searchResultsWithoutPlace.Notes[0].Id != createdWithoutPlace.Id {
-		t.Fatalf("search note without place id = %q, want %q", searchResultsWithoutPlace.Notes[0].Id, createdWithoutPlace.Id)
+	requireCreatedNote(t, searchResultsWithoutPlace.Results[0].Note, requestWithoutPlace)
+	if searchResultsWithoutPlace.Results[0].Note.Id != createdWithoutPlace.Id {
+		t.Fatalf("search note without place id = %q, want %q", searchResultsWithoutPlace.Results[0].Note.Id, createdWithoutPlace.Id)
 	}
 
 	filteredSearchResults := searchNotesByCategory(t, client, "mundial", "travel")
-	if len(filteredSearchResults.Notes) != 1 {
-		t.Fatalf("filtered search note count = %d, want 1", len(filteredSearchResults.Notes))
+	if len(filteredSearchResults.Results) != 1 {
+		t.Fatalf("filtered search note count = %d, want 1", len(filteredSearchResults.Results))
 	}
-	requireCreatedNote(t, filteredSearchResults.Notes[0], requestWithoutPlace)
+	requireCreatedNote(t, filteredSearchResults.Results[0].Note, requestWithoutPlace)
 
 	emptyFilteredSearchResults := searchNotesByCategory(t, client, "mundial", "food")
-	if len(emptyFilteredSearchResults.Notes) != 0 {
-		t.Fatalf("empty filtered search note count = %d, want 0", len(emptyFilteredSearchResults.Notes))
+	if len(emptyFilteredSearchResults.Results) != 0 {
+		t.Fatalf("empty filtered search note count = %d, want 0", len(emptyFilteredSearchResults.Results))
 	}
 
 	emptySearchResults := searchNotes(t, client, "necessaire")
-	if len(emptySearchResults.Notes) != 0 {
-		t.Fatalf("empty search note count = %d, want 0", len(emptySearchResults.Notes))
+	if len(emptySearchResults.Results) != 0 {
+		t.Fatalf("empty search note count = %d, want 0", len(emptySearchResults.Results))
 	}
 
 	accentRequest := openapi.CreateNoteJSONRequestBody{
@@ -262,8 +262,8 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	requireOnlySearchNoteIDs(t, punctuationResults, []string{punctuationNote.Id})
 
 	punctuationOnlyResults := searchNotes(t, client, "!!! *** ()")
-	if len(punctuationOnlyResults.Notes) != 0 {
-		t.Fatalf("punctuation-only search note count = %d, want 0", len(punctuationOnlyResults.Notes))
+	if len(punctuationOnlyResults.Results) != 0 {
+		t.Fatalf("punctuation-only search note count = %d, want 0", len(punctuationOnlyResults.Results))
 	}
 
 	requireListNotesCategoryFilterError(t, client, "comida")
@@ -540,7 +540,7 @@ func getNote(t *testing.T, client *openapi.ClientWithResponses, id string) opena
 	return *response.JSON200
 }
 
-func searchNotes(t *testing.T, client *openapi.ClientWithResponses, query string) openapi.ListNotesResponse {
+func searchNotes(t *testing.T, client *openapi.ClientWithResponses, query string) openapi.SearchNotesResponse {
 	t.Helper()
 
 	response, err := client.SearchNotesWithResponse(context.Background(), &openapi.SearchNotesParams{Q: &query})
@@ -551,10 +551,11 @@ func searchNotes(t *testing.T, client *openapi.ClientWithResponses, query string
 	if response.JSON200 == nil {
 		t.Fatal("GET /v1/search/notes returned 200 without JSON body")
 	}
+	requireSearchResponseProvenance(t, *response.JSON200)
 	return *response.JSON200
 }
 
-func searchNotesByCategory(t *testing.T, client *openapi.ClientWithResponses, query string, category string) openapi.ListNotesResponse {
+func searchNotesByCategory(t *testing.T, client *openapi.ClientWithResponses, query string, category string) openapi.SearchNotesResponse {
 	t.Helper()
 
 	categorySlug := openapi.CategorySlug(category)
@@ -569,7 +570,19 @@ func searchNotesByCategory(t *testing.T, client *openapi.ClientWithResponses, qu
 	if response.JSON200 == nil {
 		t.Fatal("GET /v1/search/notes?category_slug returned 200 without JSON body")
 	}
+	requireSearchResponseProvenance(t, *response.JSON200)
 	return *response.JSON200
+}
+func requireSearchResponseProvenance(t *testing.T, response openapi.SearchNotesResponse) {
+	t.Helper()
+	if response.SearchVersion != openapi.SearchVersion("fts5-v1") {
+		t.Fatalf("search version = %q, want fts5-v1", response.SearchVersion)
+	}
+	for index, result := range response.Results {
+		if result.RetrievalSource != openapi.RetrievalSource("lexical") {
+			t.Fatalf("search result %d source = %q, want lexical", index, result.RetrievalSource)
+		}
+	}
 }
 
 func requireListNotesCategoryFilterError(t *testing.T, client *openapi.ClientWithResponses, category string) {
@@ -702,28 +715,28 @@ func requireListedNote(t *testing.T, notes openapi.ListNotesResponse, id string,
 	t.Fatalf("listed note id %q missing", id)
 }
 
-func requireOnlySearchNoteIDs(t *testing.T, notes openapi.ListNotesResponse, wantIDs []string) {
+func requireOnlySearchNoteIDs(t *testing.T, response openapi.SearchNotesResponse, wantIDs []string) {
 	t.Helper()
 
-	gotIDs := make([]string, 0, len(notes.Notes))
-	for _, found := range notes.Notes {
-		gotIDs = append(gotIDs, found.Id)
+	gotIDs := make([]string, 0, len(response.Results))
+	for _, result := range response.Results {
+		gotIDs = append(gotIDs, result.Note.Id)
 	}
 	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
 		t.Fatalf("search note ids mismatch (-want +got):\n%s", diff)
 	}
 }
 
-func requireSearchNoteIDs(t *testing.T, notes openapi.ListNotesResponse, wantIDs []string) {
+func requireSearchNoteIDs(t *testing.T, response openapi.SearchNotesResponse, wantIDs []string) {
 	t.Helper()
 
-	if len(notes.Notes) != len(wantIDs) {
-		t.Fatalf("search note count = %d, want %d", len(notes.Notes), len(wantIDs))
+	if len(response.Results) != len(wantIDs) {
+		t.Fatalf("search note count = %d, want %d", len(response.Results), len(wantIDs))
 	}
 
-	gotIDs := make(map[string]bool, len(notes.Notes))
-	for _, found := range notes.Notes {
-		gotIDs[found.Id] = true
+	gotIDs := make(map[string]bool, len(response.Results))
+	for _, result := range response.Results {
+		gotIDs[result.Note.Id] = true
 	}
 	for _, wantID := range wantIDs {
 		if !gotIDs[wantID] {

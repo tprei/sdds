@@ -470,9 +470,9 @@ export interface components {
         /** @enum {string} */
         EventPlatform: "ios" | "android" | "web";
         /** @enum {string} */
-        EventSearchVersion: "fts5-v1";
+        SearchVersion: "fts5-v1";
         /** @enum {string} */
-        EventRetrievalSource: "lexical" | "semantic" | "hybrid";
+        RetrievalSource: "lexical" | "semantic" | "hybrid";
         EventAppVersion: string;
         /** Format: int64 */
         EventOccurredAt: number;
@@ -486,7 +486,7 @@ export interface components {
         EventSearchResult: {
             note_id: components["schemas"]["EventID"];
             rank: components["schemas"]["EventRank"];
-            retrieval_source: components["schemas"]["EventRetrievalSource"];
+            retrieval_source: components["schemas"]["RetrievalSource"];
         };
         EventExploreNotesImpressionPayload: {
             category_slug: (string & components["schemas"]["CategorySlug"]) | null;
@@ -500,13 +500,13 @@ export interface components {
         };
         EventSearchSubmittedPayload: {
             search_id: components["schemas"]["EventID"];
-            search_version: components["schemas"]["EventSearchVersion"];
+            search_version: components["schemas"]["SearchVersion"];
             query: components["schemas"]["EventQuery"];
             category_slug: (string & components["schemas"]["CategorySlug"]) | null;
         };
         EventSearchResultsImpressionPayload: {
             search_id: components["schemas"]["EventID"];
-            search_version: components["schemas"]["EventSearchVersion"];
+            search_version: components["schemas"]["SearchVersion"];
             query: components["schemas"]["EventQuery"];
             category_slug: (string & components["schemas"]["CategorySlug"]) | null;
             result_count: components["schemas"]["EventResultCount"];
@@ -514,16 +514,16 @@ export interface components {
         };
         EventSearchResultOpenedPayload: {
             search_id: components["schemas"]["EventID"];
-            search_version: components["schemas"]["EventSearchVersion"];
+            search_version: components["schemas"]["SearchVersion"];
             note_id: components["schemas"]["EventID"];
             rank: components["schemas"]["EventRank"];
-            retrieval_source: components["schemas"]["EventRetrievalSource"];
+            retrieval_source: components["schemas"]["RetrievalSource"];
         };
         EventSearchReformulatedPayload: {
             previous_search_id: components["schemas"]["EventID"];
-            previous_search_version: components["schemas"]["EventSearchVersion"];
+            previous_search_version: components["schemas"]["SearchVersion"];
             search_id: components["schemas"]["EventID"];
-            search_version: components["schemas"]["EventSearchVersion"];
+            search_version: components["schemas"]["SearchVersion"];
             previous_query: components["schemas"]["EventQuery"];
             query: components["schemas"]["EventQuery"];
             previous_category_slug: (string & components["schemas"]["CategorySlug"]) | null;
@@ -531,7 +531,7 @@ export interface components {
         };
         EventSearchNoResultsPayload: {
             search_id: components["schemas"]["EventID"];
-            search_version: components["schemas"]["EventSearchVersion"];
+            search_version: components["schemas"]["SearchVersion"];
             query: components["schemas"]["EventQuery"];
             category_slug: (string & components["schemas"]["CategorySlug"]) | null;
             /** @enum {integer} */
@@ -544,9 +544,9 @@ export interface components {
              */
             source: "search";
             search_id: components["schemas"]["EventID"];
-            search_version: components["schemas"]["EventSearchVersion"];
+            search_version: components["schemas"]["SearchVersion"];
             rank: components["schemas"]["EventRank"];
-            retrieval_source: components["schemas"]["EventRetrievalSource"];
+            retrieval_source: components["schemas"]["RetrievalSource"];
         };
         EventExploreUsefulContext: {
             /**
@@ -790,6 +790,14 @@ export interface components {
         };
         ListNotesResponse: {
             notes: components["schemas"]["Note"][];
+        };
+        SearchNotesResponse: {
+            search_version: components["schemas"]["SearchVersion"];
+            results: components["schemas"]["SearchNoteResult"][];
+        };
+        SearchNoteResult: {
+            note: components["schemas"]["Note"];
+            retrieval_source: components["schemas"]["RetrievalSource"];
         };
         ListNoteCommentsResponse: {
             comments: components["schemas"]["Comment"][];
@@ -2021,7 +2029,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListNotesResponse"];
+                    "application/json": components["schemas"]["SearchNotesResponse"];
                 };
             };
             /** @description The search query is invalid. */

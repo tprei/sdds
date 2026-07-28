@@ -35,6 +35,8 @@ const (
 	ErrorCodeInternal                  ErrorCode = "internal_error"
 	ErrorCodeInvalidAuth               ErrorCode = "invalid_auth"
 	ErrorCodeInvalidComment            ErrorCode = "invalid_comment"
+	ErrorCodeInvalidEvent              ErrorCode = "invalid_event"
+	ErrorCodeInvalidEventBatch         ErrorCode = "invalid_event_batch"
 	ErrorCodeInvalidJSON               ErrorCode = "invalid_json"
 	ErrorCodeInvalidMedia              ErrorCode = "invalid_media"
 	ErrorCodeInvalidNote               ErrorCode = "invalid_note"
@@ -66,6 +68,10 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeInvalidAuth:
 		return true
 	case ErrorCodeInvalidComment:
+		return true
+	case ErrorCodeInvalidEvent:
+		return true
+	case ErrorCodeInvalidEventBatch:
 		return true
 	case ErrorCodeInvalidJSON:
 		return true
@@ -106,6 +112,513 @@ func (e ErrorCode) Valid() bool {
 	}
 }
 
+// Defines values for EventAuthorProfileUsefulContextSource.
+const (
+	AuthorProfile EventAuthorProfileUsefulContextSource = "author_profile"
+)
+
+// Valid indicates whether the value is a known member of the EventAuthorProfileUsefulContextSource enum.
+func (e EventAuthorProfileUsefulContextSource) Valid() bool {
+	switch e {
+	case AuthorProfile:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventCommentCreatedKind.
+const (
+	CommentCreated EventCommentCreatedKind = "comment_created"
+)
+
+// Valid indicates whether the value is a known member of the EventCommentCreatedKind enum.
+func (e EventCommentCreatedKind) Valid() bool {
+	switch e {
+	case CommentCreated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventCommentCreatedSchemaVersion.
+const (
+	EventCommentCreatedSchemaVersionN1 EventCommentCreatedSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the EventCommentCreatedSchemaVersion enum.
+func (e EventCommentCreatedSchemaVersion) Valid() bool {
+	switch e {
+	case EventCommentCreatedSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventErrorResponseCode.
+const (
+	InvalidEvent EventErrorResponseCode = "invalid_event"
+)
+
+// Valid indicates whether the value is a known member of the EventErrorResponseCode enum.
+func (e EventErrorResponseCode) Valid() bool {
+	switch e {
+	case InvalidEvent:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventExploreNoteOpenedKind.
+const (
+	ExploreNoteOpened EventExploreNoteOpenedKind = "explore_note_opened"
+)
+
+// Valid indicates whether the value is a known member of the EventExploreNoteOpenedKind enum.
+func (e EventExploreNoteOpenedKind) Valid() bool {
+	switch e {
+	case ExploreNoteOpened:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventExploreNoteOpenedSchemaVersion.
+const (
+	EventExploreNoteOpenedSchemaVersionN1 EventExploreNoteOpenedSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the EventExploreNoteOpenedSchemaVersion enum.
+func (e EventExploreNoteOpenedSchemaVersion) Valid() bool {
+	switch e {
+	case EventExploreNoteOpenedSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventExploreNotesImpressionKind.
+const (
+	ExploreNotesImpression EventExploreNotesImpressionKind = "explore_notes_impression"
+)
+
+// Valid indicates whether the value is a known member of the EventExploreNotesImpressionKind enum.
+func (e EventExploreNotesImpressionKind) Valid() bool {
+	switch e {
+	case ExploreNotesImpression:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventExploreNotesImpressionSchemaVersion.
+const (
+	EventExploreNotesImpressionSchemaVersionN1 EventExploreNotesImpressionSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the EventExploreNotesImpressionSchemaVersion enum.
+func (e EventExploreNotesImpressionSchemaVersion) Valid() bool {
+	switch e {
+	case EventExploreNotesImpressionSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventExploreUsefulContextSource.
+const (
+	Explore EventExploreUsefulContextSource = "explore"
+)
+
+// Valid indicates whether the value is a known member of the EventExploreUsefulContextSource enum.
+func (e EventExploreUsefulContextSource) Valid() bool {
+	switch e {
+	case Explore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventNoteDetailUsefulContextSource.
+const (
+	NoteDetail EventNoteDetailUsefulContextSource = "note_detail"
+)
+
+// Valid indicates whether the value is a known member of the EventNoteDetailUsefulContextSource enum.
+func (e EventNoteDetailUsefulContextSource) Valid() bool {
+	switch e {
+	case NoteDetail:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventNoteMarkedUsefulKind.
+const (
+	NoteMarkedUseful EventNoteMarkedUsefulKind = "note_marked_useful"
+)
+
+// Valid indicates whether the value is a known member of the EventNoteMarkedUsefulKind enum.
+func (e EventNoteMarkedUsefulKind) Valid() bool {
+	switch e {
+	case NoteMarkedUseful:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventNoteMarkedUsefulSchemaVersion.
+const (
+	EventNoteMarkedUsefulSchemaVersionN1 EventNoteMarkedUsefulSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the EventNoteMarkedUsefulSchemaVersion enum.
+func (e EventNoteMarkedUsefulSchemaVersion) Valid() bool {
+	switch e {
+	case EventNoteMarkedUsefulSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventNotePublishedKind.
+const (
+	NotePublished EventNotePublishedKind = "note_published"
+)
+
+// Valid indicates whether the value is a known member of the EventNotePublishedKind enum.
+func (e EventNotePublishedKind) Valid() bool {
+	switch e {
+	case NotePublished:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventNotePublishedSchemaVersion.
+const (
+	EventNotePublishedSchemaVersionN1 EventNotePublishedSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the EventNotePublishedSchemaVersion enum.
+func (e EventNotePublishedSchemaVersion) Valid() bool {
+	switch e {
+	case EventNotePublishedSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventNoteUnmarkedUsefulKind.
+const (
+	NoteUnmarkedUseful EventNoteUnmarkedUsefulKind = "note_unmarked_useful"
+)
+
+// Valid indicates whether the value is a known member of the EventNoteUnmarkedUsefulKind enum.
+func (e EventNoteUnmarkedUsefulKind) Valid() bool {
+	switch e {
+	case NoteUnmarkedUseful:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventNoteUnmarkedUsefulSchemaVersion.
+const (
+	EventNoteUnmarkedUsefulSchemaVersionN1 EventNoteUnmarkedUsefulSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the EventNoteUnmarkedUsefulSchemaVersion enum.
+func (e EventNoteUnmarkedUsefulSchemaVersion) Valid() bool {
+	switch e {
+	case EventNoteUnmarkedUsefulSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventPlatform.
+const (
+	Android EventPlatform = "android"
+	Ios     EventPlatform = "ios"
+	Web     EventPlatform = "web"
+)
+
+// Valid indicates whether the value is a known member of the EventPlatform enum.
+func (e EventPlatform) Valid() bool {
+	switch e {
+	case Android:
+		return true
+	case Ios:
+		return true
+	case Web:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventReportCreatedKind.
+const (
+	ReportCreated EventReportCreatedKind = "report_created"
+)
+
+// Valid indicates whether the value is a known member of the EventReportCreatedKind enum.
+func (e EventReportCreatedKind) Valid() bool {
+	switch e {
+	case ReportCreated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventReportCreatedSchemaVersion.
+const (
+	EventReportCreatedSchemaVersionN1 EventReportCreatedSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the EventReportCreatedSchemaVersion enum.
+func (e EventReportCreatedSchemaVersion) Valid() bool {
+	switch e {
+	case EventReportCreatedSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventRetrievalSource.
+const (
+	Hybrid   EventRetrievalSource = "hybrid"
+	Lexical  EventRetrievalSource = "lexical"
+	Semantic EventRetrievalSource = "semantic"
+)
+
+// Valid indicates whether the value is a known member of the EventRetrievalSource enum.
+func (e EventRetrievalSource) Valid() bool {
+	switch e {
+	case Hybrid:
+		return true
+	case Lexical:
+		return true
+	case Semantic:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventSearchNoResultsKind.
+const (
+	SearchNoResults EventSearchNoResultsKind = "search_no_results"
+)
+
+// Valid indicates whether the value is a known member of the EventSearchNoResultsKind enum.
+func (e EventSearchNoResultsKind) Valid() bool {
+	switch e {
+	case SearchNoResults:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventSearchNoResultsSchemaVersion.
+const (
+	EventSearchNoResultsSchemaVersionN1 EventSearchNoResultsSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the EventSearchNoResultsSchemaVersion enum.
+func (e EventSearchNoResultsSchemaVersion) Valid() bool {
+	switch e {
+	case EventSearchNoResultsSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventSearchNoResultsPayloadResultCount.
+const (
+	N0 EventSearchNoResultsPayloadResultCount = 0
+)
+
+// Valid indicates whether the value is a known member of the EventSearchNoResultsPayloadResultCount enum.
+func (e EventSearchNoResultsPayloadResultCount) Valid() bool {
+	switch e {
+	case N0:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventSearchReformulatedKind.
+const (
+	SearchReformulated EventSearchReformulatedKind = "search_reformulated"
+)
+
+// Valid indicates whether the value is a known member of the EventSearchReformulatedKind enum.
+func (e EventSearchReformulatedKind) Valid() bool {
+	switch e {
+	case SearchReformulated:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventSearchReformulatedSchemaVersion.
+const (
+	EventSearchReformulatedSchemaVersionN1 EventSearchReformulatedSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the EventSearchReformulatedSchemaVersion enum.
+func (e EventSearchReformulatedSchemaVersion) Valid() bool {
+	switch e {
+	case EventSearchReformulatedSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventSearchResultOpenedKind.
+const (
+	SearchResultOpened EventSearchResultOpenedKind = "search_result_opened"
+)
+
+// Valid indicates whether the value is a known member of the EventSearchResultOpenedKind enum.
+func (e EventSearchResultOpenedKind) Valid() bool {
+	switch e {
+	case SearchResultOpened:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventSearchResultOpenedSchemaVersion.
+const (
+	EventSearchResultOpenedSchemaVersionN1 EventSearchResultOpenedSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the EventSearchResultOpenedSchemaVersion enum.
+func (e EventSearchResultOpenedSchemaVersion) Valid() bool {
+	switch e {
+	case EventSearchResultOpenedSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventSearchResultsImpressionKind.
+const (
+	SearchResultsImpression EventSearchResultsImpressionKind = "search_results_impression"
+)
+
+// Valid indicates whether the value is a known member of the EventSearchResultsImpressionKind enum.
+func (e EventSearchResultsImpressionKind) Valid() bool {
+	switch e {
+	case SearchResultsImpression:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventSearchResultsImpressionSchemaVersion.
+const (
+	EventSearchResultsImpressionSchemaVersionN1 EventSearchResultsImpressionSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the EventSearchResultsImpressionSchemaVersion enum.
+func (e EventSearchResultsImpressionSchemaVersion) Valid() bool {
+	switch e {
+	case EventSearchResultsImpressionSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventSearchSubmittedKind.
+const (
+	SearchSubmitted EventSearchSubmittedKind = "search_submitted"
+)
+
+// Valid indicates whether the value is a known member of the EventSearchSubmittedKind enum.
+func (e EventSearchSubmittedKind) Valid() bool {
+	switch e {
+	case SearchSubmitted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventSearchSubmittedSchemaVersion.
+const (
+	EventSearchSubmittedSchemaVersionN1 EventSearchSubmittedSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the EventSearchSubmittedSchemaVersion enum.
+func (e EventSearchSubmittedSchemaVersion) Valid() bool {
+	switch e {
+	case EventSearchSubmittedSchemaVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventSearchUsefulContextSource.
+const (
+	Search EventSearchUsefulContextSource = "search"
+)
+
+// Valid indicates whether the value is a known member of the EventSearchUsefulContextSource enum.
+func (e EventSearchUsefulContextSource) Valid() bool {
+	switch e {
+	case Search:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EventSearchVersion.
+const (
+	Fts5V1 EventSearchVersion = "fts5-v1"
+)
+
+// Valid indicates whether the value is a known member of the EventSearchVersion enum.
+func (e EventSearchVersion) Valid() bool {
+	switch e {
+	case Fts5V1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ImageUploadReceiptContentType.
 const (
 	ImageUploadReceiptContentTypeImagejpeg ImageUploadReceiptContentType = "image/jpeg"
@@ -118,6 +631,36 @@ func (e ImageUploadReceiptContentType) Valid() bool {
 	case ImageUploadReceiptContentTypeImagejpeg:
 		return true
 	case ImageUploadReceiptContentTypeImagepng:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for InvalidEventProblemCode.
+const (
+	Invalid     InvalidEventProblemCode = "invalid"
+	Required    InvalidEventProblemCode = "required"
+	TooLarge    InvalidEventProblemCode = "too_large"
+	TooLong     InvalidEventProblemCode = "too_long"
+	Unknown     InvalidEventProblemCode = "unknown"
+	Unsupported InvalidEventProblemCode = "unsupported"
+)
+
+// Valid indicates whether the value is a known member of the InvalidEventProblemCode enum.
+func (e InvalidEventProblemCode) Valid() bool {
+	switch e {
+	case Invalid:
+		return true
+	case Required:
+		return true
+	case TooLarge:
+		return true
+	case TooLong:
+		return true
+	case Unknown:
+		return true
+	case Unsupported:
 		return true
 	default:
 		return false
@@ -334,6 +877,17 @@ type CreateCommentRequest struct {
 	Body string `json:"body"`
 }
 
+// CreateEventsReceipt defines model for CreateEventsReceipt.
+type CreateEventsReceipt struct {
+	AcceptedCount  int `json:"accepted_count"`
+	DuplicateCount int `json:"duplicate_count"`
+}
+
+// CreateEventsRequest defines model for CreateEventsRequest.
+type CreateEventsRequest struct {
+	Events []EventInput `json:"events"`
+}
+
 // CreateNoteRequest defines model for CreateNoteRequest.
 type CreateNoteRequest struct {
 	Body            string       `json:"body"`
@@ -388,6 +942,409 @@ type ErrorResponse struct {
 	Fields *[]ValidationProblem `json:"fields,omitempty"`
 }
 
+// EventAppVersion defines model for EventAppVersion.
+type EventAppVersion = string
+
+// EventAuthorProfileUsefulContext defines model for EventAuthorProfileUsefulContext.
+type EventAuthorProfileUsefulContext struct {
+	Source EventAuthorProfileUsefulContextSource `json:"source"`
+}
+
+// EventAuthorProfileUsefulContextSource defines model for EventAuthorProfileUsefulContext.Source.
+type EventAuthorProfileUsefulContextSource string
+
+// EventCommentCreated defines model for EventCommentCreated.
+type EventCommentCreated struct {
+	AppVersion     *EventAppVersion                 `json:"app_version"`
+	Id             EventID                          `json:"id"`
+	InstallationId *EventID                         `json:"installation_id"`
+	Kind           EventCommentCreatedKind          `json:"kind"`
+	OccurredAt     EventOccurredAt                  `json:"occurred_at"`
+	Payload        EventCommentCreatedPayload       `json:"payload"`
+	Platform       EventPlatform                    `json:"platform"`
+	SchemaVersion  EventCommentCreatedSchemaVersion `json:"schema_version"`
+}
+
+// EventCommentCreatedKind defines model for EventCommentCreated.Kind.
+type EventCommentCreatedKind string
+
+// EventCommentCreatedSchemaVersion defines model for EventCommentCreated.SchemaVersion.
+type EventCommentCreatedSchemaVersion int
+
+// EventCommentCreatedPayload defines model for EventCommentCreatedPayload.
+type EventCommentCreatedPayload struct {
+	CommentId EventID `json:"comment_id"`
+	NoteId    EventID `json:"note_id"`
+}
+
+// EventErrorResponse defines model for EventErrorResponse.
+type EventErrorResponse struct {
+	Code     EventErrorResponseCode `json:"code"`
+	Problems []InvalidEventProblem  `json:"problems"`
+}
+
+// EventErrorResponseCode defines model for EventErrorResponse.Code.
+type EventErrorResponseCode string
+
+// EventExploreNoteOpened defines model for EventExploreNoteOpened.
+type EventExploreNoteOpened struct {
+	AppVersion     *EventAppVersion                    `json:"app_version"`
+	Id             EventID                             `json:"id"`
+	InstallationId *EventID                            `json:"installation_id"`
+	Kind           EventExploreNoteOpenedKind          `json:"kind"`
+	OccurredAt     EventOccurredAt                     `json:"occurred_at"`
+	Payload        EventExploreNoteOpenedPayload       `json:"payload"`
+	Platform       EventPlatform                       `json:"platform"`
+	SchemaVersion  EventExploreNoteOpenedSchemaVersion `json:"schema_version"`
+}
+
+// EventExploreNoteOpenedKind defines model for EventExploreNoteOpened.Kind.
+type EventExploreNoteOpenedKind string
+
+// EventExploreNoteOpenedSchemaVersion defines model for EventExploreNoteOpened.SchemaVersion.
+type EventExploreNoteOpenedSchemaVersion int
+
+// EventExploreNoteOpenedPayload defines model for EventExploreNoteOpenedPayload.
+type EventExploreNoteOpenedPayload struct {
+	CategorySlug *CategorySlug `json:"category_slug"`
+	NoteId       EventID       `json:"note_id"`
+	Rank         EventRank     `json:"rank"`
+}
+
+// EventExploreNotesImpression defines model for EventExploreNotesImpression.
+type EventExploreNotesImpression struct {
+	AppVersion     *EventAppVersion                         `json:"app_version"`
+	Id             EventID                                  `json:"id"`
+	InstallationId *EventID                                 `json:"installation_id"`
+	Kind           EventExploreNotesImpressionKind          `json:"kind"`
+	OccurredAt     EventOccurredAt                          `json:"occurred_at"`
+	Payload        EventExploreNotesImpressionPayload       `json:"payload"`
+	Platform       EventPlatform                            `json:"platform"`
+	SchemaVersion  EventExploreNotesImpressionSchemaVersion `json:"schema_version"`
+}
+
+// EventExploreNotesImpressionKind defines model for EventExploreNotesImpression.Kind.
+type EventExploreNotesImpressionKind string
+
+// EventExploreNotesImpressionSchemaVersion defines model for EventExploreNotesImpression.SchemaVersion.
+type EventExploreNotesImpressionSchemaVersion int
+
+// EventExploreNotesImpressionPayload defines model for EventExploreNotesImpressionPayload.
+type EventExploreNotesImpressionPayload struct {
+	CategorySlug *CategorySlug        `json:"category_slug"`
+	ResultCount  EventResultCount     `json:"result_count"`
+	Results      []EventExploreResult `json:"results"`
+}
+
+// EventExploreResult defines model for EventExploreResult.
+type EventExploreResult struct {
+	NoteId EventID   `json:"note_id"`
+	Rank   EventRank `json:"rank"`
+}
+
+// EventExploreUsefulContext defines model for EventExploreUsefulContext.
+type EventExploreUsefulContext struct {
+	CategorySlug *CategorySlug                   `json:"category_slug"`
+	Rank         EventRank                       `json:"rank"`
+	Source       EventExploreUsefulContextSource `json:"source"`
+}
+
+// EventExploreUsefulContextSource defines model for EventExploreUsefulContext.Source.
+type EventExploreUsefulContextSource string
+
+// EventID defines model for EventID.
+type EventID = openapi_types.UUID
+
+// EventInput defines model for EventInput.
+type EventInput struct {
+	union json.RawMessage
+}
+
+// EventNoteDetailUsefulContext defines model for EventNoteDetailUsefulContext.
+type EventNoteDetailUsefulContext struct {
+	Source EventNoteDetailUsefulContextSource `json:"source"`
+}
+
+// EventNoteDetailUsefulContextSource defines model for EventNoteDetailUsefulContext.Source.
+type EventNoteDetailUsefulContextSource string
+
+// EventNoteMarkedUseful defines model for EventNoteMarkedUseful.
+type EventNoteMarkedUseful struct {
+	AppVersion     *EventAppVersion                   `json:"app_version"`
+	Id             EventID                            `json:"id"`
+	InstallationId *EventID                           `json:"installation_id"`
+	Kind           EventNoteMarkedUsefulKind          `json:"kind"`
+	OccurredAt     EventOccurredAt                    `json:"occurred_at"`
+	Payload        EventUsefulPayload                 `json:"payload"`
+	Platform       EventPlatform                      `json:"platform"`
+	SchemaVersion  EventNoteMarkedUsefulSchemaVersion `json:"schema_version"`
+}
+
+// EventNoteMarkedUsefulKind defines model for EventNoteMarkedUseful.Kind.
+type EventNoteMarkedUsefulKind string
+
+// EventNoteMarkedUsefulSchemaVersion defines model for EventNoteMarkedUseful.SchemaVersion.
+type EventNoteMarkedUsefulSchemaVersion int
+
+// EventNotePublished defines model for EventNotePublished.
+type EventNotePublished struct {
+	AppVersion     *EventAppVersion                `json:"app_version"`
+	Id             EventID                         `json:"id"`
+	InstallationId *EventID                        `json:"installation_id"`
+	Kind           EventNotePublishedKind          `json:"kind"`
+	OccurredAt     EventOccurredAt                 `json:"occurred_at"`
+	Payload        EventNotePublishedPayload       `json:"payload"`
+	Platform       EventPlatform                   `json:"platform"`
+	SchemaVersion  EventNotePublishedSchemaVersion `json:"schema_version"`
+}
+
+// EventNotePublishedKind defines model for EventNotePublished.Kind.
+type EventNotePublishedKind string
+
+// EventNotePublishedSchemaVersion defines model for EventNotePublished.SchemaVersion.
+type EventNotePublishedSchemaVersion int
+
+// EventNotePublishedPayload defines model for EventNotePublishedPayload.
+type EventNotePublishedPayload struct {
+	CategorySlug CategorySlug `json:"category_slug"`
+	NoteId       EventID      `json:"note_id"`
+}
+
+// EventNoteUnmarkedUseful defines model for EventNoteUnmarkedUseful.
+type EventNoteUnmarkedUseful struct {
+	AppVersion     *EventAppVersion                     `json:"app_version"`
+	Id             EventID                              `json:"id"`
+	InstallationId *EventID                             `json:"installation_id"`
+	Kind           EventNoteUnmarkedUsefulKind          `json:"kind"`
+	OccurredAt     EventOccurredAt                      `json:"occurred_at"`
+	Payload        EventUsefulPayload                   `json:"payload"`
+	Platform       EventPlatform                        `json:"platform"`
+	SchemaVersion  EventNoteUnmarkedUsefulSchemaVersion `json:"schema_version"`
+}
+
+// EventNoteUnmarkedUsefulKind defines model for EventNoteUnmarkedUseful.Kind.
+type EventNoteUnmarkedUsefulKind string
+
+// EventNoteUnmarkedUsefulSchemaVersion defines model for EventNoteUnmarkedUseful.SchemaVersion.
+type EventNoteUnmarkedUsefulSchemaVersion int
+
+// EventOccurredAt defines model for EventOccurredAt.
+type EventOccurredAt = int64
+
+// EventPlatform defines model for EventPlatform.
+type EventPlatform string
+
+// EventQuery defines model for EventQuery.
+type EventQuery = string
+
+// EventRank defines model for EventRank.
+type EventRank = int
+
+// EventReportCreated defines model for EventReportCreated.
+type EventReportCreated struct {
+	AppVersion     *EventAppVersion                `json:"app_version"`
+	Id             EventID                         `json:"id"`
+	InstallationId *EventID                        `json:"installation_id"`
+	Kind           EventReportCreatedKind          `json:"kind"`
+	OccurredAt     EventOccurredAt                 `json:"occurred_at"`
+	Payload        EventReportCreatedPayload       `json:"payload"`
+	Platform       EventPlatform                   `json:"platform"`
+	SchemaVersion  EventReportCreatedSchemaVersion `json:"schema_version"`
+}
+
+// EventReportCreatedKind defines model for EventReportCreated.Kind.
+type EventReportCreatedKind string
+
+// EventReportCreatedSchemaVersion defines model for EventReportCreated.SchemaVersion.
+type EventReportCreatedSchemaVersion int
+
+// EventReportCreatedPayload defines model for EventReportCreatedPayload.
+type EventReportCreatedPayload struct {
+	ReportId   EventID          `json:"report_id"`
+	TargetId   EventID          `json:"target_id"`
+	TargetType ReportTargetType `json:"target_type"`
+}
+
+// EventResultCount defines model for EventResultCount.
+type EventResultCount = int
+
+// EventRetrievalSource defines model for EventRetrievalSource.
+type EventRetrievalSource string
+
+// EventSearchNoResults defines model for EventSearchNoResults.
+type EventSearchNoResults struct {
+	AppVersion     *EventAppVersion                  `json:"app_version"`
+	Id             EventID                           `json:"id"`
+	InstallationId *EventID                          `json:"installation_id"`
+	Kind           EventSearchNoResultsKind          `json:"kind"`
+	OccurredAt     EventOccurredAt                   `json:"occurred_at"`
+	Payload        EventSearchNoResultsPayload       `json:"payload"`
+	Platform       EventPlatform                     `json:"platform"`
+	SchemaVersion  EventSearchNoResultsSchemaVersion `json:"schema_version"`
+}
+
+// EventSearchNoResultsKind defines model for EventSearchNoResults.Kind.
+type EventSearchNoResultsKind string
+
+// EventSearchNoResultsSchemaVersion defines model for EventSearchNoResults.SchemaVersion.
+type EventSearchNoResultsSchemaVersion int
+
+// EventSearchNoResultsPayload defines model for EventSearchNoResultsPayload.
+type EventSearchNoResultsPayload struct {
+	CategorySlug  *CategorySlug                          `json:"category_slug"`
+	Query         EventQuery                             `json:"query"`
+	ResultCount   EventSearchNoResultsPayloadResultCount `json:"result_count"`
+	SearchId      EventID                                `json:"search_id"`
+	SearchVersion EventSearchVersion                     `json:"search_version"`
+}
+
+// EventSearchNoResultsPayloadResultCount defines model for EventSearchNoResultsPayload.ResultCount.
+type EventSearchNoResultsPayloadResultCount int
+
+// EventSearchReformulated defines model for EventSearchReformulated.
+type EventSearchReformulated struct {
+	AppVersion     *EventAppVersion                     `json:"app_version"`
+	Id             EventID                              `json:"id"`
+	InstallationId *EventID                             `json:"installation_id"`
+	Kind           EventSearchReformulatedKind          `json:"kind"`
+	OccurredAt     EventOccurredAt                      `json:"occurred_at"`
+	Payload        EventSearchReformulatedPayload       `json:"payload"`
+	Platform       EventPlatform                        `json:"platform"`
+	SchemaVersion  EventSearchReformulatedSchemaVersion `json:"schema_version"`
+}
+
+// EventSearchReformulatedKind defines model for EventSearchReformulated.Kind.
+type EventSearchReformulatedKind string
+
+// EventSearchReformulatedSchemaVersion defines model for EventSearchReformulated.SchemaVersion.
+type EventSearchReformulatedSchemaVersion int
+
+// EventSearchReformulatedPayload defines model for EventSearchReformulatedPayload.
+type EventSearchReformulatedPayload struct {
+	CategorySlug          *CategorySlug      `json:"category_slug"`
+	PreviousCategorySlug  *CategorySlug      `json:"previous_category_slug"`
+	PreviousQuery         EventQuery         `json:"previous_query"`
+	PreviousSearchId      EventID            `json:"previous_search_id"`
+	PreviousSearchVersion EventSearchVersion `json:"previous_search_version"`
+	Query                 EventQuery         `json:"query"`
+	SearchId              EventID            `json:"search_id"`
+	SearchVersion         EventSearchVersion `json:"search_version"`
+}
+
+// EventSearchResult defines model for EventSearchResult.
+type EventSearchResult struct {
+	NoteId          EventID              `json:"note_id"`
+	Rank            EventRank            `json:"rank"`
+	RetrievalSource EventRetrievalSource `json:"retrieval_source"`
+}
+
+// EventSearchResultOpened defines model for EventSearchResultOpened.
+type EventSearchResultOpened struct {
+	AppVersion     *EventAppVersion                     `json:"app_version"`
+	Id             EventID                              `json:"id"`
+	InstallationId *EventID                             `json:"installation_id"`
+	Kind           EventSearchResultOpenedKind          `json:"kind"`
+	OccurredAt     EventOccurredAt                      `json:"occurred_at"`
+	Payload        EventSearchResultOpenedPayload       `json:"payload"`
+	Platform       EventPlatform                        `json:"platform"`
+	SchemaVersion  EventSearchResultOpenedSchemaVersion `json:"schema_version"`
+}
+
+// EventSearchResultOpenedKind defines model for EventSearchResultOpened.Kind.
+type EventSearchResultOpenedKind string
+
+// EventSearchResultOpenedSchemaVersion defines model for EventSearchResultOpened.SchemaVersion.
+type EventSearchResultOpenedSchemaVersion int
+
+// EventSearchResultOpenedPayload defines model for EventSearchResultOpenedPayload.
+type EventSearchResultOpenedPayload struct {
+	NoteId          EventID              `json:"note_id"`
+	Rank            EventRank            `json:"rank"`
+	RetrievalSource EventRetrievalSource `json:"retrieval_source"`
+	SearchId        EventID              `json:"search_id"`
+	SearchVersion   EventSearchVersion   `json:"search_version"`
+}
+
+// EventSearchResultsImpression defines model for EventSearchResultsImpression.
+type EventSearchResultsImpression struct {
+	AppVersion     *EventAppVersion                          `json:"app_version"`
+	Id             EventID                                   `json:"id"`
+	InstallationId *EventID                                  `json:"installation_id"`
+	Kind           EventSearchResultsImpressionKind          `json:"kind"`
+	OccurredAt     EventOccurredAt                           `json:"occurred_at"`
+	Payload        EventSearchResultsImpressionPayload       `json:"payload"`
+	Platform       EventPlatform                             `json:"platform"`
+	SchemaVersion  EventSearchResultsImpressionSchemaVersion `json:"schema_version"`
+}
+
+// EventSearchResultsImpressionKind defines model for EventSearchResultsImpression.Kind.
+type EventSearchResultsImpressionKind string
+
+// EventSearchResultsImpressionSchemaVersion defines model for EventSearchResultsImpression.SchemaVersion.
+type EventSearchResultsImpressionSchemaVersion int
+
+// EventSearchResultsImpressionPayload defines model for EventSearchResultsImpressionPayload.
+type EventSearchResultsImpressionPayload struct {
+	CategorySlug  *CategorySlug       `json:"category_slug"`
+	Query         EventQuery          `json:"query"`
+	ResultCount   EventResultCount    `json:"result_count"`
+	Results       []EventSearchResult `json:"results"`
+	SearchId      EventID             `json:"search_id"`
+	SearchVersion EventSearchVersion  `json:"search_version"`
+}
+
+// EventSearchSubmitted defines model for EventSearchSubmitted.
+type EventSearchSubmitted struct {
+	AppVersion     *EventAppVersion                  `json:"app_version"`
+	Id             EventID                           `json:"id"`
+	InstallationId *EventID                          `json:"installation_id"`
+	Kind           EventSearchSubmittedKind          `json:"kind"`
+	OccurredAt     EventOccurredAt                   `json:"occurred_at"`
+	Payload        EventSearchSubmittedPayload       `json:"payload"`
+	Platform       EventPlatform                     `json:"platform"`
+	SchemaVersion  EventSearchSubmittedSchemaVersion `json:"schema_version"`
+}
+
+// EventSearchSubmittedKind defines model for EventSearchSubmitted.Kind.
+type EventSearchSubmittedKind string
+
+// EventSearchSubmittedSchemaVersion defines model for EventSearchSubmitted.SchemaVersion.
+type EventSearchSubmittedSchemaVersion int
+
+// EventSearchSubmittedPayload defines model for EventSearchSubmittedPayload.
+type EventSearchSubmittedPayload struct {
+	CategorySlug  *CategorySlug      `json:"category_slug"`
+	Query         EventQuery         `json:"query"`
+	SearchId      EventID            `json:"search_id"`
+	SearchVersion EventSearchVersion `json:"search_version"`
+}
+
+// EventSearchUsefulContext defines model for EventSearchUsefulContext.
+type EventSearchUsefulContext struct {
+	Rank            EventRank                      `json:"rank"`
+	RetrievalSource EventRetrievalSource           `json:"retrieval_source"`
+	SearchId        EventID                        `json:"search_id"`
+	SearchVersion   EventSearchVersion             `json:"search_version"`
+	Source          EventSearchUsefulContextSource `json:"source"`
+}
+
+// EventSearchUsefulContextSource defines model for EventSearchUsefulContext.Source.
+type EventSearchUsefulContextSource string
+
+// EventSearchVersion defines model for EventSearchVersion.
+type EventSearchVersion string
+
+// EventUsefulContext defines model for EventUsefulContext.
+type EventUsefulContext struct {
+	union json.RawMessage
+}
+
+// EventUsefulPayload defines model for EventUsefulPayload.
+type EventUsefulPayload struct {
+	Context EventUsefulContext `json:"context"`
+	NoteId  EventID            `json:"note_id"`
+}
+
 // ImageUploadReceipt defines model for ImageUploadReceipt.
 type ImageUploadReceipt struct {
 	ByteSize      int64                         `json:"byte_size"`
@@ -400,6 +1357,16 @@ type ImageUploadReceipt struct {
 
 // ImageUploadReceiptContentType defines model for ImageUploadReceipt.ContentType.
 type ImageUploadReceiptContentType string
+
+// InvalidEventProblem defines model for InvalidEventProblem.
+type InvalidEventProblem struct {
+	Code  InvalidEventProblemCode `json:"code"`
+	Field string                  `json:"field"`
+	Index int                     `json:"index"`
+}
+
+// InvalidEventProblemCode defines model for InvalidEventProblem.Code.
+type InvalidEventProblemCode string
 
 // ListCategoriesResponse defines model for ListCategoriesResponse.
 type ListCategoriesResponse struct {
@@ -518,6 +1485,11 @@ type ListAuthorNotesParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// CreateEvents400JSONResponseBody defines parameters for CreateEvents.
+type CreateEvents400JSONResponseBody struct {
+	union json.RawMessage
+}
+
 // ListNotesParams defines parameters for ListNotes.
 type ListNotesParams struct {
 	// CategorySlug Optional active category slug used to narrow recent notes.
@@ -545,6 +1517,9 @@ type CreateAuthSessionJSONRequestBody = CreateSessionRequest
 // CreateAuthUserJSONRequestBody defines body for CreateAuthUser for application/json ContentType.
 type CreateAuthUserJSONRequestBody = CreateUserRequest
 
+// CreateEventsJSONRequestBody defines body for CreateEvents for application/json ContentType.
+type CreateEventsJSONRequestBody = CreateEventsRequest
+
 // PrepareImageUploadMultipartRequestBody defines body for PrepareImageUpload for multipart/form-data ContentType.
 type PrepareImageUploadMultipartRequestBody = PrepareImageUploadMultipart
 
@@ -556,6 +1531,606 @@ type CreateNoteCommentJSONRequestBody = CreateCommentRequest
 
 // CreateReportJSONRequestBody defines body for CreateReport for application/json ContentType.
 type CreateReportJSONRequestBody = CreateReportRequest
+
+// AsEventExploreNotesImpression returns the union data inside the EventInput as a EventExploreNotesImpression
+func (t EventInput) AsEventExploreNotesImpression() (EventExploreNotesImpression, error) {
+	var body EventExploreNotesImpression
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventExploreNotesImpression overwrites any union data inside the EventInput as the provided EventExploreNotesImpression
+func (t *EventInput) FromEventExploreNotesImpression(v EventExploreNotesImpression) error {
+	v.Kind = "explore_notes_impression"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventExploreNotesImpression performs a merge with any union data inside the EventInput, using the provided EventExploreNotesImpression
+func (t *EventInput) MergeEventExploreNotesImpression(v EventExploreNotesImpression) error {
+	v.Kind = "explore_notes_impression"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEventExploreNoteOpened returns the union data inside the EventInput as a EventExploreNoteOpened
+func (t EventInput) AsEventExploreNoteOpened() (EventExploreNoteOpened, error) {
+	var body EventExploreNoteOpened
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventExploreNoteOpened overwrites any union data inside the EventInput as the provided EventExploreNoteOpened
+func (t *EventInput) FromEventExploreNoteOpened(v EventExploreNoteOpened) error {
+	v.Kind = "explore_note_opened"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventExploreNoteOpened performs a merge with any union data inside the EventInput, using the provided EventExploreNoteOpened
+func (t *EventInput) MergeEventExploreNoteOpened(v EventExploreNoteOpened) error {
+	v.Kind = "explore_note_opened"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEventSearchSubmitted returns the union data inside the EventInput as a EventSearchSubmitted
+func (t EventInput) AsEventSearchSubmitted() (EventSearchSubmitted, error) {
+	var body EventSearchSubmitted
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventSearchSubmitted overwrites any union data inside the EventInput as the provided EventSearchSubmitted
+func (t *EventInput) FromEventSearchSubmitted(v EventSearchSubmitted) error {
+	v.Kind = "search_submitted"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventSearchSubmitted performs a merge with any union data inside the EventInput, using the provided EventSearchSubmitted
+func (t *EventInput) MergeEventSearchSubmitted(v EventSearchSubmitted) error {
+	v.Kind = "search_submitted"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEventSearchResultsImpression returns the union data inside the EventInput as a EventSearchResultsImpression
+func (t EventInput) AsEventSearchResultsImpression() (EventSearchResultsImpression, error) {
+	var body EventSearchResultsImpression
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventSearchResultsImpression overwrites any union data inside the EventInput as the provided EventSearchResultsImpression
+func (t *EventInput) FromEventSearchResultsImpression(v EventSearchResultsImpression) error {
+	v.Kind = "search_results_impression"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventSearchResultsImpression performs a merge with any union data inside the EventInput, using the provided EventSearchResultsImpression
+func (t *EventInput) MergeEventSearchResultsImpression(v EventSearchResultsImpression) error {
+	v.Kind = "search_results_impression"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEventSearchResultOpened returns the union data inside the EventInput as a EventSearchResultOpened
+func (t EventInput) AsEventSearchResultOpened() (EventSearchResultOpened, error) {
+	var body EventSearchResultOpened
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventSearchResultOpened overwrites any union data inside the EventInput as the provided EventSearchResultOpened
+func (t *EventInput) FromEventSearchResultOpened(v EventSearchResultOpened) error {
+	v.Kind = "search_result_opened"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventSearchResultOpened performs a merge with any union data inside the EventInput, using the provided EventSearchResultOpened
+func (t *EventInput) MergeEventSearchResultOpened(v EventSearchResultOpened) error {
+	v.Kind = "search_result_opened"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEventSearchReformulated returns the union data inside the EventInput as a EventSearchReformulated
+func (t EventInput) AsEventSearchReformulated() (EventSearchReformulated, error) {
+	var body EventSearchReformulated
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventSearchReformulated overwrites any union data inside the EventInput as the provided EventSearchReformulated
+func (t *EventInput) FromEventSearchReformulated(v EventSearchReformulated) error {
+	v.Kind = "search_reformulated"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventSearchReformulated performs a merge with any union data inside the EventInput, using the provided EventSearchReformulated
+func (t *EventInput) MergeEventSearchReformulated(v EventSearchReformulated) error {
+	v.Kind = "search_reformulated"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEventSearchNoResults returns the union data inside the EventInput as a EventSearchNoResults
+func (t EventInput) AsEventSearchNoResults() (EventSearchNoResults, error) {
+	var body EventSearchNoResults
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventSearchNoResults overwrites any union data inside the EventInput as the provided EventSearchNoResults
+func (t *EventInput) FromEventSearchNoResults(v EventSearchNoResults) error {
+	v.Kind = "search_no_results"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventSearchNoResults performs a merge with any union data inside the EventInput, using the provided EventSearchNoResults
+func (t *EventInput) MergeEventSearchNoResults(v EventSearchNoResults) error {
+	v.Kind = "search_no_results"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEventNoteMarkedUseful returns the union data inside the EventInput as a EventNoteMarkedUseful
+func (t EventInput) AsEventNoteMarkedUseful() (EventNoteMarkedUseful, error) {
+	var body EventNoteMarkedUseful
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventNoteMarkedUseful overwrites any union data inside the EventInput as the provided EventNoteMarkedUseful
+func (t *EventInput) FromEventNoteMarkedUseful(v EventNoteMarkedUseful) error {
+	v.Kind = "note_marked_useful"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventNoteMarkedUseful performs a merge with any union data inside the EventInput, using the provided EventNoteMarkedUseful
+func (t *EventInput) MergeEventNoteMarkedUseful(v EventNoteMarkedUseful) error {
+	v.Kind = "note_marked_useful"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEventNoteUnmarkedUseful returns the union data inside the EventInput as a EventNoteUnmarkedUseful
+func (t EventInput) AsEventNoteUnmarkedUseful() (EventNoteUnmarkedUseful, error) {
+	var body EventNoteUnmarkedUseful
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventNoteUnmarkedUseful overwrites any union data inside the EventInput as the provided EventNoteUnmarkedUseful
+func (t *EventInput) FromEventNoteUnmarkedUseful(v EventNoteUnmarkedUseful) error {
+	v.Kind = "note_unmarked_useful"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventNoteUnmarkedUseful performs a merge with any union data inside the EventInput, using the provided EventNoteUnmarkedUseful
+func (t *EventInput) MergeEventNoteUnmarkedUseful(v EventNoteUnmarkedUseful) error {
+	v.Kind = "note_unmarked_useful"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEventCommentCreated returns the union data inside the EventInput as a EventCommentCreated
+func (t EventInput) AsEventCommentCreated() (EventCommentCreated, error) {
+	var body EventCommentCreated
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventCommentCreated overwrites any union data inside the EventInput as the provided EventCommentCreated
+func (t *EventInput) FromEventCommentCreated(v EventCommentCreated) error {
+	v.Kind = "comment_created"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventCommentCreated performs a merge with any union data inside the EventInput, using the provided EventCommentCreated
+func (t *EventInput) MergeEventCommentCreated(v EventCommentCreated) error {
+	v.Kind = "comment_created"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEventReportCreated returns the union data inside the EventInput as a EventReportCreated
+func (t EventInput) AsEventReportCreated() (EventReportCreated, error) {
+	var body EventReportCreated
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventReportCreated overwrites any union data inside the EventInput as the provided EventReportCreated
+func (t *EventInput) FromEventReportCreated(v EventReportCreated) error {
+	v.Kind = "report_created"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventReportCreated performs a merge with any union data inside the EventInput, using the provided EventReportCreated
+func (t *EventInput) MergeEventReportCreated(v EventReportCreated) error {
+	v.Kind = "report_created"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEventNotePublished returns the union data inside the EventInput as a EventNotePublished
+func (t EventInput) AsEventNotePublished() (EventNotePublished, error) {
+	var body EventNotePublished
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventNotePublished overwrites any union data inside the EventInput as the provided EventNotePublished
+func (t *EventInput) FromEventNotePublished(v EventNotePublished) error {
+	v.Kind = "note_published"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventNotePublished performs a merge with any union data inside the EventInput, using the provided EventNotePublished
+func (t *EventInput) MergeEventNotePublished(v EventNotePublished) error {
+	v.Kind = "note_published"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t EventInput) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"kind"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t EventInput) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "comment_created":
+		return t.AsEventCommentCreated()
+	case "explore_note_opened":
+		return t.AsEventExploreNoteOpened()
+	case "explore_notes_impression":
+		return t.AsEventExploreNotesImpression()
+	case "note_marked_useful":
+		return t.AsEventNoteMarkedUseful()
+	case "note_published":
+		return t.AsEventNotePublished()
+	case "note_unmarked_useful":
+		return t.AsEventNoteUnmarkedUseful()
+	case "report_created":
+		return t.AsEventReportCreated()
+	case "search_no_results":
+		return t.AsEventSearchNoResults()
+	case "search_reformulated":
+		return t.AsEventSearchReformulated()
+	case "search_result_opened":
+		return t.AsEventSearchResultOpened()
+	case "search_results_impression":
+		return t.AsEventSearchResultsImpression()
+	case "search_submitted":
+		return t.AsEventSearchSubmitted()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t EventInput) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *EventInput) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsEventSearchUsefulContext returns the union data inside the EventUsefulContext as a EventSearchUsefulContext
+func (t EventUsefulContext) AsEventSearchUsefulContext() (EventSearchUsefulContext, error) {
+	var body EventSearchUsefulContext
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventSearchUsefulContext overwrites any union data inside the EventUsefulContext as the provided EventSearchUsefulContext
+func (t *EventUsefulContext) FromEventSearchUsefulContext(v EventSearchUsefulContext) error {
+	v.Source = "search"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventSearchUsefulContext performs a merge with any union data inside the EventUsefulContext, using the provided EventSearchUsefulContext
+func (t *EventUsefulContext) MergeEventSearchUsefulContext(v EventSearchUsefulContext) error {
+	v.Source = "search"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEventExploreUsefulContext returns the union data inside the EventUsefulContext as a EventExploreUsefulContext
+func (t EventUsefulContext) AsEventExploreUsefulContext() (EventExploreUsefulContext, error) {
+	var body EventExploreUsefulContext
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventExploreUsefulContext overwrites any union data inside the EventUsefulContext as the provided EventExploreUsefulContext
+func (t *EventUsefulContext) FromEventExploreUsefulContext(v EventExploreUsefulContext) error {
+	v.Source = "explore"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventExploreUsefulContext performs a merge with any union data inside the EventUsefulContext, using the provided EventExploreUsefulContext
+func (t *EventUsefulContext) MergeEventExploreUsefulContext(v EventExploreUsefulContext) error {
+	v.Source = "explore"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEventNoteDetailUsefulContext returns the union data inside the EventUsefulContext as a EventNoteDetailUsefulContext
+func (t EventUsefulContext) AsEventNoteDetailUsefulContext() (EventNoteDetailUsefulContext, error) {
+	var body EventNoteDetailUsefulContext
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventNoteDetailUsefulContext overwrites any union data inside the EventUsefulContext as the provided EventNoteDetailUsefulContext
+func (t *EventUsefulContext) FromEventNoteDetailUsefulContext(v EventNoteDetailUsefulContext) error {
+	v.Source = "note_detail"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventNoteDetailUsefulContext performs a merge with any union data inside the EventUsefulContext, using the provided EventNoteDetailUsefulContext
+func (t *EventUsefulContext) MergeEventNoteDetailUsefulContext(v EventNoteDetailUsefulContext) error {
+	v.Source = "note_detail"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsEventAuthorProfileUsefulContext returns the union data inside the EventUsefulContext as a EventAuthorProfileUsefulContext
+func (t EventUsefulContext) AsEventAuthorProfileUsefulContext() (EventAuthorProfileUsefulContext, error) {
+	var body EventAuthorProfileUsefulContext
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventAuthorProfileUsefulContext overwrites any union data inside the EventUsefulContext as the provided EventAuthorProfileUsefulContext
+func (t *EventUsefulContext) FromEventAuthorProfileUsefulContext(v EventAuthorProfileUsefulContext) error {
+	v.Source = "author_profile"
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventAuthorProfileUsefulContext performs a merge with any union data inside the EventUsefulContext, using the provided EventAuthorProfileUsefulContext
+func (t *EventUsefulContext) MergeEventAuthorProfileUsefulContext(v EventAuthorProfileUsefulContext) error {
+	v.Source = "author_profile"
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t EventUsefulContext) Discriminator() (string, error) {
+	var discriminator struct {
+		Discriminator string `json:"source"`
+	}
+	err := json.Unmarshal(t.union, &discriminator)
+	return discriminator.Discriminator, err
+}
+
+func (t EventUsefulContext) ValueByDiscriminator() (interface{}, error) {
+	discriminator, err := t.Discriminator()
+	if err != nil {
+		return nil, err
+	}
+	switch discriminator {
+	case "author_profile":
+		return t.AsEventAuthorProfileUsefulContext()
+	case "explore":
+		return t.AsEventExploreUsefulContext()
+	case "note_detail":
+		return t.AsEventNoteDetailUsefulContext()
+	case "search":
+		return t.AsEventSearchUsefulContext()
+	default:
+		return nil, errors.New("unknown discriminator value: " + discriminator)
+	}
+}
+
+func (t EventUsefulContext) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *EventUsefulContext) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsEventErrorResponse returns the union data inside the CreateEvents400JSONResponseBody as a EventErrorResponse
+func (t CreateEvents400JSONResponseBody) AsEventErrorResponse() (EventErrorResponse, error) {
+	var body EventErrorResponse
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromEventErrorResponse overwrites any union data inside the CreateEvents400JSONResponseBody as the provided EventErrorResponse
+func (t *CreateEvents400JSONResponseBody) FromEventErrorResponse(v EventErrorResponse) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeEventErrorResponse performs a merge with any union data inside the CreateEvents400JSONResponseBody, using the provided EventErrorResponse
+func (t *CreateEvents400JSONResponseBody) MergeEventErrorResponse(v EventErrorResponse) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsErrorResponse returns the union data inside the CreateEvents400JSONResponseBody as a ErrorResponse
+func (t CreateEvents400JSONResponseBody) AsErrorResponse() (ErrorResponse, error) {
+	var body ErrorResponse
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromErrorResponse overwrites any union data inside the CreateEvents400JSONResponseBody as the provided ErrorResponse
+func (t *CreateEvents400JSONResponseBody) FromErrorResponse(v ErrorResponse) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeErrorResponse performs a merge with any union data inside the CreateEvents400JSONResponseBody, using the provided ErrorResponse
+func (t *CreateEvents400JSONResponseBody) MergeErrorResponse(v ErrorResponse) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t CreateEvents400JSONResponseBody) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *CreateEvents400JSONResponseBody) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -586,6 +2161,9 @@ type ServerInterface interface {
 	// List category catalog
 	// (GET /v1/categories)
 	ListCategories(w http.ResponseWriter, r *http.Request)
+	// Record product events
+	// (POST /v1/events)
+	CreateEvents(w http.ResponseWriter, r *http.Request)
 	// Stage one private image upload
 	// (POST /v1/media/image-uploads)
 	PrepareImageUpload(w http.ResponseWriter, r *http.Request)
@@ -682,6 +2260,12 @@ func (_ Unimplemented) ListAuthorNotes(w http.ResponseWriter, r *http.Request, a
 // List category catalog
 // (GET /v1/categories)
 func (_ Unimplemented) ListCategories(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Record product events
+// (POST /v1/events)
+func (_ Unimplemented) CreateEvents(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -972,6 +2556,26 @@ func (siw *ServerInterfaceWrapper) ListCategories(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListCategories(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateEvents operation middleware
+func (siw *ServerInterfaceWrapper) CreateEvents(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateEvents(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1547,6 +3151,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/categories", wrapper.ListCategories)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/events", wrapper.CreateEvents)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/v1/media/image-uploads", wrapper.PrepareImageUpload)
@@ -2170,6 +3777,106 @@ func (response ListCategories401JSONResponse) VisitListCategoriesResponse(w http
 type ListCategories500JSONResponse ErrorResponse
 
 func (response ListCategories500JSONResponse) VisitListCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEventsRequestObject struct {
+	Body *CreateEventsJSONRequestBody
+}
+
+type CreateEventsResponseObject interface {
+	VisitCreateEventsResponse(w http.ResponseWriter) error
+}
+
+type CreateEvents200JSONResponse CreateEventsReceipt
+
+func (response CreateEvents200JSONResponse) VisitCreateEventsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEvents400JSONResponse = CreateEvents400JSONResponseBody
+
+func (response CreateEvents400JSONResponse) VisitCreateEventsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.union); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEvents401JSONResponse ErrorResponse
+
+func (response CreateEvents401JSONResponse) VisitCreateEventsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEvents413JSONResponse ErrorResponse
+
+func (response CreateEvents413JSONResponse) VisitCreateEventsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEvents429ResponseHeaders struct {
+	RetryAfter int
+}
+
+type CreateEvents429JSONResponse struct {
+	Body    ErrorResponse
+	Headers CreateEvents429ResponseHeaders
+}
+
+func (response CreateEvents429JSONResponse) VisitCreateEventsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEvents500JSONResponse ErrorResponse
+
+func (response CreateEvents500JSONResponse) VisitCreateEventsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -3370,6 +5077,9 @@ type StrictServerInterface interface {
 	// List category catalog
 	// (GET /v1/categories)
 	ListCategories(ctx context.Context, request ListCategoriesRequestObject) (ListCategoriesResponseObject, error)
+	// Record product events
+	// (POST /v1/events)
+	CreateEvents(ctx context.Context, request CreateEventsRequestObject) (CreateEventsResponseObject, error)
 	// Stage one private image upload
 	// (POST /v1/media/image-uploads)
 	PrepareImageUpload(ctx context.Context, request PrepareImageUploadRequestObject) (PrepareImageUploadResponseObject, error)
@@ -3668,6 +5378,37 @@ func (sh *strictHandler) ListCategories(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListCategoriesResponseObject); ok {
 		if err := validResponse.VisitListCategoriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateEvents operation middleware
+func (sh *strictHandler) CreateEvents(w http.ResponseWriter, r *http.Request) {
+	var request CreateEventsRequestObject
+
+	var body CreateEventsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateEvents(ctx, request.(CreateEventsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateEvents")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateEventsResponseObject); ok {
+		if err := validResponse.VisitCreateEventsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -4040,80 +5781,106 @@ func (sh *strictHandler) SearchNotes(w http.ResponseWriter, r *http.Request, par
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"//8=",
+	"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",
+	"ybeCxd3i/wMAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

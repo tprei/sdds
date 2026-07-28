@@ -195,6 +195,8 @@ export const errorCodeSchema = z.enum([
   'media_storage_unavailable',
   'media_integrity_error',
   'too_many_images',
+  'invalid_event',
+  'invalid_event_batch',
 ]) satisfies z.ZodType<ErrorCode>;
 
 export const validationFieldSchema = z.enum([

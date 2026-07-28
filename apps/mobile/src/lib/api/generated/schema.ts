@@ -314,6 +314,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record product events */
+        post: operations["createEvents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -443,10 +460,333 @@ export interface components {
             author: components["schemas"]["AuthorSummary"];
         };
         /** @enum {string} */
-        ErrorCode: "internal_error" | "forbidden" | "invalid_auth" | "invalid_comment" | "invalid_json" | "invalid_note" | "invalid_report" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken" | "invalid_media" | "unsupported_media_type" | "idempotency_conflict" | "upload_in_progress" | "upload_expired" | "media_staging_quota_exceeded" | "media_storage_unavailable" | "media_integrity_error" | "too_many_images";
+        ErrorCode: "internal_error" | "forbidden" | "invalid_auth" | "invalid_comment" | "invalid_json" | "invalid_note" | "invalid_report" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken" | "invalid_media" | "unsupported_media_type" | "idempotency_conflict" | "upload_in_progress" | "upload_expired" | "media_staging_quota_exceeded" | "media_storage_unavailable" | "media_integrity_error" | "too_many_images" | "invalid_event" | "invalid_event_batch";
         ErrorResponse: {
             code: components["schemas"]["ErrorCode"];
             fields?: components["schemas"]["ValidationProblem"][];
+        };
+        /** Format: uuid */
+        EventID: string;
+        /** @enum {string} */
+        EventPlatform: "ios" | "android" | "web";
+        /** @enum {string} */
+        EventSearchVersion: "fts5-v1";
+        /** @enum {string} */
+        EventRetrievalSource: "lexical" | "semantic" | "hybrid";
+        EventAppVersion: string;
+        /** Format: int64 */
+        EventOccurredAt: number;
+        EventRank: number;
+        EventResultCount: number;
+        EventQuery: string;
+        EventExploreResult: {
+            note_id: components["schemas"]["EventID"];
+            rank: components["schemas"]["EventRank"];
+        };
+        EventSearchResult: {
+            note_id: components["schemas"]["EventID"];
+            rank: components["schemas"]["EventRank"];
+            retrieval_source: components["schemas"]["EventRetrievalSource"];
+        };
+        EventExploreNotesImpressionPayload: {
+            category_slug: (string & components["schemas"]["CategorySlug"]) | null;
+            result_count: components["schemas"]["EventResultCount"];
+            results: components["schemas"]["EventExploreResult"][];
+        };
+        EventExploreNoteOpenedPayload: {
+            note_id: components["schemas"]["EventID"];
+            rank: components["schemas"]["EventRank"];
+            category_slug: (string & components["schemas"]["CategorySlug"]) | null;
+        };
+        EventSearchSubmittedPayload: {
+            search_id: components["schemas"]["EventID"];
+            search_version: components["schemas"]["EventSearchVersion"];
+            query: components["schemas"]["EventQuery"];
+            category_slug: (string & components["schemas"]["CategorySlug"]) | null;
+        };
+        EventSearchResultsImpressionPayload: {
+            search_id: components["schemas"]["EventID"];
+            search_version: components["schemas"]["EventSearchVersion"];
+            query: components["schemas"]["EventQuery"];
+            category_slug: (string & components["schemas"]["CategorySlug"]) | null;
+            result_count: components["schemas"]["EventResultCount"];
+            results: components["schemas"]["EventSearchResult"][];
+        };
+        EventSearchResultOpenedPayload: {
+            search_id: components["schemas"]["EventID"];
+            search_version: components["schemas"]["EventSearchVersion"];
+            note_id: components["schemas"]["EventID"];
+            rank: components["schemas"]["EventRank"];
+            retrieval_source: components["schemas"]["EventRetrievalSource"];
+        };
+        EventSearchReformulatedPayload: {
+            previous_search_id: components["schemas"]["EventID"];
+            previous_search_version: components["schemas"]["EventSearchVersion"];
+            search_id: components["schemas"]["EventID"];
+            search_version: components["schemas"]["EventSearchVersion"];
+            previous_query: components["schemas"]["EventQuery"];
+            query: components["schemas"]["EventQuery"];
+            previous_category_slug: (string & components["schemas"]["CategorySlug"]) | null;
+            category_slug: (string & components["schemas"]["CategorySlug"]) | null;
+        };
+        EventSearchNoResultsPayload: {
+            search_id: components["schemas"]["EventID"];
+            search_version: components["schemas"]["EventSearchVersion"];
+            query: components["schemas"]["EventQuery"];
+            category_slug: (string & components["schemas"]["CategorySlug"]) | null;
+            /** @enum {integer} */
+            result_count: 0;
+        };
+        EventSearchUsefulContext: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            source: "search";
+            search_id: components["schemas"]["EventID"];
+            search_version: components["schemas"]["EventSearchVersion"];
+            rank: components["schemas"]["EventRank"];
+            retrieval_source: components["schemas"]["EventRetrievalSource"];
+        };
+        EventExploreUsefulContext: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            source: "explore";
+            rank: components["schemas"]["EventRank"];
+            category_slug: (string & components["schemas"]["CategorySlug"]) | null;
+        };
+        EventNoteDetailUsefulContext: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            source: "note_detail";
+        };
+        EventAuthorProfileUsefulContext: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            source: "author_profile";
+        };
+        EventUsefulContext: components["schemas"]["EventSearchUsefulContext"] | components["schemas"]["EventExploreUsefulContext"] | components["schemas"]["EventNoteDetailUsefulContext"] | components["schemas"]["EventAuthorProfileUsefulContext"];
+        EventUsefulPayload: {
+            note_id: components["schemas"]["EventID"];
+            context: components["schemas"]["EventUsefulContext"];
+        };
+        EventCommentCreatedPayload: {
+            note_id: components["schemas"]["EventID"];
+            comment_id: components["schemas"]["EventID"];
+        };
+        EventReportCreatedPayload: {
+            report_id: components["schemas"]["EventID"];
+            target_type: components["schemas"]["ReportTargetType"];
+            target_id: components["schemas"]["EventID"];
+        };
+        EventNotePublishedPayload: {
+            note_id: components["schemas"]["EventID"];
+            category_slug: components["schemas"]["CategorySlug"];
+        };
+        EventExploreNotesImpression: {
+            id: components["schemas"]["EventID"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "explore_notes_impression";
+            occurred_at: components["schemas"]["EventOccurredAt"];
+            installation_id: (string & components["schemas"]["EventID"]) | null;
+            platform: components["schemas"]["EventPlatform"];
+            app_version: (string & components["schemas"]["EventAppVersion"]) | null;
+            /** @enum {integer} */
+            schema_version: 1;
+            payload: components["schemas"]["EventExploreNotesImpressionPayload"];
+        };
+        EventExploreNoteOpened: {
+            id: components["schemas"]["EventID"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "explore_note_opened";
+            occurred_at: components["schemas"]["EventOccurredAt"];
+            installation_id: (string & components["schemas"]["EventID"]) | null;
+            platform: components["schemas"]["EventPlatform"];
+            app_version: (string & components["schemas"]["EventAppVersion"]) | null;
+            /** @enum {integer} */
+            schema_version: 1;
+            payload: components["schemas"]["EventExploreNoteOpenedPayload"];
+        };
+        EventSearchSubmitted: {
+            id: components["schemas"]["EventID"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "search_submitted";
+            occurred_at: components["schemas"]["EventOccurredAt"];
+            installation_id: (string & components["schemas"]["EventID"]) | null;
+            platform: components["schemas"]["EventPlatform"];
+            app_version: (string & components["schemas"]["EventAppVersion"]) | null;
+            /** @enum {integer} */
+            schema_version: 1;
+            payload: components["schemas"]["EventSearchSubmittedPayload"];
+        };
+        EventSearchResultsImpression: {
+            id: components["schemas"]["EventID"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "search_results_impression";
+            occurred_at: components["schemas"]["EventOccurredAt"];
+            installation_id: (string & components["schemas"]["EventID"]) | null;
+            platform: components["schemas"]["EventPlatform"];
+            app_version: (string & components["schemas"]["EventAppVersion"]) | null;
+            /** @enum {integer} */
+            schema_version: 1;
+            payload: components["schemas"]["EventSearchResultsImpressionPayload"];
+        };
+        EventSearchResultOpened: {
+            id: components["schemas"]["EventID"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "search_result_opened";
+            occurred_at: components["schemas"]["EventOccurredAt"];
+            installation_id: (string & components["schemas"]["EventID"]) | null;
+            platform: components["schemas"]["EventPlatform"];
+            app_version: (string & components["schemas"]["EventAppVersion"]) | null;
+            /** @enum {integer} */
+            schema_version: 1;
+            payload: components["schemas"]["EventSearchResultOpenedPayload"];
+        };
+        EventSearchReformulated: {
+            id: components["schemas"]["EventID"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "search_reformulated";
+            occurred_at: components["schemas"]["EventOccurredAt"];
+            installation_id: (string & components["schemas"]["EventID"]) | null;
+            platform: components["schemas"]["EventPlatform"];
+            app_version: (string & components["schemas"]["EventAppVersion"]) | null;
+            /** @enum {integer} */
+            schema_version: 1;
+            payload: components["schemas"]["EventSearchReformulatedPayload"];
+        };
+        EventSearchNoResults: {
+            id: components["schemas"]["EventID"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "search_no_results";
+            occurred_at: components["schemas"]["EventOccurredAt"];
+            installation_id: (string & components["schemas"]["EventID"]) | null;
+            platform: components["schemas"]["EventPlatform"];
+            app_version: (string & components["schemas"]["EventAppVersion"]) | null;
+            /** @enum {integer} */
+            schema_version: 1;
+            payload: components["schemas"]["EventSearchNoResultsPayload"];
+        };
+        EventNoteMarkedUseful: {
+            id: components["schemas"]["EventID"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "note_marked_useful";
+            occurred_at: components["schemas"]["EventOccurredAt"];
+            installation_id: (string & components["schemas"]["EventID"]) | null;
+            platform: components["schemas"]["EventPlatform"];
+            app_version: (string & components["schemas"]["EventAppVersion"]) | null;
+            /** @enum {integer} */
+            schema_version: 1;
+            payload: components["schemas"]["EventUsefulPayload"];
+        };
+        EventNoteUnmarkedUseful: {
+            id: components["schemas"]["EventID"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "note_unmarked_useful";
+            occurred_at: components["schemas"]["EventOccurredAt"];
+            installation_id: (string & components["schemas"]["EventID"]) | null;
+            platform: components["schemas"]["EventPlatform"];
+            app_version: (string & components["schemas"]["EventAppVersion"]) | null;
+            /** @enum {integer} */
+            schema_version: 1;
+            payload: components["schemas"]["EventUsefulPayload"];
+        };
+        EventCommentCreated: {
+            id: components["schemas"]["EventID"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "comment_created";
+            occurred_at: components["schemas"]["EventOccurredAt"];
+            installation_id: (string & components["schemas"]["EventID"]) | null;
+            platform: components["schemas"]["EventPlatform"];
+            app_version: (string & components["schemas"]["EventAppVersion"]) | null;
+            /** @enum {integer} */
+            schema_version: 1;
+            payload: components["schemas"]["EventCommentCreatedPayload"];
+        };
+        EventReportCreated: {
+            id: components["schemas"]["EventID"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "report_created";
+            occurred_at: components["schemas"]["EventOccurredAt"];
+            installation_id: (string & components["schemas"]["EventID"]) | null;
+            platform: components["schemas"]["EventPlatform"];
+            app_version: (string & components["schemas"]["EventAppVersion"]) | null;
+            /** @enum {integer} */
+            schema_version: 1;
+            payload: components["schemas"]["EventReportCreatedPayload"];
+        };
+        EventNotePublished: {
+            id: components["schemas"]["EventID"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "note_published";
+            occurred_at: components["schemas"]["EventOccurredAt"];
+            installation_id: (string & components["schemas"]["EventID"]) | null;
+            platform: components["schemas"]["EventPlatform"];
+            app_version: (string & components["schemas"]["EventAppVersion"]) | null;
+            /** @enum {integer} */
+            schema_version: 1;
+            payload: components["schemas"]["EventNotePublishedPayload"];
+        };
+        EventInput: components["schemas"]["EventExploreNotesImpression"] | components["schemas"]["EventExploreNoteOpened"] | components["schemas"]["EventSearchSubmitted"] | components["schemas"]["EventSearchResultsImpression"] | components["schemas"]["EventSearchResultOpened"] | components["schemas"]["EventSearchReformulated"] | components["schemas"]["EventSearchNoResults"] | components["schemas"]["EventNoteMarkedUseful"] | components["schemas"]["EventNoteUnmarkedUseful"] | components["schemas"]["EventCommentCreated"] | components["schemas"]["EventReportCreated"] | components["schemas"]["EventNotePublished"];
+        CreateEventsRequest: {
+            events: components["schemas"]["EventInput"][];
+        };
+        CreateEventsReceipt: {
+            accepted_count: number;
+            duplicate_count: number;
+        };
+        InvalidEventProblem: {
+            index: number;
+            field: string;
+            /** @enum {string} */
+            code: "required" | "invalid" | "unknown" | "unsupported" | "too_long" | "too_large";
+        };
+        EventErrorResponse: {
+            /** @enum {string} */
+            code: "invalid_event";
+            problems: components["schemas"]["InvalidEventProblem"][];
         };
         ListNotesResponse: {
             notes: components["schemas"]["Note"][];
@@ -1781,6 +2121,76 @@ export interface operations {
                 };
             };
             /** @description The API could not create the report. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEventsRequest"];
+            };
+        };
+        responses: {
+            /** @description Events accepted or already stored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateEventsReceipt"];
+                };
+            };
+            /** @description Invalid JSON, event batch, or indexed event. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventErrorResponse"] | components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is missing a valid authenticated session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request body exceeds 256 KiB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The event rate limit was exceeded. */
+            429: {
+                headers: {
+                    "Retry-After": number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The event batch could not be stored. */
             500: {
                 headers: {
                     [name: string]: unknown;

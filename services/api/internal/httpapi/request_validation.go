@@ -47,9 +47,8 @@ func openAPIRequestValidator() func(http.Handler) http.Handler {
 			requestOptions := options
 			validationRoute := route
 			if hasPolicy && policy.excludeRequestBody {
-				// The application multipart parser is the sole consumer of this bounded body.
-				// Kin-openapi security validation also buffers it, despite ExcludeRequestBody.
-				// Auth middleware already verified this route, so never consume, buffer, or substitute it here.
+				// The application decoder is the sole consumer of this bounded request body.
+				// Validation here must not buffer or substitute it before indexed errors are built.
 				requestOptions.ExcludeRequestBody = true
 				operation := *route.Operation
 				security := openapi3.SecurityRequirements{}
@@ -131,6 +130,9 @@ func requestValidationPolicyForOperation(operationID string) (requestValidationP
 		return policy, true
 	}
 	if policy, ok := reportRequestValidationPolicy(operationID); ok {
+		return policy, true
+	}
+	if policy, ok := eventRequestValidationPolicy(operationID); ok {
 		return policy, true
 	}
 	return mediaRequestValidationPolicy(operationID)

@@ -639,6 +639,7 @@ func TestCommentRoutesRejectUnauthenticatedSessions(t *testing.T) {
 				NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
 				CommentDependencies{Store: fakeCommentStore{}},
 				ReportDependencies{Store: fakeReportStore{}},
+				EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
 				AuthDependencies{Users: fakeUserStore{
 					findCurrentSession: func(context.Context, string, time.Time) (user.CurrentSession, error) {
 						if test.storeError == nil {
@@ -672,6 +673,7 @@ func newCommentRouter(notes fakeNoteStore, comments fakeCommentStore) http.Handl
 		NotesDependencies{Stores: notes, Catalog: fakeCatalog{}},
 		CommentDependencies{Store: comments},
 		ReportDependencies{Store: fakeReportStore{}, CommentTargets: comments},
+		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
 		AuthDependencies{Users: authenticatedFakeUserStore(fakeUserStore{}), Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},

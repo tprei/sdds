@@ -449,6 +449,7 @@ func TestCreateReportRejectsUnauthenticatedBeforeValidation(t *testing.T) {
 			t.Fatal("CreateReport should not be called")
 			return report.CreateResult{}, nil
 		}}},
+		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
 		AuthDependencies{Users: authenticatedFakeUserStore(fakeUserStore{}), Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
@@ -545,6 +546,7 @@ func newReportRouter(reports fakeReportStore, notes fakeNoteStore, comments fake
 		NotesDependencies{Stores: notes, Catalog: fakeCatalog{}},
 		CommentDependencies{Store: comments},
 		ReportDependencies{Store: reports, CommentTargets: comments},
+		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
 		AuthDependencies{Users: authenticatedFakeUserStore(fakeUserStore{}), Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},

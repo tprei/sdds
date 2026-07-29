@@ -65,6 +65,7 @@ vi.mock('@/components/foundation-screen', () => ({
   FoundationTextInput: (props: NativeProps) => createElement('input', props),
 }));
 vi.mock('@/components/note-card', () => ({
+  NOTE_USEFUL_ERROR_MESSAGE: 'Não deu pra atualizar o Útil. Tenta de novo.',
   NoteCard: ({ note, ...props }: { note: { id: string } } & NativeProps) =>
     createElement('article', { ...props, note, testID: `note-card-${note.id}` }),
 }));

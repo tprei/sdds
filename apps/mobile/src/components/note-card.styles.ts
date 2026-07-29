@@ -1,87 +1,84 @@
 import { StyleSheet } from 'react-native';
 
-import { colors, radius, semanticColors, spacing, typography } from '@sdds/tokens';
+import { colors, radius, semanticColors, shadows, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
-  author: {
-    color: semanticColors.textMuted,
-    fontSize: typography.sizeSmall,
-    fontWeight: typography.weightSemibold,
-  },
-  authorControl: {
-    alignSelf: 'flex-start',
-    justifyContent: 'center',
-    marginBottom: spacing.sp5,
-    marginHorizontal: spacing.sp5,
-    minHeight: 44,
-    minWidth: 44,
-  },
-  authorPressed: {
-    opacity: 0.7,
-  },
-  actionRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sp3,
-    marginBottom: spacing.sp5,
-    marginHorizontal: spacing.sp5,
-  },
-  body: {
-    color: semanticColors.textBody,
-    fontSize: typography.sizeBody,
-    lineHeight: 22,
-  },
   card: {
     backgroundColor: semanticColors.cardSurface,
     borderColor: semanticColors.borderSubtle,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     borderWidth: 1,
+    overflow: 'hidden',
+    ...shadows.xs,
   },
-  noteTarget: {
-    gap: spacing.sp4,
-    padding: spacing.sp5,
+  photoFrame: {
+    backgroundColor: colors.paper2,
+    overflow: 'hidden',
+    position: 'relative',
   },
-  place: {
-    color: semanticColors.textMuted,
-    fontSize: typography.sizeSmall,
-    fontWeight: typography.weightSemibold,
+  photoImage: {
+    height: '100%',
+    width: '100%',
   },
-  metaRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sp3,
+  postItHeader: {
+    backgroundColor: colors.yellow100,
+    borderBottomColor: colors.yellow200,
+    borderBottomWidth: 1,
+    overflow: 'hidden',
+    padding: 14,
+    position: 'relative',
   },
-  pill: {
-    alignSelf: 'flex-start',
-    backgroundColor: semanticColors.accentTint,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sp4,
-    paddingVertical: spacing.sp2,
+  chipTopLeft: {
+    left: 8,
+    position: 'absolute',
+    top: 8,
+    zIndex: 1,
   },
-  pillText: {
-    color: semanticColors.accentPress,
-    fontSize: typography.sizeExtraSmall,
-    fontWeight: typography.weightExtraBold,
-    letterSpacing: 0,
-    textTransform: 'uppercase',
+  chipTopRight: {
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    zIndex: 1,
   },
-  pressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.99 }],
+  quoteMark: {
+    fontSize: 34,
+    lineHeight: 34,
+  },
+  bodyExcerpt: {
+    color: colors.ink700,
+    marginTop: spacing.sp1,
+  },
+  titleBlock: {
+    paddingBottom: spacing.sp3,
+    paddingHorizontal: 12,
+    paddingTop: 10,
   },
   title: {
     color: semanticColors.textStrong,
-    fontSize: typography.sizeTitle,
-    fontWeight: typography.weightBold,
-    lineHeight: 24,
+  },
+  footerRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sp2,
+    paddingBottom: 11,
+    paddingHorizontal: 12,
+  },
+  authorTarget: {
+    alignItems: 'center',
+    flexShrink: 1,
+    flexDirection: 'row',
+    gap: spacing.sp2,
+    minHeight: 44,
+  },
+  authorName: {
+    color: semanticColors.textMuted,
+    flexShrink: 1,
+  },
+  errorBlock: {
+    paddingBottom: 10,
+    paddingHorizontal: 12,
   },
   usefulError: {
     color: colors.danger500,
-    fontSize: typography.sizeSmall,
-    fontWeight: typography.weightSemibold,
-    marginBottom: spacing.sp5,
-    marginHorizontal: spacing.sp5,
   },
 });

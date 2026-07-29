@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   },
   authState: { status: 'loading' } as AuthStateMock,
   logout: vi.fn(async () => undefined),
+  navigate: vi.fn(),
   push: vi.fn(),
   record: vi.fn(),
   productEventsReady: true,
@@ -35,20 +36,60 @@ vi.mock('expo-crypto', () => ({
 }));
 
 vi.mock('react-native', () => {
-  function NativeView({ children, ...props }: NativeProps) {
-    const content = typeof children === 'function' ? null : children;
-    return createElement('div', props, content);
+  const { createElement } = React;
+  type NP = {
+    children?: ReactNode;
+    [key: string]: unknown;
+  };
+  function NativeView({ children, ...props }: NP) {
+    return createElement('div', props, children);
   }
   function NativePressable({ children, ...props }: NativeProps) {
-    const content = typeof children === 'function' ? children({ pressed: false }) : children;
+    const content =
+      typeof children === 'function' ? children({ pressed: false }) : children;
     return createElement('button', props, content);
   }
+  class AnimatedValue {
+    value: number;
+    constructor(value: number) {
+      this.value = value;
+    }
+  }
   return {
-    Pressable: NativePressable,
-    StyleSheet: { create: (styles: Record<string, unknown>) => styles },
-    Text: NativeView,
     View: NativeView,
+    Text: NativeView,
+    Pressable: NativePressable,
+    ScrollView: NativeView,
+    Image: NativeView,
+    RefreshControl: NativeView,
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 1, fontScale: 1 }),
+    Animated: {
+      View: NativeView,
+      Value: AnimatedValue,
+      timing: () => ({ start: () => {} }),
+    },
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => {} }),
+    },
+    StyleSheet: { create: (styles: Record<string, unknown>) => styles },
   };
+});
+
+vi.mock('react-native-safe-area-context', () => {
+  const { createElement } = React;
+  function SafeAreaView({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) {
+    return createElement('div', props, children);
+  }
+  return { SafeAreaView };
+});
+
+vi.mock('react-native-svg', () => {
+  const { createElement } = React;
+  function Node({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) {
+    return createElement('div', props, children);
+  }
+  return { Svg: Node, Path: Node, Circle: Node, Rect: Node };
 });
 
 vi.mock('@/components/foundation-screen', () => ({
@@ -59,6 +100,7 @@ vi.mock('@/components/foundation-screen', () => ({
     createElement('section', null, children),
 }));
 vi.mock('@/components/note-card', () => ({
+  NOTE_USEFUL_ERROR_MESSAGE: 'Não deu pra atualizar o Útil. Tenta de novo.',
   NoteCard: (props: NativeProps) =>
     createElement('div', { ...props, testID: 'note-card' }),
 }));
@@ -76,7 +118,7 @@ vi.mock('expo-router', async () => {
     useFocusEffect(effect: () => void | (() => void)) {
       react.useEffect(effect, [effect]);
     },
-    useRouter: () => ({ push: mocks.push }),
+    useRouter: () => ({ push: mocks.push, navigate: mocks.navigate }),
   };
 });
 vi.mock('@/lib/auth/auth-provider', () => ({
@@ -107,6 +149,22 @@ function deferred<T>(): Deferred<T> {
     resolve = nextResolve;
   });
   return { promise, resolve };
+}
+
+function exploreNote(id: string) {
+  return {
+    author: { displayName: 'Ana', id: 'author-id' },
+    body: 'Corpo curto do achado.',
+    categorySlug: 'food',
+    createdAt: 1782993600000,
+    id,
+    images: [],
+    placeSlug: null,
+    title: `Nota ${id}`,
+    updatedAt: 1782993600000,
+    usefulByCurrentUser: false,
+    usefulCount: 0,
+  };
 }
 
 describe('HomeScreen auth gate', () => {
@@ -191,20 +249,7 @@ describe('HomeScreen auth gate', () => {
     renderer.unmount();
   });
   it('records the rendered Explore set and provenance before interactions', async () => {
-    const note = {
-      author: { displayName: 'Ana', id: 'author-id' },
-      body: 'Corpo',
-      categorySlug: 'food',
-      createdAt: 1782993600000,
-      id: 'note-id',
-      images: [],
-      placeSlug: null,
-      title: 'Título',
-      updatedAt: 1782993600000,
-      usefulByCurrentUser: false,
-      usefulCount: 0,
-    };
-    mocks.apiClient.listNotes.mockResolvedValueOnce([note]);
+    mocks.apiClient.listNotes.mockResolvedValueOnce([exploreNote('note-id')]);
     mocks.apiClient.markNoteUseful.mockResolvedValueOnce(undefined);
 
     let renderer!: ReactTestRenderer;
@@ -249,19 +294,6 @@ describe('HomeScreen auth gate', () => {
   it('ignores stale Explore responses and deduplicates a committed impression', async () => {
     const first = deferred<unknown[]>();
     const second = deferred<unknown[]>();
-    const note = (id: string) => ({
-      author: { displayName: 'Ana', id: 'author-id' },
-      body: 'Corpo',
-      categorySlug: 'food',
-      createdAt: 1782993600000,
-      id,
-      images: [],
-      placeSlug: null,
-      title: id,
-      updatedAt: 1782993600000,
-      usefulByCurrentUser: false,
-      usefulCount: 0,
-    });
     mocks.apiClient.listNotes
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise);
@@ -277,11 +309,11 @@ describe('HomeScreen auth gate', () => {
     });
 
     await act(async () => {
-      second.resolve([note('current-note')]);
+      second.resolve([exploreNote('current-note')]);
       await settle();
     });
     await act(async () => {
-      first.resolve([note('stale-note')]);
+      first.resolve([exploreNote('stale-note')]);
       await settle();
       renderer.update(createElement(HomeScreen));
       await settle();
@@ -296,5 +328,40 @@ describe('HomeScreen auth gate', () => {
       resultCount: 1,
       results: [{ noteID: 'current-note', rank: 1 }],
     });
+  });
+  it('keeps API-order ranks across two masonry columns', async () => {
+    mocks.apiClient.listNotes.mockResolvedValueOnce([
+      exploreNote('n1'),
+      exploreNote('n2'),
+      exploreNote('n3'),
+      exploreNote('n4'),
+      exploreNote('n5'),
+    ]);
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(createElement(HomeScreen));
+      await settle();
+    });
+
+    expect(mocks.record).toHaveBeenCalledWith('explore_notes_impression', {
+      categorySlug: null,
+      resultCount: 5,
+      results: [
+        { noteID: 'n1', rank: 1 },
+        { noteID: 'n2', rank: 2 },
+        { noteID: 'n3', rank: 3 },
+        { noteID: 'n4', rank: 4 },
+        { noteID: 'n5', rank: 5 },
+      ],
+    });
+
+    const cards = renderer.root.findAllByProps({ testID: 'note-card' });
+    expect(cards).toHaveLength(5);
+
+    const columns = new Set(
+      cards.map((card) => card.parent?.parent?.parent?.parent),
+    );
+    expect(columns.size).toBe(2);
   });
 });

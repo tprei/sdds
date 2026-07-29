@@ -9,7 +9,7 @@ import {
   FoundationScreen,
   FoundationTextInput,
 } from '@/components/foundation-screen';
-import { NoteCard } from '@/components/note-card';
+import { NoteCard, NOTE_USEFUL_ERROR_MESSAGE } from '@/components/note-card';
 import { useAuth } from '@/lib/auth/auth-provider';
 import type { APIClient } from '@/lib/api/client';
 import { requestStatus } from '@/lib/api/request-error';
@@ -739,12 +739,15 @@ function SearchStateContent({
             key={labelledNote.id}
             note={labelledNote}
             onPress={() => onOpenNote(result)}
-            onPressAuthor={onOpenAuthor}
+            onPressAuthor={() => onOpenAuthor(labelledNote.author.id)}
             onPressUseful={() => {
               void onToggleUseful(result);
             }}
-            placeLabel={labelledNote.placeLabel}
-            usefulError={usefulMutations[labelledNote.id] === 'error'}
+            usefulError={
+              usefulMutations[labelledNote.id] === 'error'
+                ? NOTE_USEFUL_ERROR_MESSAGE
+                : null
+            }
             usefulPending={usefulMutations[labelledNote.id] === 'pending'}
           />
         );

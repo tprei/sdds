@@ -6,36 +6,51 @@ import type { Note } from '@/lib/api/notes';
 
 import { NoteCard } from './note-card';
 
-const { createElement } = React;
 type ReactNode = React.ReactNode;
 
-type NativeProps = {
-  children?: ReactNode | ((state: { pressed: boolean }) => ReactNode);
-  [key: string]: unknown;
-};
-
 vi.mock('react-native', () => {
-  function NativeView({ children, ...props }: NativeProps) {
-    const content = typeof children === 'function' ? null : children;
-    return createElement('div', props, content);
+  const { createElement } = React;
+  type NP = {
+    children?: ReactNode;
+    [key: string]: unknown;
+  };
+  function NativeView({ children, ...props }: NP) {
+    return createElement('div', props, children);
   }
-
-  function NativePressable({ children, ...props }: NativeProps) {
-    const content =
-      typeof children === 'function' ? children({ pressed: false }) : children;
-    return createElement('div', props, content);
+  class AnimatedValue {
+    value: number;
+    constructor(value: number) {
+      this.value = value;
+    }
   }
-
   return {
-    Image: ({ children, ...props }: NativeProps) => {
+    Image: ({ children, ...props }: NP) => {
       const content = typeof children === 'function' ? null : children;
       return createElement('img', props, content);
     },
-    Pressable: NativePressable,
-    StyleSheet: { create: (styles: Record<string, unknown>) => styles },
-    Text: NativeView,
+    Pressable: NativeView,
     View: NativeView,
+    Text: NativeView,
+    Animated: {
+      View: NativeView,
+      Value: AnimatedValue,
+      timing: () => ({ start: () => {} }),
+    },
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => {} }),
+    },
+    StyleSheet: { create: (styles: Record<string, unknown>) => styles },
   };
+});
+
+vi.mock('react-native-svg', () => {
+  const { createElement } = React;
+  function Node({ children, ...props }: NP) {
+    return createElement('div', props, children);
+  }
+  type NP = { children?: ReactNode; [key: string]: unknown };
+  return { Svg: Node, Path: Node, Circle: Node, Rect: Node };
 });
 
 function render(element: React.ReactElement): ReactTestRenderer {
@@ -46,19 +61,20 @@ function render(element: React.ReactElement): ReactTestRenderer {
   return renderer;
 }
 
-function note(images: Note['images']): Note {
+function note(overrides: Partial<Note> = {}): Note {
   return {
-    author: { displayName: 'Thiago', id: 'author-id' },
+    author: { displayName: 'Thiago Alves', id: 'author-id' },
     body: 'Tem pao de queijo decente.',
     categorySlug: 'food',
     createdAt: 1782993600000,
     id: 'note-id',
-    images,
+    images: [],
     placeSlug: null,
     title: 'Cafe bom',
     updatedAt: 1782993600000,
-    usefulCount: 0,
     usefulByCurrentUser: false,
+    usefulCount: 3,
+    ...overrides,
   };
 }
 
@@ -74,65 +90,132 @@ const firstImage = {
   width: 1200,
 };
 
-const secondImage = {
-  ...firstImage,
-  id: 'image-id-2',
-  position: 1,
-  url: 'http://localhost:8080/v1/media/images/image-id-2',
-};
-
-describe('NoteCard media', () => {
-  it('renders only the first seeded image without nested accessibility', () => {
-    const currentNote = note([firstImage, secondImage]);
-    const onPress = vi.fn();
+describe('NoteCard', () => {
+  it('renders the photo variant with the first image and the category chip', () => {
+    const currentNote = note({ images: [firstImage] });
     const renderer = render(
       <NoteCard
-        categoryLabel="Comida"
         note={currentNote}
-        onPress={onPress}
+        categoryLabel="Comida"
+        onPress={() => undefined}
         onPressUseful={() => undefined}
-        placeLabel={null}
-        usefulError={false}
         usefulPending={false}
+        usefulError={null}
       />,
     );
 
-    const nativeImages = renderer.root.findAllByType('img');
-    expect(nativeImages).toHaveLength(1);
-    expect(nativeImages[0]?.props.source).toEqual({ uri: firstImage.url });
-    expect(nativeImages[0]?.props.accessible).toBe(false);
-
-    const notePressable = renderer.root.findByProps({
-      accessibilityLabel: `Abrir nota com imagem: ${currentNote.title}`,
-      accessibilityRole: 'button',
-    });
-    expect(notePressable.props.accessibilityLabel).toBe(
-      `Abrir nota com imagem: ${currentNote.title}`,
-    );
-    act(() => {
-      notePressable.props.onPress();
-    });
-    expect(onPress).toHaveBeenCalledOnce();
+    const images = renderer.root.findAllByType('img');
+    expect(images).toHaveLength(1);
+    expect(images[0]?.props.source).toEqual({ uri: firstImage.url });
+    expect(renderer.root.findAllByProps({ children: 'Comida' })).not.toHaveLength(0);
   });
 
-  it('keeps note text when its first image fails to load', async () => {
-    const currentNote = note([firstImage]);
+  it('renders the post-it body excerpt clamped to four lines', () => {
+    const currentNote = note({ body: 'Um corpo bem mais longo pra ocupar varias linhas no mural.' });
     const renderer = render(
-      <NoteCard categoryLabel="Comida" note={currentNote} onPressUseful={() => undefined} placeLabel={null} usefulError={false} usefulPending={false} />,
+      <NoteCard
+        note={currentNote}
+        categoryLabel="Comida"
+        onPressUseful={() => undefined}
+        usefulPending={false}
+        usefulError={null}
+      />,
     );
-    const nativeImage = renderer.root.findByType('img');
-    expect(nativeImage.props.accessible).toBe(true);
 
-    await act(async () => {
-      nativeImage.props.onError();
+    const excerpt = renderer.root.findByProps({ children: currentNote.body });
+    expect(excerpt.props.numberOfLines).toBe(4);
+    expect(renderer.root.findAllByProps({ children: currentNote.title })).not.toHaveLength(0);
+  });
+
+  it('fires the three touch targets independently', () => {
+    const onPress = vi.fn();
+    const onPressAuthor = vi.fn();
+    const onPressUseful = vi.fn();
+    const currentNote = note();
+    const renderer = render(
+      <NoteCard
+        note={currentNote}
+        categoryLabel="Comida"
+        onPress={onPress}
+        onPressAuthor={onPressAuthor}
+        onPressUseful={onPressUseful}
+        usefulPending={false}
+        usefulError={null}
+      />,
+    );
+
+    act(() => {
+      renderer.root.findByProps({
+        accessibilityLabel: `Abrir nota: ${currentNote.title}`,
+      }).props.onPress();
     });
+    expect(onPress).toHaveBeenCalledOnce();
+    expect(onPressAuthor).not.toHaveBeenCalled();
+    expect(onPressUseful).not.toHaveBeenCalled();
 
-    expect(renderer.root.findAllByType('img')).toHaveLength(0);
+    act(() => {
+      renderer.root.findByProps({
+        accessibilityLabel: `Abrir perfil do autor: ${currentNote.author.displayName}`,
+      }).props.onPress();
+    });
+    expect(onPressAuthor).toHaveBeenCalledOnce();
+
+    act(() => {
+      renderer.root.findByProps({ accessibilityLabel: 'Marcar como útil' }).props.onPress();
+    });
+    expect(onPressUseful).toHaveBeenCalledOnce();
+  });
+
+  it('renders the useful error line only when usefulError is set', () => {
+    const renderer = render(
+      <NoteCard
+        note={note()}
+        categoryLabel="Comida"
+        onPressUseful={() => undefined}
+        usefulPending={false}
+        usefulError="Não deu pra atualizar o Útil. Tenta de novo."
+      />,
+    );
+
     expect(
-      renderer.root.findAllByProps({ children: currentNote.title }),
+      renderer.root.findAllByProps({
+        children: 'Não deu pra atualizar o Útil. Tenta de novo.',
+      }),
     ).not.toHaveLength(0);
+
+    const clean = render(
+      <NoteCard
+        note={note()}
+        categoryLabel="Comida"
+        onPressUseful={() => undefined}
+        usefulPending={false}
+        usefulError={null}
+      />,
+    );
     expect(
-      renderer.root.findAllByProps({ children: currentNote.body }),
-    ).not.toHaveLength(0);
+      clean.root.findAllByProps({
+        children: 'Não deu pra atualizar o Útil. Tenta de novo.',
+      }),
+    ).toHaveLength(0);
+  });
+
+  it('renders a single useful metric and no place label', () => {
+    const currentNote = note({ placeSlug: 'sao-paulo' });
+    const renderer = render(
+      <NoteCard
+        note={currentNote}
+        categoryLabel="Comida"
+        onPressUseful={() => undefined}
+        usefulPending={false}
+        usefulError={null}
+      />,
+    );
+
+    expect(renderer.root.findAllByProps({ kind: 'useful' })).toHaveLength(1);
+    expect(renderer.root.findAllByProps({ kind: 'saved' })).toHaveLength(0);
+
+    const strings = JSON.stringify(renderer.toJSON());
+    expect(strings).not.toContain('sao-paulo');
+    expect(strings).not.toContain('Mundo todo');
   });
 });

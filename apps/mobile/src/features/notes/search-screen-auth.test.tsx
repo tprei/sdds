@@ -60,7 +60,10 @@ vi.mock('@/components/foundation-screen', () => ({
   FoundationScreen: ({ children }: { children: ReactNode }) => createElement('section', null, children),
   FoundationTextInput: () => createElement('input'),
 }));
-vi.mock('@/components/note-card', () => ({ NoteCard: () => createElement('div') }));
+vi.mock('@/components/note-card', () => ({
+  NOTE_USEFUL_ERROR_MESSAGE: 'Não deu pra atualizar o Útil. Tenta de novo.',
+  NoteCard: () => createElement('div'),
+}));
 vi.mock('@/features/notes/category-filter-controls', () => ({ CategoryFilterControls: () => createElement('div') }));
 vi.mock('@/features/notes/catalog', () => ({ buildNoteCatalog: () => ({ kind: 'catalog' }) }));
 vi.mock('@/features/notes/search-screen', () => ({

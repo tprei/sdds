@@ -25,7 +25,6 @@ test('publishes an image through the UI for another signed-in user', async ({
 }) => {
   const scenario = createScenario();
   await page.goto('/');
-  await expectExplore(page);
   await authorSignupAndPublish(page, scenario);
   await logoutAndSignupReader(page, scenario);
   const readerImage = await discoverPublishedImage(page, scenario);

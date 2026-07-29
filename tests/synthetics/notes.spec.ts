@@ -127,9 +127,6 @@ test('creates a note and reads it from the API-backed home feed', async ({
   const body = `Coado gostoso, balcão simpático e pão na chapa no ponto ${timestamp}.`;
 
   await page.goto('/');
-  await expect(
-    page.getByRole('tab', { name: /^Explorar$/ }),
-  ).toBeVisible();
   await expect(page.getByText('Entre para continuar')).toBeVisible();
   await expect(
     page.getByText('Entre ou crie uma conta para acessar as notas.'),

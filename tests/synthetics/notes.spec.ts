@@ -135,19 +135,17 @@ test('creates a note and reads it from the API-backed home feed', async ({
     page.getByText('Entre ou crie uma conta para acessar as notas.'),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Criar conta' }).click();
-  await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Criar conta$/ }),
-  ).toBeVisible();
-  await page.getByLabel('Seu nome').fill(displayName);
-  await page.getByLabel('Nome de usuário').fill(username);
-  await page.getByLabel('Senha').fill(syntheticPassword);
+  await expect(page.getByTestId('signup-submit-button')).toBeVisible();
+  await page.getByTestId('signup-display-name-input').fill(displayName);
+  await page.getByTestId('signup-username-input').fill(username);
+  await page.getByTestId('signup-password-input').fill(syntheticPassword);
   await page.getByRole('button', { name: 'Criar conta' }).click();
 
   await expect(page).toHaveURL(/\/(?:[?#]|$)/);
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
   ).toBeVisible();
-  await clickTab(page, 'Escrever');
+  await openCompose(page);
   await expect(page.getByText('Conta uma dica')).toBeVisible();
   await expect(page).toHaveURL(/\/compose(?:[?#]|$)/);
 
@@ -158,7 +156,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
     }),
   ).toBeVisible({ timeout: 30000 });
   await expect(page.getByText('0 Notas')).toBeVisible();
-  await clickTab(page, 'Escrever');
+  await openCompose(page);
   await expect(page.getByText('Conta uma dica')).toBeVisible();
   await expect(page).toHaveURL(/\/compose(?:[?#]|$)/);
 
@@ -303,7 +301,7 @@ test('shows auth validation reasons and clears stale login submit state', async 
     timeout: 10000,
   });
   await page.getByTestId('profile-signup-button').click();
-  await expect(visibleScreenTitle(page, 'Criar conta')).toBeVisible();
+  await expect(page.getByTestId('signup-submit-button')).toBeVisible();
 
   await page.getByTestId('signup-display-name-input').fill('Valida Auth');
   await page
@@ -386,12 +384,12 @@ test('shows auth validation reasons and clears stale login submit state', async 
   await page.unroute('**/v1/auth/session');
 
   await page.getByTestId('profile-signup-button').click();
-  await expect(visibleScreenTitle(page, 'Criar conta')).toBeVisible();
+  await expect(page.getByTestId('signup-submit-button')).toBeVisible();
   await expect(page.getByTestId('signup-submit-button')).toContainText(
     'Criar conta',
   );
   await page.getByTestId('signup-login-button').click();
-  await expect(visibleScreenTitle(page, 'Entrar')).toBeVisible();
+  await expect(page.getByTestId('login-submit-button')).toBeVisible();
 
   await page.getByTestId('login-username-input').fill('aa');
   await page.getByTestId('login-password-input').fill('short');
@@ -409,7 +407,7 @@ test('shows auth validation reasons and clears stale login submit state', async 
     timeout: 10000,
   });
   await page.getByTestId('profile-login-button').click();
-  await expect(visibleScreenTitle(page, 'Entrar')).toBeVisible();
+  await expect(page.getByTestId('login-submit-button')).toBeVisible();
   await expect(page.getByTestId('login-username-input')).toBeVisible();
   await expect(page.getByTestId('login-submit-button')).toContainText('Entrar');
 });
@@ -921,8 +919,8 @@ test('shows distinct authors when a second user signs in', async ({
   expect(firstNote.author.id).not.toBe(secondNote.author.id);
 
   await page.goto('/login?next=/profile');
-  await page.getByLabel('Nome de usuário').fill(secondUsername);
-  await page.getByLabel('Senha').fill(syntheticPassword);
+  await page.getByTestId('login-username-input').fill(secondUsername);
+  await page.getByTestId('login-password-input').fill(syntheticPassword);
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page.getByText(secondDisplayName).last()).toBeVisible();
 
@@ -1056,11 +1054,11 @@ function visibleGlobalScope(page: Page) {
   return page.locator('[aria-label="Escopo atual: Mundo todo"]:visible').last();
 }
 
-function visibleScreenTitle(page: Page, name: string) {
-  return page
-    .getByTestId('screen-title')
-    .filter({ hasText: name, visible: true })
-    .last();
+async function openCompose(page: Page): Promise<void> {
+  await page
+    .getByRole('button', { name: 'Escrever um achado' })
+    .or(page.getByLabel('Escrever um achado'))
+    .click();
 }
 
 

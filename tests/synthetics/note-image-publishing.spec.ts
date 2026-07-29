@@ -62,7 +62,7 @@ async function authorSignupAndPublish(
   page: Page,
   scenario: SyntheticScenario,
 ): Promise<void> {
-  await clickTab(page, 'Escrever');
+  await openCompose(page);
   await expectVisible(
     page.getByText('Entre para continuar', { exact: true }).first(),
     30_000,
@@ -72,7 +72,7 @@ async function authorSignupAndPublish(
   );
   await page.getByRole('button', { exact: true, name: 'Criar conta' }).click();
   await expect(page).toHaveURL(/\/signup(?:[?#]|$)/, { timeout: 30_000 });
-  await expectVisible(page.getByLabel('Seu nome'));
+  await expectVisible(page.getByTestId('signup-display-name-input'));
   await signUp(page, scenario.author);
   await expect(page).toHaveURL(/\/compose(?:[?#]|$)/, { timeout: 30_000 });
   await expectVisible(
@@ -132,7 +132,7 @@ async function logoutAndSignupReader(
   );
   await page.getByRole('button', { exact: true, name: 'Criar conta' }).click();
   await expect(page).toHaveURL(/\/signup(?:[?#]|$)/, { timeout: 30_000 });
-  await expectVisible(page.getByLabel('Seu nome'));
+  await expectVisible(page.getByTestId('signup-display-name-input'));
   await signUp(page, scenario.reader);
   await expect(page).toHaveURL(/\/profile(?:[?#]|$)/, { timeout: 30_000 });
   await expectVisible(
@@ -225,15 +225,22 @@ async function logoutReader(page: Page): Promise<void> {
   );
 }
 async function signUp(page: Page, user: SyntheticUser): Promise<void> {
-  await page.getByLabel('Seu nome').fill(user.displayName);
-  await page.getByLabel('Nome de usuário').fill(user.username);
-  await page.getByLabel('Senha').fill(syntheticPassword);
+  await page.getByTestId('signup-display-name-input').fill(user.displayName);
+  await page.getByTestId('signup-username-input').fill(user.username);
+  await page.getByTestId('signup-password-input').fill(syntheticPassword);
   await page.getByRole('button', { exact: true, name: 'Criar conta' }).click();
 }
 async function clickTab(page: Page, name: string): Promise<void> {
   const tab = page.getByRole('tab', { name: new RegExp(`${name}$`) });
   await expectVisible(tab);
   await tab.click();
+}
+async function openCompose(page: Page): Promise<void> {
+  const fab = page
+    .getByRole('button', { name: 'Escrever um achado' })
+    .or(page.getByLabel('Escrever um achado'));
+  await expectVisible(fab);
+  await fab.click();
 }
 
 async function expectVisible(

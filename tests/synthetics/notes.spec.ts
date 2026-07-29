@@ -128,7 +128,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
 
   await page.goto('/');
   await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
+    page.getByRole('tab', { name: /^Explorar$/ }),
   ).toBeVisible();
   await expect(page.getByText('Entre para continuar')).toBeVisible();
   await expect(
@@ -143,7 +143,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
 
   await expect(page).toHaveURL(/\/(?:[?#]|$)/);
   await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
+    page.getByRole('tab', { name: /^Explorar$/ }),
   ).toBeVisible();
   await openCompose(page);
   await expect(page.getByText('Conta uma dica')).toBeVisible();
@@ -166,11 +166,10 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await page.getByLabel('Texto da nota').fill(body);
   await expect(page.getByRole('button', { name: 'Comida' })).toBeVisible();
   await page.getByRole('button', { name: 'Comida' }).click();
-  await page.getByRole('button', { name: 'São Paulo' }).click();
   await page.getByRole('button', { name: 'Publicar' }).click();
 
   await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
+    page.getByRole('tab', { name: /^Explorar$/ }),
   ).toBeVisible();
   await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(
@@ -187,7 +186,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
       .getByRole('button', { name: `Abrir perfil do autor: ${displayName}` })
       .first(),
   ).toBeVisible();
-  await expect(publishedNote).toContainText('São Paulo');
+  await expect(publishedNote).toBeVisible();
   const exploreURL = page.url();
   await page
     .getByRole('button', { name: `Abrir perfil do autor: ${displayName}` })
@@ -223,7 +222,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
       .getByRole('button', { name: `Abrir perfil do autor: ${displayName}` })
       .last(),
   ).toBeVisible();
-  await expect(searchResult).toContainText('São Paulo');
+  await expect(searchResult).toBeVisible();
   const searchAuthor = page
     .getByRole('button', {
       name: `Abrir perfil do autor: ${displayName}`,
@@ -268,7 +267,6 @@ test('creates a note and reads it from the API-backed home feed', async ({
   ).toBeVisible();
   await expect(page.getByLabel(`Texto da nota: ${body}`)).toBeVisible();
   await expect(page.getByLabel('Categoria da nota: Comida')).toBeVisible();
-  await expect(page.getByLabel('Lugar da nota: São Paulo')).toBeVisible();
 
   await page.getByLabel('Voltar').click();
   await expect(page).toHaveURL(/\/(?:[?#]|$)/);
@@ -447,7 +445,7 @@ test('narrows the mobile explore feed by category', async ({
 
   await loginUser(page, session.user.username, '/');
   await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
+    page.getByRole('tab', { name: /^Explorar$/ }),
   ).toBeVisible();
   await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(

@@ -93,7 +93,7 @@ test('exports the authenticated search event lineage', async ({
     .toBe(true);
 
   const usefulResponse = waitForEventsResponse(page);
-  await page.getByRole('button', { name: /^Útil 0$/ }).click();
+  await page.getByRole('button', { name: /^Marcar como útil$/ }).click();
   await usefulResponse;
   await expect
     .poll(() =>

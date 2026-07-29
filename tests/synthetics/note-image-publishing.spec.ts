@@ -54,7 +54,7 @@ function createScenario(): SyntheticScenario {
 }
 async function expectExplore(page: Page): Promise<void> {
   await expectVisible(
-    page.getByRole('heading', { exact: true, name: 'Explorar' }),
+    page.getByRole('tab', { name: /^Explorar$/ }),
     30_000,
   );
 }
@@ -87,7 +87,6 @@ async function authorSignupAndPublish(
   );
   await uploadFixture(page);
   await page.getByRole('button', { exact: true, name: 'Comida' }).click();
-  await page.getByRole('button', { exact: true, name: 'São Paulo' }).click();
   await expect(
     page.getByRole('button', { exact: true, name: 'Publicar' }),
   ).toBeEnabled();
@@ -95,7 +94,7 @@ async function authorSignupAndPublish(
   await expectExplore(page);
   const authorCard = noteCard(page, scenario);
   await expectVisible(authorCard, 30_000);
-  await expect(authorCard).toContainText(scenario.note.body);
+  await expect(authorCard).toContainText(scenario.note.title);
 }
 async function uploadFixture(page: Page): Promise<void> {
   const fileChooserPromise = page.waitForEvent('filechooser');
@@ -152,21 +151,21 @@ async function discoverPublishedImage(
   await expectExplore(page);
   const card = noteCard(page, scenario);
   await expectVisible(card, 30_000);
-  await expect(card).toContainText(scenario.note.body);
+  await expect(card).toContainText(scenario.note.title);
   await expectVisible(
     page.getByRole('button', {
       exact: true,
       name: `Abrir perfil do autor: ${scenario.author.displayName}`,
     }),
   );
-  const image = noteImage(card, page, scenario);
+  const image = card.locator('[style*="background-image"]');
   await expect(image).toHaveCount(1);
   return image;
 }
 function noteCard(page: Page, scenario: SyntheticScenario): Locator {
   return page.getByRole('button', {
     exact: true,
-    name: `Abrir nota com imagem: ${scenario.note.title}`,
+    name: `Abrir nota: ${scenario.note.title}`,
   });
 }
 function noteImage(
@@ -203,9 +202,6 @@ async function viewPublishedNoteDetail(
   );
   await expectVisible(
     page.getByLabel('Categoria da nota: Comida', { exact: true }),
-  );
-  await expectVisible(
-    page.getByLabel('Lugar da nota: São Paulo', { exact: true }),
   );
   const image = noteImage(page, page, scenario);
   await expect(image).toHaveCount(1);

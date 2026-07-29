@@ -44,7 +44,7 @@ export default function SignupScreen() {
 
   useEffect(() => {
     if (state.status === 'authenticated') {
-      router.replace(returnPath);
+      router.navigate(returnPath);
     }
   }, [returnPath, router, state.status]);
 
@@ -57,7 +57,7 @@ export default function SignupScreen() {
     try {
       await signup({ displayName, password, username });
       setSubmitState({ status: 'idle' });
-      router.replace(returnPath);
+      router.navigate(returnPath);
     } catch (error) {
       setSubmitState({
         message: signupErrorMessage(error),

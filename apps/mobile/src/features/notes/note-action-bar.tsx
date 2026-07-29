@@ -30,6 +30,7 @@ export function NoteActionBar({
       <PressableScale
         style={styles.pill}
         accessibilityRole="button"
+        accessibilityLabel="Diz alguma coisa boa…"
         onPress={onFocusComposer}
       >
         <IconPencil size={15} color={semanticColors.textMeta} />

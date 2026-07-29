@@ -32,6 +32,10 @@ vi.mock('react-native', () => {
       Value: AnimatedValue,
       timing: () => ({ start: () => {} }),
     },
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => {} }),
+    },
     StyleSheet: { create: <T,>(styles: T): T => styles },
   };
 });

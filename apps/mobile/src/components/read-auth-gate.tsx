@@ -1,7 +1,5 @@
-import {
-  EmptyStateCard,
-  FoundationButton,
-} from './foundation-screen';
+import { EmptyState } from '@/ui/empty-state';
+import { Button } from '@/ui/button';
 
 type ReadAuthGateProps = {
   onLogin: () => void;
@@ -12,7 +10,7 @@ type ReadAuthGateProps = {
 export function ReadAuthGate({ onLogin, onSignup, status }: ReadAuthGateProps) {
   if (status === 'loading') {
     return (
-      <EmptyStateCard
+      <EmptyState
         title="Conferindo sua sessão"
         body="A gente já libera o acesso se você estiver com uma conta ativa."
       />
@@ -22,23 +20,23 @@ export function ReadAuthGate({ onLogin, onSignup, status }: ReadAuthGateProps) {
   if (status === 'error') {
     return (
       <>
-        <EmptyStateCard
+        <EmptyState
           title="Não deu pra confirmar sua sessão"
           body="Verifique sua conexão e entre de novo."
         />
-        <FoundationButton label="Entrar" onPress={onLogin} />
+        <Button label="Entrar" onPress={onLogin} />
       </>
     );
   }
 
   return (
     <>
-      <EmptyStateCard
+      <EmptyState
         title="Entre para continuar"
         body="Entre ou crie uma conta para acessar as notas."
       />
-      <FoundationButton label="Criar conta" onPress={onSignup} />
-      <FoundationButton label="Entrar" onPress={onLogin} />
+      <Button label="Criar conta" onPress={onSignup} />
+      <Button label="Entrar" onPress={onLogin} variant="secondary" />
     </>
   );
 }

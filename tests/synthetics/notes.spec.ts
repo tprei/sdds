@@ -154,7 +154,8 @@ test('creates a note and reads it from the API-backed home feed', async ({
       name: displayName,
     }),
   ).toBeVisible({ timeout: 30000 });
-  await expect(page.getByText('0 Notas')).toBeVisible();
+  await expect(page.getByTestId('author-profile-note-count')).toContainText('0');
+  await expect(page.getByTestId('author-profile-note-count')).toContainText('achados');
   await openCompose(page);
   await expect(page.getByPlaceholder('Compartilhe seu achado')).toBeVisible();
   await expect(page).toHaveURL(/\/compose(?:[?#]|$)/);
@@ -273,9 +274,12 @@ test('creates a note and reads it from the API-backed home feed', async ({
       name: displayName,
     }),
   ).toBeVisible({ timeout: 30000 });
-  await expect(profileRoot.getByTestId('author-profile-note-count')).toHaveText(
-    '1 Nota',
-  );
+  await expect(
+    profileRoot.getByTestId('author-profile-note-count'),
+  ).toContainText('1');
+  await expect(
+    profileRoot.getByTestId('author-profile-note-count'),
+  ).toContainText('achado');
   await expect(
     profileRoot.getByRole('button', { name: `Abrir nota: ${title}` }),
   ).toContainText(body);
@@ -806,9 +810,12 @@ test('opens a public author profile and appends paginated notes', async ({
   await expect(
     profileHeader.getByRole('heading', { name: displayName }),
   ).toBeVisible();
-  await expect(page.getByTestId('author-profile-note-count')).toHaveText(
-    '21 Notas',
-  );
+  await expect(
+    page.getByTestId('author-profile-note-count'),
+  ).toContainText('21');
+  await expect(
+    page.getByTestId('author-profile-note-count'),
+  ).toContainText('achados');
   await expect(page.getByText(`Nota pública ${timestamp} 20`)).toBeVisible();
   await expect(
     page.getByText(`Nome de usuário: ${username}`, { exact: true }),

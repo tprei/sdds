@@ -14,6 +14,7 @@ import { colors, semanticColors } from '@sdds/tokens';
 
 import { Screen } from '@/ui/screen';
 import { EmptyState } from '@/ui/empty-state';
+import { lightTick } from '@/ui/haptics';
 import { IconButton } from '@/ui/icon-button';
 import { IconChevronLeft, IconFlag } from '@/ui/icons';
 import { Avatar } from '@/ui/avatar';
@@ -472,6 +473,7 @@ function AuthenticatedNoteDetailScreen({
 
   const recordUsefulSuccess = useCallback(
     (note: Note, action: UsefulMutationAction) => {
+      lightTick();
       try {
         productEvents.record(
           action === 'marked'

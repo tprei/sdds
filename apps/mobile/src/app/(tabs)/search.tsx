@@ -42,6 +42,7 @@ import { Button } from '@/ui/button';
 import { MasonryGrid } from '@/ui/masonry-grid';
 import { NoteCardSkeleton } from '@/ui/skeleton';
 import { EmptyState } from '@/ui/empty-state';
+import { lightTick } from '@/ui/haptics';
 import { AppText } from '@/ui/text';
 import { semanticColors, spacing } from '@sdds/tokens';
 
@@ -489,6 +490,7 @@ function AuthenticatedSearchScreen({
         } else {
           await apiClient.markNoteUseful(targetNote.id);
         }
+        lightTick();
         try {
           productEvents.record(
             targetNote.usefulByCurrentUser

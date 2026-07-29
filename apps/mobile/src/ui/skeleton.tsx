@@ -4,6 +4,7 @@ import { Animated, View } from 'react-native';
 import { colors, motion, radius, spacing } from '@sdds/tokens';
 
 import { styles } from './skeleton.styles';
+import { useReducedMotion } from './use-reduced-motion';
 
 type SkeletonProps = {
   height: number;
@@ -14,14 +15,19 @@ export function Skeleton({
   height,
   radius: radiusOverride = radius.md,
 }: SkeletonProps) {
+  const reduced = useReducedMotion();
   const [opacity] = useState(() => new Animated.Value(0));
   useEffect(() => {
+    if (reduced) {
+      opacity.setValue(1);
+      return;
+    }
     Animated.timing(opacity, {
       toValue: 1,
       duration: motion.durationBase,
       useNativeDriver: true,
     }).start();
-  }, [opacity]);
+  }, [opacity, reduced]);
   return (
     <Animated.View
       style={[

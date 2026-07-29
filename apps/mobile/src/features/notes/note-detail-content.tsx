@@ -1,6 +1,10 @@
-import { View } from 'react-native';
+import { useState } from 'react';
+import { Image, View } from 'react-native';
 
-import { NoteMedia } from '@/components/note-media';
+import {
+  maxNoteMediaAspectRatio,
+  minNoteMediaAspectRatio,
+} from '@/features/notes/note-card-estimate';
 import { semanticColors, type CategorySlug } from '@sdds/tokens';
 
 import { AppText } from '@/ui/text';
@@ -24,10 +28,7 @@ export function NoteDetailContent({ note }: NoteDetailContentProps) {
 
   return (
     <>
-      <NoteMedia
-        accessibilityLabel={`Imagem da nota: ${note.title}`}
-        images={note.images}
-      />
+      <DetailMedia note={note} />
       <View style={styles.container}>
         <AppText
           accessibilityRole="header"
@@ -60,5 +61,42 @@ export function NoteDetailContent({ note }: NoteDetailContentProps) {
         </View>
       </View>
     </>
+  );
+}
+
+function DetailMedia({ note }: { note: LabelledNote }) {
+  const [hasError, setHasError] = useState(false);
+  const image = note.images[0];
+  const imageURL = image?.url ?? null;
+
+  if (image === undefined || imageURL === null || imageURL.length === 0) {
+    return null;
+  }
+
+  const rawRatio = image.width / image.height;
+  const aspectRatio =
+    Number.isFinite(rawRatio) && rawRatio > 0
+      ? Math.min(
+          maxNoteMediaAspectRatio,
+          Math.max(minNoteMediaAspectRatio, rawRatio),
+        )
+      : null;
+
+  if (aspectRatio === null || hasError) {
+    return null;
+  }
+
+  return (
+    <View style={[styles.media, { aspectRatio }]}>
+      <Image
+        accessibilityLabel={`Imagem da nota: ${note.title}`}
+        accessibilityRole="image"
+        accessible
+        onError={() => setHasError(true)}
+        resizeMode="cover"
+        source={{ uri: image.url }}
+        style={{ height: '100%', width: '100%' }}
+      />
+    </View>
   );
 }

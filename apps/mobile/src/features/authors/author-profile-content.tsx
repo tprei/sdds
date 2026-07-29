@@ -1,18 +1,20 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   ScrollView,
-  Text,
   View,
+  useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
+import { colors, semanticColors, spacing } from '@sdds/tokens';
+
 import {
   NoteCard,
   NOTE_USEFUL_ERROR_MESSAGE,
 } from '../../components/note-card';
-import { FoundationButton } from '../../components/foundation-screen';
+import { estimateNoteCardHeight } from '../notes/note-card-estimate';
 import { APIRequestError } from '../../lib/api/notes';
 import { requestStatus } from '../../lib/api/request-error';
 import { unauthorizedStatus } from '../../lib/api/status';
@@ -26,52 +28,64 @@ import {
 } from '../notes/catalog';
 import { useProductEvents } from '../../lib/events/product-event-provider';
 import { productEventKinds } from '../../lib/events/event-types';
+import { AppText } from '@/ui/text';
+import { Avatar } from '@/ui/avatar';
+import { Button } from '@/ui/button';
+import { EmptyState } from '@/ui/empty-state';
+import { lightTick } from '@/ui/haptics';
+import { MasonryGrid } from '@/ui/masonry-grid';
 import { styles } from './author-profile-content.styles';
 
 type Props = {
-  authorID: string;
-  onPressNote: (noteID: string) => void;
   apiClient: APIClient;
+  authorID: string;
+  isOwnProfile?: boolean;
+  onCompose?: () => void;
+  onPressNote: (noteID: string) => void;
   onSessionExpired: () => Promise<void>;
 };
 type ProfileError = 'not_found' | 'error' | null;
 type UsefulMutationState = 'error' | 'pending';
 
-function initials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => Array.from(part)[0]?.toLocaleUpperCase('pt-BR') ?? '')
-    .join('');
+function noteCountLabel(count: number): string {
+  return count === 1 ? 'achado' : 'achados';
 }
 
-function noteCount(count: number): string {
-  return `${count} ${count === 1 ? 'Nota' : 'Notas'}`;
-}
-
-function ProfileHeader({ author }: { author: PublicAuthor }) {
+function ProfileHeader({
+  author,
+  isOwnProfile,
+}: {
+  author: PublicAuthor;
+  isOwnProfile: boolean;
+}) {
   return (
     <View style={styles.header} testID="author-profile-header">
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{initials(author.displayName)}</Text>
-      </View>
-      <Text
+      <Avatar name={author.displayName} ring={isOwnProfile} size={84} />
+      <AppText
         accessibilityRole="header"
-        style={styles.name}
-        testID="author-profile-name"
+        color={semanticColors.textStrong}
+        variant="h2"
       >
         {author.displayName}
-      </Text>
-      <Text style={styles.count} testID="author-profile-note-count">
-        {noteCount(author.noteCount)}
-      </Text>
+      </AppText>
+      <View style={styles.stat} testID="author-profile-note-count">
+        <AppText
+          color={semanticColors.textStrong}
+          variant="h3"
+          weight="extraBold"
+        >
+          {author.noteCount}
+        </AppText>
+        <AppText color={semanticColors.textMeta} variant="xs">
+          {noteCountLabel(author.noteCount)}
+        </AppText>
+      </View>
     </View>
   );
 }
 
 function InitialLoading() {
-  return <Text style={styles.message}>Carregando perfil…</Text>;
+  return <EmptyState title="Carregando perfil…" />;
 }
 
 function InitialError({
@@ -82,41 +96,55 @@ function InitialError({
   onRetry: () => void;
 }) {
   return (
-    <View>
-      <Text
-        accessibilityRole={notFound ? undefined : 'alert'}
-        style={styles.message}
-      >
-        {notFound
-          ? 'Perfil não encontrado.'
-          : 'Não foi possível carregar este perfil.'}
-      </Text>
-      <FoundationButton label="Tentar de novo" onPress={onRetry} />
+    <View style={styles.statusGroup}>
+      <EmptyState
+        title={
+          notFound
+            ? 'Perfil não encontrado.'
+            : 'Não foi possível carregar este perfil.'
+        }
+      />
+      <Button label="Tentar de novo" onPress={onRetry} variant="secondary" />
     </View>
   );
 }
 
 function ProfileNotes({
+  columnWidth,
+  isOwnProfile,
   notes,
+  onCompose,
   onPressNote,
   onToggleUseful,
   usefulMutations,
 }: {
+  columnWidth: number;
+  isOwnProfile: boolean;
   notes: LabelledNote[];
+  onCompose?: () => void;
   onPressNote: (noteID: string) => void;
   onToggleUseful: (note: LabelledNote) => Promise<void>;
   usefulMutations: Partial<Record<string, UsefulMutationState>>;
 }) {
   if (notes.length === 0) {
-    return <Text style={styles.message}>Nenhuma nota ainda.</Text>;
+    return isOwnProfile ? (
+      <EmptyState
+        action={onCompose ? { label: 'Escrever', onPress: onCompose } : undefined}
+        title="Seus achados vão aparecer aqui. Bora escrever o primeiro?"
+      />
+    ) : (
+      <EmptyState title="Nenhuma nota ainda." />
+    );
   }
 
   return (
-    <>
-      {notes.map((note) => (
+    <MasonryGrid
+      items={notes}
+      keyFor={(note) => note.id}
+      estimateHeight={(note) => estimateNoteCardHeight(note, columnWidth)}
+      renderItem={(note) => (
         <NoteCard
           categoryLabel={note.categoryLabel}
-          key={note.id}
           note={note}
           onPress={() => onPressNote(note.id)}
           onPressUseful={() => {
@@ -129,8 +157,8 @@ function ProfileNotes({
           }
           usefulPending={usefulMutations[note.id] === 'pending'}
         />
-      ))}
-    </>
+      )}
+    />
   );
 }
 
@@ -145,16 +173,18 @@ function PaginationStatus({
 }) {
   if (error) {
     return (
-      <View>
-        <Text accessibilityRole="alert" style={styles.message}>
+      <View style={styles.statusGroup}>
+        <AppText accessibilityRole="alert" color={colors.danger500} variant="sm">
           Não foi possível carregar mais notas.
-        </Text>
-        <FoundationButton label="Tentar de novo" onPress={onRetry} />
+        </AppText>
+        <Button label="Tentar de novo" onPress={onRetry} variant="secondary" />
       </View>
     );
   }
   return loading ? (
-    <Text style={styles.message}>Carregando mais notas…</Text>
+    <AppText color={semanticColors.textMeta} variant="sm">
+      Carregando mais notas…
+    </AppText>
   ) : null;
 }
 
@@ -172,10 +202,14 @@ function nearScrollEnd(event: {
 export function AuthorProfileContent({
   apiClient,
   authorID,
+  isOwnProfile = false,
+  onCompose,
   onPressNote,
   onSessionExpired,
 }: Props) {
   const productEvents = useProductEvents();
+  const { width } = useWindowDimensions();
+  const columnWidth = (width - 2 * spacing.gutter - spacing.masonryGap) / 2;
   const [author, setAuthor] = useState<PublicAuthor | null>(null);
   const [catalog, setCatalog] = useState<NoteCatalog | null>(null);
   const [notes, setNotes] = useState<LabelledNote[]>([]);
@@ -332,6 +366,7 @@ export function AuthorProfileContent({
         } else {
           await apiClient.markNoteUseful(target.id);
         }
+        lightTick();
         try {
           productEvents.record(
             action === 'marked'
@@ -421,9 +456,12 @@ export function AuthorProfileContent({
       scrollEventThrottle={100}
       testID="author-profile-scroll"
     >
-      <ProfileHeader author={author} />
+      <ProfileHeader author={author} isOwnProfile={isOwnProfile} />
       <ProfileNotes
+        columnWidth={columnWidth}
+        isOwnProfile={isOwnProfile}
         notes={notes}
+        onCompose={onCompose}
         onPressNote={onPressNote}
         onToggleUseful={toggleUseful}
         usefulMutations={usefulMutations}

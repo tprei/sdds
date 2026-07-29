@@ -91,14 +91,11 @@ vi.mock('react-native-svg', () => {
   }
   return { Svg: Node, Path: Node, Circle: Node, Rect: Node };
 });
-
-vi.mock('@/components/foundation-screen', () => ({
-  EmptyStateCard: ({ title }: { title: string }) => createElement('div', { title }),
-  FoundationButton: ({ label, onPress }: { label: string; onPress?: () => void }) =>
-    createElement('button', { onPress }, label),
-  FoundationScreen: ({ children }: { children: ReactNode }) =>
-    createElement('section', null, children),
+vi.mock('@/ui/haptics', () => ({
+  lightTick: () => {},
+  success: () => {},
 }));
+
 vi.mock('@/components/note-card', () => ({
   NOTE_USEFUL_ERROR_MESSAGE: 'Não deu pra atualizar o Útil. Tenta de novo.',
   NoteCard: (props: NativeProps) =>

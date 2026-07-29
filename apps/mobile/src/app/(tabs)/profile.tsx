@@ -1,22 +1,17 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { spacing } from '@sdds/tokens';
+import { colors } from '@sdds/tokens';
 
-import {
-  EmptyStateCard,
-  FoundationButton,
-  FoundationScreen,
-} from '@/components/foundation-screen';
 import { AuthorProfileContent } from '@/features/authors/author-profile-content';
-import { styles as authStyles } from '@/features/auth/auth-screen.styles';
+import { Screen } from '@/ui/screen';
+import { EmptyState } from '@/ui/empty-state';
+import { Button } from '@/ui/button';
+import { AppText } from '@/ui/text';
 import { useAuth } from '@/lib/auth/auth-provider';
 
-const styles = StyleSheet.create({
-  authenticatedRoot: { flex: 1 },
-  logoutSection: { gap: spacing.sp3, padding: spacing.sp4 },
-});
+import { styles } from './profile.styles';
 
 type LogoutState =
   | { status: 'idle' }
@@ -49,51 +44,53 @@ export default function ProfileScreen() {
 
   if (state.status === 'authenticated') {
     return (
-      <View style={styles.authenticatedRoot}>
-        <AuthorProfileContent
-          authorID={state.user.author.id}
-          onPressNote={(noteID) =>
-            router.push({ pathname: '/notes/[id]', params: { id: noteID } })
-          }
-          onSessionExpired={logout}
-          apiClient={apiClient}
-        />
+      <Screen scroll={false}>
+        <View style={styles.content}>
+          <AuthorProfileContent
+            apiClient={apiClient}
+            authorID={state.user.author.id}
+            isOwnProfile
+            onCompose={() => router.push('/compose')}
+            onPressNote={(noteID) =>
+              router.push({ pathname: '/notes/[id]', params: { id: noteID } })
+            }
+            onSessionExpired={logout}
+          />
+        </View>
         <View style={styles.logoutSection}>
           {logoutState.status === 'error' ? (
-            <Text accessibilityRole="alert" style={authStyles.statusError}>
+            <AppText accessibilityRole="alert" color={colors.danger500} variant="sm">
               {logoutState.message}
-            </Text>
+            </AppText>
           ) : null}
-          <FoundationButton
+          <Button
             disabled={logoutState.status === 'submitting'}
             label={logoutState.status === 'submitting' ? 'Saindo...' : 'Sair'}
             onPress={handleLogout}
+            size="sm"
             testID="profile-logout-button"
+            variant="ghost"
           />
         </View>
-      </View>
+      </Screen>
     );
   }
 
   return (
-    <FoundationScreen
-      eyebrow="Perfil"
-      title="Seu cantinho"
-      description="Suas notas, cadernos e preferências aparecem aqui."
-    >
+    <Screen>
       {state.status === 'loading' ? (
-        <EmptyStateCard
+        <EmptyState
           title="Carregando sua sessão"
           body="Conferindo se você já tá com uma conta ativa."
         />
       ) : null}
       {state.status === 'error' ? (
         <>
-          <EmptyStateCard
+          <EmptyState
             title="Não deu pra confirmar sua sessão"
             body="Verifique sua conexão e tente abrir o app de novo."
           />
-          <FoundationButton
+          <Button
             label="Entrar de novo"
             onPress={() => router.push({ pathname: '/login', params: { next: '/profile' } })}
             testID="profile-retry-login-button"
@@ -102,27 +99,28 @@ export default function ProfileScreen() {
       ) : null}
       {state.status === 'anonymous' ? (
         <>
-          <EmptyStateCard
+          <EmptyState
             title="Entre para continuar"
             body="Entre ou crie uma conta para acessar as notas."
           />
-          <FoundationButton
+          <Button
             label="Criar conta"
             onPress={() =>
               router.push({ pathname: '/signup', params: { next: '/profile' } })
             }
             testID="profile-signup-button"
           />
-          <FoundationButton
+          <Button
             label="Entrar"
             onPress={() =>
               router.push({ pathname: '/login', params: { next: '/profile' } })
             }
             testID="profile-login-button"
+            variant="secondary"
           />
         </>
       ) : null}
-    </FoundationScreen>
+    </Screen>
   );
 }
 

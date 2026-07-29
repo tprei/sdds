@@ -264,7 +264,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(page.getByLabel(`Texto da nota: ${body}`)).toBeVisible();
   await expect(page.getByLabel('Categoria da nota: Comida')).toBeVisible();
 
-  await page.getByLabel('Voltar').click();
+  await page.getByLabel('Voltar', { exact: true }).click();
   await expect(page).toHaveURL(/\/(?:[?#]|$)/);
   await clickTab(page, 'Perfil');
   const profileRoot = page.getByTestId('author-profile-scroll');

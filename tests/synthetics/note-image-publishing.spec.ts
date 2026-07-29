@@ -75,7 +75,7 @@ async function authorSignupAndPublish(
   await signUp(page, scenario.author);
   await expect(page).toHaveURL(/\/compose(?:[?#]|$)/, { timeout: 30_000 });
   await expectVisible(
-    page.getByText('Conta uma dica', { exact: true }),
+    page.getByPlaceholder('Compartilhe seu achado'),
     30_000,
   );
   await page.getByLabel('Título da nota').fill(scenario.note.title);
@@ -98,7 +98,7 @@ async function authorSignupAndPublish(
 async function uploadFixture(page: Page): Promise<void> {
   const fileChooserPromise = page.waitForEvent('filechooser');
   await page
-    .getByRole('button', { exact: true, name: 'Adicionar imagem' })
+    .getByRole('button', { exact: true, name: 'Adicionar 1 foto (opcional)' })
     .click();
   const fileChooser = await fileChooserPromise;
   await fileChooser.setFiles(fixturePath);

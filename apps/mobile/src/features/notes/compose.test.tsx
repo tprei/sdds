@@ -61,19 +61,43 @@ vi.mock('react-native', () => {
       typeof children === 'function' ? children({ pressed: false }) : children;
     return React.createElement('button', props, content);
   }
-  return { Pressable, Text: Native, View: Native };
+  function NativeTextInput(props: NativeProps) {
+    return React.createElement('input', props);
+  }
+  class AnimatedValue {
+    value: number;
+    constructor(value: number) {
+      this.value = value;
+    }
+  }
+  return {
+    Image: Native,
+    Pressable,
+    ScrollView: Native,
+    Text: Native,
+    TextInput: NativeTextInput,
+    View: Native,
+    StyleSheet: { create: (styles: Record<string, unknown>) => styles },
+    Animated: {
+      View: Native,
+      Value: AnimatedValue,
+      timing: () => ({ start: () => {} }),
+    },
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => {} }),
+    },
+  };
 });
-
-vi.mock('@/components/foundation-screen', () => ({
-  EmptyStateCard: ({ body, title }: { body: string; title: string }) =>
-    React.createElement('empty-state', { body, title }),
-  FoundationButton: ({ label, ...props }: NativeProps & { label: string }) =>
-    React.createElement('button', props, label),
-  FoundationScreen: ({ children }: NativeProps) =>
-    React.createElement('screen', null, children),
-  FoundationTextInput: (props: NativeProps) =>
-    React.createElement('input', props),
+vi.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: ({ children }: NativeProps) => children,
 }));
+vi.mock('react-native-svg', () => {
+  function Node({ children, ...props }: NativeProps) {
+    return React.createElement('div', props, children);
+  }
+  return { Svg: Node, Path: Node, Circle: Node, Rect: Node };
+});
 vi.mock('@/features/notes/compose-screen.styles', () => ({ styles: {} }));
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'singleton-request' }));
 vi.mock('expo-image-picker', () => ({

@@ -94,6 +94,9 @@ function AuthenticatedComposeScreen({
   const createNote = useCallback(
     async (input: CreateNoteInput) => {
       const note = await apiClient.createNote(input);
+      // Best-effort telemetry: publishing must succeed even if event
+      // recording fails (matches the pattern used across the app's other
+      // product-event call sites).
       try {
         productEvents.record(
           productEventKinds.notePublished,
@@ -216,6 +219,7 @@ function AuthenticatedComposeScreen({
           {image === null ? (
             <PressableScale
               accessibilityRole="button"
+              accessibilityLabel="Adicionar 1 foto (opcional)"
               disabled={isSubmitting}
               onPress={pickImage}
               style={styles.photoDashed}

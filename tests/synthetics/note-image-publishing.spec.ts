@@ -64,7 +64,7 @@ async function authorSignupAndPublish(
 ): Promise<void> {
   await openCompose(page);
   await expectVisible(
-    page.getByText('Entre para continuar', { exact: true }).first(),
+    page.getByText('Entre para continuar', { exact: true }).last(),
     30_000,
   );
   await expectVisible(
@@ -213,6 +213,8 @@ async function viewPublishedNoteDetail(
   expect(detailProof.mediaURL).toBe(mediaURL);
 }
 async function logoutReader(page: Page): Promise<void> {
+  await page.getByLabel('Voltar').click();
+  await expect(page).toHaveURL(/\/(?:[?#]|$)/);
   await clickTab(page, 'Perfil');
   await expectVisible(
     page.getByRole('button', { exact: true, name: 'Sair' }),

@@ -87,7 +87,7 @@ function AuthenticatedComposeScreen({
 }: AuthenticatedComposeScreenProps) {
   const router = useRouter();
   const productEvents = useProductEvents();
-  const onPublished = useCallback(() => router.navigate('/'), [router]);
+  const onPublished = useCallback(() => router.dismissTo('/'), [router]);
   const createNote = useCallback(
     async (input: CreateNoteInput) => {
       const note = await apiClient.createNote(input);

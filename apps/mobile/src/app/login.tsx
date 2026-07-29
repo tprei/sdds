@@ -39,7 +39,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (state.status === 'authenticated') {
-      router.navigate(returnPath);
+      router.dismissTo(returnPath);
     }
   }, [returnPath, router, state.status]);
 
@@ -52,7 +52,6 @@ export default function LoginScreen() {
     try {
       await login({ password, username });
       setSubmitState({ status: 'idle' });
-      router.navigate(returnPath);
     } catch (error) {
       setSubmitState({
         message: loginErrorMessage(error),

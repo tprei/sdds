@@ -133,7 +133,7 @@ export default function NoteDetailScreen() {
         <IconButton
           icon={<IconChevronLeft />}
           accessibilityLabel="Voltar"
-          onPress={() => router.back()}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
         />
       </View>
       {content}

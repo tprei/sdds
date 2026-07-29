@@ -148,6 +148,8 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await openCompose(page);
   await expect(page.getByText('Conta uma dica')).toBeVisible();
   await expect(page).toHaveURL(/\/compose(?:[?#]|$)/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/(?:[?#]|$)/);
 
   await clickTab(page, 'Perfil');
   await expect(
@@ -268,6 +270,8 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(page.getByLabel('Categoria da nota: Comida')).toBeVisible();
   await expect(page.getByLabel('Lugar da nota: São Paulo')).toBeVisible();
 
+  await page.getByLabel('Voltar').click();
+  await expect(page).toHaveURL(/\/(?:[?#]|$)/);
   await clickTab(page, 'Perfil');
   const profileRoot = page.getByTestId('author-profile-scroll');
   await expect(

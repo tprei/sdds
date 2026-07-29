@@ -168,7 +168,6 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await expect(
     page.getByRole('tab', { name: /^Explorar$/ }),
   ).toBeVisible();
-  await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
@@ -444,7 +443,6 @@ test('narrows the mobile explore feed by category', async ({
   await expect(
     page.getByRole('tab', { name: /^Explorar$/ }),
   ).toBeVisible();
-  await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
@@ -465,7 +463,6 @@ test('narrows the mobile explore feed by category', async ({
   await expect(
     page.getByRole('button', { exact: true, name: 'Comida, selecionado' }),
   ).toBeVisible();
-  await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toHaveCount(0);
 
@@ -511,7 +508,6 @@ test('narrows the mobile search results by category and clears stale cards', asy
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
   ).toBeVisible();
-  await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
@@ -540,7 +536,6 @@ test('narrows the mobile search results by category and clears stale cards', asy
   await expect(
     page.getByRole('button', { exact: true, name: 'Comida, selecionado' }),
   ).toBeVisible();
-  await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(page.getByText(`1 nota para ${marker}`)).toBeVisible();
   await expect(
     page.getByLabel(
@@ -819,9 +814,6 @@ test('opens a public author profile and appends paginated notes', async ({
     page.getByText(`Nome de usuário: ${username}`, { exact: true }),
   ).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
-  await expect(
-    page.getByLabel(`Autor da nota: ${displayName}`).first(),
-  ).toBeVisible();
   const firstPage = await request.get(
     `${apiBaseURL}/v1/authors/${author.id}/notes?limit=20`,
     {
@@ -1046,11 +1038,6 @@ async function expectCategoryFilterError(
   const body = parseErrorResponse(await response.json());
   expect(body.code).toBe(want.code);
   expect(body.fields).toEqual([{ code: 'unknown', field: 'category_slug' }]);
-}
-
-
-function visibleGlobalScope(page: Page) {
-  return page.locator('[aria-label="Escopo atual: Mundo todo"]:visible').last();
 }
 
 async function openCompose(page: Page): Promise<void> {

@@ -4,6 +4,11 @@ import {
   minNoteMediaAspectRatio,
 } from '@/components/note-media';
 
+// Approximate pixel metrics for the masonry layout's height estimate, tuned
+// against the current note-card typography and spacing (title line height
+// ~18px, avg body char width ~6.5px, body line height ~19px, card chrome
+// ~20-34px). Re-tune these if note-card.styles.ts's font sizes or padding
+// change enough to visibly desync estimated vs. rendered card heights.
 export function estimateNoteCardHeight(
   note: Note,
   columnWidth: number,

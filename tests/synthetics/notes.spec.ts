@@ -205,7 +205,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
     page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
   ).toBeVisible();
 
-  await page.getByLabel('Buscar').fill(title);
+  await page.getByPlaceholder('Buscar uma dica').fill(title);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   const searchResult = page.getByRole('button', {
@@ -234,7 +234,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   ).toBeVisible();
   await page.goto(exploreURL);
   await clickTab(page, 'Buscar');
-  await page.getByLabel('Buscar').fill(title);
+  await page.getByPlaceholder('Buscar uma dica').fill(title);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   await searchResult.click();
@@ -513,7 +513,7 @@ test('narrows the mobile search results by category and clears stale cards', asy
   ).toBeVisible();
   await expect(page.getByText('Pesquisas desta sessão')).toHaveCount(0);
 
-  await page.getByLabel('Buscar').fill(marker);
+  await page.getByPlaceholder('Buscar uma dica').fill(marker);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   const foodNote = page.getByRole('button', {
@@ -555,13 +555,13 @@ test('narrows the mobile search results by category and clears stale cards', asy
   await expect(travelNote).toBeVisible();
 
   await page.getByRole('button', { name: 'Limpar' }).click();
-  await expect(page.getByLabel('Buscar')).toHaveValue('');
+  await expect(page.getByPlaceholder('Buscar uma dica')).toHaveValue('');
   await expect(foodNote).toHaveCount(0);
   await expect(travelNote).toHaveCount(0);
   await expect(page.getByText('Pesquisas desta sessão')).toBeVisible();
 
   await page.getByRole('button', { exact: true, name: marker }).click();
-  await expect(page.getByLabel('Buscar')).toHaveValue(marker);
+  await expect(page.getByPlaceholder('Buscar uma dica')).toHaveValue(marker);
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toBeVisible();
 });
@@ -601,7 +601,7 @@ test('orders search results by weighted title matches and handles punctuation-on
     page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
   ).toBeVisible();
 
-  await page.getByLabel('Buscar').fill(marker);
+  await page.getByPlaceholder('Buscar uma dica').fill(marker);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   const searchResults = page.getByRole('button', { name: /Abrir nota:/ });
@@ -612,7 +612,7 @@ test('orders search results by weighted title matches and handles punctuation-on
     page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
   ).toBeVisible();
 
-  await page.getByLabel('Buscar').fill('!!! *** ()');
+  await page.getByPlaceholder('Buscar uma dica').fill('!!! *** ()');
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   await expect(page.getByText('Nada por aqui ainda')).toBeVisible();

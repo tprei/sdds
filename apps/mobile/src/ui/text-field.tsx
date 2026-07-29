@@ -74,7 +74,7 @@ export function TextField({
       >
         {label}
       </AppText>
-      {focused ? <View style={styles.ring}>{row}</View> : row}
+    <View style={[styles.ringHost, focused ? styles.ring : null]}>{row}</View>
       {hint || counter ? (
         <View style={styles.footnoteRow}>
           {hint ? (

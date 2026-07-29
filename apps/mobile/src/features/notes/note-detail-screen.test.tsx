@@ -91,6 +91,21 @@ vi.mock('react-native', () => {
     View: NativeView,
   };
 });
+vi.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: ({ children }: { children: ReactNode }) => children,
+}));
+vi.mock('@/ui/icon-button', () => ({
+  IconButton: ({
+    icon,
+    accessibilityLabel,
+  }: {
+    icon: ReactNode;
+    accessibilityLabel: string;
+  }) => createElement('button', { accessibilityLabel }, icon),
+}));
+vi.mock('@/ui/icons', () => ({
+  IconChevronLeft: () => createElement('svg', null),
+}));
 
 vi.mock('@/components/foundation-screen', () => ({
   EmptyStateCard: ({ body, title }: { body: string; title: string }) =>

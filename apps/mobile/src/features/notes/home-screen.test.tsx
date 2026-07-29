@@ -2,7 +2,7 @@ import * as React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import HomeScreen from '@/app/index';
+import HomeScreen from '@/app/(tabs)/index';
 
 const { createElement } = React;
 type ReactNode = React.ReactNode;

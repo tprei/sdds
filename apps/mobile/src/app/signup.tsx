@@ -1,22 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Text } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import {
-  FoundationButton,
-  FoundationScreen,
-  FoundationTextInput,
-} from '@/components/foundation-screen';
-import { AuthAPIRequestError } from '@/lib/api/auth';
-import { useAuth } from '@/lib/auth/auth-provider';
+import { colors } from '@sdds/tokens';
+
+import { BrandHeader } from '@/features/auth/brand-header';
 import { styles } from '@/features/auth/auth-screen.styles';
 import {
   genericSignupErrorMessage,
-  signupValidationMessage,
   returnPathFromParam,
+  signupValidationMessage,
   usernameTakenErrorMessage,
 } from '@/features/auth/auth-messages';
+import { AuthAPIRequestError } from '@/lib/api/auth';
+import { useAuth } from '@/lib/auth/auth-provider';
 import { conflictStatus } from '@/lib/api/status';
+import { Button } from '@/ui/button';
+import { Screen } from '@/ui/screen';
+import { AppText } from '@/ui/text';
+import { TextField } from '@/ui/text-field';
 
 type SubmitState =
   | { status: 'idle' }
@@ -65,57 +67,75 @@ export default function SignupScreen() {
   }
 
   return (
-    <FoundationScreen
-      description="Crie uma conta pra publicar notas com seu nome público."
-      eyebrow="Criar conta"
-      title="Criar conta"
-    >
-      <FoundationTextInput
-        accessibilityLabel="Seu nome"
-        onChangeText={setDisplayName}
-        placeholder="Seu nome"
-        testID="signup-display-name-input"
-        value={displayName}
-      />
-      <FoundationTextInput
-        accessibilityLabel="Nome de usuário"
-        autoCapitalize="none"
-        autoCorrect={false}
-        onChangeText={setUsername}
-        placeholder="Nome de usuário"
-        testID="signup-username-input"
-        value={username}
-      />
-      <FoundationTextInput
-        accessibilityLabel="Senha"
-        onChangeText={setPassword}
-        placeholder="Senha"
-        secureTextEntry
-        testID="signup-password-input"
-        value={password}
-      />
-      {submitState.status === 'error' ? (
-        <Text accessibilityRole="alert" style={styles.statusError}>
-          {submitState.message}
-        </Text>
-      ) : null}
-      <FoundationButton
-        disabled={!canSubmit || isSubmitting}
-        label={isSubmitting ? 'Criando...' : 'Criar conta'}
-        onPress={handleSubmit}
-        testID="signup-submit-button"
-      />
-      <FoundationButton
-        label="Já tenho conta"
-        onPress={() => {
-          router.push({
-            pathname: '/login',
-            params: { next: returnPath },
-          });
-        }}
-        testID="signup-login-button"
-      />
-    </FoundationScreen>
+    <Screen scroll={false}>
+      <View style={styles.shell}>
+        <View style={styles.sunrise} />
+        <ScrollView
+          style={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.form}
+        >
+          <BrandHeader />
+          <TextField
+            accessibilityLabel="Seu nome"
+            label="Nome de exibição"
+            onChangeText={setDisplayName}
+            placeholder="Seu nome"
+            testID="signup-display-name-input"
+            value={displayName}
+          />
+          <TextField
+            accessibilityLabel="Nome de usuário"
+            autoCapitalize="none"
+            autoCorrect={false}
+            label="Nome de usuário"
+            onChangeText={setUsername}
+            placeholder="Nome de usuário"
+            testID="signup-username-input"
+            value={username}
+          />
+          <TextField
+            accessibilityLabel="Senha"
+            label="Senha"
+            onChangeText={setPassword}
+            placeholder="Senha"
+            secureTextEntry
+            testID="signup-password-input"
+            value={password}
+          />
+          {submitState.status === 'error' ? (
+            <AppText
+              variant="sm"
+              color={colors.danger500}
+              accessibilityRole="alert"
+            >
+              {submitState.message}
+            </AppText>
+          ) : null}
+          <Button
+            variant="primary"
+            size="lg"
+            block
+            disabled={!canSubmit || isSubmitting}
+            label={isSubmitting ? 'Criando...' : 'Criar conta'}
+            onPress={handleSubmit}
+            testID="signup-submit-button"
+          />
+          <Button
+            variant="ghost"
+            block
+            label="Já tenho conta · Entrar"
+            onPress={() => {
+              router.push({
+                pathname: '/login',
+                params: { next: returnPath },
+              });
+            }}
+            testID="signup-login-button"
+          />
+        </ScrollView>
+      </View>
+    </Screen>
   );
 }
 

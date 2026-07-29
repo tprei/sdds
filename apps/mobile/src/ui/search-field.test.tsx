@@ -101,18 +101,25 @@ describe('SearchField', () => {
         onSubmit: vi.fn(),
       }),
     );
-    const ringBefore = renderer.root.findAll(
-      (node) => node.props?.style?.backgroundColor === semanticColors.accentTint,
-    );
+    const hasRing = (node: { props?: { style?: unknown } }) => {
+      const style = node.props?.style;
+      const flattened = Array.isArray(style) ? style : [style];
+      return flattened.some(
+        (entry) =>
+          entry &&
+          typeof entry === 'object' &&
+          (entry as { backgroundColor?: unknown }).backgroundColor ===
+            semanticColors.accentTint,
+      );
+    };
+    const ringBefore = renderer.root.findAll(hasRing);
     expect(ringBefore).toHaveLength(0);
 
     act(() => {
       renderer.root.findByType(TextInput).props.onFocus();
     });
 
-    const ringAfter = renderer.root.findAll(
-      (node) => node.props?.style?.backgroundColor === semanticColors.accentTint,
-    );
+    const ringAfter = renderer.root.findAll(hasRing);
     expect(ringAfter.length).toBeGreaterThan(0);
   });
 });

@@ -213,7 +213,7 @@ async function viewPublishedNoteDetail(
   expect(detailProof.mediaURL).toBe(mediaURL);
 }
 async function logoutReader(page: Page): Promise<void> {
-  await page.getByLabel('Voltar').click();
+  await page.getByLabel('Voltar', { exact: true }).click();
   await expect(page).toHaveURL(/\/(?:[?#]|$)/);
   await clickTab(page, 'Perfil');
   await expectVisible(

@@ -202,10 +202,10 @@ test('creates a note and reads it from the API-backed home feed', async ({
 
   await clickTab(page, 'Buscar');
   await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
+    page.getByPlaceholder('O que você tá procurando?'),
   ).toBeVisible();
 
-  await page.getByPlaceholder('Buscar uma dica').fill(title);
+  await page.getByTestId('search-field-input').fill(title);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   const searchResult = page.getByRole('button', {
@@ -234,7 +234,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   ).toBeVisible();
   await page.goto(exploreURL);
   await clickTab(page, 'Buscar');
-  await page.getByPlaceholder('Buscar uma dica').fill(title);
+  await page.getByTestId('search-field-input').fill(title);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   await searchResult.click();
@@ -506,14 +506,14 @@ test('narrows the mobile search results by category and clears stale cards', asy
 
   await loginUser(page, session.user.username, '/search');
   await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
+    page.getByPlaceholder('O que você tá procurando?'),
   ).toBeVisible();
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
-  await expect(page.getByText('Pesquisas desta sessão')).toHaveCount(0);
+  await expect(page.getByText('Nada por aqui ainda.')).toBeVisible();
 
-  await page.getByPlaceholder('Buscar uma dica').fill(marker);
+  await page.getByTestId('search-field-input').fill(marker);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   const foodNote = page.getByRole('button', {
@@ -527,22 +527,22 @@ test('narrows the mobile search results by category and clears stale cards', asy
   await expect(
     page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
   ).toBeVisible();
-  await expect(page.getByText(`2 notas para ${marker}`)).toBeVisible();
+  await expect(page.getByText(`2 achados para "${marker}"`)).toBeVisible();
   await expect(
-    page.getByLabel(`Resultado da busca: 2 notas para ${marker}. Mundo todo.`),
+    page.getByLabel(`2 achados para ${marker}.`),
   ).toBeVisible();
 
   await page.getByRole('button', { exact: true, name: 'Comida' }).click();
   await expect(
     page.getByRole('button', { exact: true, name: 'Comida, selecionado' }),
   ).toBeVisible();
-  await expect(page.getByText(`1 nota para ${marker}`)).toBeVisible();
+
   await expect(
-    page.getByLabel(
-      `Resultado da busca: 1 nota para ${marker}. Categoria Comida, Mundo todo.`,
-    ),
+    page.getByText(`1 achado para "${marker}" · Comida`),
   ).toBeVisible();
-  await expect(page.getByText('Categoria Comida · Mundo todo')).toBeVisible();
+  await expect(
+    page.getByLabel(`1 achado para ${marker}, categoria Comida.`),
+  ).toBeVisible();
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toHaveCount(0);
 
@@ -550,18 +550,18 @@ test('narrows the mobile search results by category and clears stale cards', asy
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
-  await expect(page.getByText(`2 notas para ${marker}`)).toBeVisible();
+  await expect(page.getByText(`2 achados para "${marker}"`)).toBeVisible();
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toBeVisible();
 
-  await page.getByRole('button', { name: 'Limpar' }).click();
-  await expect(page.getByPlaceholder('Buscar uma dica')).toHaveValue('');
+  await page.getByLabel('Limpar busca').click();
+  await expect(page.getByTestId('search-field-input')).toHaveValue('');
   await expect(foodNote).toHaveCount(0);
   await expect(travelNote).toHaveCount(0);
-  await expect(page.getByText('Pesquisas desta sessão')).toBeVisible();
+  await expect(page.getByText('Nada por aqui ainda.')).toHaveCount(0);
 
   await page.getByRole('button', { exact: true, name: marker }).click();
-  await expect(page.getByPlaceholder('Buscar uma dica')).toHaveValue(marker);
+  await expect(page.getByTestId('search-field-input')).toHaveValue(marker);
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toBeVisible();
 });
@@ -598,10 +598,10 @@ test('orders search results by weighted title matches and handles punctuation-on
 
   await loginUser(page, session.user.username, '/search');
   await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
+    page.getByPlaceholder('O que você tá procurando?'),
   ).toBeVisible();
 
-  await page.getByPlaceholder('Buscar uma dica').fill(marker);
+  await page.getByTestId('search-field-input').fill(marker);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   const searchResults = page.getByRole('button', { name: /Abrir nota:/ });
@@ -612,7 +612,7 @@ test('orders search results by weighted title matches and handles punctuation-on
     page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
   ).toBeVisible();
 
-  await page.getByPlaceholder('Buscar uma dica').fill('!!! *** ()');
+  await page.getByTestId('search-field-input').fill('!!! *** ()');
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   await expect(page.getByText('Nada por aqui ainda')).toBeVisible();

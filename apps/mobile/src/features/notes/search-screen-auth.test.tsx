@@ -45,12 +45,47 @@ vi.mock('react-native', () => {
     const content = typeof children === 'function' ? children({ pressed: false }) : children;
     return createElement('button', props, content);
   }
+  function NativeTextInput(props: NativeProps) {
+    return createElement('input', props);
+  }
+  class AnimatedValue {
+    value: number;
+    constructor(value: number) {
+      this.value = value;
+    }
+  }
   return {
     Pressable: NativePressable,
+    ScrollView: NativeView,
     StyleSheet: { create: (styles: Record<string, unknown>) => styles },
     Text: NativeView,
+    TextInput: NativeTextInput,
     View: NativeView,
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 1, fontScale: 1 }),
+    Animated: {
+      View: NativeView,
+      Value: AnimatedValue,
+      timing: () => ({ start: () => {} }),
+    },
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => {} }),
+    },
   };
+});
+
+vi.mock('react-native-safe-area-context', () => {
+  function SafeAreaView({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) {
+    return createElement('div', props, children);
+  }
+  return { SafeAreaView };
+});
+
+vi.mock('react-native-svg', () => {
+  function Node({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) {
+    return createElement('div', props, children);
+  }
+  return { Svg: Node, Path: Node, Circle: Node, Rect: Node };
 });
 
 vi.mock('@/components/foundation-screen', () => ({
@@ -65,14 +100,15 @@ vi.mock('@/components/note-card', () => ({
   NoteCard: () => createElement('div'),
 }));
 vi.mock('@/features/notes/category-filter-controls', () => ({ CategoryFilterControls: () => createElement('div') }));
-vi.mock('@/features/notes/catalog', () => ({ buildNoteCatalog: () => ({ kind: 'catalog' }) }));
+vi.mock('@/features/notes/catalog', () => ({ buildNoteCatalog: () => ({ kind: 'catalog', activeCategories: [] }) }));
 vi.mock('@/features/notes/search-screen', () => ({
   appendRecentSearchQuery: (current: string[], query: string) => [...current, query],
   createSearchRequest: () => null,
   isCurrentSearchRequest: () => true,
   labelSearchResults: (_catalog: unknown, results: unknown[]) => results,
-  searchResultContext: () => ({ categoryLabel: null, query: 'q', resultCount: 0, scopeLabel: 'Mundo todo' }),
-  searchResultCountLabel: () => '0 notas',
+  searchResultContext: () => ({ categoryLabel: null, query: 'q', resultCount: 0 }),
+  searchResultCountLabel: () => '0 achados',
+  selectedSearchCategory: () => null,
 }));
 vi.mock('expo-router', async () => {
   const react = (await vi.importActual('react')) as typeof React;

@@ -1,14 +1,9 @@
 import * as Crypto from 'expo-crypto';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { ScrollView, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import {
-  EmptyStateCard,
-  FoundationButton,
-  FoundationScreen,
-  FoundationTextInput,
-} from '@/components/foundation-screen';
+import { ReadAuthGate } from '@/components/read-auth-gate';
 import { NoteCard, NOTE_USEFUL_ERROR_MESSAGE } from '@/components/note-card';
 import { useAuth } from '@/lib/auth/auth-provider';
 import type { APIClient } from '@/lib/api/client';
@@ -25,6 +20,7 @@ import {
   presentSearchResults,
   searchResultContext,
   searchResultCountLabel,
+  selectedSearchCategory,
 } from '@/features/notes/search-screen';
 import type {
   PresentedSearchResult,
@@ -37,9 +33,19 @@ import type { SearchVersion } from '@/lib/api/notes';
 import { useProductEvents } from '@/lib/events/product-event-provider';
 import { productEventKinds } from '@/lib/events/event-types';
 import { registerPresentedNoteOrigin } from '@/features/notes/presented-note-origin';
+import { estimateNoteCardHeight } from '@/features/notes/note-card-estimate';
+import { SearchIdle } from '@/features/notes/search-idle';
+import { BrandHeader } from '@/features/auth/brand-header';
+import { Screen } from '@/ui/screen';
+import { SearchField } from '@/ui/search-field';
+import { Button } from '@/ui/button';
+import { MasonryGrid } from '@/ui/masonry-grid';
+import { NoteCardSkeleton } from '@/ui/skeleton';
+import { EmptyState } from '@/ui/empty-state';
+import { AppText } from '@/ui/text';
+import { semanticColors, spacing } from '@sdds/tokens';
 
-import { styles } from '@/features/notes/search-screen.styles';
-import { ReadAuthGate } from '@/components/read-auth-gate';
+import { styles } from './search.styles';
 
 type CatalogState =
   | { status: 'loading' }
@@ -93,11 +99,8 @@ export default function SearchScreen() {
   }
 
   return (
-    <FoundationScreen
-      eyebrow="Buscar"
-      title="Buscar"
-      description="Ache notas, produtos, lugares e dicas."
-    >
+    <Screen>
+      <BrandHeader compact />
       <ReadAuthGate
         onLogin={() =>
           router.push({ pathname: '/login', params: { next: '/search' } })
@@ -107,7 +110,7 @@ export default function SearchScreen() {
         }
         status={state.status}
       />
-    </FoundationScreen>
+    </Screen>
   );
 }
 
@@ -116,6 +119,8 @@ function AuthenticatedSearchScreen({
   onSessionExpired,
 }: AuthenticatedSearchScreenProps) {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const columnWidth = (width - 2 * spacing.gutter - spacing.masonryGap) / 2;
   const productEvents = useProductEvents();
   const catalogRequestIDRef = useRef(0);
   const searchRequestIDRef = useRef(0);
@@ -616,68 +621,82 @@ function AuthenticatedSearchScreen({
   }
 
   return (
-    <FoundationScreen
-      eyebrow="Buscar"
-      title="Buscar"
-      description="Ache notas, produtos, lugares e dicas."
-    >
-      <FoundationTextInput
-        accessibilityLabel="Buscar"
-        onChangeText={handleQueryChange}
-        onSubmitEditing={handleSubmit}
-        placeholder="Buscar uma dica"
-        returnKeyType="search"
-        value={query}
-      />
-      <View style={styles.actionRow}>
-        <FoundationButton
-          disabled={
-            state.status === 'loading' || catalogState.status === 'loading'
-          }
-          label={state.status === 'loading' ? 'Buscando...' : 'Buscar'}
-          onPress={handleSubmit}
+    <Screen scroll={false}>
+      <View style={styles.header}>
+        <View style={styles.searchRow}>
+          <View style={styles.searchFieldSlot}>
+            <SearchField
+              value={query}
+              onChangeText={handleQueryChange}
+              onSubmit={handleSubmit}
+              onClear={handleClear}
+              placeholder="O que você tá procurando?"
+              autoFocus={false}
+              testID="search-field-input"
+            />
+          </View>
+          <Button
+            variant="ghost"
+            label="Buscar"
+            onPress={handleSubmit}
+            disabled={catalogState.status !== 'ready'}
+          />
+        </View>
+        <CategoryFilterControls
+          catalog={catalogState.status === 'ready' ? catalogState.catalog : null}
+          onSelectCategorySlug={handleSelectCategorySlug}
+          selectedCategorySlug={selectedCategorySlug}
         />
-        {query.length === 0 ? null : (
-          <FoundationButton
-            label="Limpar"
-            onPress={handleClear}
-            style={styles.secondaryButton}
+      </View>
+      <ScrollView
+        style={styles.resultsScroll}
+        contentContainerStyle={styles.resultsContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {catalogState.status === 'error' ? (
+          <CatalogError />
+        ) : (
+          <SearchStateContent
+            catalogState={catalogState}
+            columnWidth={columnWidth}
+            onClearRecents={() => setRecentQueries([])}
+            onCompose={() => router.push('/compose')}
+            onOpenAuthor={openAuthor}
+            onOpenNote={openNote}
+            onPickCategory={handleSelectCategorySlug}
+            onPickQuery={handleSelectRecentQuery}
+            onToggleUseful={toggleUseful}
+            recentQueries={recentQueries}
+            state={state}
+            usefulMutations={usefulMutations}
           />
         )}
-      </View>
-      <CategoryFilterControls
-        catalog={catalogState.status === 'ready' ? catalogState.catalog : null}
-        onSelectCategorySlug={handleSelectCategorySlug}
-        selectedCategorySlug={selectedCategorySlug}
-      />
-      {catalogState.status === 'error' ? (
-        <CatalogError />
-      ) : (
-        <SearchStateContent
-          onOpenAuthor={openAuthor}
-          onOpenNote={openNote}
-          onSelectRecentQuery={handleSelectRecentQuery}
-          onToggleUseful={toggleUseful}
-          recentQueries={recentQueries}
-          state={state}
-          usefulMutations={usefulMutations}
-        />
-      )}
-    </FoundationScreen>
+      </ScrollView>
+    </Screen>
   );
 }
 function SearchStateContent({
+  catalogState,
+  columnWidth,
+  onClearRecents,
+  onCompose,
   onOpenAuthor,
   onOpenNote,
-  onSelectRecentQuery,
+  onPickCategory,
+  onPickQuery,
   onToggleUseful,
   recentQueries,
   state,
   usefulMutations,
 }: {
+  catalogState: CatalogState;
+  columnWidth: number;
+  onClearRecents: () => void;
+  onCompose: () => void;
   onOpenAuthor: (authorID: string) => void;
   onOpenNote: (result: PresentedSearchResult) => void;
-  onSelectRecentQuery: (query: string) => void;
+  onPickCategory: (categorySlug: string) => void;
+  onPickQuery: (query: string) => void;
   onToggleUseful: (result: PresentedSearchResult) => Promise<void>;
   recentQueries: string[];
   state: SearchScreenState;
@@ -685,24 +704,48 @@ function SearchStateContent({
 }) {
   if (state.status === 'idle') {
     return (
-      <>
-        <RecentSearches
-          onSelectRecentQuery={onSelectRecentQuery}
-          recentQueries={recentQueries}
-        />
-        <EmptyStateCard
-          title="Nada pesquisado ainda"
-          body="Comece por uma dica, produto, bairro ou dúvida."
-        />
-      </>
+      <SearchIdle
+        recentQueries={recentQueries}
+        onPickQuery={onPickQuery}
+        onClearRecents={onClearRecents}
+        categories={
+          catalogState.status === 'ready'
+            ? catalogState.catalog.activeCategories
+            : []
+        }
+        onPickCategory={onPickCategory}
+      />
     );
   }
 
   if (state.status === 'loading') {
+    const categoryLabel =
+      catalogState.status === 'ready'
+        ? selectedSearchCategory(catalogState.catalog, state.request.categorySlug)
+            ?.label ?? null
+        : null;
     return (
-      <EmptyStateCard
-        title="Buscando notas"
-        body={`Procurando achados para "${state.request.query}" no Mundo todo.`}
+      <>
+        <SearchFeedback categoryLabel={categoryLabel} query={state.request.query} />
+        <View style={styles.skeletonRow}>
+          <View style={styles.skeletonColumn}>
+            <NoteCardSkeleton tall />
+            <NoteCardSkeleton />
+          </View>
+          <View style={styles.skeletonColumn}>
+            <NoteCardSkeleton />
+            <NoteCardSkeleton tall />
+          </View>
+        </View>
+      </>
+    );
+  }
+
+  if (state.status === 'error') {
+    return (
+      <EmptyState
+        title="Não deu pra buscar"
+        body={`Mantivemos "${state.request.query}" aqui. Confere sua conexão e tenta de novo.`}
       />
     );
   }
@@ -710,110 +753,92 @@ function SearchStateContent({
   if (state.status === 'empty') {
     return (
       <>
-        <ResultHeader context={state.context} />
-        <EmptyStateCard
+        <SearchFeedback
+          categoryLabel={state.context.categoryLabel}
+          countLabel={searchResultCountLabel(state.context.resultCount)}
+          query={state.context.query}
+        />
+        <EmptyState
           title="Nada por aqui ainda"
-          body={`Que tal escrever a primeira nota útil sobre "${state.request.query}"?`}
+          body="Que tal escrever o primeiro achado sobre isso?"
+          action={{ label: 'Escrever', onPress: onCompose }}
         />
       </>
     );
   }
 
-  if (state.status === 'error') {
-    return (
-      <EmptyStateCard
-        title="Não deu pra buscar"
-        body={`Mantive "${state.request.query}" aqui. Confere sua conexão e tenta de novo.`}
-      />
-    );
-  }
-
   return (
     <>
-      <ResultHeader context={state.context} />
-      {state.results.map((result) => {
-        const labelledNote = result.note;
-        return (
+      <SearchFeedback
+        categoryLabel={state.context.categoryLabel}
+        countLabel={searchResultCountLabel(state.context.resultCount)}
+        query={state.context.query}
+      />
+      <MasonryGrid
+        items={state.results}
+        keyFor={(result) => result.note.id}
+        estimateHeight={(result) =>
+          estimateNoteCardHeight(result.note, columnWidth)
+        }
+        renderItem={(result) => (
           <NoteCard
-            categoryLabel={labelledNote.categoryLabel}
-            key={labelledNote.id}
-            note={labelledNote}
+            categoryLabel={result.note.categoryLabel}
+            key={result.note.id}
+            note={result.note}
             onPress={() => onOpenNote(result)}
-            onPressAuthor={() => onOpenAuthor(labelledNote.author.id)}
+            onPressAuthor={() => onOpenAuthor(result.note.author.id)}
             onPressUseful={() => {
               void onToggleUseful(result);
             }}
             usefulError={
-              usefulMutations[labelledNote.id] === 'error'
+              usefulMutations[result.note.id] === 'error'
                 ? NOTE_USEFUL_ERROR_MESSAGE
                 : null
             }
-            usefulPending={usefulMutations[labelledNote.id] === 'pending'}
+            usefulPending={usefulMutations[result.note.id] === 'pending'}
           />
-        );
-      })}
+        )}
+      />
     </>
   );
 }
 
 function CatalogError() {
   return (
-    <EmptyStateCard
+    <EmptyState
       title="Não deu pra carregar as categorias"
       body="A gente precisa delas pra mostrar as notas sem inventar rótulo. Fecha e abre de novo em instantes."
     />
   );
 }
 
-function RecentSearches({
-  onSelectRecentQuery,
-  recentQueries,
+function SearchFeedback({
+  categoryLabel,
+  countLabel,
+  query,
 }: {
-  onSelectRecentQuery: (query: string) => void;
-  recentQueries: string[];
+  categoryLabel: string | null;
+  countLabel?: string;
+  query: string;
 }) {
-  if (recentQueries.length === 0) {
-    return null;
-  }
-
-  return (
-    <View style={styles.recentSection}>
-      <Text style={styles.sectionLabel}>Pesquisas desta sessão</Text>
-      <View style={styles.recentRow}>
-        {recentQueries.map((recentQuery) => (
-          <Pressable
-            accessibilityRole="button"
-            key={recentQuery}
-            onPress={() => onSelectRecentQuery(recentQuery)}
-            style={({ pressed }) => [
-              styles.recentButton,
-              pressed ? styles.recentButtonPressed : null,
-            ]}
-          >
-            <Text style={styles.recentButtonText}>{recentQuery}</Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function ResultHeader({ context }: { context: SearchResultContext }) {
-  const contextParts =
-    context.categoryLabel === null
-      ? [context.scopeLabel]
-      : [`Categoria ${context.categoryLabel}`, context.scopeLabel];
-
+  const categorySuffix = categoryLabel === null ? '' : ` · ${categoryLabel}`;
   return (
     <View
       accessible
-      accessibilityLabel={`Resultado da busca: ${searchResultCountLabel(context.resultCount)} para ${context.query}. ${contextParts.join(', ')}.`}
-      style={styles.resultHeader}
+      accessibilityLabel={`${countLabel ?? 'Buscando'} para ${query}${categoryLabel === null ? '' : `, categoria ${categoryLabel}`}.`}
+      style={styles.feedback}
     >
-      <Text style={styles.resultTitle}>
-        {searchResultCountLabel(context.resultCount)} para {context.query}
-      </Text>
-      <Text style={styles.resultMeta}>{contextParts.join(' · ')}</Text>
+      <AppText variant="sm" color={semanticColors.textMuted}>
+        {countLabel === undefined ? (
+          'Buscando'
+        ) : (
+          <AppText variant="sm" weight="bold" color={semanticColors.textMuted}>
+            {countLabel}
+          </AppText>
+        )}
+        {` para "${query}"`}
+        {categorySuffix}
+      </AppText>
     </View>
   );
 }

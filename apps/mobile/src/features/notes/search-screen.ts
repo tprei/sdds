@@ -11,7 +11,6 @@ import type {
   SearchVersion,
 } from '@/lib/api/notes';
 
-export const searchScopeLabel = 'Mundo todo';
 export const searchRecentQueryLimit = 5;
 
 export type SearchDispatchedContext = {
@@ -33,7 +32,6 @@ export type SearchResultContext = {
   categoryLabel: string | null;
   query: string;
   resultCount: number;
-  scopeLabel: typeof searchScopeLabel;
 };
 
 export type LabelledSearchResult = {
@@ -200,12 +198,11 @@ export function searchResultContext({
     categoryLabel: selectedSearchCategory(catalog, categorySlug)?.label ?? null,
     query,
     resultCount,
-    scopeLabel: searchScopeLabel,
   };
 }
 
 export function searchResultCountLabel(resultCount: number): string {
-  const noun = resultCount === 1 ? 'nota' : 'notas';
+  const noun = resultCount === 1 ? 'achado' : 'achados';
   return `${resultCount} ${noun}`;
 }
 

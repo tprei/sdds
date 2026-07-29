@@ -48,22 +48,46 @@ vi.mock('react-native', () => {
     const content = typeof children === 'function' ? children({ pressed: false }) : children;
     return createElement('button', props, content);
   }
+  function NativeTextInput(props: NativeProps) {
+    return createElement('input', props);
+  }
+  class AnimatedValue {
+    value: number;
+    constructor(value: number) {
+      this.value = value;
+    }
+  }
   return {
     Pressable: NativePressable,
+    ScrollView: NativeView,
     StyleSheet: { create: (styles: Record<string, unknown>) => styles },
     Text: NativeView,
+    TextInput: NativeTextInput,
     View: NativeView,
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 1, fontScale: 1 }),
+    Animated: {
+      View: NativeView,
+      Value: AnimatedValue,
+      timing: () => ({ start: () => {} }),
+    },
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => {} }),
+    },
   };
 });
-vi.mock('@/components/foundation-screen', () => ({
-  EmptyStateCard: ({ body, title }: { body: string; title: string }) =>
-    createElement('div', { body, title }),
-  FoundationButton: ({ label, onPress }: { label: string; onPress?: () => void }) =>
-    createElement('button', { onPress, label }, label),
-  FoundationScreen: ({ children }: { children: ReactNode }) =>
-    createElement('section', null, children),
-  FoundationTextInput: (props: NativeProps) => createElement('input', props),
-}));
+vi.mock('react-native-safe-area-context', () => {
+  function SafeAreaView({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) {
+    return createElement('div', props, children);
+  }
+  return { SafeAreaView };
+});
+vi.mock('react-native-svg', () => {
+  function Node({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) {
+    return createElement('div', props, children);
+  }
+  return { Svg: Node, Path: Node, Circle: Node, Rect: Node };
+});
 vi.mock('@/components/note-card', () => ({
   NOTE_USEFUL_ERROR_MESSAGE: 'Não deu pra atualizar o Útil. Tenta de novo.',
   NoteCard: ({ note, ...props }: { note: { id: string } } & NativeProps) =>
@@ -298,12 +322,14 @@ async function renderSearch(): Promise<void> {
 
 async function submit(query: string): Promise<void> {
   await act(async () => {
-    const input = renderer.root.findByProps({ accessibilityLabel: 'Buscar' });
+    const matches = renderer.root.findAllByProps({ testID: 'search-field-input' });
+    const input = matches[matches.length - 1];
     input.props.onChangeText(query);
     await settle();
   });
   await act(async () => {
-    const input = renderer.root.findByProps({ accessibilityLabel: 'Buscar' });
+    const matches = renderer.root.findAllByProps({ testID: 'search-field-input' });
+    const input = matches[matches.length - 1];
     input.props.onSubmitEditing();
     await settle();
   });

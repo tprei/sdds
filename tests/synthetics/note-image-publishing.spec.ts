@@ -11,7 +11,7 @@ import {
 } from './note-image-visual';
 import { syntheticPassword } from './support';
 
-test.use({ viewport: { height: 720, width: 1280 } });
+test.use({ viewport: { height: 1400, width: 1280 } });
 
 type SyntheticUser = { displayName: string; username: string };
 type SyntheticScenario = {

@@ -1,10 +1,17 @@
-import { Pressable, Text, View } from 'react-native';
+import type { Ref } from 'react';
+import type { TextInput } from 'react-native';
+import { View } from 'react-native';
 
-import {
-  FoundationButton,
-  FoundationTextInput,
-} from '@/components/foundation-screen';
+import { colors, semanticColors } from '@sdds/tokens';
+
 import type { Comment } from '@/lib/api/comments';
+import { Avatar } from '@/ui/avatar';
+import { Badge } from '@/ui/badge';
+import { Button } from '@/ui/button';
+import { PressableScale } from '@/ui/pressable-scale';
+import { relativeTimeLabel } from '@/ui/relative-time';
+import { AppText } from '@/ui/text';
+import { TextField } from '@/ui/text-field';
 
 import {
   commentBodyMaxCodePoints,
@@ -19,13 +26,9 @@ import type {
   CommentThreadState,
 } from './comment-thread';
 
-const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
-
 export type CommentsSectionProps = {
   currentAuthorID: string;
+  noteAuthorID: string;
   onDraftChange: (draft: string) => void;
   onLoadMore: () => void;
   onPressAuthor: (authorID: string) => void;
@@ -33,12 +36,15 @@ export type CommentsSectionProps = {
   onReportComment?: (commentID: string) => void;
   onRetryInitial: () => void;
   onSubmit: (body: string) => void;
+  composerRef?: Ref<TextInput>;
   thread: CommentThreadState;
 };
 
 export function CommentsSection({
-  onDraftChange,
+  composerRef,
   currentAuthorID,
+  noteAuthorID,
+  onDraftChange,
   onLoadMore,
   onPressAuthor,
   onDeleteComment,
@@ -53,47 +59,49 @@ export function CommentsSection({
 
   return (
     <View style={styles.section}>
-      <Text accessibilityRole="header" style={styles.heading}>
-        Comentários
-      </Text>
+      <AppText accessibilityRole="header" variant="title" weight="extraBold">
+        {displayedCommentCount(thread)} comentários
+      </AppText>
       <CommentThread
-        onLoadMore={onLoadMore}
         currentAuthorID={currentAuthorID}
-        onPressAuthor={onPressAuthor}
-        onRetryInitial={onRetryInitial}
+        noteAuthorID={noteAuthorID}
         onDeleteComment={onDeleteComment}
+        onLoadMore={onLoadMore}
+        onPressAuthor={onPressAuthor}
         onReportComment={onReportComment}
+        onRetryInitial={onRetryInitial}
         thread={thread}
       />
       <View style={styles.composer}>
-        <Text style={styles.composerLabel}>Escreva um comentário</Text>
-        <FoundationTextInput
-          accessibilityLabel="Escreva um comentário"
+        <TextField
+          counter={{
+            count: validation.codePointCount,
+            max: commentBodyMaxCodePoints,
+          }}
+          label="Escreva um comentário"
           multiline
           onChangeText={onDraftChange}
           placeholder="Escreva um comentário"
-          style={styles.input}
+          ref={composerRef}
           testID="comment-draft"
           value={thread.draft}
         />
-        <Text style={styles.counter}>
-          {validation.codePointCount}/{commentBodyMaxCodePoints}
-        </Text>
         {draftError === null ? null : (
-          <Text accessibilityRole="alert" style={styles.draftError}>
+          <AppText accessibilityRole="alert" color={colors.danger500} variant="sm" weight="semibold">
             {draftErrorMessage(draftError)}
-          </Text>
+          </AppText>
         )}
         {thread.submitStatus === 'error' ? (
-          <Text accessibilityRole="alert" style={styles.draftError}>
+          <AppText accessibilityRole="alert" color={colors.danger500} variant="sm" weight="semibold">
             Não deu pra publicar o comentário. Tenta de novo.
-          </Text>
+          </AppText>
         ) : null}
-        <FoundationButton
+        <Button
           disabled={submitDisabled}
           label={thread.submitStatus === 'pending' ? 'Publicando...' : 'Comentar'}
           onPress={() => onSubmit(validation.body)}
           testID="comment-submit"
+          variant="primary"
         />
       </View>
     </View>
@@ -102,6 +110,7 @@ export function CommentsSection({
 
 function CommentThread({
   currentAuthorID,
+  noteAuthorID,
   onDeleteComment,
   onReportComment = () => undefined,
   onLoadMore,
@@ -111,6 +120,7 @@ function CommentThread({
 }: Pick<
   CommentsSectionProps,
   | 'currentAuthorID'
+  | 'noteAuthorID'
   | 'onReportComment'
   | 'onDeleteComment'
   | 'onLoadMore'
@@ -154,6 +164,7 @@ function CommentThread({
         )}
         currentAuthorID={currentAuthorID}
         deleteStatusByCommentID={thread.deleteStatusByCommentID}
+        noteAuthorID={noteAuthorID}
         onDeleteComment={onDeleteComment}
         onReportComment={onReportComment}
         onPressAuthor={onPressAuthor}
@@ -166,6 +177,7 @@ function CommentThread({
         )}
         currentAuthorID={currentAuthorID}
         deleteStatusByCommentID={thread.deleteStatusByCommentID}
+        noteAuthorID={noteAuthorID}
         onDeleteComment={onDeleteComment}
         onReportComment={onReportComment}
         onPressAuthor={onPressAuthor}
@@ -178,10 +190,7 @@ function LoadMoreControl({
   onLoadMore,
   thread,
 }: Pick<CommentsSectionProps, 'onLoadMore' | 'thread'>) {
-  if (
-    thread.initialLoadStatus !== 'ready' ||
-    thread.nextCursor === null
-  ) {
+  if (thread.initialLoadStatus !== 'ready' || thread.nextCursor === null) {
     return null;
   }
 
@@ -192,23 +201,25 @@ function LoadMoreControl({
   if (thread.loadMoreStatus === 'error') {
     return (
       <View style={styles.statusGroup}>
-        <Text accessibilityRole="alert" style={[styles.status, styles.statusError]}>
+        <AppText accessibilityRole="alert" color={colors.danger500} variant="body" weight="semibold">
           Não deu pra carregar mais comentários. Tenta de novo.
-        </Text>
-        <FoundationButton
+        </AppText>
+        <Button
           label="Tentar de novo"
           onPress={onLoadMore}
           testID="comments-retry-load-more"
+          variant="secondary"
         />
       </View>
     );
   }
 
   return (
-    <FoundationButton
+    <Button
       label="Ver mais comentários"
       onPress={onLoadMore}
       testID="comments-load-more"
+      variant="secondary"
     />
   );
 }
@@ -216,26 +227,32 @@ function LoadMoreControl({
 function InitialLoadError({ onRetry }: { onRetry: () => void }) {
   return (
     <View style={styles.statusGroup}>
-      <Text accessibilityRole="alert" style={[styles.status, styles.statusError]}>
+      <AppText accessibilityRole="alert" color={colors.danger500} variant="body" weight="semibold">
         Não deu pra carregar os comentários.
-      </Text>
-      <FoundationButton
+      </AppText>
+      <Button
         label="Tentar de novo"
         onPress={onRetry}
         testID="comments-retry-initial"
+        variant="secondary"
       />
     </View>
   );
 }
 
 function StatusMessage({ children }: { children: string }) {
-  return <Text style={styles.status}>{children}</Text>;
+  return (
+    <AppText color={semanticColors.textMuted} variant="body">
+      {children}
+    </AppText>
+  );
 }
 
 function CommentList({
   comments,
   currentAuthorID,
   deleteStatusByCommentID,
+  noteAuthorID,
   onDeleteComment,
   onPressAuthor,
   onReportComment,
@@ -243,6 +260,7 @@ function CommentList({
   comments: Comment[];
   currentAuthorID: string;
   deleteStatusByCommentID: ReadonlyMap<string, CommentDeleteStatus>;
+  noteAuthorID: string;
   onDeleteComment: (commentID: string) => void;
   onReportComment: (commentID: string) => void;
   onPressAuthor: (authorID: string) => void;
@@ -250,50 +268,55 @@ function CommentList({
   return comments.map((comment) => (
     <View key={comment.id} style={styles.comment}>
       <View style={styles.commentHeader}>
-        <Pressable
+        <PressableScale
           accessibilityLabel={`Abrir perfil do autor: ${comment.author.displayName}`}
           accessibilityRole="button"
           onPress={() => onPressAuthor(comment.author.id)}
-          style={({ pressed }) => [
-            styles.authorControl,
-            pressed ? styles.authorPressed : null,
-          ]}
+          style={styles.authorControl}
         >
-          <Text style={styles.author}>{comment.author.displayName}</Text>
-        </Pressable>
-        <Text style={styles.date}>{formatTimestamp(comment.createdAt)}</Text>
+          <Avatar name={comment.author.displayName} size={32} />
+          <AppText color={semanticColors.textMuted} variant="sm" weight="bold">
+            {comment.author.displayName}
+          </AppText>
+        </PressableScale>
+        {comment.author.id === noteAuthorID ? <Badge label="Autor" /> : null}
       </View>
-      <Text style={styles.commentBody}>{comment.body}</Text>
-      {comment.author.id === currentAuthorID ? (
-        <Pressable
-          accessibilityLabel="Excluir comentário"
+      <AppText color={semanticColors.textMeta} variant="xs">
+        {relativeTimeLabel(new Date(comment.createdAt).toISOString(), new Date())}
+      </AppText>
+      <AppText color={semanticColors.textStrong} variant="body">
+        {comment.body}
+      </AppText>
+      <View style={styles.commentActions}>
+        {comment.author.id === currentAuthorID ? (
+          <PressableScale
+            accessibilityLabel="Excluir comentário"
+            accessibilityRole="button"
+            onPress={() => onDeleteComment(comment.id)}
+            style={styles.deleteControl}
+            testID={`comment-delete-${comment.id}`}
+          >
+            <AppText color={colors.danger500} variant="sm" weight="semibold">
+              Excluir comentário
+            </AppText>
+          </PressableScale>
+        ) : null}
+        <PressableScale
+          accessibilityLabel="Denunciar comentário"
           accessibilityRole="button"
-          onPress={() => onDeleteComment(comment.id)}
-          style={({ pressed }) => [
-            styles.deleteControl,
-            pressed ? styles.deletePressed : null,
-          ]}
-          testID={`comment-delete-${comment.id}`}
+          onPress={() => onReportComment(comment.id)}
+          style={styles.reportControl}
+          testID={`comment-report-${comment.id}`}
         >
-          <Text style={styles.deleteText}>Excluir comentário</Text>
-        </Pressable>
-      ) : null}
-      <Pressable
-        accessibilityLabel="Denunciar comentário"
-        accessibilityRole="button"
-        onPress={() => onReportComment(comment.id)}
-        style={({ pressed }) => [
-          styles.reportControl,
-          pressed ? styles.reportPressed : null,
-        ]}
-        testID={`comment-report-${comment.id}`}
-      >
-        <Text style={styles.reportText}>Denunciar comentário</Text>
-      </Pressable>
+          <AppText color={colors.danger500} variant="sm" weight="semibold">
+            Denunciar comentário
+          </AppText>
+        </PressableScale>
+      </View>
       {deleteStatusByCommentID.get(comment.id) === 'error' ? (
-        <Text accessibilityRole="alert" style={styles.deleteError}>
+        <AppText accessibilityRole="alert" color={colors.danger500} variant="sm" weight="semibold">
           Não deu pra excluir o comentário. Tenta de novo.
-        </Text>
+        </AppText>
       ) : null}
     </View>
   ));
@@ -304,8 +327,4 @@ function draftErrorMessage(error: 'required' | 'too_long'): string {
     return 'Escreva alguma coisa antes de comentar.';
   }
   return 'Seu comentário pode ter até 1.000 caracteres.';
-}
-
-function formatTimestamp(timestamp: number): string {
-  return dateFormatter.format(new Date(timestamp));
 }

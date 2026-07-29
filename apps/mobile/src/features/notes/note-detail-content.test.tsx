@@ -87,13 +87,7 @@ function note(images: NoteImage[]): LabelledNote {
 describe('NoteDetailContent media', () => {
   it('keeps note text visible when there are no images', () => {
     const currentNote = note([]);
-    const renderer = render(
-      <NoteDetailContent
-        note={currentNote}
-        onPressAuthor={() => undefined}
-        onPressUseful={() => undefined}
-      />,
-    );
+    const renderer = render(<NoteDetailContent note={currentNote} />);
 
     expect(renderer.root.findAllByType('img')).toHaveLength(0);
     expect(
@@ -103,13 +97,7 @@ describe('NoteDetailContent media', () => {
 
   it('renders the first image from a seeded note', () => {
     const currentNote = note([firstImage, secondImage]);
-    const renderer = render(
-      <NoteDetailContent
-        note={currentNote}
-        onPressAuthor={() => undefined}
-        onPressUseful={() => undefined}
-      />,
-    );
+    const renderer = render(<NoteDetailContent note={currentNote} />);
 
     const nativeImages = renderer.root.findAllByType('img');
     expect(nativeImages).toHaveLength(1);
@@ -123,13 +111,7 @@ describe('NoteDetailContent media', () => {
 
   it('keeps note text visible after an image load error', async () => {
     const currentNote = note([firstImage]);
-    const renderer = render(
-      <NoteDetailContent
-        note={currentNote}
-        onPressAuthor={() => undefined}
-        onPressUseful={() => undefined}
-      />,
-    );
+    const renderer = render(<NoteDetailContent note={currentNote} />);
     const nativeImage = renderer.root.findByType('img');
 
     await act(async () => {
@@ -144,78 +126,53 @@ describe('NoteDetailContent media', () => {
       renderer.root.findAllByProps({ children: currentNote.body }),
     ).not.toHaveLength(0);
   });
+});
 
-  it('renders the shared useful action and inline error', () => {
-    const currentNote = {
-      ...note([]),
-      usefulCount: 3,
-      usefulByCurrentUser: true,
-    };
-    const renderer = render(
-      <NoteDetailContent
-        note={currentNote}
-        onPressAuthor={() => undefined}
-        onPressUseful={() => undefined}
-        usefulError
-        usefulPending={false}
-      />,
-    );
+describe('NoteDetailContent meta row', () => {
+  it('exposes the category label as an accessible name', () => {
+    const currentNote = note([]);
+    const renderer = render(<NoteDetailContent note={currentNote} />);
 
-    const buttons = renderer.root.findAll(
-      (node) =>
-        node.props.accessibilityRole === 'button' &&
-        node.props.accessibilityState?.selected === true,
-    );
-    expect(buttons.length).toBeGreaterThanOrEqual(1);
     expect(
       renderer.root.findByProps({
-        children: 'Não deu pra atualizar o Útil. Tenta de novo.',
+        accessibilityLabel: `Categoria da nota: ${currentNote.categoryLabel}`,
       }),
     ).toBeDefined();
   });
-});
 
-describe('NoteDetailContent report action', () => {
-  it('renders the report control and forwards presses to onReportNote', () => {
-    const onReportNote = vi.fn();
-    const renderer = render(
-      <NoteDetailContent
-        note={note([])}
-        onPressAuthor={() => undefined}
-        onPressUseful={() => undefined}
-        onReportNote={onReportNote}
-      />,
+  it('renders the relative time without an edited suffix when untouched', () => {
+    const currentNote = note([]);
+    const renderer = render(<NoteDetailContent note={currentNote} />);
+
+    const matches = renderer.root.findAll(
+      (node) =>
+        typeof node.props.children === 'string' &&
+        node.props.children.length > 0 &&
+        !node.props.children.includes(' · editado') &&
+        (node.props.children.startsWith('há ') ||
+          node.props.children === 'agora' ||
+          /^\d{1,2} [a-zç]{3}$/.test(node.props.children)),
     );
-
-    const control = renderer.root.findByProps({ testID: 'note-report' });
-    expect(control.props.accessibilityLabel).toBe('Denunciar nota');
+    expect(matches.length).toBeGreaterThanOrEqual(1);
     expect(
       renderer.root.findAll(
         (node) =>
-          typeof node.type === 'string' && node.props.testID === 'note-report',
+          typeof node.props.children === 'string' &&
+          node.props.children.includes(' · editado'),
       ),
-    ).toHaveLength(1);
-
-    act(() => {
-      control.props.onPress();
-    });
-    expect(onReportNote).toHaveBeenCalledTimes(1);
+    ).toHaveLength(0);
   });
 
-  it('does not require onReportNote and stays a no-op when omitted', () => {
-    const renderer = render(
-      <NoteDetailContent
-        note={note([])}
-        onPressAuthor={() => undefined}
-        onPressUseful={() => undefined}
-      />,
-    );
+  it('appends the edited suffix when updatedAt differs from createdAt', () => {
+    const currentNote = { ...note([]), updatedAt: 1782993600000 + 60_000 };
+    const renderer = render(<NoteDetailContent note={currentNote} />);
 
-    const control = renderer.root.findByProps({ testID: 'note-report' });
-    expect(() =>
-      act(() => {
-        control.props.onPress();
-      }),
-    ).not.toThrow();
+    expect(
+      renderer.root.findAll(
+        (node) =>
+          typeof node.props.children === 'string' &&
+          node.props.children.includes(' · editado'),
+      ),
+    ).not.toHaveLength(0);
   });
 });

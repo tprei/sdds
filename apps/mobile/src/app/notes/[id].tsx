@@ -6,23 +6,26 @@ import {
   useRef,
   useState,
 } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { semanticColors, spacing, typography } from '@sdds/tokens';
+import { ScrollView, View } from 'react-native';
+import type { TextInput } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
-import {
-  EmptyStateCard,
-  FoundationScreen,
-} from '@/components/foundation-screen';
+import { colors, semanticColors } from '@sdds/tokens';
+
+import { Screen } from '@/ui/screen';
+import { EmptyState } from '@/ui/empty-state';
 import { IconButton } from '@/ui/icon-button';
-import { IconChevronLeft } from '@/ui/icons';
+import { IconChevronLeft, IconFlag } from '@/ui/icons';
+import { Avatar } from '@/ui/avatar';
+import { AppText } from '@/ui/text';
+import { PressableScale } from '@/ui/pressable-scale';
 import { CommentsSection } from '@/features/comments/comments-section';
 import {
   canDeleteComment,
   canSubmitComment,
   commentThreadReducer,
   createCommentThreadState,
+  displayedCommentCount,
   validateCommentDraft,
 } from '@/features/comments/comment-thread';
 import { ReportDialog } from '@/features/reports/report-dialog';
@@ -32,6 +35,7 @@ import {
   reportFormReducer,
 } from '@/features/reports/report-form';
 import { NoteDetailContent } from '@/features/notes/note-detail-content';
+import { NoteActionBar } from '@/features/notes/note-action-bar';
 import { buildNoteCatalog, labelNote } from '@/features/notes/catalog';
 import type { LabelledNote } from '@/features/notes/catalog';
 import { APIRequestError } from '@/lib/api/notes';
@@ -51,6 +55,8 @@ import {
   type UsefulMutationAction,
 } from '@/features/notes/use-useful-mutation';
 import { ReadAuthGate } from '@/components/read-auth-gate';
+
+import { styles } from './note-detail-screen.styles';
 
 type NoteDetailState =
   | { status: 'loading' }
@@ -79,22 +85,22 @@ export default function NoteDetailScreen() {
   const trimmedNoteID = typeof id === 'string' ? id.trim() : undefined;
   const originNonce = typeof origin === 'string' ? origin : undefined;
 
-  let content: ReactNode;
   if (!trimmedNoteID) {
-    content = (
-      <FoundationScreen
-        description="Leia a nota completa, com lugar, categoria e data."
-        eyebrow="Nota"
-        title="Nota"
-      >
-        <EmptyStateCard
-          title="Nota não encontrada"
-          body="Essa nota não existe mais ou o link tá incompleto."
-        />
-      </FoundationScreen>
+    return (
+      <Screen scroll={false}>
+        <DetailTopRow onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+        <View style={styles.fallback}>
+          <EmptyState
+            title="Nota não encontrada"
+            body="Essa nota não existe mais ou o link tá incompleto."
+          />
+        </View>
+      </Screen>
     );
-  } else if (state.status === 'authenticated') {
-    content = (
+  }
+
+  if (state.status === 'authenticated') {
+    return (
       <AuthenticatedNoteDetailScreen
         key={`${state.user.id}:${trimmedNoteID}:${originNonce ?? ''}`}
         apiClient={apiClient}
@@ -104,13 +110,12 @@ export default function NoteDetailScreen() {
         originNonce={originNonce}
       />
     );
-  } else {
-    content = (
-      <FoundationScreen
-        description="Leia a nota completa, com lugar, categoria e data."
-        eyebrow="Nota"
-        title="Nota"
-      >
+  }
+
+  return (
+    <Screen scroll={false}>
+      <DetailTopRow onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+      <View style={styles.fallback}>
         <ReadAuthGate
           onLogin={() =>
             router.push({ pathname: '/login', params: { next: `/notes/${trimmedNoteID}` } })
@@ -123,21 +128,9 @@ export default function NoteDetailScreen() {
           }
           status={state.status}
         />
-      </FoundationScreen>
-    );
-  }
 
-  return (
-    <SafeAreaView style={screenStyles.root}>
-      <View style={screenStyles.backRow}>
-        <IconButton
-          icon={<IconChevronLeft />}
-          accessibilityLabel="Voltar"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-        />
       </View>
-      {content}
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -150,6 +143,7 @@ function AuthenticatedNoteDetailScreen({
 }: AuthenticatedNoteDetailScreenProps) {
   const router = useRouter();
   const productEvents = useProductEvents();
+  const composerRef = useRef<TextInput>(null);
   const [presentedUsefulContext] = useState<UsefulContext | null>(() =>
     originNonce === undefined
       ? null
@@ -609,75 +603,126 @@ function AuthenticatedNoteDetailScreen({
   let content: ReactNode;
   if (state.status === 'loading') {
     content = (
-      <EmptyStateCard
-        title="Carregando a nota"
-        body="Buscando essa nota completa."
-      />
+      <View style={styles.fallback}>
+        <EmptyState
+          title="Carregando a nota"
+          body="Buscando essa nota completa."
+        />
+      </View>
     );
   } else if (state.status === 'notFound') {
     content = (
-      <EmptyStateCard
-        title="Nota não encontrada"
-        body="Essa nota não existe mais ou o link tá incompleto."
-      />
+      <View style={styles.fallback}>
+        <EmptyState
+          title="Nota não encontrada"
+          body="Essa nota não existe mais ou o link tá incompleto."
+        />
+      </View>
     );
   } else if (state.status === 'error') {
     content = (
-      <EmptyStateCard
-        title="Não deu pra abrir"
-        body="Confira sua conexão e tente novamente em instantes."
-      />
+      <View style={styles.fallback}>
+        <EmptyState
+          title="Não deu pra abrir"
+          body="Confira sua conexão e tente novamente em instantes."
+        />
+      </View>
     );
   } else {
     content = (
       <>
-        <NoteDetailContent
-          note={state.note}
-          onPressAuthor={(authorID) =>
-            router.push({ pathname: '/authors/[id]', params: { id: authorID } })
-          }
-          onPressUseful={() => {
-            void handleToggleUseful(state.note);
-          }}
-          usefulError={getMutationState(state.note.id) === 'error'}
-          usefulPending={getMutationState(state.note.id) === 'pending'}
-          onReportNote={handleReportNote}
-        />
-        <CommentsSection
-          currentAuthorID={currentAuthorID}
-          onDeleteComment={handleDeleteComment}
-          onReportComment={handleReportComment}
-          onDraftChange={(draft) =>
-            dispatchCommentThread({ type: 'draft_changed', draft })
-          }
-          onLoadMore={handleLoadMoreComments}
-          onPressAuthor={(authorID) =>
-            router.push({ pathname: '/authors/[id]', params: { id: authorID } })
-          }
-          onRetryInitial={() => loadCommentPage()}
-          onSubmit={handleSubmitComment}
-          thread={commentThread}
-        />
+        <NoteDetailContent note={state.note} />
+        <View style={styles.commentsWrap}>
+          <CommentsSection
+            composerRef={composerRef}
+            currentAuthorID={currentAuthorID}
+            noteAuthorID={state.note.author.id}
+            onDeleteComment={handleDeleteComment}
+            onReportComment={handleReportComment}
+            onDraftChange={(draft) =>
+              dispatchCommentThread({ type: 'draft_changed', draft })
+            }
+            onLoadMore={handleLoadMoreComments}
+            onPressAuthor={(authorID) =>
+              router.push({ pathname: '/authors/[id]', params: { id: authorID } })
+            }
+            onRetryInitial={() => loadCommentPage()}
+            onSubmit={handleSubmitComment}
+            thread={commentThread}
+          />
+        </View>
       </>
     );
   }
 
   return (
-    <FoundationScreen
-      description="Leia a nota completa, com lugar, categoria e data."
-      eyebrow="Nota"
-      title="Nota"
-    >
-      {content}
-      {reportForm.status === 'success' ? (
-        <Text accessibilityRole="alert" style={noticeStyles.notice}>
-          Denúncia recebida. Obrigado por avisar.
-        </Text>
-      ) : null}
-      {reportForm.status === 'missing' ? (
-        <Text accessibilityRole="alert" style={noticeStyles.notice}>
-          Esse conteúdo não está mais disponível.
-        </Text>
+    <Screen scroll={false}>
+      <DetailTopRow
+        note={state.status === 'ready' ? state.note : undefined}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+        onPressAuthor={() => {
+          if (state.status === 'ready') {
+            router.push({
+              pathname: '/authors/[id]',
+              params: { id: state.note.author.id },
+            });
+          }
+        }}
+        onReportNote={handleReportNote}
+      />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {content}
+        {reportForm.status === 'success' ? (
+          <AppText
+            accessibilityRole="alert"
+            color={semanticColors.accent}
+            style={styles.notice}
+            variant="sm"
+          >
+            Valeu por avisar! A gente cuida pra rede seguir feita pra humanos.
+          </AppText>
+        ) : null}
+        {reportForm.status === 'missing' ? (
+          <AppText
+            accessibilityRole="alert"
+            color={semanticColors.textMuted}
+            style={styles.notice}
+            variant="sm"
+          >
+            Esse conteúdo não está mais disponível.
+          </AppText>
+        ) : null}
+      </ScrollView>
+      {state.status === 'ready' ? (
+        <>
+          {getMutationState(state.note.id) === 'error' ? (
+            <AppText
+              accessibilityRole="alert"
+              color={colors.danger500}
+              style={styles.usefulError}
+              testID="useful-error"
+              variant="sm"
+            >
+              Não deu pra atualizar o Útil. Tenta de novo.
+            </AppText>
+          ) : null}
+          <NoteActionBar
+            commentCount={displayedCommentCount(commentThread)}
+            onFocusComposer={() => composerRef.current?.focus()}
+            useful={{
+              count: state.note.usefulCount,
+              marked: state.note.usefulByCurrentUser,
+              onToggle: () => {
+                void handleToggleUseful(state.note);
+              },
+              pending: getMutationState(state.note.id) === 'pending',
+            }}
+          />
+        </>
       ) : null}
       <ReportDialog
         target={
@@ -697,24 +742,54 @@ function AuthenticatedNoteDetailScreen({
         onCancel={() => dispatchReportForm({ type: 'close' })}
         onSubmit={handleSubmitReport}
       />
-    </FoundationScreen>
+    </Screen>
   );
 }
 
-const noticeStyles = StyleSheet.create({
-  notice: {
-    color: semanticColors.textMuted,
-    fontSize: typography.sizeBody,
-    lineHeight: 22,
-  },
-});
-
-const screenStyles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  backRow: {
-    paddingHorizontal: spacing.sp3,
-    paddingVertical: spacing.sp2,
-  },
-});
+function DetailTopRow({
+  note,
+  onBack,
+  onPressAuthor,
+  onReportNote,
+}: {
+  note?: LabelledNote;
+  onBack: () => void;
+  onPressAuthor?: () => void;
+  onReportNote?: () => void;
+}) {
+  return (
+    <View style={styles.topRow}>
+      <IconButton
+        icon={<IconChevronLeft />}
+        accessibilityLabel="Voltar"
+        onPress={onBack}
+      />
+      {note ? (
+        <>
+          <PressableScale
+            accessibilityLabel={`Abrir perfil do autor: ${note.author.displayName}`}
+            accessibilityRole="button"
+            onPress={onPressAuthor}
+            style={styles.authorControl}
+          >
+            <Avatar name={note.author.displayName} size={34} />
+            <AppText
+              color={semanticColors.textStrong}
+              variant="body"
+              weight="bold"
+            >
+              {note.author.displayName}
+            </AppText>
+          </PressableScale>
+          <View style={styles.spacer} />
+          <IconButton
+            accessibilityLabel="Denunciar nota"
+            icon={<IconFlag />}
+            onPress={onReportNote}
+            testID="note-report"
+          />
+        </>
+      ) : null}
+    </View>
+  );
+}

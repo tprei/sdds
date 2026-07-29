@@ -81,6 +81,17 @@ vi.mock('react-native', () => {
     return createElement('button', props, content);
   }
 
+  function NativeTextInput(props: NativeProps) {
+    return createElement('input', props);
+  }
+
+  class AnimatedValue {
+    value: number;
+    constructor(value: number) {
+      this.value = value;
+    }
+  }
+
   return {
     Modal: ({ children }: NativeProps) =>
       createElement('div', null, typeof children === 'function' ? null : children),
@@ -88,7 +99,21 @@ vi.mock('react-native', () => {
     ScrollView: NativeView,
     StyleSheet: { create: (styles: Record<string, unknown>) => styles },
     Text: NativeView,
+    TextInput: NativeTextInput,
     View: NativeView,
+    Animated: {
+      View: NativeView,
+      Value: AnimatedValue,
+      timing: () => ({ start: () => {} }),
+    },
+    Easing: {
+      out: (fn: unknown) => fn,
+      ease: (x: number) => x,
+    },
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => {} }),
+    },
   };
 });
 vi.mock('react-native-safe-area-context', () => ({
@@ -98,13 +123,18 @@ vi.mock('@/ui/icon-button', () => ({
   IconButton: ({
     icon,
     accessibilityLabel,
+    onPress,
+    testID,
   }: {
     icon: ReactNode;
     accessibilityLabel: string;
-  }) => createElement('button', { accessibilityLabel }, icon),
+    onPress?: () => void;
+    testID?: string;
+  }) => createElement('button', { accessibilityLabel, onPress, testID }, icon),
 }));
 vi.mock('@/ui/icons', () => ({
   IconChevronLeft: () => createElement('svg', null),
+  IconFlag: () => createElement('svg', null),
 }));
 
 vi.mock('@/components/foundation-screen', () => ({
@@ -163,18 +193,24 @@ vi.mock('@/features/notes/catalog', () => ({
 }));
 
 vi.mock('@/features/notes/note-detail-content', () => ({
-  NoteDetailContent: ({
-    note,
-    onPressUseful,
-    onReportNote,
-    usefulError,
-    usefulPending,
+  NoteDetailContent: ({ note }: { note: { id: string } }) =>
+    createElement('div', { testID: 'note-detail-content' }, note.id),
+}));
+
+vi.mock('@/features/notes/note-action-bar', () => ({
+  NoteActionBar: ({
+    commentCount,
+    onFocusComposer,
+    useful,
   }: {
-    note: { usefulByCurrentUser: boolean; usefulCount: number };
-    onPressUseful: () => void;
-    onReportNote: () => void;
-    usefulError?: boolean;
-    usefulPending?: boolean;
+    commentCount: number;
+    onFocusComposer: () => void;
+    useful: {
+      count: number;
+      marked: boolean;
+      pending: boolean;
+      onToggle: () => void;
+    };
   }) =>
     createElement(
       'div',
@@ -182,25 +218,19 @@ vi.mock('@/features/notes/note-detail-content', () => ({
       createElement(
         'div',
         { testID: 'useful-state' },
-        `${note.usefulCount}:${note.usefulByCurrentUser}`,
+        `${useful.count}:${useful.marked}`,
       ),
       createElement(
         'button',
-        { disabled: usefulPending, onPress: onPressUseful, testID: 'useful-button' },
+        { disabled: useful.pending, onPress: useful.onToggle, testID: 'useful-button' },
         'Útil',
       ),
       createElement(
         'button',
-        { onPress: onReportNote, testID: 'note-report' },
-        'Denunciar nota',
+        { onPress: onFocusComposer, testID: 'focus-composer' },
+        'Comentar',
       ),
-      usefulError
-        ? createElement(
-            'div',
-            { testID: 'useful-error' },
-            'Não deu pra atualizar o Útil. Tenta de novo.',
-          )
-        : null,
+      createElement('div', { testID: 'comment-count' }, String(commentCount)),
     ),
 }));
 
@@ -731,7 +761,7 @@ describe('NoteDetailScreen route', () => {
       await settle();
     });
 
-    expect(hostCount(renderer, 'report-backdrop')).toBe(1);
+    expect(hostCount(renderer, 'report-sheet')).toBe(1);
     expect(
       renderer.root.findAll(
         (node) =>
@@ -754,7 +784,7 @@ describe('NoteDetailScreen route', () => {
       await settle();
     });
 
-    expect(hostCount(renderer, 'report-backdrop')).toBe(1);
+    expect(hostCount(renderer, 'report-sheet')).toBe(1);
     expect(hostTextCount(renderer, 'Denunciar comentário')).toBe(1);
   });
 
@@ -783,9 +813,9 @@ describe('NoteDetailScreen route', () => {
       targetType: 'note',
     });
     expect(
-      hostTextCount(renderer, 'Denúncia recebida. Obrigado por avisar.'),
+      hostTextCount(renderer, 'Valeu por avisar! A gente cuida pra rede seguir feita pra humanos.'),
     ).toBe(1);
-    expect(hostCount(renderer, 'report-backdrop')).toBe(0);
+    expect(hostCount(renderer, 'report-sheet')).toBe(0);
   });
 
   it('logs out on a report 401', async () => {
@@ -818,7 +848,7 @@ describe('NoteDetailScreen route', () => {
     expect(
       hostTextCount(renderer, 'Esse conteúdo não está mais disponível.'),
     ).toBe(1);
-    expect(hostCount(renderer, 'report-backdrop')).toBe(0);
+    expect(hostCount(renderer, 'report-sheet')).toBe(0);
   });
 
   it('preserves the reason and details and shows the retry notice on a retryable failure', async () => {
@@ -844,7 +874,7 @@ describe('NoteDetailScreen route', () => {
       await settle();
     });
 
-    expect(hostCount(renderer, 'report-backdrop')).toBe(1);
+    expect(hostCount(renderer, 'report-sheet')).toBe(1);
     expect(
       hostTextCount(renderer, 'Não deu pra enviar a denúncia. Tenta de novo.'),
     ).toBe(1);
@@ -881,7 +911,7 @@ describe('NoteDetailScreen route', () => {
       await settle();
     });
     expect(
-      hostTextCount(renderer, 'Denúncia recebida. Obrigado por avisar.'),
+      hostTextCount(renderer, 'Valeu por avisar! A gente cuida pra rede seguir feita pra humanos.'),
     ).toBe(1);
   });
 
@@ -927,7 +957,7 @@ describe('NoteDetailScreen route', () => {
       targetType: 'note',
     });
     expect(
-      hostTextCount(renderer, 'Denúncia recebida. Obrigado por avisar.'),
+      hostTextCount(renderer, 'Valeu por avisar! A gente cuida pra rede seguir feita pra humanos.'),
     ).toBe(0);
   });
 });

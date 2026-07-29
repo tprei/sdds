@@ -149,7 +149,10 @@ async function readImageSurface(container: Locator) {
       /^url\((?:"|')?(.*?)(?:"|')?\)$/,
     );
     const bounds = (surface ?? element).getBoundingClientRect();
-    const preload = element.querySelector("img");
+    const preload =
+      element.querySelector("img") ??
+      element.parentElement?.querySelector("img") ??
+      null;
     return {
       backgroundURL: backgroundMatch?.[1] ?? null,
       height: bounds.height,

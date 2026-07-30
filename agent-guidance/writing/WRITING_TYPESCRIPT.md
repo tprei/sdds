@@ -32,6 +32,7 @@ This guide follows:
 - DO move a type only when multiple real owners share the same semantic contract.
 - DO NOT create a generic `types.ts`, global model bag, or duplicate API and feature types without semantic conversion.
 - A helper extraction MUST follow a named domain or boundary owner. DO NOT create `utils`, `helpers`, `common`, or generic `service` modules merely to reduce line count.
+- A new pure module MUST have a production consumer in the pull request that introduces it. A module whose only importer is its own test proves nothing and reimplements what it claims to check.
 
 ## OpenAPI and runtime contracts
 

@@ -227,6 +227,7 @@ export function AuthorProfileContent({
   const usefulPendingRef = useRef(new Set<string>());
   const [activeAuthorID, setActiveAuthorID] = useState<string | null>(null);
   const currentAuthorID = useRef(authorID);
+  const hasLoadedAuthorIDRef = useRef<string | null>(null);
 
   useLayoutEffect(() => {
     currentAuthorID.current = authorID;
@@ -253,17 +254,21 @@ export function AuthorProfileContent({
     const version = requestVersion.current + 1;
     requestVersion.current = version;
     pendingCursor.current = undefined;
-    setActiveAuthorID(null);
-    setAuthor(null);
-    setCatalog(null);
-    setNotes([]);
-    setCursor(null);
-    setLoadingNext(false);
-    setNextError(false);
-    setUsefulMutations({});
-    setLoading(true);
-    usefulMutationGenerationRef.current += 1;
-    setError(null);
+    const isWarm = hasLoadedAuthorIDRef.current === requestedAuthorID;
+    hasLoadedAuthorIDRef.current = requestedAuthorID;
+    if (!isWarm) {
+      setActiveAuthorID(null);
+      setAuthor(null);
+      setCatalog(null);
+      setNotes([]);
+      setCursor(null);
+      setLoadingNext(false);
+      setNextError(false);
+      setUsefulMutations({});
+      setLoading(true);
+      usefulMutationGenerationRef.current += 1;
+      setError(null);
+    }
     try {
       const [profile, page, catalogs] = await Promise.all([
         apiClient.getPublicAuthor(requestedAuthorID),

@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { colors } from '@sdds/tokens';
 
 import { NoteCardSkeleton, Skeleton } from './skeleton';
+import { styles } from './skeleton.styles';
 
 vi.mock('react-native', () => {
   const { createElement } = React;
@@ -21,6 +22,7 @@ vi.mock('react-native', () => {
   }
   class AnimatedValue {
     value: number;
+    stopAnimation = vi.fn();
     constructor(value: number) {
       this.value = value;
     }
@@ -61,5 +63,28 @@ describe('Skeleton', () => {
   it('renders a card with one media block and two text bars', () => {
     const renderer = render(React.createElement(NoteCardSkeleton, { tall: true }));
     expect(renderer.root.findAllByType(Animated.View)).toHaveLength(3);
+  });
+
+  it('starts the fade from a visible base instead of fully transparent', () => {
+    const renderer = render(React.createElement(Skeleton, { height: 80 }));
+    const block = renderer.root.findByType(Animated.View);
+    const style = block.props.style as { opacity: { value: number } }[];
+    expect(style[1].opacity.value).toBe(0.4);
+  });
+
+  it('stops the fade animation on unmount', () => {
+    const renderer = render(React.createElement(Skeleton, { height: 80 }));
+    const block = renderer.root.findByType(Animated.View);
+    const style = block.props.style as { opacity: { stopAnimation: () => void } }[];
+    const { opacity } = style[1];
+    act(() => {
+      renderer.unmount();
+    });
+    expect(opacity.stopAnimation).toHaveBeenCalledOnce();
+  });
+
+  it('gives the card a paper surface so the paper2 bars stand out, never white', () => {
+    expect(styles.card.backgroundColor).not.toBe(colors.white);
+    expect(styles.card.backgroundColor).not.toBe(colors.paper2);
   });
 });

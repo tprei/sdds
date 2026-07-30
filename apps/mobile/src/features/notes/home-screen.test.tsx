@@ -3,7 +3,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import HomeScreen from '@/app/(tabs)/index';
-import { assertLoadingFirstCommit } from '@/ui/assert-loading-first-commit';
+import { assertLoadingFirstCommit } from '@/test-support/assert-loading-first-commit';
 import { NoteCardSkeleton } from '@/ui/skeleton';
 
 const { createElement } = React;

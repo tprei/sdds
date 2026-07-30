@@ -6,7 +6,6 @@ import type { Locator, Page } from '@playwright/test';
 import {
   expectFixtureComparatorRejectsCorruptions,
   expectFixtureImage,
-  fixtureName,
   fixturePath,
 } from './note-image-visual';
 import { syntheticPassword } from './support';
@@ -102,7 +101,6 @@ async function uploadFixture(page: Page): Promise<void> {
     .click();
   const fileChooser = await fileChooserPromise;
   await fileChooser.setFiles(fixturePath);
-  await expectVisible(page.getByText(fixtureName, { exact: true }), 30_000);
   await expectVisible(
     page.getByRole('button', { exact: true, name: 'Trocar imagem' }),
   );

@@ -34,21 +34,49 @@ export const styles = StyleSheet.create({
   },
   photoRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sp4,
+  },
+  photoThumbWrap: {
+    position: 'relative',
   },
   photoThumb: {
     borderRadius: radius.md,
     height: 132,
     width: 132,
   },
+  removeImageChip: {
+    alignItems: 'center',
+    // Same dark ink as the app-wide scrim (semanticColors.scrim), reused
+    // directly instead of duplicating the color as a new rgba literal.
+    backgroundColor: semanticColors.scrim,
+    borderRadius: radius.pill,
+    height: 24,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: spacing.sp2,
+    top: spacing.sp2,
+    width: 24,
+  },
   photoActions: {
+    alignItems: 'flex-start',
     flex: 1,
-    gap: spacing.sp3,
+    flexShrink: 1,
     justifyContent: 'center',
   },
-  photoActionsRow: {
-    flexDirection: 'row',
-    gap: spacing.sp3,
+  photoReplaceChip: {
+    alignItems: 'center',
+    backgroundColor: semanticColors.sunkenBackground,
+    borderRadius: radius.pill,
+    // Height/padding match CategoryChip's `sm` size
+    // (ui/category-chip.styles.ts) so this action reads as the same
+    // chip family rather than a differently sized one-off.
+    height: 28,
+    justifyContent: 'center',
+    paddingHorizontal: 11,
+  },
+  disabledChip: {
+    opacity: 0.45,
   },
   categoryRow: {
     flexDirection: 'row',

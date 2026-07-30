@@ -236,33 +236,46 @@ function AuthenticatedComposeScreen({
             </PressableScale>
           ) : (
             <View style={styles.photoRow}>
-              <Image source={{ uri: image.asset.uri }} style={styles.photoThumb} />
-              <View style={styles.photoActions}>
-                <AppText
-                  color={semanticColors.textMeta}
-                  testID="compose-image-name"
-                  variant="xs"
+              <View style={styles.photoThumbWrap}>
+                <Image
+                  source={{ uri: image.asset.uri }}
+                  style={styles.photoThumb}
+                />
+                <PressableScale
+                  accessibilityLabel="Remover imagem"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isSubmitting }}
+                  disabled={isSubmitting}
+                  onPress={removeImage}
+                  style={[
+                    styles.removeImageChip,
+                    isSubmitting ? styles.disabledChip : null,
+                  ]}
+                  testID="compose-remove-image"
                 >
-                  {image.asset.fileName ?? image.asset.uri}
-                </AppText>
-                <View style={styles.photoActionsRow}>
-                  <Button
-                    disabled={isSubmitting}
-                    label="Trocar imagem"
-                    onPress={pickImage}
-                    size="sm"
-                    testID="compose-replace-image"
-                    variant="secondary"
-                  />
-                  <Button
-                    disabled={isSubmitting}
-                    label="Remover imagem"
-                    onPress={removeImage}
-                    size="sm"
-                    testID="compose-remove-image"
-                    variant="ghost"
-                  />
-                </View>
+                  <IconX color={semanticColors.textOnAccent} size={14} />
+                </PressableScale>
+              </View>
+              <View style={styles.photoActions}>
+                <PressableScale
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isSubmitting }}
+                  disabled={isSubmitting}
+                  onPress={pickImage}
+                  style={[
+                    styles.photoReplaceChip,
+                    isSubmitting ? styles.disabledChip : null,
+                  ]}
+                  testID="compose-replace-image"
+                >
+                  <AppText
+                    color={semanticColors.textStrong}
+                    variant="sm"
+                    weight="semibold"
+                  >
+                    Trocar imagem
+                  </AppText>
+                </PressableScale>
               </View>
             </View>
           )}

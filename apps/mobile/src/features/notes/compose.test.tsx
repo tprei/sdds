@@ -249,21 +249,24 @@ describe('ComposeScreen', () => {
       assets: [asset],
     });
     await press(renderer, 'compose-add-image');
+    expect(store.get('owner-1')?.image?.asset).toEqual(asset);
     expect(
-      renderer.root.findByProps({ testID: 'compose-image-name' }).props
-        .children,
-    ).toBe(asset.fileName);
+      renderer.root.findAllByProps({ testID: 'compose-image-name' }),
+    ).toHaveLength(0);
 
     mocks.launchImageLibraryAsync.mockResolvedValueOnce({
       canceled: false,
       assets: [pngAsset],
     });
     await press(renderer, 'compose-replace-image');
-    expect(
-      renderer.root.findByProps({ testID: 'compose-image-name' }).props
-        .children,
-    ).toBe(pngAsset.fileName);
+    expect(store.get('owner-1')?.image?.asset).toEqual(pngAsset);
 
+    expect(
+      renderer.root.findByProps({
+        accessibilityLabel: 'Remover imagem',
+        testID: 'compose-remove-image',
+      }),
+    ).toBeDefined();
     await press(renderer, 'compose-remove-image');
     expect(
       renderer.root.findByProps({ testID: 'compose-add-image' }),
@@ -324,10 +327,6 @@ describe('ComposeScreen', () => {
       });
       await press(renderer, 'compose-replace-image');
       expect(store.get('owner-1')).toEqual(draftBeforeRejections);
-      expect(
-        renderer.root.findByProps({ testID: 'compose-image-name' }).props
-          .children,
-      ).toBe(asset.fileName);
       expect(
         renderer.root.findByProps({
           children:

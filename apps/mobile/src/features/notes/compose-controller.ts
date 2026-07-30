@@ -173,7 +173,13 @@ export function createComposeController(
       publish();
       return true;
     }
-    reconcileCatalog(buildNoteCatalog(completion.catalogs));
+    const catalog = buildNoteCatalog(completion.catalogs);
+    if (catalog === null) {
+      catalogState = { status: 'error' };
+      publish();
+      return true;
+    }
+    reconcileCatalog(catalog);
     publish();
     return true;
   }

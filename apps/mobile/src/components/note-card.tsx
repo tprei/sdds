@@ -8,6 +8,7 @@ import {
   motion,
   semanticColors,
 } from '@sdds/tokens';
+import type { CategoryHue } from '@sdds/tokens';
 
 import { AppText } from '@/ui/text';
 import { Avatar } from '@/ui/avatar';
@@ -28,6 +29,7 @@ const QUOTE_MARK = '\u201C';
 
 type NoteCardProps = {
   note: Note;
+  categoryHue: CategoryHue;
   categoryLabel: string;
   onPress?: () => void;
   onPressAuthor?: () => void;
@@ -38,6 +40,7 @@ type NoteCardProps = {
 
 export function NoteCard({
   note,
+  categoryHue,
   categoryLabel,
   onPress,
   onPressAuthor,
@@ -54,9 +57,17 @@ export function NoteCard({
     <View style={styles.card} testID="note-card">
       <OpenTarget onPress={onPress} openLabel={openLabel}>
         {note.images.length > 0 ? (
-          <PhotoVariant note={note} categoryLabel={categoryLabel} />
+          <PhotoVariant
+            categoryHue={categoryHue}
+            categoryLabel={categoryLabel}
+            note={note}
+          />
         ) : (
-          <PostItVariant note={note} categoryLabel={categoryLabel} />
+          <PostItVariant
+            categoryHue={categoryHue}
+            categoryLabel={categoryLabel}
+            note={note}
+          />
         )}
         <View style={styles.titleBlock}>
           <AppText
@@ -160,11 +171,13 @@ function AuthorTarget({
 }
 
 function PhotoVariant({
-  note,
+  categoryHue,
   categoryLabel,
+  note,
 }: {
-  note: Note;
+  categoryHue: CategoryHue;
   categoryLabel: string;
+  note: Note;
 }) {
   const image = note.images[0];
   const ratio = clampAspectRatio(image.width / image.height);
@@ -178,7 +191,7 @@ function PhotoVariant({
       />
       <View style={styles.chipTopLeft}>
         <CategoryChip
-          slug={note.categorySlug}
+          hue={categoryHue}
           label={categoryLabel}
           size="sm"
         />
@@ -188,17 +201,19 @@ function PhotoVariant({
 }
 
 function PostItVariant({
-  note,
+  categoryHue,
   categoryLabel,
+  note,
 }: {
-  note: Note;
+  categoryHue: CategoryHue;
   categoryLabel: string;
+  note: Note;
 }) {
   return (
     <View style={styles.postItHeader}>
       <View style={styles.chipTopRight}>
         <CategoryChip
-          slug={note.categorySlug}
+          hue={categoryHue}
           label={categoryLabel}
           size="sm"
         />

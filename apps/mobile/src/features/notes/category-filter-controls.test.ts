@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildNoteCatalog } from './catalog';
+import type { NoteCatalog } from './catalog';
 import {
   categoryFilterChipAccessibility,
   resolveCategoryFilterSlug,
@@ -23,14 +24,14 @@ describe('category filter controls', () => {
   });
 
   it('keeps active selected categories after catalog refreshes', () => {
-    expect(resolveCategoryFilterSlug(buildNoteCatalog(catalogs()), 'food')).toBe(
+    expect(resolveCategoryFilterSlug(builtCatalog(), 'food')).toBe(
       'food',
     );
   });
 
   it('clears inactive selected categories after catalog refreshes', () => {
     expect(
-      resolveCategoryFilterSlug(buildNoteCatalog(catalogs()), 'travel'),
+      resolveCategoryFilterSlug(builtCatalog(), 'travel'),
     ).toBeNull();
   });
 });
@@ -53,4 +54,12 @@ function catalogs(): Catalogs {
     ],
     places: [],
   };
+}
+
+function builtCatalog(): NoteCatalog {
+  const catalog = buildNoteCatalog(catalogs());
+  if (catalog === null) {
+    throw new Error('test catalog fixture must resolve every active category hue');
+  }
+  return catalog;
 }

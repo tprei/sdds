@@ -146,6 +146,7 @@ function ProfileNotes({
       estimateHeight={(note) => estimateNoteCardHeight(note, gridLayout.columnWidth)}
       renderItem={(note) => (
         <NoteCard
+          categoryHue={note.categoryHue}
           categoryLabel={note.categoryLabel}
           note={note}
           onPress={() => onPressNote(note.id)}
@@ -279,6 +280,7 @@ export function AuthorProfileContent({
       ]);
       if (!isCurrentRequest(version, requestedAuthorID)) return;
       const nextCatalog = buildNoteCatalog(catalogs);
+      if (nextCatalog === null) throw new Error('catalog_labels_missing');
       const labelledNotes = labelNotes(nextCatalog, page.notes);
       if (labelledNotes === null) throw new Error('catalog_labels_missing');
       setAuthor(profile);

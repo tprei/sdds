@@ -52,7 +52,7 @@ export function NoteDetailContent({ note }: NoteDetailContentProps) {
             <CategoryChip
               label={note.categoryLabel}
               size="sm"
-              slug={note.categorySlug}
+              hue={note.categoryHue}
             />
           </View>
           <AppText color={semanticColors.textMeta} variant="sm">

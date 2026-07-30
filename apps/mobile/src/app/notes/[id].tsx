@@ -513,7 +513,12 @@ function AuthenticatedNoteDetailScreen({
           ) {
             return;
           }
-          const labelled = labelNote(buildNoteCatalog(catalogs), note);
+          const catalog = buildNoteCatalog(catalogs);
+          if (catalog === null) {
+            setState({ status: 'error' });
+            return;
+          }
+          const labelled = labelNote(catalog, note);
           if (labelled === null) {
             setState({ status: 'error' });
             return;
@@ -560,6 +565,10 @@ function AuthenticatedNoteDetailScreen({
             return;
           }
           const catalog = buildNoteCatalog(catalogs);
+          if (catalog === null) {
+            setState({ status: 'error' });
+            return;
+          }
           const labelledNote = labelNote(catalog, note);
           if (labelledNote === null) {
             setState({ status: 'error' });

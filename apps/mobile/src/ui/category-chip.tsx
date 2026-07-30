@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { categoryFilterChipAccessibility } from '@/features/notes/category-filter';
-import { categoryHueFor, semanticColors } from '@sdds/tokens';
+import { semanticColors } from '@sdds/tokens';
+import type { CategoryHue } from '@sdds/tokens';
 
 import { AppText } from './text';
 import { PressableScale } from './pressable-scale';
@@ -9,7 +10,7 @@ import { styles } from './category-chip.styles';
 type ChipSize = 'md' | 'sm';
 
 type CategoryChipProps = {
-  slug: string;
+  hue: CategoryHue;
   label: string;
   size?: ChipSize;
   selected?: boolean;
@@ -18,17 +19,13 @@ type CategoryChipProps = {
 };
 
 export function CategoryChip({
-  slug,
+  hue,
   label,
   size = 'md',
   selected = false,
   onPress,
   testID,
 }: CategoryChipProps) {
-  const hue = categoryHueFor(slug);
-  if (hue === null) {
-    return null;
-  }
   const backgroundColor = selected
     ? semanticColors.selectionBackground
     : hue.background;

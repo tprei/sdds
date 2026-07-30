@@ -2,6 +2,8 @@ import * as React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import { categoryColors } from '@sdds/tokens';
+
 import type { NoteCatalog } from './catalog';
 
 import { CategoryFilterControls } from './category-filter-controls';
@@ -50,10 +52,14 @@ function render(element: React.ReactElement): ReactTestRenderer {
 
 const catalog: NoteCatalog = {
   activeCategories: [
-    { active: true, displayOrder: 10, label: 'Comida', slug: 'food' },
-    { active: true, displayOrder: 20, label: 'Viagem', slug: 'travel' },
+    { hue: categoryColors.food, label: 'Comida', slug: 'food' },
+    { hue: categoryColors.travel, label: 'Viagem', slug: 'travel' },
   ],
   activePlaces: [],
+  categoryHues: new Map([
+    ['food', categoryColors.food],
+    ['travel', categoryColors.travel],
+  ]),
   categoryLabels: new Map(),
   placeLabels: new Map(),
 };

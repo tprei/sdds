@@ -225,6 +225,12 @@ function AuthenticatedHomeScreen({
           return;
         }
         const catalog = buildNoteCatalog(catalogs);
+        if (catalog === null) {
+          catalogRef.current = null;
+          setCatalogState({ status: 'error' });
+          setFeedState({ status: 'error' });
+          return;
+        }
         catalogRef.current = catalog;
         const categorySlug = resolveCategoryFilterSlug(
           catalog,
@@ -554,6 +560,7 @@ function FeedContent({
       }
       renderItem={(presented) => (
         <NoteCard
+          categoryHue={presented.note.categoryHue}
           categoryLabel={presented.note.categoryLabel}
           note={presented.note}
           onPress={() => onOpenNote(presented)}

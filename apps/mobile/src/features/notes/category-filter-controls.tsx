@@ -37,7 +37,7 @@ export function CategoryFilterControls({
               label={category.label}
               onPress={() => onSelectCategorySlug(category.slug)}
               selected={selectedCategorySlug === category.slug}
-              slug={category.slug}
+              hue={category.hue}
             />
           ))}
         </ScrollView>

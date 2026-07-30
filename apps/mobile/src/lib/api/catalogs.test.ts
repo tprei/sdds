@@ -152,17 +152,6 @@ describe('catalogs API client', () => {
     await expect(client.listCategories()).rejects.toThrow(CatalogAPIResponseError);
   });
 
-  it('rejects a category response with no configured hue', async () => {
-    stubFetch(async () =>
-      jsonResponse({
-        categories: [apiCategory({ slug: 'wellness' })],
-      }),
-    );
-
-    const client = createAPIClient(exampleToken);
-    await expect(client.listCategories()).rejects.toThrow(CatalogAPIResponseError);
-  });
-
   it('ignores extra place response fields', async () => {
     stubFetch(async () =>
       jsonResponse({

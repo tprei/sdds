@@ -3,6 +3,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { NoteImage } from '@/lib/api/notes';
+import { categoryColors } from '@sdds/tokens';
 
 import type { LabelledNote } from './catalog';
 import { NoteDetailContent } from './note-detail-content';
@@ -76,6 +77,7 @@ function note(images: NoteImage[]): LabelledNote {
   return {
     author: { displayName: 'Thiago', id: 'author-id' },
     body: 'Tem pao de queijo decente.',
+    categoryHue: categoryColors.food,
     categoryLabel: 'Comida',
     categorySlug: 'food',
     createdAt: 1782993600000,

@@ -297,7 +297,7 @@ function AuthenticatedComposeScreen({
                   label={option.label}
                   onPress={() => selectCategorySlug(option.slug)}
                   selected={option.slug === categorySlug}
-                  slug={option.slug}
+                  hue={option.hue}
                 />
               ))}
             </View>

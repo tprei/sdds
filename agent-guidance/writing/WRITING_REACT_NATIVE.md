@@ -61,6 +61,18 @@ This guide follows:
 - DO NOT create giant style objects or generated styling blobs.
 - Tailwind/NativeWind and component frameworks MUST NOT be added without explicit human approval.
 
+## Visual verification
+
+- Frontend work MUST be verified in a running browser before review. Reading the diff is not verification.
+- The implementing agent MUST run the Expo web build, drive the changed surface, and capture screenshots at 390×844, 430×932, and 820×1180.
+- Every async surface MUST be captured in all four states: loading, success, empty, error.
+- Screenshots MUST be generated outside the repository, uploaded with `gh gist create --secret`, and embedded in the PR body as raw URLs. Screenshot artifacts MUST NOT be committed.
+- A screen with an approved mock MUST be shown side by side with that mock at the same viewport. The mock source is issue #180 comment 4.
+- When the mock and the written spec disagree, the spec's numbers win. The mock proves composition, hierarchy, and proportion, not exact metrics.
+- Spec-locked component metrics MUST come from `componentMetrics` in `@sdds/tokens`. DO NOT write a raw literal for a spacing, radius, or font-size value.
+- Layout MUST be judged against react-native-web semantics, not native. `flex: 1` resolves to `flexGrow: 1; flexShrink: 1; flexBasis: 0%`, `gap` and percentage heights differ from native, `shadow*` becomes `box-shadow`, and `hitSlop` is not implemented for `Pressable` on web. A web-only layout break is a real defect.
+- Touch targets MUST reach 44×44 through real box size on web. DO NOT rely on `hitSlop` to satisfy a target-size requirement.
+
 ## State and lifecycle
 
 - DO start with local component state when the state belongs only to presentation.
@@ -96,7 +108,9 @@ This guide follows:
 
 - Unit/Vitest tests MUST own state, parser, mapping, retry, and component behavior.
 - Runtime validation tests MUST begin with unknown/raw boundary input, then assert a validated app model or typed failure.
-- Playwright MUST cover only a critical user-visible journey across Expo web and the real API.
+- Playwright MUST cover a critical user-visible journey across Expo web and the real API, and MUST additionally own layout geometry, viewport adaptation, visual baselines, and accessibility invariants. Presentation cannot be proven in the node-environment unit layer.
+- Every async surface MUST have a test for each of loading, success, empty, and error. The loading test MUST assert the first commit before any promise flush, so an empty-state flash fails.
+- A component test MUST NOT assert only that a style object was passed. The node environment has no layout engine: a passing style assertion does not prove a row renders as a row, is centered, fits the viewport, or is not clipped. Geometry belongs in `tests/synthetics/layout.spec.ts`.
+- DO NOT use snapshot-only unit tests. A committed Playwright visual baseline is an appearance contract, not a snapshot-only test, and is required for approved design surfaces.
 - DO use durable accessibility contracts or a focused `testID`; DO NOT use broad order-dependent locators.
-- DO NOT use snapshot-only tests.
 - DO NOT test internal hook state directly when a user action can prove the behavior.

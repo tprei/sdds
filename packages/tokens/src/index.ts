@@ -200,3 +200,43 @@ export const motion = {
   pressCardScale: 0.98,
   pressIconScale: 0.92,
 } as const;
+
+// Pixel-exact layout metrics transcribed from the design spec (issue #180
+// comment 4), not derived from any component or style file. Consumers that
+// hardcode one of these numbers as a raw literal should read it from here
+// instead; `apps/mobile/src/ui/ds-metrics.test.ts` locks the real resolved
+// `.styles.ts` values against this list to catch silent drift.
+export const componentMetrics = {
+  nav: {
+    height: 64,
+  },
+  fab: {
+    width: 54,
+    height: 38,
+    radius: 13,
+    marginTop: -4,
+  },
+  chip: {
+    md: { height: 34, paddingHorizontal: 14 },
+    sm: { height: 28, paddingHorizontal: 11 },
+  },
+  metric: {
+    iconSize: { sm: 16, md: 18 },
+    countSlotWidth: 18,
+  },
+  avatar: {
+    xs: 20,
+    sm: 32,
+    md: 34,
+    lg: 84,
+  },
+  compose: {
+    thumb: 132,
+    placeholder: 88,
+  },
+  sheet: {
+    handleWidth: 40,
+    handleHeight: 4,
+  },
+  minTarget: 44,
+} as const;

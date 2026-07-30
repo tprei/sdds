@@ -55,9 +55,9 @@ func insertImageUploadTestUser(t *testing.T, db *sql.DB, id string) {
 func insertImageUploadTestNote(t *testing.T, db *sql.DB, id, userID string) {
 	t.Helper()
 	if _, err := db.Exec(`
-		INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, userID, "Upload note", "body", "food", "sao-paulo", 0, 0); err != nil {
+		INSERT INTO notes (id, user_id, title, body, category_slug, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		id, userID, "Upload note", "body", "food", 0, 0); err != nil {
 		t.Fatalf("insert upload note: %v", err)
 	}
 }

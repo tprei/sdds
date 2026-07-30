@@ -733,7 +733,6 @@ const (
 	ValidationFieldImageUploadIDs  ValidationField = "image_upload_ids"
 	ValidationFieldLimit           ValidationField = "limit"
 	ValidationFieldPassword        ValidationField = "password"
-	ValidationFieldPlaceSlug       ValidationField = "place_slug"
 	ValidationFieldQ               ValidationField = "q"
 	ValidationFieldReason          ValidationField = "reason"
 	ValidationFieldTargetID        ValidationField = "target_id"
@@ -765,8 +764,6 @@ func (e ValidationField) Valid() bool {
 	case ValidationFieldLimit:
 		return true
 	case ValidationFieldPassword:
-		return true
-	case ValidationFieldPlaceSlug:
 		return true
 	case ValidationFieldQ:
 		return true
@@ -845,14 +842,6 @@ type CatalogCategory struct {
 	Slug         CategorySlug `json:"slug"`
 }
 
-// CatalogPlace defines model for CatalogPlace.
-type CatalogPlace struct {
-	Active       bool      `json:"active"`
-	DisplayOrder int32     `json:"display_order"`
-	Label        string    `json:"label"`
-	Slug         PlaceSlug `json:"slug"`
-}
-
 // CategorySlug defines model for CategorySlug.
 type CategorySlug = string
 
@@ -888,7 +877,6 @@ type CreateNoteRequest struct {
 	CategorySlug    CategorySlug `json:"category_slug"`
 	ClientRequestId string       `json:"client_request_id"`
 	ImageUploadIds  *[]string    `json:"image_upload_ids,omitempty"`
-	PlaceSlug       *PlaceSlug   `json:"place_slug,omitempty"`
 	Title           string       `json:"title"`
 }
 
@@ -1372,11 +1360,6 @@ type ListNotesResponse struct {
 	Notes []Note `json:"notes"`
 }
 
-// ListPlacesResponse defines model for ListPlacesResponse.
-type ListPlacesResponse struct {
-	Places []CatalogPlace `json:"places"`
-}
-
 // Note defines model for Note.
 type Note struct {
 	Author       AuthorSummary `json:"author"`
@@ -1387,7 +1370,6 @@ type Note struct {
 	CreatedAt int64       `json:"created_at"`
 	Id        string      `json:"id"`
 	Images    []NoteImage `json:"images"`
-	PlaceSlug *PlaceSlug  `json:"place_slug"`
 	Title     string      `json:"title"`
 
 	// UpdatedAt Unix timestamp in milliseconds.
@@ -1415,9 +1397,6 @@ type NoteImage struct {
 
 // NoteImageContentType defines model for NoteImage.ContentType.
 type NoteImageContentType string
-
-// PlaceSlug defines model for PlaceSlug.
-type PlaceSlug = string
 
 // PrepareImageUploadMultipart defines model for PrepareImageUploadMultipart.
 type PrepareImageUploadMultipart struct {
@@ -2281,9 +2260,6 @@ type ClientInterface interface {
 	// MarkNoteUseful request
 	MarkNoteUseful(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListPlaces request
-	ListPlaces(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// CreateReportWithBody request with any body
 	CreateReportWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -2583,18 +2559,6 @@ func (c *Client) UnmarkNoteUseful(ctx context.Context, noteId string, reqEditors
 
 func (c *Client) MarkNoteUseful(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMarkNoteUsefulRequest(c.Server, noteId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ListPlaces(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListPlacesRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -3423,33 +3387,6 @@ func NewMarkNoteUsefulRequest(server string, noteId string) (*http.Request, erro
 	return req, nil
 }
 
-// NewListPlacesRequest generates requests for ListPlaces
-func NewListPlacesRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/v1/places")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
 // NewCreateReportRequest calls the generic CreateReport builder with application/json body
 func NewCreateReportRequest(server string, body CreateReportJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -3668,9 +3605,6 @@ type ClientWithResponsesInterface interface {
 
 	// MarkNoteUsefulWithResponse request
 	MarkNoteUsefulWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*MarkNoteUsefulHTTPResponse, error)
-
-	// ListPlacesWithResponse request
-	ListPlacesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPlacesHTTPResponse, error)
 
 	// CreateReportWithBodyWithResponse request with any body
 	CreateReportWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateReportHTTPResponse, error)
@@ -4352,39 +4286,6 @@ func (r MarkNoteUsefulHTTPResponse) ContentType() string {
 	return ""
 }
 
-type ListPlacesHTTPResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *ListPlacesResponse
-	JSON400      *ErrorResponse
-	JSON401      *ErrorResponse
-	JSON500      *ErrorResponse
-}
-
-// Status returns HTTPResponse.Status
-func (r ListPlacesHTTPResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListPlacesHTTPResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListPlacesHTTPResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
 type CreateReportHTTPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4672,15 +4573,6 @@ func (c *ClientWithResponses) MarkNoteUsefulWithResponse(ctx context.Context, no
 		return nil, err
 	}
 	return ParseMarkNoteUsefulHTTPResponse(rsp)
-}
-
-// ListPlacesWithResponse request returning *ListPlacesHTTPResponse
-func (c *ClientWithResponses) ListPlacesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPlacesHTTPResponse, error) {
-	rsp, err := c.ListPlaces(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListPlacesHTTPResponse(rsp)
 }
 
 // CreateReportWithBodyWithResponse request with arbitrary body returning *CreateReportHTTPResponse
@@ -5713,53 +5605,6 @@ func ParseMarkNoteUsefulHTTPResponse(rsp *http.Response) (*MarkNoteUsefulHTTPRes
 			return nil, err
 		}
 		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseListPlacesHTTPResponse parses an HTTP response from a ListPlacesWithResponse call
-func ParseListPlacesHTTPResponse(rsp *http.Response) (*ListPlacesHTTPResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ListPlacesHTTPResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ListPlacesResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse

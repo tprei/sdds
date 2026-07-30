@@ -83,8 +83,6 @@ function note(images: NoteImage[]): LabelledNote {
     createdAt: 1782993600000,
     id: 'note-id',
     images,
-    placeLabel: null,
-    placeSlug: null,
     title: 'Cafe bom',
     updatedAt: 1782993600000,
     usefulCount: 0,

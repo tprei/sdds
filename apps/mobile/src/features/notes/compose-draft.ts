@@ -12,7 +12,6 @@ export type ComposeDraftImage = {
 export type ComposeDraftFields = {
   body: string;
   categorySlug: string | null;
-  placeSlug: string | null;
   title: string;
   image: ComposeDraftImage | null;
 };
@@ -54,7 +53,6 @@ const emptyDraftFields: ComposeDraftFields = {
   body: '',
   categorySlug: null,
   image: null,
-  placeSlug: null,
   title: '',
 };
 export function createComposeDraftStore(
@@ -222,7 +220,6 @@ function normalizeFields(fields: ComposeDraftFields): ComposeDraftFields {
     body: fields.body.trim(),
     categorySlug: normalizeSlug(fields.categorySlug),
     image: fields.image,
-    placeSlug: normalizeSlug(fields.placeSlug),
     title: fields.title.trim(),
   };
 }
@@ -237,7 +234,6 @@ function isEmpty(fields: ComposeDraftFields): boolean {
     fields.body === '' &&
     fields.categorySlug === null &&
     fields.image === null &&
-    fields.placeSlug === null &&
     fields.title === ''
   );
 }
@@ -252,7 +248,6 @@ function draftFingerprint(fields: ComposeDraftFields): string {
             asset: imageAssetKey(fields.image.asset),
             uploadRequestId: fields.image.uploadRequestId,
           },
-    placeSlug: fields.placeSlug,
     title: fields.title,
   });
 }

@@ -14,8 +14,8 @@ import (
 
 const (
 	insertNoteSQL = `
-		INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO notes (id, user_id, title, body, category_slug, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 	insertNoteSearchSQL = `
 		INSERT INTO note_search (note_id, title, body)
@@ -113,7 +113,6 @@ func (store *NoteStore) createNoteInTransaction(ctx context.Context, tx *sql.Tx,
 		Title:        input.Title,
 		Body:         input.Body,
 		CategorySlug: input.CategorySlug,
-		PlaceSlug:    input.PlaceSlug,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -142,15 +141,6 @@ func validateNoteCreateCatalog(ctx context.Context, tx *sql.Tx, input note.Creat
 			return fmt.Errorf("check active category: %w", err)
 		}
 	}
-	if input.PlaceSlug != "" {
-		if _, err := scanPlaceRow(tx.QueryRowContext(ctx, findActivePlaceSQL, string(input.PlaceSlug))); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				problems = append(problems, note.ValidationProblem{Field: "place_slug", Message: "unknown"})
-			} else {
-				return fmt.Errorf("check active place: %w", err)
-			}
-		}
-	}
 	if len(problems) > 0 {
 		return &note.CatalogValidationError{Problems: problems}
 	}
@@ -166,7 +156,6 @@ func insertNoteAndSearch(ctx context.Context, tx *sql.Tx, created note.Note) err
 		created.Title,
 		created.Body,
 		string(created.CategorySlug),
-		nullablePlaceSlug(created.PlaceSlug),
 		unixMillis(created.CreatedAt),
 		unixMillis(created.UpdatedAt),
 	); err != nil {

@@ -9,7 +9,6 @@ type AuthorNotesPageResponse = GeneratedSchemas['AuthorNotesPage'];
 type AuthorSummaryResponse = GeneratedSchemas['AuthorSummary'];
 type CategorySlug = GeneratedSchemas['CategorySlug'];
 type CatalogCategoryResponse = GeneratedSchemas['CatalogCategory'];
-type CatalogPlaceResponse = GeneratedSchemas['CatalogPlace'];
 type CommentResponse = GeneratedSchemas['Comment'];
 type CurrentSessionResponse = GeneratedSchemas['CurrentSessionResponse'];
 type CurrentUserResponse = GeneratedSchemas['CurrentUser'];
@@ -18,7 +17,6 @@ type ErrorResponse = GeneratedSchemas['ErrorResponse'];
 type ListCategoriesResponse = GeneratedSchemas['ListCategoriesResponse'];
 type ListNotesResponse = GeneratedSchemas['ListNotesResponse'];
 type ListNoteCommentsResponse = GeneratedSchemas['ListNoteCommentsResponse'];
-type ListPlacesResponse = GeneratedSchemas['ListPlacesResponse'];
 type NoteResponse = GeneratedSchemas['Note'];
 type NoteImageResponse = GeneratedSchemas['NoteImage'];
 type SearchNotesResponse = GeneratedSchemas['SearchNotesResponse'];
@@ -28,7 +26,6 @@ type InvalidEventProblem = GeneratedSchemas['InvalidEventProblem'];
 type SearchNoteResult = GeneratedSchemas['SearchNoteResult'];
 type SearchVersion = GeneratedSchemas['SearchVersion'];
 type RetrievalSource = GeneratedSchemas['RetrievalSource'];
-type PlaceSlug = GeneratedSchemas['PlaceSlug'];
 type ReportReceiptResponse = GeneratedSchemas['ReportReceipt'];
 type ValidationField = GeneratedSchemas['ValidationField'];
 type ValidationProblemResponse = GeneratedSchemas['ValidationProblem'];
@@ -37,7 +34,6 @@ type ValidationProblemCode = ValidationProblemResponse['code'];
 const canonicalUUIDPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const categorySlugSchema = z.string() satisfies z.ZodType<CategorySlug>;
-const placeSlugSchema = z.string() satisfies z.ZodType<PlaceSlug>;
 const commentBodySchema = z
   .string()
   .min(1)
@@ -113,7 +109,6 @@ export const noteSchema = z.object({
   title: z.string(),
   body: z.string(),
   category_slug: categorySlugSchema,
-  place_slug: placeSlugSchema.nullable(),
   author: authorSummarySchema,
   created_at: z.number().int().nonnegative(),
   updated_at: z.number().int().nonnegative(),
@@ -133,13 +128,6 @@ export const catalogCategorySchema = z.object({
   active: z.boolean(),
   display_order: z.number().int(),
 }) satisfies z.ZodType<CatalogCategoryResponse>;
-
-export const catalogPlaceSchema = z.object({
-  slug: placeSlugSchema,
-  label: z.string(),
-  active: z.boolean(),
-  display_order: z.number().int(),
-}) satisfies z.ZodType<CatalogPlaceResponse>;
 
 export const listNotesResponseSchema = z.object({
   notes: z.array(noteSchema),
@@ -170,10 +158,6 @@ export const searchNotesResponseSchema = z
 export const listCategoriesResponseSchema = z.object({
   categories: z.array(catalogCategorySchema),
 }) satisfies z.ZodType<ListCategoriesResponse>;
-
-export const listPlacesResponseSchema = z.object({
-  places: z.array(catalogPlaceSchema),
-}) satisfies z.ZodType<ListPlacesResponse>;
 
 export const currentUserSchema = z.object({
   id: z.string(),
@@ -232,7 +216,6 @@ export const validationFieldSchema = z.enum([
   'title',
   'body',
   'category_slug',
-  'place_slug',
   'q',
   'username',
   'password',
@@ -313,7 +296,6 @@ type Assert<T extends true> = T;
 
 export type SchemaExactnessChecks = [
   Assert<Exact<CategorySlug, z.output<typeof categorySlugSchema>>>,
-  Assert<Exact<PlaceSlug, z.output<typeof placeSlugSchema>>>,
   Assert<Exact<AuthorSummaryResponse, z.output<typeof authorSummarySchema>>>,
   Assert<Exact<CommentResponse, z.output<typeof commentSchema>>>,
   Assert<
@@ -336,7 +318,6 @@ export type SchemaExactnessChecks = [
   Assert<
     Exact<CatalogCategoryResponse, z.output<typeof catalogCategorySchema>>
   >,
-  Assert<Exact<CatalogPlaceResponse, z.output<typeof catalogPlaceSchema>>>,
   Assert<Exact<ListNotesResponse, z.output<typeof listNotesResponseSchema>>>,
   Assert<
     Exact<SearchNoteResult, z.output<typeof searchNoteResultSchema>>
@@ -347,7 +328,6 @@ export type SchemaExactnessChecks = [
   Assert<
     Exact<ListCategoriesResponse, z.output<typeof listCategoriesResponseSchema>>
   >,
-  Assert<Exact<ListPlacesResponse, z.output<typeof listPlacesResponseSchema>>>,
   Assert<Exact<CurrentUserResponse, z.output<typeof currentUserSchema>>>,
   Assert<
     Exact<AuthSessionResponse, z.output<typeof authSessionResponseSchema>>

@@ -492,7 +492,6 @@ describe('ComposeScreen', () => {
       body: 'Corpo',
       categorySlug: 'food',
       image: null,
-      placeSlug: null,
       title: 'Título',
     });
     store.selectImage('owner-1', asset);
@@ -530,7 +529,6 @@ describe('ComposeScreen', () => {
       body: 'Corpo',
       categorySlug: 'food',
       image: null,
-      placeSlug: null,
       title: 'Título',
     });
     store.selectImage('owner-1', asset);
@@ -905,5 +903,4 @@ const catalogs: Catalogs = {
   categories: [
     { active: true, displayOrder: 1, label: 'Comida', slug: 'food' },
   ],
-  places: [],
 };

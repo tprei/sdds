@@ -32,8 +32,8 @@ func seedReportsDatabase(t *testing.T, databasePath string) {
 	if _, err := db.ExecContext(ctx, `INSERT INTO users (id, state, created_at, updated_at) VALUES (?, 'active', 0, 0)`, reporter); err != nil {
 		t.Fatalf("insert reporter: %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		"n1", reporter, "Nota boa", "Tem pão de queijo.", note.CategorySlugFood, note.PlaceSlugSaoPaulo, 0, 0); err != nil {
+	if _, err := db.ExecContext(ctx, `INSERT INTO notes (id, user_id, title, body, category_slug, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"n1", reporter, "Nota boa", "Tem pão de queijo.", note.CategorySlugFood, 0, 0); err != nil {
 		t.Fatalf("insert note: %v", err)
 	}
 	if _, err := db.ExecContext(ctx, `INSERT INTO note_comments (id, note_id, user_id, body, created_at) VALUES (?, ?, ?, ?, ?)`,

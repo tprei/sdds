@@ -38,7 +38,6 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 				Title:        "Café bom",
 				Body:         "Tem pão de queijo decente.",
 				CategorySlug: "food",
-				PlaceSlug:    "sao-paulo",
 				CreatedAt:    now,
 				UpdatedAt:    now,
 			}}, nil
@@ -64,7 +63,6 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 		Title:        "Café bom",
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugFood),
-		PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
 		Images:       []openapi.NoteImage{},
 		CreatedAt:    now.UnixMilli(),
 		UpdatedAt:    now.UnixMilli(),
@@ -86,7 +84,7 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 	if !ok {
 		t.Fatalf("note = %T, want map[string]any", notesValue[0])
 	}
-	requireJSONKeys(t, noteValue, "id", "title", "body", "category_slug", "place_slug", "images", "created_at", "updated_at")
+	requireJSONKeys(t, noteValue, "id", "title", "body", "category_slug", "images", "created_at", "updated_at")
 	requireJSONNumber(t, noteValue, "created_at", now.UnixMilli())
 	requireJSONNumber(t, noteValue, "updated_at", now.UnixMilli())
 }
@@ -219,7 +217,6 @@ func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 				Title:        "Café bom",
 				Body:         "Tem pão de queijo decente.",
 				CategorySlug: "food",
-				PlaceSlug:    "sao-paulo",
 				CreatedAt:    now,
 				UpdatedAt:    now,
 			}}, nil
@@ -248,7 +245,6 @@ func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 				Title:        "Café bom",
 				Body:         "Tem pão de queijo decente.",
 				CategorySlug: string(note.CategorySlugFood),
-				PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
 				Images:       []openapi.NoteImage{},
 				CreatedAt:    now.UnixMilli(),
 				UpdatedAt:    now.UnixMilli(),
@@ -570,7 +566,6 @@ func TestGetNoteReturnsNote(t *testing.T) {
 				Title:        "Café bom",
 				Body:         "Tem pão de queijo decente.",
 				CategorySlug: "food",
-				PlaceSlug:    "sao-paulo",
 				CreatedAt:    now,
 				UpdatedAt:    now,
 			}, nil
@@ -597,7 +592,6 @@ func TestGetNoteReturnsNote(t *testing.T) {
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugFood),
 		Images:       []openapi.NoteImage{},
-		PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
 		CreatedAt:    now.UnixMilli(),
 		UpdatedAt:    now.UnixMilli(),
 	}
@@ -683,7 +677,6 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 				Title:        input.Title,
 				Body:         input.Body,
 				CategorySlug: input.CategorySlug,
-				PlaceSlug:    input.PlaceSlug,
 				Images: []note.Image{{
 					ID:          "image-1",
 					ContentType: "image/jpeg",
@@ -700,7 +693,7 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 		},
 	})
 
-	requestBody := []byte(`{"title":" Café bom ","body":"Tem pão de queijo decente.","category_slug":"food","client_request_id":"http-created-note","place_slug":"sao-paulo","image_upload_ids":["upload-1"]}`)
+	requestBody := []byte(`{"title":" Café bom ","body":"Tem pão de queijo decente.","category_slug":"food","client_request_id":"http-created-note","image_upload_ids":["upload-1"]}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -721,7 +714,6 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 		Title:        "Café bom",
 		Body:         "Tem pão de queijo decente.",
 		CategorySlug: string(note.CategorySlugFood),
-		PlaceSlug:    stringPointer(string(note.PlaceSlugSaoPaulo)),
 		Images: []openapi.NoteImage{{
 			Id:          "image-1",
 			Url:         "/v1/media/images/image-1",
@@ -781,83 +773,9 @@ func TestCreateNoteRejectsMissingSessionBeforeValidation(t *testing.T) {
 	}
 }
 
-func TestCreateNoteAcceptsOmittedPlace(t *testing.T) {
-	router := newTestRouter(fakeNoteStore{
-		createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
-			if input.PlaceSlug != "" {
-				t.Fatalf("place slug = %q, want empty", input.PlaceSlug)
-			}
-			return note.Note{
-				ID:           exampleNoteID,
-				Title:        input.Title,
-				Body:         input.Body,
-				CategorySlug: input.CategorySlug,
-				CreatedAt:    time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
-				UpdatedAt:    time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
-			}, nil
-		},
-	})
-
-	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(`{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-omitted-place"}`))
-	request.Header.Set("Content-Type", "application/json")
-
-	router.ServeHTTP(response, request)
-	requireOpenAPIResponse(t, request, response)
-
-	if response.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusCreated)
-	}
-
-	var body openapi.Note
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if body.PlaceSlug != nil {
-		t.Fatalf("place_slug = %q, want nil", *body.PlaceSlug)
-	}
-}
-
-func TestCreateNoteAcceptsNullPlace(t *testing.T) {
-	router := newTestRouter(fakeNoteStore{
-		createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
-			if input.PlaceSlug != "" {
-				t.Fatalf("place slug = %q, want empty", input.PlaceSlug)
-			}
-			return note.Note{
-				ID:           exampleNoteID,
-				Title:        input.Title,
-				Body:         input.Body,
-				CategorySlug: input.CategorySlug,
-				CreatedAt:    time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
-				UpdatedAt:    time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
-			}, nil
-		},
-	})
-
-	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/v1/notes", strings.NewReader(`{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-null-place","place_slug":null}`))
-	request.Header.Set("Content-Type", "application/json")
-
-	router.ServeHTTP(response, request)
-	requireOpenAPIResponse(t, request, response)
-
-	if response.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusCreated)
-	}
-
-	var body openapi.Note
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if body.PlaceSlug != nil {
-		t.Fatalf("place_slug = %q, want nil", *body.PlaceSlug)
-	}
-}
-
 func TestCreateNoteRejectsValidationProblems(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{})
-	requestBody := []byte(`{"title":"   ","body":"   ","category_slug":"food","client_request_id":"http-validation","place_slug":"sao-paulo"}`)
+	requestBody := []byte(`{"title":"   ","body":"   ","category_slug":"food","client_request_id":"http-validation"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -909,11 +827,11 @@ func TestCreateNoteRejectsOpenAPIRequestSchemaProblems(t *testing.T) {
 	}{
 		{
 			name: "title too long",
-			body: `{"title":"` + strings.Repeat("a", note.TitleMaxLength+1) + `","body":"Funciona.","category_slug":"food","client_request_id":"http-title-too-long","place_slug":"sao-paulo"}`,
+			body: `{"title":"` + strings.Repeat("a", note.TitleMaxLength+1) + `","body":"Funciona.","category_slug":"food","client_request_id":"http-title-too-long"}`,
 		},
 		{
 			name: "body too long",
-			body: `{"title":"Café bom","body":"` + strings.Repeat("a", note.BodyMaxLength+1) + `","category_slug":"food","client_request_id":"http-body-too-long","place_slug":"sao-paulo"}`,
+			body: `{"title":"Café bom","body":"` + strings.Repeat("a", note.BodyMaxLength+1) + `","category_slug":"food","client_request_id":"http-body-too-long"}`,
 		},
 	}
 
@@ -1044,22 +962,18 @@ func TestCreateNotePassesCatalogValidationToStore(t *testing.T) {
 			if input.CategorySlug != "qualquer" {
 				t.Fatalf("category slug = %q, want qualquer", input.CategorySlug)
 			}
-			if input.PlaceSlug != "qualquer" {
-				t.Fatalf("place slug = %q, want qualquer", input.PlaceSlug)
-			}
 			return note.Note{
 				ID:           exampleNoteID,
 				Title:        input.Title,
 				Body:         input.Body,
 				CategorySlug: input.CategorySlug,
-				PlaceSlug:    input.PlaceSlug,
 				Images:       []note.Image{},
 				CreatedAt:    time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
 				UpdatedAt:    time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC),
 			}, nil
 		},
 	})
-	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"qualquer","client_request_id":"http-unknown-catalog","place_slug":"qualquer"}`)
+	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"qualquer","client_request_id":"http-unknown-catalog"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -1076,37 +990,20 @@ func TestCreateNoteMapsUnknownAndInactiveCatalogErrorsToValidation(t *testing.T)
 	tests := []struct {
 		name         string
 		categorySlug string
-		placeSlug    string
 		storeErr     error
 		wantField    openapi.ValidationField
 	}{
 		{
 			name:         "unknown category",
 			categorySlug: "unknown-category",
-			placeSlug:    "sao-paulo",
 			storeErr:     fmt.Errorf("constraint failed: %w", note.ErrCategoryNotFound),
 			wantField:    openapi.ValidationFieldCategorySlug,
 		},
 		{
 			name:         "inactive category",
 			categorySlug: "retired-category",
-			placeSlug:    "sao-paulo",
 			storeErr:     fmt.Errorf("constraint failed: %w", note.ErrCategoryNotFound),
 			wantField:    openapi.ValidationFieldCategorySlug,
-		},
-		{
-			name:         "unknown place",
-			categorySlug: "food",
-			placeSlug:    "unknown-place",
-			storeErr:     fmt.Errorf("constraint failed: %w", note.ErrPlaceNotFound),
-			wantField:    openapi.ValidationFieldPlaceSlug,
-		},
-		{
-			name:         "inactive place",
-			categorySlug: "food",
-			placeSlug:    "retired-place",
-			storeErr:     fmt.Errorf("constraint failed: %w", note.ErrPlaceNotFound),
-			wantField:    openapi.ValidationFieldPlaceSlug,
 		},
 	}
 
@@ -1117,13 +1014,10 @@ func TestCreateNoteMapsUnknownAndInactiveCatalogErrorsToValidation(t *testing.T)
 					if input.CategorySlug != note.CategorySlug(tt.categorySlug) {
 						t.Fatalf("category slug = %q, want %q", input.CategorySlug, tt.categorySlug)
 					}
-					if input.PlaceSlug != note.PlaceSlug(tt.placeSlug) {
-						t.Fatalf("place slug = %q, want %q", input.PlaceSlug, tt.placeSlug)
-					}
 					return note.Note{}, tt.storeErr
 				},
 			})
-			request := jsonRequest(http.MethodPost, "/v1/notes", fmt.Sprintf(`{"title":"Café bom","body":"Funciona.","category_slug":%q,"client_request_id":%q,"place_slug":%q}`, tt.categorySlug, "http-"+strings.ReplaceAll(tt.name, " ", "-"), tt.placeSlug))
+			request := jsonRequest(http.MethodPost, "/v1/notes", fmt.Sprintf(`{"title":"Café bom","body":"Funciona.","category_slug":%q,"client_request_id":%q}`, tt.categorySlug, "http-"+strings.Join(strings.Split(tt.name, " "), "-")))
 			response := httptest.NewRecorder()
 
 			router.ServeHTTP(response, request)
@@ -1151,43 +1045,17 @@ func TestCreateNoteMapsAggregateCatalogErrorsInStableOrder(t *testing.T) {
 	tests := []struct {
 		name         string
 		categorySlug string
-		placeSlug    string
 		storeErr     error
 		wantFields   []openapi.ValidationProblem
 	}{
 		{
-			name:         "both invalid",
-			categorySlug: "unknown-category",
-			placeSlug:    "unknown-place",
-			storeErr: &note.CatalogValidationError{Problems: []note.ValidationProblem{
-				{Field: "place_slug", Message: "unknown"},
-				{Field: "category_slug", Message: "unknown"},
-			}},
-			wantFields: []openapi.ValidationProblem{
-				{Field: openapi.ValidationFieldCategorySlug, Code: openapi.ValidationProblemCodeUnknown},
-				{Field: openapi.ValidationFieldPlaceSlug, Code: openapi.ValidationProblemCodeUnknown},
-			},
-		},
-		{
-			name:         "invalid category with valid place",
+			name:         "invalid category",
 			categorySlug: "retired-category",
-			placeSlug:    "sao-paulo",
 			storeErr: &note.CatalogValidationError{Problems: []note.ValidationProblem{
 				{Field: "category_slug", Message: "unknown"},
 			}},
 			wantFields: []openapi.ValidationProblem{
 				{Field: openapi.ValidationFieldCategorySlug, Code: openapi.ValidationProblemCodeUnknown},
-			},
-		},
-		{
-			name:         "valid category with invalid place",
-			categorySlug: "food",
-			placeSlug:    "retired-place",
-			storeErr: &note.CatalogValidationError{Problems: []note.ValidationProblem{
-				{Field: "place_slug", Message: "unknown"},
-			}},
-			wantFields: []openapi.ValidationProblem{
-				{Field: openapi.ValidationFieldPlaceSlug, Code: openapi.ValidationProblemCodeUnknown},
 			},
 		},
 	}
@@ -1199,13 +1067,10 @@ func TestCreateNoteMapsAggregateCatalogErrorsInStableOrder(t *testing.T) {
 					if input.CategorySlug != note.CategorySlug(tt.categorySlug) {
 						t.Fatalf("category slug = %q, want %q", input.CategorySlug, tt.categorySlug)
 					}
-					if input.PlaceSlug != note.PlaceSlug(tt.placeSlug) {
-						t.Fatalf("place slug = %q, want %q", input.PlaceSlug, tt.placeSlug)
-					}
 					return note.Note{}, tt.storeErr
 				},
 			})
-			request := jsonRequest(http.MethodPost, "/v1/notes", fmt.Sprintf(`{"title":"Café bom","body":"Funciona.","category_slug":%q,"client_request_id":%q,"place_slug":%q}`, tt.categorySlug, "http-aggregate-"+strings.ReplaceAll(tt.name, " ", "-"), tt.placeSlug))
+			request := jsonRequest(http.MethodPost, "/v1/notes", fmt.Sprintf(`{"title":"Café bom","body":"Funciona.","category_slug":%q,"client_request_id":%q}`, tt.categorySlug, "http-aggregate-"+strings.Join(strings.Split(tt.name, " "), "-")))
 			response := httptest.NewRecorder()
 
 			router.ServeHTTP(response, request)
@@ -1238,7 +1103,7 @@ func TestCreateNotePreservesGenuineStoreFailure(t *testing.T) {
 			return note.Note{}, errors.New("database unavailable")
 		},
 	})
-	request := jsonRequest(http.MethodPost, "/v1/notes", `{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-store-failure","place_slug":"sao-paulo"}`)
+	request := jsonRequest(http.MethodPost, "/v1/notes", `{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-store-failure"}`)
 	response := httptest.NewRecorder()
 
 	router.ServeHTTP(response, request)
@@ -1296,7 +1161,7 @@ func TestCreateNoteRejectsMissingOrUnsupportedContentType(t *testing.T) {
 			return note.Note{}, nil
 		},
 	})
-	requestBody := `{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-content-type","place_slug":"sao-paulo"}`
+	requestBody := `{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-content-type"}`
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1359,7 +1224,7 @@ func TestCreateNoteRejectsUnknownJSONFields(t *testing.T) {
 			return note.Note{}, nil
 		},
 	})
-	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-unknown-field","place_slug":"sao-paulo","unexpected":true}`)
+	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-unknown-field","unexpected":true}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -1382,7 +1247,7 @@ func TestCreateNoteRejectsUnknownJSONFields(t *testing.T) {
 
 func TestCreateNoteRejectsTrailingJSON(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{})
-	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-trailing-json","place_slug":"sao-paulo"} {}`)
+	requestBody := []byte(`{"title":"Café bom","body":"Funciona.","category_slug":"food","client_request_id":"http-trailing-json"} {}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -1405,7 +1270,7 @@ func TestCreateNoteRejectsTrailingJSON(t *testing.T) {
 
 func TestCreateNoteRejectsOversizedRequestBody(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{})
-	requestBody := []byte(`{"title":"Café bom","body":"` + strings.Repeat("a", int(maxCreateNoteRequestBytes)) + `","category_slug":"food","client_request_id":"http-oversized","place_slug":"sao-paulo"}`)
+	requestBody := []byte(`{"title":"Café bom","body":"` + strings.Repeat("a", int(maxCreateNoteRequestBytes)) + `","category_slug":"food","client_request_id":"http-oversized"}`)
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/notes", bytes.NewReader(requestBody))
 	request.Header.Set("Content-Type", "application/json")
@@ -1551,8 +1416,4 @@ func requireJSONKeys(t *testing.T, value map[string]any, keys ...string) {
 			t.Fatalf("missing JSON key %q in %#v", key, value)
 		}
 	}
-}
-
-func stringPointer(value string) *string {
-	return &value
 }

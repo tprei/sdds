@@ -16,7 +16,6 @@ const emptyFields: ComposeDraftFields = {
   body: '',
   categorySlug: null,
   image: null,
-  placeSlug: null,
   title: '',
 };
 
@@ -24,7 +23,6 @@ const firstFields: ComposeDraftFields = {
   body: ' body ',
   categorySlug: ' category ',
   image: null,
-  placeSlug: ' place ',
   title: ' title ',
 };
 
@@ -59,7 +57,6 @@ describe('compose draft store', () => {
       body: 'body',
       categorySlug: 'category',
       image: null,
-      placeSlug: 'place',
       title: 'title',
     });
 
@@ -68,7 +65,6 @@ describe('compose draft store', () => {
       categorySlug: 'category',
       image: null,
       clientRequestId: 'request-1',
-      placeSlug: 'place',
       title: 'title',
     });
     expect(unchanged).toEqual(first);
@@ -91,7 +87,6 @@ describe('compose draft store', () => {
         body: 'changed',
         categorySlug: null,
         image: ready?.image ?? null,
-        placeSlug: null,
         title: '',
       })?.clientRequestId,
     ).toBe('request-2');

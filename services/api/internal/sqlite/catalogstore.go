@@ -15,19 +15,9 @@ const (
 		FROM categories
 		ORDER BY display_order ASC, label ASC, slug ASC
 	`
-	listPlacesSQL = `
-		SELECT slug, label, active, display_order
-		FROM places
-		ORDER BY display_order ASC, label ASC, slug ASC
-	`
 	findActiveCategorySQL = `
 		SELECT slug, label, active, display_order
 		FROM categories
-		WHERE slug = ? AND active = 1
-	`
-	findActivePlaceSQL = `
-		SELECT slug, label, active, display_order
-		FROM places
 		WHERE slug = ? AND active = 1
 	`
 )
@@ -68,32 +58,6 @@ func (store *CatalogStore) ListCategories(ctx context.Context) (categories []not
 	return categories, nil
 }
 
-func (store *CatalogStore) ListPlaces(ctx context.Context) (places []note.Place, err error) {
-	rows, err := store.db.QueryContext(ctx, listPlacesSQL)
-	if err != nil {
-		return nil, fmt.Errorf("query places: %w", err)
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && err == nil {
-			err = fmt.Errorf("close place rows: %w", closeErr)
-		}
-	}()
-
-	places = make([]note.Place, 0)
-	for rows.Next() {
-		place, err := scanPlace(rows)
-		if err != nil {
-			return nil, err
-		}
-		places = append(places, place)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("read places: %w", err)
-	}
-
-	return places, nil
-}
-
 func (store *CatalogStore) FindActiveCategory(ctx context.Context, slug note.CategorySlug) (note.Category, error) {
 	category, err := scanCategoryRow(store.db.QueryRowContext(ctx, findActiveCategorySQL, string(slug)))
 	if err == nil {
@@ -103,17 +67,6 @@ func (store *CatalogStore) FindActiveCategory(ctx context.Context, slug note.Cat
 		return note.Category{}, note.ErrCategoryNotFound
 	}
 	return note.Category{}, fmt.Errorf("find active category: %w", err)
-}
-
-func (store *CatalogStore) FindActivePlace(ctx context.Context, slug note.PlaceSlug) (note.Place, error) {
-	place, err := scanPlaceRow(store.db.QueryRowContext(ctx, findActivePlaceSQL, string(slug)))
-	if err == nil {
-		return place, nil
-	}
-	if errors.Is(err, sql.ErrNoRows) {
-		return note.Place{}, note.ErrPlaceNotFound
-	}
-	return note.Place{}, fmt.Errorf("find active place: %w", err)
 }
 
 func scanCategory(rows *sql.Rows) (note.Category, error) {
@@ -135,25 +88,4 @@ func scanCategoryValues(scan func(dest ...any) error) (note.Category, error) {
 	category.Slug = note.CategorySlug(slug)
 	category.Active = active
 	return category, nil
-}
-
-func scanPlace(rows *sql.Rows) (note.Place, error) {
-	return scanPlaceValues(rows.Scan)
-}
-
-func scanPlaceRow(row *sql.Row) (note.Place, error) {
-	return scanPlaceValues(row.Scan)
-}
-
-func scanPlaceValues(scan func(dest ...any) error) (note.Place, error) {
-	var place note.Place
-	var slug string
-	var active bool
-	if err := scan(&slug, &place.Label, &active, &place.DisplayOrder); err != nil {
-		return note.Place{}, fmt.Errorf("scan place: %w", err)
-	}
-
-	place.Slug = note.PlaceSlug(slug)
-	place.Active = active
-	return place, nil
 }

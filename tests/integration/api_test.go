@@ -24,7 +24,6 @@ type noteFields struct {
 	Title        string
 	Body         string
 	CategorySlug string
-	PlaceSlug    *string
 }
 
 func TestAPIRuntimeBoundaries(t *testing.T) {
@@ -73,32 +72,30 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		t.Fatalf("initial note count = %d, want 0", len(initialNotes.Notes))
 	}
 
-	selectedPlace := "sao-paulo"
 	request := openapi.CreateNoteJSONRequestBody{
 		Title:           "Café bom",
 		Body:            "Tem pao de queijo decente e balcao simpatico.",
 		CategorySlug:    "food",
 		ClientRequestId: "integration-created-note",
-		PlaceSlug:       &selectedPlace,
 	}
 	created := createNote(t, client, request)
 	requireCreatedNote(t, created, request)
 
-	requestWithoutPlace := openapi.CreateNoteJSONRequestBody{
-		Title:           "Dica sem lugar",
+	travelRequest := openapi.CreateNoteJSONRequestBody{
+		Title:           "Dica de viagem",
 		Body:            "Serve para qualquer lugar mundial.",
 		CategorySlug:    "travel",
-		ClientRequestId: "integration-note-without-place",
+		ClientRequestId: "integration-travel-note",
 	}
-	createdWithoutPlace := createNote(t, client, requestWithoutPlace)
-	requireCreatedNote(t, createdWithoutPlace, requestWithoutPlace)
+	travelNote := createNote(t, client, travelRequest)
+	requireCreatedNote(t, travelNote, travelRequest)
 
 	updatedNotes := listNotes(t, client)
 	if len(updatedNotes.Notes) != 2 {
 		t.Fatalf("updated note count = %d, want 2", len(updatedNotes.Notes))
 	}
 	requireListedNote(t, updatedNotes, created.Id, request)
-	requireListedNote(t, updatedNotes, createdWithoutPlace.Id, requestWithoutPlace)
+	requireListedNote(t, updatedNotes, travelNote.Id, travelRequest)
 
 	foodNotes := listNotesByCategory(t, client, "food")
 	if len(foodNotes.Notes) != 1 {
@@ -110,7 +107,7 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	if len(travelNotes.Notes) != 1 {
 		t.Fatalf("travel note count = %d, want 1", len(travelNotes.Notes))
 	}
-	requireListedNote(t, travelNotes, createdWithoutPlace.Id, requestWithoutPlace)
+	requireListedNote(t, travelNotes, travelNote.Id, travelRequest)
 
 	fetched := getNote(t, client, created.Id)
 	requireCreatedNote(t, fetched, request)
@@ -124,13 +121,10 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		t.Fatalf("fetched updated_at = %d, want %d", fetched.UpdatedAt, created.UpdatedAt)
 	}
 
-	fetchedWithoutPlace := getNote(t, client, createdWithoutPlace.Id)
-	requireCreatedNote(t, fetchedWithoutPlace, requestWithoutPlace)
-	if fetchedWithoutPlace.Id != createdWithoutPlace.Id {
-		t.Fatalf("fetched note without place id = %q, want %q", fetchedWithoutPlace.Id, createdWithoutPlace.Id)
-	}
-	if fetchedWithoutPlace.PlaceSlug != nil {
-		t.Fatalf("fetched note without place place_slug = %q, want nil", *fetchedWithoutPlace.PlaceSlug)
+	fetchedTravelNote := getNote(t, client, travelNote.Id)
+	requireCreatedNote(t, fetchedTravelNote, travelRequest)
+	if fetchedTravelNote.Id != travelNote.Id {
+		t.Fatalf("fetched travel note id = %q, want %q", fetchedTravelNote.Id, travelNote.Id)
 	}
 
 	searchResults := searchNotes(t, client, "balcao")
@@ -142,20 +136,20 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		t.Fatalf("search note id = %q, want %q", searchResults.Results[0].Note.Id, created.Id)
 	}
 
-	searchResultsWithoutPlace := searchNotes(t, client, "mundial")
-	if len(searchResultsWithoutPlace.Results) != 1 {
-		t.Fatalf("search note without place count = %d, want 1", len(searchResultsWithoutPlace.Results))
+	travelSearchResults := searchNotes(t, client, "mundial")
+	if len(travelSearchResults.Results) != 1 {
+		t.Fatalf("travel search note count = %d, want 1", len(travelSearchResults.Results))
 	}
-	requireCreatedNote(t, searchResultsWithoutPlace.Results[0].Note, requestWithoutPlace)
-	if searchResultsWithoutPlace.Results[0].Note.Id != createdWithoutPlace.Id {
-		t.Fatalf("search note without place id = %q, want %q", searchResultsWithoutPlace.Results[0].Note.Id, createdWithoutPlace.Id)
+	requireCreatedNote(t, travelSearchResults.Results[0].Note, travelRequest)
+	if travelSearchResults.Results[0].Note.Id != travelNote.Id {
+		t.Fatalf("travel search note id = %q, want %q", travelSearchResults.Results[0].Note.Id, travelNote.Id)
 	}
 
 	filteredSearchResults := searchNotesByCategory(t, client, "mundial", "travel")
 	if len(filteredSearchResults.Results) != 1 {
 		t.Fatalf("filtered search note count = %d, want 1", len(filteredSearchResults.Results))
 	}
-	requireCreatedNote(t, filteredSearchResults.Results[0].Note, requestWithoutPlace)
+	requireCreatedNote(t, filteredSearchResults.Results[0].Note, travelRequest)
 
 	emptyFilteredSearchResults := searchNotesByCategory(t, client, "mundial", "food")
 	if len(emptyFilteredSearchResults.Results) != 0 {
@@ -232,24 +226,22 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	categoryResults := searchNotesByCategory(t, client, "catbusca48", "food")
 	requireOnlySearchNoteIDs(t, categoryResults, []string{categoryFoodNote.Id})
 
-	globalPlace := "sao-paulo"
-	globalWithPlaceRequest := openapi.CreateNoteJSONRequestBody{
-		Title:           "globalbusca48 com lugar",
+	globalFirstRequest := openapi.CreateNoteJSONRequestBody{
+		Title:           "globalbusca48 primeira",
 		Body:            "Aparece na busca global.",
 		CategorySlug:    "travel",
-		ClientRequestId: "integration-global-with-place",
-		PlaceSlug:       &globalPlace,
+		ClientRequestId: "integration-global-first",
 	}
-	globalWithPlaceNote := createNote(t, client, globalWithPlaceRequest)
-	globalWithoutPlaceRequest := openapi.CreateNoteJSONRequestBody{
-		Title:           "globalbusca48 sem lugar",
+	globalFirstNote := createNote(t, client, globalFirstRequest)
+	globalSecondRequest := openapi.CreateNoteJSONRequestBody{
+		Title:           "globalbusca48 segunda",
 		Body:            "Tambem aparece na busca global.",
 		CategorySlug:    "travel",
-		ClientRequestId: "integration-global-without-place",
+		ClientRequestId: "integration-global-second",
 	}
-	globalWithoutPlaceNote := createNote(t, client, globalWithoutPlaceRequest)
+	globalSecondNote := createNote(t, client, globalSecondRequest)
 	globalResults := searchNotes(t, client, "globalbusca48")
-	requireSearchNoteIDs(t, globalResults, []string{globalWithPlaceNote.Id, globalWithoutPlaceNote.Id})
+	requireSearchNoteIDs(t, globalResults, []string{globalFirstNote.Id, globalSecondNote.Id})
 
 	punctuationRequest := openapi.CreateNoteJSONRequestBody{
 		Title:           "pontoseguro48",
@@ -290,23 +282,6 @@ func requireCatalogs(t *testing.T, client *openapi.ClientWithResponses) {
 	}
 	if diff := cmp.Diff(wantCategories, categories.JSON200.Categories); diff != "" {
 		t.Fatalf("categories mismatch (-want +got):\n%s", diff)
-	}
-
-	places, err := client.ListPlacesWithResponse(context.Background())
-	if err != nil {
-		t.Fatalf("GET /v1/places: %v", err)
-	}
-	requireStatus(t, "GET /v1/places", places.StatusCode(), http.StatusOK, places.Body)
-	if places.JSON200 == nil {
-		t.Fatal("GET /v1/places returned 200 without JSON body")
-	}
-	wantPlaces := []openapi.CatalogPlace{
-		{Active: true, DisplayOrder: 10, Label: "São Paulo", Slug: "sao-paulo"},
-		{Active: true, DisplayOrder: 20, Label: "Rio de Janeiro", Slug: "rio-de-janeiro"},
-		{Active: true, DisplayOrder: 30, Label: "Lisboa", Slug: "lisboa"},
-	}
-	if diff := cmp.Diff(wantPlaces, places.JSON200.Places); diff != "" {
-		t.Fatalf("places mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -750,7 +725,6 @@ func noteFieldsFromResponse(note openapi.Note) noteFields {
 		Title:        note.Title,
 		Body:         note.Body,
 		CategorySlug: note.CategorySlug,
-		PlaceSlug:    note.PlaceSlug,
 	}
 }
 
@@ -759,6 +733,5 @@ func noteFieldsFromRequest(request openapi.CreateNoteRequest) noteFields {
 		Title:        request.Title,
 		Body:         request.Body,
 		CategorySlug: request.CategorySlug,
-		PlaceSlug:    request.PlaceSlug,
 	}
 }

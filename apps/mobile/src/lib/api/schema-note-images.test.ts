@@ -11,7 +11,6 @@ const baseNote: NoteResponse = {
   created_at: 1700000000000,
   id: 'note-1',
   images: [],
-  place_slug: null,
   useful_count: 0,
   useful_by_current_user: false,
   title: 'A note',

@@ -32,7 +32,6 @@ type Note struct {
 	Title               string
 	Body                string
 	CategorySlug        CategorySlug
-	PlaceSlug           PlaceSlug
 	Author              AuthorSummary
 	Images              []Image
 	UsefulCount         int64
@@ -51,7 +50,6 @@ type CreateInput struct {
 	Title           string
 	Body            string
 	CategorySlug    CategorySlug
-	PlaceSlug       PlaceSlug
 	ClientRequestID string
 	ImageUploadIDs  []string
 }

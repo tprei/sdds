@@ -52,7 +52,6 @@ function catalogs(): Catalogs {
         slug: 'travel',
       },
     ],
-    places: [],
   };
 }
 

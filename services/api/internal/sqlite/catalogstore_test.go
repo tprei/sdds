@@ -23,20 +23,6 @@ func TestCatalogStoreListsCategories(t *testing.T) {
 	}
 }
 
-func TestCatalogStoreListsPlaces(t *testing.T) {
-	ctx := context.Background()
-	db := openMigratedDatabase(t, ctx)
-
-	found, err := NewCatalogStore(db).ListPlaces(ctx)
-	if err != nil {
-		t.Fatalf("list places: %v", err)
-	}
-
-	if diff := cmp.Diff(note.Places, found); diff != "" {
-		t.Fatalf("places mismatch (-want +got):\n%s", diff)
-	}
-}
-
 func TestCatalogStoreFindsActiveCategory(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
@@ -48,20 +34,6 @@ func TestCatalogStoreFindsActiveCategory(t *testing.T) {
 
 	if diff := cmp.Diff(note.Categories[1], found); diff != "" {
 		t.Fatalf("category mismatch (-want +got):\n%s", diff)
-	}
-}
-
-func TestCatalogStoreFindsActivePlace(t *testing.T) {
-	ctx := context.Background()
-	db := openMigratedDatabase(t, ctx)
-
-	found, err := NewCatalogStore(db).FindActivePlace(ctx, note.PlaceSlugSaoPaulo)
-	if err != nil {
-		t.Fatalf("find active place: %v", err)
-	}
-
-	if diff := cmp.Diff(note.Places[0], found); diff != "" {
-		t.Fatalf("place mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -85,28 +57,5 @@ func TestCatalogStoreTreatsInactiveCategoryAsNotFound(t *testing.T) {
 	_, err := NewCatalogStore(db).FindActiveCategory(ctx, note.CategorySlugFood)
 	if !errors.Is(err, note.ErrCategoryNotFound) {
 		t.Fatalf("find active category error = %v, want ErrCategoryNotFound", err)
-	}
-}
-
-func TestCatalogStoreTreatsUnknownPlaceAsNotFound(t *testing.T) {
-	ctx := context.Background()
-	db := openMigratedDatabase(t, ctx)
-
-	_, err := NewCatalogStore(db).FindActivePlace(ctx, "missing")
-	if !errors.Is(err, note.ErrPlaceNotFound) {
-		t.Fatalf("find active place error = %v, want ErrPlaceNotFound", err)
-	}
-}
-
-func TestCatalogStoreTreatsInactivePlaceAsNotFound(t *testing.T) {
-	ctx := context.Background()
-	db := openMigratedDatabase(t, ctx)
-	if _, err := db.ExecContext(ctx, `UPDATE places SET active = 0 WHERE slug = ?`, note.PlaceSlugSaoPaulo); err != nil {
-		t.Fatalf("deactivate place: %v", err)
-	}
-
-	_, err := NewCatalogStore(db).FindActivePlace(ctx, note.PlaceSlugSaoPaulo)
-	if !errors.Is(err, note.ErrPlaceNotFound) {
-		t.Fatalf("find active place error = %v, want ErrPlaceNotFound", err)
 	}
 }

@@ -25,7 +25,6 @@ const (
 		notes.title,
 		notes.body,
 		notes.category_slug,
-		notes.place_slug,
 		authors.id,
 		authors.display_name,
 		(SELECT COUNT(*)
@@ -254,7 +253,6 @@ func scanNoteValues(scan func(dest ...any) error) (note.Note, error) {
 	found.Images = make([]note.Image, 0)
 	var userID string
 	var categorySlug string
-	var placeSlug sql.NullString
 	var authorID string
 	var createdAt int64
 	var updatedAt int64
@@ -265,7 +263,6 @@ func scanNoteValues(scan func(dest ...any) error) (note.Note, error) {
 		&found.Title,
 		&found.Body,
 		&categorySlug,
-		&placeSlug,
 		&authorID,
 		&found.Author.DisplayName,
 		&found.UsefulCount,
@@ -278,20 +275,10 @@ func scanNoteValues(scan func(dest ...any) error) (note.Note, error) {
 
 	found.UserID = user.UserID(userID)
 	found.CategorySlug = note.CategorySlug(categorySlug)
-	if placeSlug.Valid {
-		found.PlaceSlug = note.PlaceSlug(placeSlug.String)
-	}
 	found.Author.ID = author.AuthorID(authorID)
 	found.CreatedAt = timeFromUnixMillis(createdAt)
 	found.UpdatedAt = timeFromUnixMillis(updatedAt)
 	return found, nil
-}
-
-func nullablePlaceSlug(slug note.PlaceSlug) any {
-	if slug == "" {
-		return nil
-	}
-	return string(slug)
 }
 
 func normalizeTime(value time.Time) time.Time {

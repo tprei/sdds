@@ -30,7 +30,7 @@ func TestNoteStoreAssociatesReadyImageAtomically(t *testing.T) {
 	command := note.CreateInput{
 		ClientRequestID: "note-request-atomic", Title: "Atomic image note",
 		Body: "The image is attached in the same transaction.", CategorySlug: note.CategorySlugFood,
-		PlaceSlug: note.PlaceSlugSaoPaulo, ImageUploadIDs: []string{"upload-atomic"},
+		ImageUploadIDs: []string{"upload-atomic"},
 	}
 	created, err := store.CreateNote(ctx, command)
 	if err != nil {
@@ -88,7 +88,6 @@ func TestNoteStoreReplaysBeforeCatalogChecksAndConflictsChangedCommand(t *testin
 		Title:           "Replayable note",
 		Body:            "The receipt wins over catalog state.",
 		CategorySlug:    note.CategorySlugFood,
-		PlaceSlug:       note.PlaceSlugSaoPaulo,
 	}
 	first, err := store.CreateNote(ctx, input)
 	if err != nil {
@@ -96,9 +95,6 @@ func TestNoteStoreReplaysBeforeCatalogChecksAndConflictsChangedCommand(t *testin
 	}
 	if _, err := db.ExecContext(ctx, `UPDATE categories SET active = 0 WHERE slug = ?`, note.CategorySlugFood); err != nil {
 		t.Fatalf("deactivate category: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, `UPDATE places SET active = 0 WHERE slug = ?`, note.PlaceSlugSaoPaulo); err != nil {
-		t.Fatalf("deactivate place: %v", err)
 	}
 	replayed, err := store.CreateNote(ctx, input)
 	if err != nil {
@@ -113,7 +109,6 @@ func TestNoteStoreReplaysBeforeCatalogChecksAndConflictsChangedCommand(t *testin
 	_, err = store.CreateNote(ctx, newRequest)
 	requireCatalogValidationError(t, err, []note.ValidationProblem{
 		{Field: "category_slug", Message: "unknown"},
-		{Field: "place_slug", Message: "unknown"},
 	})
 	input.Title = "Changed command"
 	if _, err := store.CreateNote(ctx, input); !errors.Is(err, note.ErrIdempotencyConflict) {
@@ -162,7 +157,7 @@ func TestNoteStoreUploadAvailabilityErrors(t *testing.T) {
 			_, err := store.CreateNote(ctx, note.CreateInput{
 				ClientRequestID: "request-" + test.name, Title: "Upload state note",
 				Body: "Association must reject unavailable media.", CategorySlug: note.CategorySlugFood,
-				PlaceSlug: note.PlaceSlugSaoPaulo, ImageUploadIDs: []string{test.imageID},
+				ImageUploadIDs: []string{test.imageID},
 			})
 			if !errors.Is(err, test.want) {
 				t.Fatalf("create error = %v, want %v", err, test.want)
@@ -186,7 +181,6 @@ func TestNoteStoreAssociationRollbackRestoresAllRows(t *testing.T) {
 		Title:           "Atomic rollback",
 		Body:            "The existing image ID forces association failure.",
 		CategorySlug:    note.CategorySlugFood,
-		PlaceSlug:       note.PlaceSlugSaoPaulo,
 		ImageUploadIDs:  []string{"upload-rollback"},
 	})
 	if err == nil {
@@ -234,7 +228,6 @@ func TestNoteStoreConcurrentIdenticalCreatesConvergeOnOneReceipt(t *testing.T) {
 			input := note.CreateInput{
 				ClientRequestID: "note-request-concurrent-" + test.name, Title: "Concurrent note",
 				Body: "One transaction wins and the other replays.", CategorySlug: note.CategorySlugFood,
-				PlaceSlug: note.PlaceSlugSaoPaulo,
 			}
 			if test.imageID != "" {
 				input.ImageUploadIDs = []string{test.imageID}
@@ -279,7 +272,6 @@ func TestNoteStoreReconcilesCommittedReceiptPrimaryKeyRace(t *testing.T) {
 	input := note.CreateInput{
 		UserID: systemNoteOwnerUserID, ClientRequestID: "note-request-receipt-primary-key", Title: "Receipt primary key",
 		Body: "A committed receipt wins after an explicit rollback.", CategorySlug: note.CategorySlugFood,
-		PlaceSlug: note.PlaceSlugSaoPaulo,
 	}
 	winner, err := store.CreateNote(ctx, input)
 	if err != nil {
@@ -326,7 +318,7 @@ func TestNoteStoreConcurrentRequestsCompeteForReadyImage(t *testing.T) {
 	input := note.CreateInput{
 		ClientRequestID: "note-request-competing-a", Title: "Competing image note",
 		Body: "Only one request may consume the image.", CategorySlug: note.CategorySlugFood,
-		PlaceSlug: note.PlaceSlugSaoPaulo, ImageUploadIDs: []string{imageID},
+		ImageUploadIDs: []string{imageID},
 	}
 	other := input
 	other.ClientRequestID = "note-request-competing-b"
@@ -383,7 +375,6 @@ func TestNoteStoreReceiptFailureRollsBackCompletedAssociation(t *testing.T) {
 		Title:           "Receipt rollback",
 		Body:            "The receipt failure must roll back every earlier write.",
 		CategorySlug:    note.CategorySlugFood,
-		PlaceSlug:       note.PlaceSlugSaoPaulo,
 		ImageUploadIDs:  []string{imageID},
 	})
 	if err == nil || !strings.Contains(err.Error(), "receipt insert aborted") {

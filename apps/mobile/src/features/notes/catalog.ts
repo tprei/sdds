@@ -1,6 +1,5 @@
 import type {
   CatalogCategory,
-  CatalogPlace,
   Catalogs,
 } from '@/lib/api/catalogs';
 import type { Note } from '@/lib/api/notes';
@@ -15,16 +14,13 @@ export type CategoryOption = {
 
 export type NoteCatalog = {
   activeCategories: CategoryOption[];
-  activePlaces: CatalogPlace[];
   categoryHues: ReadonlyMap<string, CategoryHue>;
   categoryLabels: ReadonlyMap<string, string>;
-  placeLabels: ReadonlyMap<string, string>;
 };
 
 export type LabelledNote = Note & {
   categoryHue: CategoryHue;
   categoryLabel: string;
-  placeLabel: string | null;
 };
 
 // An active category with no configured hue fails the whole catalog: the
@@ -40,10 +36,8 @@ export function buildNoteCatalog(catalogs: Catalogs): NoteCatalog | null {
 
   return {
     activeCategories,
-    activePlaces: catalogs.places.filter((place) => place.active),
     categoryHues: categoryHueMap(catalogs.categories),
     categoryLabels: labelMap(catalogs.categories),
-    placeLabels: labelMap(catalogs.places),
   };
 }
 
@@ -97,17 +91,6 @@ export function categoryHue(
   return catalog.categoryHues.get(slug) ?? null;
 }
 
-export function placeLabel(
-  catalog: NoteCatalog,
-  slug: string | null,
-): string | null {
-  if (slug === null) {
-    return null;
-  }
-
-  return catalog.placeLabels.get(slug) ?? null;
-}
-
 export function labelNote(
   catalog: NoteCatalog,
   note: Note,
@@ -118,16 +101,10 @@ export function labelNote(
     return null;
   }
 
-  const resolvedPlaceLabel = placeLabel(catalog, note.placeSlug);
-  if (note.placeSlug !== null && resolvedPlaceLabel === null) {
-    return null;
-  }
-
   return {
     ...note,
     categoryHue: resolvedCategoryHue,
     categoryLabel: resolvedCategoryLabel,
-    placeLabel: resolvedPlaceLabel,
   };
 }
 
@@ -169,15 +146,3 @@ export function resolveSelectedCategorySlug(
   return catalog.activeCategories[0]?.slug ?? null;
 }
 
-export function resolveSelectedPlaceSlug(
-  catalog: NoteCatalog,
-  currentSlug: string | null,
-): string | null {
-  if (currentSlug === null) {
-    return null;
-  }
-
-  return catalog.activePlaces.some((place) => place.slug === currentSlug)
-    ? currentSlug
-    : null;
-}

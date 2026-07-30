@@ -14,7 +14,6 @@ type CreateNoteRequest = {
   body: string;
   category_slug: string;
   client_request_id: string;
-  place_slug: string | null;
   title: string;
 };
 
@@ -38,7 +37,6 @@ type NoteResponse = {
   created_at: number;
   id: string;
   images: NoteImageResponse[];
-  place_slug: string | null;
   title: string;
   updated_at: number;
   useful_count: number;
@@ -109,7 +107,6 @@ const noteResponseKeys = [
   'created_at',
   'id',
   'images',
-  'place_slug',
   'title',
   'updated_at',
   'useful_count',
@@ -432,14 +429,12 @@ test('narrows the mobile explore feed by category', async ({
     body: `Nota de comida criada para testar Explorar ${timestamp}.`,
     client_request_id: `synthetic-explore-food-${timestamp}`,
     category_slug: 'food',
-    place_slug: 'sao-paulo',
     title: foodTitle,
   });
   await createNote(request, session.token, {
     body: `Nota de viagem criada para testar Explorar ${timestamp}.`,
     client_request_id: `synthetic-explore-travel-${timestamp}`,
     category_slug: 'travel',
-    place_slug: 'rio-de-janeiro',
     title: travelTitle,
   });
 
@@ -497,14 +492,12 @@ test('narrows the mobile search results by category and clears stale cards', asy
     body: `Marcador ${marker} para resultado de comida.`,
     client_request_id: `synthetic-search-food-${timestamp}`,
     category_slug: 'food',
-    place_slug: 'sao-paulo',
     title: foodTitle,
   });
   await createNote(request, session.token, {
     body: `Marcador ${marker} para resultado de viagem.`,
     client_request_id: `synthetic-search-travel-${timestamp}`,
     category_slug: 'travel',
-    place_slug: 'rio-de-janeiro',
     title: travelTitle,
   });
 
@@ -589,14 +582,12 @@ test('orders search results by weighted title matches and handles punctuation-on
     body: `Nota antiga para ranking ${timestamp}.`,
     client_request_id: `synthetic-ranking-title-${timestamp}`,
     category_slug: 'food',
-    place_slug: 'sao-paulo',
     title: titleMatchTitle,
   });
   await createNote(request, session.token, {
     body: `${marker}.`,
     client_request_id: `synthetic-ranking-body-${timestamp}`,
     category_slug: 'food',
-    place_slug: 'sao-paulo',
     title: bodyMatchTitle,
   });
 
@@ -640,14 +631,12 @@ test('filters note discovery by category through the public API', async ({
     body: `Marcador ${marker} para comida.`,
     client_request_id: `synthetic-category-food-${timestamp}`,
     category_slug: 'food',
-    place_slug: 'sao-paulo',
     title: foodTitle,
   });
   const travelNote = await createNote(request, session.token, {
     body: `Marcador ${marker} para viagem.`,
     client_request_id: `synthetic-category-travel-${timestamp}`,
     category_slug: 'travel',
-    place_slug: 'rio-de-janeiro',
     title: travelTitle,
   });
   expect(foodNote.author).toEqual(session.user.author);
@@ -713,7 +702,6 @@ test('paginates, creates, and deletes an owned note comment', async ({
     body: `Uma nota com uma conversa longa ${timestamp}.`,
     category_slug: 'food',
     client_request_id: `synthetic-comment-note-${timestamp}`,
-    place_slug: 'sao-paulo',
     title,
   });
   const seededBodies = Array.from(
@@ -784,7 +772,6 @@ test('opens a public author profile and appends paginated notes', async ({
         body: `Texto público ${timestamp} ${index}.`,
         client_request_id: `synthetic-profile-${timestamp}-${index}`,
         category_slug: index % 2 === 0 ? 'food' : 'travel',
-        place_slug: null,
         title: `Nota pública ${timestamp} ${index}`,
       }),
     );
@@ -901,14 +888,12 @@ test('shows distinct authors when a second user signs in', async ({
     body: `Texto publicado pela Ana ${timestamp}.`,
     client_request_id: `synthetic-author-first-${timestamp}`,
     category_slug: 'food',
-    place_slug: 'sao-paulo',
     title: firstTitle,
   });
   const secondNote = await createNote(request, secondSession.token, {
     body: `Texto publicado pela Luiza ${timestamp}.`,
     client_request_id: `synthetic-author-second-${timestamp}`,
     category_slug: 'travel',
-    place_slug: 'rio-de-janeiro',
     title: secondTitle,
   });
 
@@ -1143,7 +1128,6 @@ function isNoteResponse(value: unknown): value is NoteResponse {
     typeof value.title === 'string' &&
     typeof value.body === 'string' &&
     typeof value.category_slug === 'string' &&
-    (typeof value.place_slug === 'string' || value.place_slug === null) &&
     typeof value.created_at === 'number' &&
     typeof value.updated_at === 'number' &&
     typeof value.useful_count === 'number' &&

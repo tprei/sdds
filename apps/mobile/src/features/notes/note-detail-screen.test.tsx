@@ -174,7 +174,6 @@ vi.mock('@/features/notes/catalog', () => ({
   labelNote: (_catalog: unknown, note: Record<string, unknown>) => ({
     ...note,
     categoryLabel: 'Comida',
-    placeLabel: null,
   }),
 }));
 
@@ -248,7 +247,6 @@ const note = {
   createdAt: testTimestamp(),
   id: 'note-id',
   images: [],
-  placeSlug: null,
   title: 'Café bom',
   updatedAt: testTimestamp(),
   usefulCount: 0,
@@ -268,7 +266,7 @@ describe('NoteDetailScreen route', () => {
     };
     mocks.localParams = { id: 'note-id' };
     mocks.focusVersion = 0;
-    mocks.apiClient.listCatalogs.mockResolvedValue({ categories: [], places: [] });
+    mocks.apiClient.listCatalogs.mockResolvedValue({ categories: [] });
     mocks.apiClient.getNote.mockResolvedValue(note);
     mocks.apiClient.listNoteComments.mockResolvedValue({
       comments: [],

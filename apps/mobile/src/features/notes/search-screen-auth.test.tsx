@@ -131,7 +131,7 @@ async function settle(): Promise<void> {
 describe('SearchScreen auth gate', () => {
   beforeEach(() => {
     mocks.authState = { status: 'authenticated', token: 'session-token', user: { id: 'user-id' } };
-    mocks.apiClient.listCatalogs.mockResolvedValue({ categories: [], places: [] });
+    mocks.apiClient.listCatalogs.mockResolvedValue({ categories: [] });
     mocks.logout.mockClear();
     mocks.productEvents.record.mockClear();
   });

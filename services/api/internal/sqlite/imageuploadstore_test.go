@@ -223,7 +223,7 @@ func TestImageUploadStoreCleanupClaimFinalizeAndRetention(t *testing.T) {
 	ctx := fixture.ctx
 	db := fixture.db
 	now := fixture.now
-	if _, err := db.Exec(`INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, "cleanup-note", "cleanup-user", "Cleanup note", "body", "food", "sao-paulo", 0, 0); err != nil {
+	if _, err := db.Exec(`INSERT INTO notes (id, user_id, title, body, category_slug, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`, "cleanup-note", "cleanup-user", "Cleanup note", "body", "food", 0, 0); err != nil {
 		t.Fatalf("insert cleanup note: %v", err)
 	}
 	insertImageUploadRow(t, db, imageUploadInput(now.Add(-2*time.Hour), "expired-pending", "cleanup-request-1", "cleanup-user", 10), string(media.UploadPending), "", nil)

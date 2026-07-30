@@ -155,7 +155,6 @@ describe('SearchScreen product events', () => {
       categories: [
         { active: true, displayOrder: 1, label: 'Comida', slug: 'food' },
       ],
-      places: [],
     });
     mocks.apiClient.markNoteUseful.mockResolvedValue(undefined);
     mocks.apiClient.unmarkNoteUseful.mockResolvedValue(undefined);
@@ -377,7 +376,6 @@ function note(id: string, title: string) {
     createdAt: 1782993600000,
     id,
     images: [],
-    placeSlug: null,
     title,
     updatedAt: 1782993600000,
     usefulCount: 0,

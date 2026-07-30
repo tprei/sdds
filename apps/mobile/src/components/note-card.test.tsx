@@ -71,7 +71,6 @@ function note(overrides: Partial<Note> = {}): Note {
     createdAt: 1782993600000,
     id: 'note-id',
     images: [],
-    placeSlug: null,
     title: 'Cafe bom',
     updatedAt: 1782993600000,
     usefulByCurrentUser: false,
@@ -206,8 +205,8 @@ describe('NoteCard', () => {
     ).toHaveLength(0);
   });
 
-  it('renders a single useful metric and no place label', () => {
-    const currentNote = note({ placeSlug: 'sao-paulo' });
+  it('renders a single useful metric', () => {
+    const currentNote = note();
     const renderer = render(
       <NoteCard
         note={currentNote}
@@ -221,10 +220,6 @@ describe('NoteCard', () => {
 
     expect(renderer.root.findAllByProps({ kind: 'useful' })).toHaveLength(1);
     expect(renderer.root.findAllByProps({ kind: 'saved' })).toHaveLength(0);
-
-    const strings = JSON.stringify(renderer.toJSON());
-    expect(strings).not.toContain('sao-paulo');
-    expect(strings).not.toContain('Mundo todo');
   });
 
   it('puts note-card on the outermost card view, not the open-target pressable', () => {

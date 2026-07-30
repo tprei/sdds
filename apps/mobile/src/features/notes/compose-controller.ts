@@ -1,4 +1,4 @@
-import { buildNoteCatalog, resolveSelectedCategorySlug, resolveSelectedPlaceSlug } from './catalog';
+import { buildNoteCatalog, resolveSelectedCategorySlug } from './catalog';
 import type { NoteCatalog } from './catalog';
 import type { ComposeDraft, ComposeDraftFields, ComposeDraftStore } from './compose-draft';
 import { evaluateComposeSubmission, isSupportedComposeImageMimeType } from './compose-policy';
@@ -42,7 +42,6 @@ export type ComposeController = {
   activate: () => void; blur: () => void; cancel: () => void; deactivate: () => void;
   focus: () => void; getState: () => ComposeControllerState; pickImage: () => Promise<void>;
   removeImage: () => void; selectCategorySlug: (value: string | null) => void;
-  selectPlaceSlug: (value: string | null) => void;
   submit: () => Promise<void>;
   subscribe: (listener: (state: ComposeControllerState) => void) => () => void;
   updateBody: (value: string) => void; updateTitle: (value: string) => void;
@@ -61,7 +60,7 @@ const unsupportedImageMessage = 'Essa imagem não é compatível. Escolha uma im
 const pickerFailureMessage = 'Não deu pra selecionar a imagem agora. Tente de novo em instantes.';
 const expiredImageMessage = 'A imagem expirou. Tente publicar de novo.';
 const expiredSessionMessage = 'Sua sessão expirou. Entre de novo para publicar.';
-const invalidSubmissionMessage = 'Revise o título, o texto, a categoria e o lugar.';
+const invalidSubmissionMessage = 'Revise o título, o texto e a categoria.';
 const submitFailureMessage = 'Não deu pra publicar agora. Tente de novo em instantes.';
 
 export function createComposeController(
@@ -141,19 +140,12 @@ export function createComposeController(
       catalog,
       current?.categorySlug ?? fields.categorySlug,
     );
-    const placeSlug = resolveSelectedPlaceSlug(
-      catalog,
-      current?.placeSlug ?? fields.placeSlug,
-    );
     if (current === null) {
       if (!hasPublished) {
-        updateFields({ ...fields, categorySlug, placeSlug }, false);
+        updateFields({ ...fields, categorySlug }, false);
       }
-    } else if (
-      categorySlug !== current.categorySlug ||
-      placeSlug !== current.placeSlug
-    ) {
-      updateFields({ ...fields, categorySlug, placeSlug }, false);
+    } else if (categorySlug !== current.categorySlug) {
+      updateFields({ ...fields, categorySlug }, false);
     }
     catalogState = categorySlug === null
       ? { status: 'error' }
@@ -399,7 +391,7 @@ export function createComposeController(
       await ports.createNote({
         body: draft.body, categorySlug: draft.categorySlug, clientRequestId: context.clientRequestID,
         imageUploadIds: uploadedReceipt === null || uploadedReceipt === undefined ? undefined : [uploadedReceipt.imageUploadId],
-        placeSlug: draft.placeSlug, title: draft.title,
+        title: draft.title,
       });
       if (!currentSubmission(context)) {
         settleStale(context);
@@ -484,7 +476,6 @@ export function createComposeController(
     activate, blur, cancel, deactivate, focus,
     getState: () => state, pickImage, removeImage,
     selectCategorySlug: (value) => updateFields({ ...fields, categorySlug: value }),
-    selectPlaceSlug: (value) => updateFields({ ...fields, placeSlug: value }),
     submit,
     subscribe: (listener) => {
       listeners.add(listener);
@@ -496,8 +487,8 @@ export function createComposeController(
 }
 
 function fieldsFor(draft: ComposeDraft | null): ComposeDraftFields {
-  const { body = '', categorySlug = null, image = null, placeSlug = null, title = '' } = draft ?? {};
-  return { body, categorySlug, image, placeSlug, title };
+  const { body = '', categorySlug = null, image = null, title = '' } = draft ?? {};
+  return { body, categorySlug, image, title };
 }
 
 function isAbortError(error: unknown): boolean {

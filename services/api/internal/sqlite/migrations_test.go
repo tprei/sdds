@@ -17,7 +17,6 @@ func TestApplyMigrationsCreatesInitialSchema(t *testing.T) {
 	tables := []string{
 		"schema_migrations",
 		"categories",
-		"places",
 		"notes",
 		"note_search",
 		"users",
@@ -49,7 +48,6 @@ func TestApplyMigrationsCreatesCatalogIndexes(t *testing.T) {
 	indexes := []string{
 		"notes_recent_idx",
 		"notes_category_idx",
-		"notes_place_idx",
 		"notes_user_idx",
 		"notes_author_page_idx",
 		"user_login_identities_user_idx",
@@ -100,22 +98,6 @@ func TestApplyMigrationsSeedsCatalogs(t *testing.T) {
 	}
 	if diff := cmp.Diff(wantCategories, gotCategories); diff != "" {
 		t.Fatalf("categories mismatch (-want +got):\n%s", diff)
-	}
-
-	wantPlaces := make(map[string]note.Place, len(note.Places))
-	gotPlaces := make(map[string]note.Place, len(note.Places))
-	for _, place := range note.Places {
-		wantPlaces[string(place.Slug)] = place
-		var got note.Place
-		var slug string
-		if err := db.QueryRowContext(ctx, `SELECT slug, label, active, display_order FROM places WHERE slug = ?`, place.Slug).Scan(&slug, &got.Label, &got.Active, &got.DisplayOrder); err != nil {
-			t.Fatalf("query place %s: %v", place.Slug, err)
-		}
-		got.Slug = note.PlaceSlug(slug)
-		gotPlaces[string(place.Slug)] = got
-	}
-	if diff := cmp.Diff(wantPlaces, gotPlaces); diff != "" {
-		t.Fatalf("places mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -261,7 +243,7 @@ func TestCatalogMigrationRequiresPlacesToReferenceCities(t *testing.T) {
 	}
 }
 
-func TestNotePlaceMigrationPreservesExistingNotes(t *testing.T) {
+func TestCatalogMigrationPreservesModifiedCategoryAttributes(t *testing.T) {
 	ctx := context.Background()
 	db, err := Open(":memory:")
 	if err != nil {
@@ -277,50 +259,9 @@ func TestNotePlaceMigrationPreservesExistingNotes(t *testing.T) {
 	if _, err := db.ExecContext(ctx, `UPDATE categories SET label = ?, active = 0, display_order = 99 WHERE slug = ?`, "Comida guardada", "comida"); err != nil {
 		t.Fatalf("update legacy category: %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `UPDATE places SET label = ?, active = 0, display_order = 88 WHERE slug = ?`, "São Paulo guardado", "sao-paulo"); err != nil {
-		t.Fatalf("update legacy place: %v", err)
-	}
-
-	if _, err := db.ExecContext(
-		ctx,
-		`
-			INSERT INTO notes (id, title, body, category_slug, city_slug, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
-		`,
-		"existing-note",
-		"Café bom",
-		"Tem pão de queijo decente.",
-		"comida",
-		"sao-paulo",
-		int64(1782993600000),
-		int64(1782993600000),
-	); err != nil {
-		t.Fatalf("insert existing note: %v", err)
-	}
 
 	if err := ApplyMigrations(ctx, db); err != nil {
 		t.Fatalf("apply remaining migrations: %v", err)
-	}
-
-	found, err := NewNoteStore(db).SearchNotes(ctx, note.SearchInput{
-		Query: "cafe",
-		Limit: 10,
-	})
-	if err != nil {
-		t.Fatalf("search notes: %v", err)
-	}
-	if len(found) != 1 {
-		t.Fatalf("search note count = %d, want 1", len(found))
-	}
-	gotNote := found[0]
-	if gotNote.ID != "existing-note" {
-		t.Fatalf("search note id = %q, want existing-note", gotNote.ID)
-	}
-	if gotNote.CategorySlug != note.CategorySlugFood {
-		t.Fatalf("search note category = %q, want %q", gotNote.CategorySlug, note.CategorySlugFood)
-	}
-	if gotNote.PlaceSlug != note.PlaceSlugSaoPaulo {
-		t.Fatalf("search note place = %q, want %q", gotNote.PlaceSlug, note.PlaceSlugSaoPaulo)
 	}
 
 	var category note.Category
@@ -338,21 +279,90 @@ func TestNotePlaceMigrationPreservesExistingNotes(t *testing.T) {
 	if diff := cmp.Diff(wantCategory, category); diff != "" {
 		t.Fatalf("category mismatch (-want +got):\n%s", diff)
 	}
+}
 
-	var place note.Place
-	var placeSlug string
-	if err := db.QueryRowContext(ctx, `SELECT slug, label, active, display_order FROM places WHERE slug = ?`, note.PlaceSlugSaoPaulo).Scan(&placeSlug, &place.Label, &place.Active, &place.DisplayOrder); err != nil {
-		t.Fatalf("query migrated place: %v", err)
+func TestDropPlacesMigrationRemovesPlaceDomainAndPreservesNotes(t *testing.T) {
+	ctx := context.Background()
+	db, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("open database: %v", err)
 	}
-	place.Slug = note.PlaceSlug(placeSlug)
-	wantPlace := note.Place{
-		Slug:         note.PlaceSlugSaoPaulo,
-		Label:        "São Paulo guardado",
-		Active:       false,
-		DisplayOrder: 88,
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close database: %v", err)
+		}
+	})
+	applyMigrationFiles(t, ctx, db,
+		"000001_initial_notes", "000002_note_search", "000003_catalogs",
+		"000004_note_places", "000005_users_authors_sessions", "000006_note_ownership",
+		"000007_author_notes_index", "000008_note_cursor_invariants", "000009_note_images",
+		"000010_image_uploads", "000011_note_create_requests", "000012_note_useful",
+		"000013_note_comments", "000014_reports", "000015_events",
+	)
+
+	if _, err := db.ExecContext(ctx, `INSERT INTO users (id, state, created_at, updated_at) VALUES (?, 'active', ?, ?)`, "drop-places-user", int64(0), int64(0)); err != nil {
+		t.Fatalf("insert user: %v", err)
 	}
-	if diff := cmp.Diff(wantPlace, place); diff != "" {
-		t.Fatalf("place mismatch (-want +got):\n%s", diff)
+	if _, err := db.ExecContext(
+		ctx,
+		`
+			INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`,
+		"note-with-place",
+		"drop-places-user",
+		"Café bom",
+		"Tem pão de queijo decente.",
+		"food",
+		"sao-paulo",
+		int64(1782993600000),
+		int64(1782993600000),
+	); err != nil {
+		t.Fatalf("insert note with place: %v", err)
+	}
+
+	if err := ApplyMigrations(ctx, db); err != nil {
+		t.Fatalf("apply drop-places migration: %v", err)
+	}
+
+	var placesTableCount int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'places'`).Scan(&placesTableCount); err != nil {
+		t.Fatalf("query places table: %v", err)
+	}
+	if placesTableCount != 0 {
+		t.Fatalf("places table count = %d, want 0", placesTableCount)
+	}
+
+	var placeIndexCount int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'notes_place_idx'`).Scan(&placeIndexCount); err != nil {
+		t.Fatalf("query notes_place_idx: %v", err)
+	}
+	if placeIndexCount != 0 {
+		t.Fatalf("notes_place_idx count = %d, want 0", placeIndexCount)
+	}
+
+	var placeColumnCount int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info('notes') WHERE name = 'place_slug'`).Scan(&placeColumnCount); err != nil {
+		t.Fatalf("query notes.place_slug column: %v", err)
+	}
+	if placeColumnCount != 0 {
+		t.Fatalf("notes.place_slug column count = %d, want 0", placeColumnCount)
+	}
+
+	var title, body, categorySlugValue string
+	if err := db.QueryRowContext(ctx, `SELECT title, body, category_slug FROM notes WHERE id = ?`, "note-with-place").Scan(&title, &body, &categorySlugValue); err != nil {
+		t.Fatalf("query migrated note: %v", err)
+	}
+	if title != "Café bom" || body != "Tem pão de queijo decente." || categorySlugValue != "food" {
+		t.Fatalf("migrated note = (%q, %q, %q), want (Café bom, Tem pão de queijo decente., food)", title, body, categorySlugValue)
+	}
+
+	var noteCount int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM notes`).Scan(&noteCount); err != nil {
+		t.Fatalf("count notes: %v", err)
+	}
+	if noteCount != 1 {
+		t.Fatalf("note count = %d, want 1", noteCount)
 	}
 }
 
@@ -443,7 +453,7 @@ func TestNoteOwnershipMigrationPreservesExistingNotes(t *testing.T) {
 		t.Fatalf("migrated note user id = %q, want %q", migratedUserID, systemNoteOwnerUserID)
 	}
 
-	for _, index := range []string{"notes_recent_idx", "notes_category_idx", "notes_place_idx", "notes_user_idx", "notes_author_page_idx"} {
+	for _, index := range []string{"notes_recent_idx", "notes_category_idx", "notes_user_idx", "notes_author_page_idx"} {
 		t.Run(index, func(t *testing.T) {
 			var count int
 			if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?`, index).Scan(&count); err != nil {
@@ -604,15 +614,14 @@ func TestNoteCursorMigrationEnforcesStoredCursorTypes(t *testing.T) {
 		_, err := db.ExecContext(
 			ctx,
 			`
-				INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+				INSERT INTO notes (id, user_id, title, body, category_slug, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?)
 			`,
 			id,
 			"cursor-user",
 			"Cursor note",
 			"Persisted cursor bounds.",
 			"food",
-			"sao-paulo",
 			createdAt,
 			updatedAt,
 		)

@@ -18,7 +18,6 @@ vi.mock('expo-file-system', () => ({
 const configuredAPIBaseURLEnvName = 'EXPO_PUBLIC_SDDS_API_BASE_URL';
 
 type CatalogCategoryResponse = components['schemas']['CatalogCategory'];
-type CatalogPlaceResponse = components['schemas']['CatalogPlace'];
 type FetchCall = {
   request: Request;
 };
@@ -59,31 +58,7 @@ describe('catalogs API client', () => {
     expect(request.method).toBe('GET');
   });
 
-  it('lists places from the API wire shape', async () => {
-    const calls: FetchCall[] = [];
-    stubFetch(async (request) => {
-      calls.push({ request });
-      return jsonResponse({
-        places: [apiPlace()],
-      });
-    });
-
-    const client = createAPIClient(exampleToken);
-    await expect(client.listPlaces()).resolves.toEqual([
-      {
-        active: true,
-        displayOrder: 10,
-        label: 'Sao Paulo',
-        slug: 'sao-paulo',
-      },
-    ]);
-
-    const request = onlyFetchCall(calls);
-    expect(request.url).toBe('http://localhost:8080/v1/places');
-    expect(request.method).toBe('GET');
-  });
-
-  it('lists categories and places together', async () => {
+  it('lists categories', async () => {
     const paths: string[] = [];
     stubFetch(async (request) => {
       const path = new URL(request.url).pathname;
@@ -91,12 +66,6 @@ describe('catalogs API client', () => {
       if (path === '/v1/categories') {
         return jsonResponse({
           categories: [apiCategory()],
-        });
-      }
-
-      if (path === '/v1/places') {
-        return jsonResponse({
-          places: [apiPlace()],
         });
       }
 
@@ -113,16 +82,8 @@ describe('catalogs API client', () => {
           slug: 'food',
         },
       ],
-      places: [
-        {
-          active: true,
-          displayOrder: 10,
-          label: 'Sao Paulo',
-          slug: 'sao-paulo',
-        },
-      ],
     });
-    expect(paths.sort()).toEqual(['/v1/categories', '/v1/places']);
+    expect(paths).toEqual(['/v1/categories']);
   });
 
   it('raises request errors from category status codes', async () => {
@@ -151,29 +112,6 @@ describe('catalogs API client', () => {
     const client = createAPIClient(exampleToken);
     await expect(client.listCategories()).rejects.toThrow(CatalogAPIResponseError);
   });
-
-  it('ignores extra place response fields', async () => {
-    stubFetch(async () =>
-      jsonResponse({
-        places: [
-          {
-            ...apiPlace(),
-            summary: 'curto',
-          },
-        ],
-      }),
-    );
-
-    const client = createAPIClient(exampleToken);
-    await expect(client.listPlaces()).resolves.toEqual([
-      {
-        active: true,
-        displayOrder: 10,
-        label: 'Sao Paulo',
-        slug: 'sao-paulo',
-      },
-    ]);
-  });
 });
 
 const httpStatusInternalServerError = 500;
@@ -187,18 +125,6 @@ function apiCategory(
     display_order: 20,
     label: 'Comida',
     slug: 'food',
-    ...overrides,
-  };
-}
-
-function apiPlace(
-  overrides: Partial<CatalogPlaceResponse> = {},
-): CatalogPlaceResponse {
-  return {
-    active: true,
-    display_order: 10,
-    label: 'Sao Paulo',
-    slug: 'sao-paulo',
     ...overrides,
   };
 }

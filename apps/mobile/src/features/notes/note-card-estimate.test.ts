@@ -33,7 +33,6 @@ function note(overrides: Partial<Note> = {}): Note {
     createdAt: 1,
     id: 'note-id',
     images: [],
-    placeSlug: null,
     title: 'Título',
     updatedAt: 1,
     usefulByCurrentUser: false,

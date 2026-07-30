@@ -115,7 +115,6 @@ const catalogs: Catalogs = {
   categories: [
     { active: true, displayOrder: 10, label: 'Comida', slug: 'food' },
   ],
-  places: [],
 };
 
 describe('AuthorProfileContent', () => {
@@ -459,7 +458,6 @@ function note(id: string, title: string): Note {
     createdAt: 1782993600000,
     id,
     images: [],
-    placeSlug: null,
     title,
     updatedAt: 1782993600000,
     usefulCount: 0,

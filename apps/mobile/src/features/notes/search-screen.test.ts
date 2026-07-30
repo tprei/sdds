@@ -250,7 +250,6 @@ function searchNote(id: string): Note {
     createdAt: 1782993600000,
     id,
     images: [],
-    placeSlug: null,
     title: 'Cafe bom',
     updatedAt: 1782993600000,
     usefulCount: 0,
@@ -273,7 +272,6 @@ function catalogs(): Catalogs {
         slug: 'travel',
       },
     ],
-    places: [],
   };
 }
 

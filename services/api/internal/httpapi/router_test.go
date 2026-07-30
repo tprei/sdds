@@ -481,9 +481,7 @@ func (store fakeNoteStore) UnmarkUseful(ctx context.Context, input note.UnmarkUs
 
 type fakeCatalog struct {
 	listCategories     func(ctx context.Context) ([]note.Category, error)
-	listPlaces         func(ctx context.Context) ([]note.Place, error)
 	findActiveCategory func(ctx context.Context, slug note.CategorySlug) (note.Category, error)
-	findActivePlace    func(ctx context.Context, slug note.PlaceSlug) (note.Place, error)
 }
 
 func (catalog fakeCatalog) ListCategories(ctx context.Context) ([]note.Category, error) {
@@ -491,13 +489,6 @@ func (catalog fakeCatalog) ListCategories(ctx context.Context) ([]note.Category,
 		return catalog.listCategories(ctx)
 	}
 	return note.Categories, nil
-}
-
-func (catalog fakeCatalog) ListPlaces(ctx context.Context) ([]note.Place, error) {
-	if catalog.listPlaces != nil {
-		return catalog.listPlaces(ctx)
-	}
-	return note.Places, nil
 }
 
 func (catalog fakeCatalog) FindActiveCategory(ctx context.Context, slug note.CategorySlug) (note.Category, error) {
@@ -510,18 +501,6 @@ func (catalog fakeCatalog) FindActiveCategory(ctx context.Context, slug note.Cat
 		}
 	}
 	return note.Category{}, note.ErrCategoryNotFound
-}
-
-func (catalog fakeCatalog) FindActivePlace(ctx context.Context, slug note.PlaceSlug) (note.Place, error) {
-	if catalog.findActivePlace != nil {
-		return catalog.findActivePlace(ctx, slug)
-	}
-	for _, place := range note.Places {
-		if place.Slug == slug && place.Active {
-			return place, nil
-		}
-	}
-	return note.Place{}, note.ErrPlaceNotFound
 }
 
 type fakeUserStore struct {

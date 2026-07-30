@@ -89,23 +89,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/places": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List place catalog */
-        get: operations["listPlaces"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/auth/users": {
         parameters: {
             query?: never;
@@ -359,16 +342,8 @@ export interface components {
             next_cursor: string | null;
         };
         CategorySlug: string;
-        PlaceSlug: string;
         CatalogCategory: {
             slug: components["schemas"]["CategorySlug"];
-            label: string;
-            active: boolean;
-            /** Format: int32 */
-            display_order: number;
-        };
-        CatalogPlace: {
-            slug: components["schemas"]["PlaceSlug"];
             label: string;
             active: boolean;
             /** Format: int32 */
@@ -435,7 +410,6 @@ export interface components {
             category_slug: components["schemas"]["CategorySlug"];
             client_request_id: string;
             image_upload_ids?: string[];
-            place_slug?: (string & components["schemas"]["PlaceSlug"]) | null;
         };
         CreateSessionRequest: {
             username: string;
@@ -806,9 +780,6 @@ export interface components {
         ListCategoriesResponse: {
             categories: components["schemas"]["CatalogCategory"][];
         };
-        ListPlacesResponse: {
-            places: components["schemas"]["CatalogPlace"][];
-        };
         NoteImage: {
             id: string;
             /** Format: uri-reference */
@@ -833,7 +804,6 @@ export interface components {
             title: string;
             body: string;
             category_slug: components["schemas"]["CategorySlug"];
-            place_slug: (string & components["schemas"]["PlaceSlug"]) | null;
             author: components["schemas"]["AuthorSummary"];
             /**
              * Format: int64
@@ -855,7 +825,7 @@ export interface components {
             useful_by_current_user: boolean;
         };
         /** @enum {string} */
-        ValidationField: "title" | "body" | "category_slug" | "place_slug" | "q" | "username" | "password" | "display_name" | "limit" | "cursor" | "client_request_id" | "upload_request_id" | "image_upload_ids" | "file" | "target_type" | "target_id" | "reason" | "details";
+        ValidationField: "title" | "body" | "category_slug" | "q" | "username" | "password" | "display_name" | "limit" | "cursor" | "client_request_id" | "upload_request_id" | "image_upload_ids" | "file" | "target_type" | "target_id" | "reason" | "details";
         ValidationProblem: {
             field: components["schemas"]["ValidationField"];
             /** @enum {string} */
@@ -1132,53 +1102,6 @@ export interface operations {
                 };
             };
             /** @description The API could not list categories. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    listPlaces: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Place catalog rows. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListPlacesResponse"];
-                };
-            };
-            /** @description The request does not match the API contract. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description The request is missing a valid authenticated session. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description The API could not list places. */
             500: {
                 headers: {
                     [name: string]: unknown;

@@ -4,7 +4,7 @@ import "testing"
 
 func TestCreateRequestFingerprintFramesFieldsAndOrder(t *testing.T) {
 	base := CreateInput{
-		Title: "Title", Body: "Body", CategorySlug: CategorySlugFood, PlaceSlug: PlaceSlugSaoPaulo,
+		Title: "Title", Body: "Body", CategorySlug: CategorySlugFood,
 		ImageUploadIDs: []string{"upload-a", "upload-b"},
 	}
 	tests := []struct {
@@ -14,7 +14,6 @@ func TestCreateRequestFingerprintFramesFieldsAndOrder(t *testing.T) {
 		{"title", func(input *CreateInput) { input.Title = "Other title" }},
 		{"body", func(input *CreateInput) { input.Body = "Other body" }},
 		{"category", func(input *CreateInput) { input.CategorySlug = CategorySlugTravel }},
-		{"place", func(input *CreateInput) { input.PlaceSlug = PlaceSlugRioDeJaneiro }},
 		{"image value", func(input *CreateInput) { input.ImageUploadIDs[0] = "upload-c" }},
 		{"image order", func(input *CreateInput) {
 			input.ImageUploadIDs[0], input.ImageUploadIDs[1] = input.ImageUploadIDs[1], input.ImageUploadIDs[0]
@@ -42,7 +41,7 @@ func TestCreateRequestFingerprintFramesFieldsAndOrder(t *testing.T) {
 	raw := base
 	raw.UserID, raw.ClientRequestID = "user-a", "request-a"
 	raw.Title, raw.Body = " Title ", "\nBody\t"
-	raw.CategorySlug, raw.PlaceSlug = " food ", " sao-paulo "
+	raw.CategorySlug = " food "
 	if got, want := CreateRequestFingerprint(raw), CreateRequestFingerprint(NormalizeCreateInput(raw)); got != want {
 		t.Fatalf("raw fingerprint = %q, want normalized fingerprint %q", got, want)
 	}
@@ -52,7 +51,7 @@ func TestCreateRequestFingerprintFramesFieldsAndOrder(t *testing.T) {
 		t.Fatalf("receipt-key fingerprint = %q, want %q", got, want)
 	}
 
-	const want = "a663e5a87ebaba289a7d6cb6049914183e0e038366db244f527bc401d54bb5db"
+	const want = "afb8bae5ace182bf938659fb87acd5829536778374afba71f807a2713fcdeddd"
 	if got := CreateRequestFingerprint(base); got != want {
 		t.Fatalf("fingerprint = %q, want %q", got, want)
 	}

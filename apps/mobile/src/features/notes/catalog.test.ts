@@ -8,7 +8,6 @@ import {
   categoryLabel,
   labelNote,
   resolveSelectedCategorySlug,
-  resolveSelectedPlaceSlug,
 } from './catalog';
 import type { NoteCatalog } from './catalog';
 import type { Catalogs } from '@/lib/api/catalogs';
@@ -23,7 +22,6 @@ describe('note catalog helpers', () => {
       ...note,
       categoryHue: categoryColors.food,
       categoryLabel: 'Comida',
-      placeLabel: 'São Paulo',
     });
   });
 
@@ -31,14 +29,12 @@ describe('note catalog helpers', () => {
     const catalog = builtCatalog();
 
     expect(resolveSelectedCategorySlug(catalog, 'travel')).toBe('travel');
-    expect(resolveSelectedPlaceSlug(catalog, 'sao-paulo')).toBe('sao-paulo');
   });
 
   it('falls back when compose selections are no longer active', () => {
     const catalog = builtCatalog();
 
     expect(resolveSelectedCategorySlug(catalog, 'beauty')).toBe('food');
-    expect(resolveSelectedPlaceSlug(catalog, 'rio-de-janeiro')).toBeNull();
   });
 
   it('fails the catalog when an active category has no configured hue', () => {
@@ -51,7 +47,6 @@ describe('note catalog helpers', () => {
           slug: 'wellness',
         },
       ],
-      places: [],
     });
 
     expect(catalog).toBeNull();
@@ -67,7 +62,6 @@ describe('note catalog helpers', () => {
           slug: 'wellness',
         },
       ],
-      places: [],
     });
     if (catalog === null) {
       throw new Error('inactive hueless category must not fail the catalog');
@@ -101,20 +95,6 @@ function catalogs(): Catalogs {
         slug: 'travel',
       },
     ],
-    places: [
-      {
-        active: true,
-        displayOrder: 10,
-        label: 'São Paulo',
-        slug: 'sao-paulo',
-      },
-      {
-        active: false,
-        displayOrder: 20,
-        label: 'Rio de Janeiro',
-        slug: 'rio-de-janeiro',
-      },
-    ],
   };
 }
 
@@ -129,7 +109,6 @@ function apiNote(): Note {
     createdAt: 1782993600000,
     id: 'note-1',
     images: [],
-    placeSlug: 'sao-paulo',
     title: 'Café bom',
     updatedAt: 1782993600000,
     usefulCount: 0,

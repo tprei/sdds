@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestValidateCreateInputAcceptsCategoryAndOptionalPlace(t *testing.T) {
+func TestValidateCreateInputAcceptsValidInput(t *testing.T) {
 	problems := ValidateCreateInput(CreateInput{
 		Title:           "Café bom",
 		Body:            "Tem pão de queijo decente.",
@@ -26,7 +26,6 @@ func TestValidateCreateInputAllowsUnknownCatalogMetadata(t *testing.T) {
 		Body:            "Tem pão de queijo decente.",
 		CategorySlug:    "qualquer",
 		ClientRequestID: "domain-unknown-catalog",
-		PlaceSlug:       "qualquer-lugar",
 	})
 
 	if len(problems) != 0 {
@@ -39,14 +38,12 @@ func TestNormalizeCreateInputTrimsBoundaryFields(t *testing.T) {
 		Title:        " Café bom ",
 		Body:         "\nTem pão de queijo.\n",
 		CategorySlug: " food ",
-		PlaceSlug:    " sao-paulo ",
 	})
 
 	want := CreateInput{
 		Title:        "Café bom",
 		Body:         "Tem pão de queijo.",
 		CategorySlug: "food",
-		PlaceSlug:    "sao-paulo",
 	}
 	if diff := cmp.Diff(want, normalized); diff != "" {
 		t.Fatalf("normalized input mismatch (-want +got):\n%s", diff)
@@ -77,7 +74,6 @@ func TestValidateCreateInputTreatsTrimmedEmptyCategoryAsRequired(t *testing.T) {
 		Body:            "Tem pão de queijo decente.",
 		ClientRequestID: "domain-invalid-category",
 		CategorySlug:    "   ",
-		PlaceSlug:       "\n\t",
 	})
 
 	want := []ValidationProblem{

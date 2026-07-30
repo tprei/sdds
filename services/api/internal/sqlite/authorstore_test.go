@@ -191,13 +191,12 @@ func insertAuthorStoreNote(t *testing.T, ctx context.Context, db execer, id stri
 	t.Helper()
 	if _, err := db.ExecContext(
 		ctx,
-		`INSERT INTO notes (id, user_id, title, body, category_slug, place_slug, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO notes (id, user_id, title, body, category_slug, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		id,
 		userID,
 		"Café bom",
 		"Tem pão de queijo decente.",
 		note.CategorySlugFood,
-		note.PlaceSlugSaoPaulo,
 		createdAt,
 		createdAt,
 	); err != nil {

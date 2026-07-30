@@ -8,6 +8,8 @@ import type { Comment } from '@/lib/api/comments';
 import { Avatar } from '@/ui/avatar';
 import { Badge } from '@/ui/badge';
 import { Button } from '@/ui/button';
+import { IconButton } from '@/ui/icon-button';
+import { IconFlag, IconTrash } from '@/ui/icons';
 import { PressableScale } from '@/ui/pressable-scale';
 import { relativeTimeLabel } from '@/ui/relative-time';
 import { AppText } from '@/ui/text';
@@ -289,29 +291,19 @@ function CommentList({
       </AppText>
       <View style={styles.commentActions}>
         {comment.author.id === currentAuthorID ? (
-          <PressableScale
+          <IconButton
             accessibilityLabel="Excluir comentário"
-            accessibilityRole="button"
+            icon={<IconTrash color={semanticColors.textMeta} size={20} />}
             onPress={() => onDeleteComment(comment.id)}
-            style={styles.deleteControl}
             testID={`comment-delete-${comment.id}`}
-          >
-            <AppText color={colors.danger500} variant="sm" weight="semibold">
-              Excluir comentário
-            </AppText>
-          </PressableScale>
+          />
         ) : null}
-        <PressableScale
+        <IconButton
           accessibilityLabel="Denunciar comentário"
-          accessibilityRole="button"
+          icon={<IconFlag color={semanticColors.textMeta} size={20} />}
           onPress={() => onReportComment(comment.id)}
-          style={styles.reportControl}
           testID={`comment-report-${comment.id}`}
-        >
-          <AppText color={colors.danger500} variant="sm" weight="semibold">
-            Denunciar comentário
-          </AppText>
-        </PressableScale>
+        />
       </View>
       {deleteStatusByCommentID.get(comment.id) === 'error' ? (
         <AppText accessibilityRole="alert" color={colors.danger500} variant="sm" weight="semibold">

@@ -186,7 +186,19 @@ export const shadows = {
   },
 } as const;
 
-export type CategorySlug = keyof typeof categoryColors;
+export type CategoryHue = (typeof categoryColors)[keyof typeof categoryColors];
+
+// Resolves a catalog category's hue by slug. Returns `null` for a slug with
+// no configured hue instead of allowing an unsafe index into
+// `categoryColors` — every caller MUST handle the explicit failure. The
+// cast is safe: it only runs once `Object.hasOwn` has proven `slug` is one
+// of `categoryColors`' own keys.
+export function categoryHueFor(slug: string): CategoryHue | null {
+  if (!Object.hasOwn(categoryColors, slug)) {
+    return null;
+  }
+  return categoryColors[slug as keyof typeof categoryColors];
+}
 
 export const fontFamilies = {
   light: 'PlusJakartaSans_300Light',

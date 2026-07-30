@@ -1,3 +1,5 @@
+import { categoryHueFor } from '@sdds/tokens';
+
 import {
   listCategoriesResponseSchema,
   listPlacesResponseSchema,
@@ -75,12 +77,18 @@ function parseListCategoriesResponse(value: unknown): CatalogCategory[] {
     throw new CatalogAPIResponseError();
   }
 
-  return categoriesResponse.data.categories.map((value) => ({
-    active: value.active,
-    displayOrder: value.display_order,
-    label: value.label,
-    slug: value.slug,
-  }));
+  return categoriesResponse.data.categories.map((value) => {
+    if (categoryHueFor(value.slug) === null) {
+      throw new CatalogAPIResponseError();
+    }
+
+    return {
+      active: value.active,
+      displayOrder: value.display_order,
+      label: value.label,
+      slug: value.slug,
+    };
+  });
 }
 
 function parseListPlacesResponse(value: unknown): CatalogPlace[] {

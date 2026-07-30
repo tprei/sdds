@@ -1,7 +1,6 @@
 import { ScrollView, View } from 'react-native';
 
 import type { NoteCatalog } from './catalog';
-import type { CategorySlug } from '@sdds/tokens';
 
 import { CategoryChip, NeutralChip } from '@/ui/category-chip';
 
@@ -38,7 +37,7 @@ export function CategoryFilterControls({
               label={category.label}
               onPress={() => onSelectCategorySlug(category.slug)}
               selected={selectedCategorySlug === category.slug}
-              slug={category.slug as CategorySlug}
+              slug={category.slug}
             />
           ))}
         </ScrollView>

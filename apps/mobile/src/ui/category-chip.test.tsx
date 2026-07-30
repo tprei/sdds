@@ -122,6 +122,17 @@ describe('CategoryChip', () => {
     );
   });
 
+  it('renders nothing instead of throwing for a slug with no configured hue', () => {
+    const renderer = render(
+      React.createElement(CategoryChip, {
+        slug: 'wellness',
+        label: 'Bem-estar',
+        testID: 'c',
+      }),
+    );
+    expect(renderer.toJSON()).toBeNull();
+  });
+
   it('NeutralChip uses the neutral surface idle and selection when selected', () => {
     const selected = render(
       React.createElement(NeutralChip, {

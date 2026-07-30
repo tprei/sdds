@@ -4,11 +4,10 @@ import { Image, Pressable, View } from 'react-native';
 import type { Note } from '@/lib/api/notes';
 import {
   colors,
+  componentMetrics,
   motion,
   semanticColors,
-  type CategorySlug,
 } from '@sdds/tokens';
-import { componentMetrics } from '@sdds/tokens';
 
 import { AppText } from '@/ui/text';
 import { Avatar } from '@/ui/avatar';
@@ -179,7 +178,7 @@ function PhotoVariant({
       />
       <View style={styles.chipTopLeft}>
         <CategoryChip
-          slug={note.categorySlug as CategorySlug}
+          slug={note.categorySlug}
           label={categoryLabel}
           size="sm"
         />
@@ -199,7 +198,7 @@ function PostItVariant({
     <View style={styles.postItHeader}>
       <View style={styles.chipTopRight}>
         <CategoryChip
-          slug={note.categorySlug as CategorySlug}
+          slug={note.categorySlug}
           label={categoryLabel}
           size="sm"
         />

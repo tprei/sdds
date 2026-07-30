@@ -8,6 +8,8 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 import { AppTabBar } from './tab-bar';
+import { TAB_BAR_SLOT_COUNT } from './tab-bar.geometry';
+import { styles } from './tab-bar.styles';
 
 const { createElement } = React;
 type ReactNode = React.ReactNode;
@@ -66,6 +68,13 @@ function flatten(
   return [json, ...flatten((json.children ?? []).filter((child): child is ReactTestRendererJSON => typeof child !== 'string'))];
 }
 
+// A slot's accessibility props and its layout style sit on the same node, so
+// the style arrives as the array PressableScale composes with its transform.
+function slotStyle(node: ReactTestRendererJSON | undefined): unknown {
+  const style = node?.props.style;
+  return Array.isArray(style) ? style[0] : style;
+}
+
 const routes = [
   { key: 'index', name: 'index' },
   { key: 'search', name: 'search' },
@@ -111,5 +120,29 @@ describe('AppTabBar', () => {
       fab?.props.onPress();
     });
     expect(push).toHaveBeenCalledWith('/compose');
+  });
+
+  it('gives the FAB slot the same flex weight as a tab item, rendering TAB_BAR_SLOT_COUNT slots', () => {
+    const renderer = renderBar(0);
+    const json = renderer.toJSON() as unknown as ReactTestRendererJSON;
+    const slots = json.children ?? [];
+    expect(slots).toHaveLength(TAB_BAR_SLOT_COUNT);
+
+    const nodes = flatten(json);
+    const fabSlot = nodes.find(
+      (node) => node.props.accessibilityLabel === 'Escrever um achado',
+    );
+    const tabItem = nodes.find((node) => node.props.accessibilityRole === 'tab');
+    expect(slotStyle(fabSlot)).toBe(styles.fabSlot);
+    expect(slotStyle(tabItem)).toBe(styles.item);
+
+    // The equal-flex weight below is what makes tab-bar.geometry.ts's
+    // formula match this component's real rendered layout.
+    expect(styles.fabSlot.flex).toBe(styles.item.flex);
+    expect(Object.keys(styles.fabSlot).sort()).toEqual([
+      'alignItems',
+      'flex',
+      'justifyContent',
+    ]);
   });
 });

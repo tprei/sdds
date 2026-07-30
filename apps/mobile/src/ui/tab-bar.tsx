@@ -60,6 +60,12 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
           onPress={() => navigation.navigate(tab.name)}
         />
       ))}
+      {/*
+        fabSlot shares the item style's flex: 1 weight, so all five slots in
+        this row (2 tabs, the FAB, 2 tabs) divide the bar width evenly. See
+        tab-bar.geometry.ts for that slot math and tab-bar.geometry.test.ts
+        for the width/gap invariants it locks.
+      */}
       <PressableScale
         scaleTo={motion.pressIconScale}
         style={styles.fabSlot}

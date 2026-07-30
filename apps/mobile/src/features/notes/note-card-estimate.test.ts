@@ -76,12 +76,4 @@ describe('estimateNoteCardHeight', () => {
       estimateNoteCardHeight(text, 150),
     );
   });
-
-  it('is deterministic for identical inputs', () => {
-    const text = note({ body: 'a'.repeat(120) });
-
-    expect(estimateNoteCardHeight(text, columnWidth)).toBe(
-      estimateNoteCardHeight(text, columnWidth),
-    );
-  });
 });

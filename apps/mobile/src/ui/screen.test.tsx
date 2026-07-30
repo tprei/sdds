@@ -3,7 +3,6 @@ import { ScrollView } from 'react-native';
 import { describe, expect, it, vi } from 'vitest';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
-import { componentMetrics, spacing } from '@sdds/tokens';
 
 import { Screen } from './screen';
 
@@ -49,9 +48,9 @@ describe('Screen', () => {
     );
     const scroll = renderer.root.findByType(ScrollView);
     expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
-    expect(scroll.props.contentContainerStyle.paddingBottom).toBe(
-      componentMetrics.nav.height + spacing.sp7,
-    );
+    // 88 = the bottom nav's 64px clearance + 24px of extra breathing room
+    // above it, independent of whichever token names supply those values.
+    expect(scroll.props.contentContainerStyle.paddingBottom).toBe(88);
   });
 
   it('renders a flat body when scrolling is disabled', () => {

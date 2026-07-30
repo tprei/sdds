@@ -8,7 +8,6 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Comment } from '@/lib/api/comments';
-import { avatarInitials } from '@/ui/avatar-palette';
 
 import {
   commentThreadReducer,
@@ -194,7 +193,7 @@ describe('CommentsSection', () => {
         nextCursor: 'cursor-2',
       }),
     });
-    const authorLabel = `${avatarInitials('Thiago')}Thiago`;
+    const authorLabel = 'TThiago';
     expect(buttonLabels(idleRenderer)).toEqual([
       authorLabel,
       'Ver mais comentários',

@@ -33,6 +33,7 @@ vi.mock('react-native', () => {
     Animated: {
       View: NativeView,
       Value: AnimatedValue,
+      createAnimatedComponent: <T,>(component: T): T => component,
       timing: () => ({ start: () => {} }),
     },
     AccessibilityInfo: {
@@ -59,13 +60,20 @@ function leaf(
   return nodes[nodes.length - 1];
 }
 
+// Mirrors StyleSheet.flatten: a style prop can nest arrays arbitrarily
+// deep (PressableScale itself wraps the caller's style in one more array),
+// so this merges every object it finds at any depth.
 function flatStyle(node: ReactTestInstance): Record<string, unknown> {
-  const style = node.props.style;
-  const entries = Array.isArray(style) ? style : [style];
-  return entries.reduce<Record<string, unknown>>((acc, entry) => {
-    if (entry && typeof entry === 'object') Object.assign(acc, entry);
-    return acc;
-  }, {});
+  const acc: Record<string, unknown> = {};
+  const visit = (style: unknown): void => {
+    if (Array.isArray(style)) {
+      style.forEach(visit);
+    } else if (style && typeof style === 'object') {
+      Object.assign(acc, style);
+    }
+  };
+  visit(node.props.style);
+  return acc;
 }
 
 describe('CategoryChip', () => {

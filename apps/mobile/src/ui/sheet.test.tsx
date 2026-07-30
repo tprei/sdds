@@ -32,6 +32,7 @@ vi.mock('react-native', () => {
         return { setValue() {} };
       },
       timing: () => ({ start: () => {} }),
+      createAnimatedComponent: <T,>(component: T): T => component,
     },
     Easing: { out: (easing: unknown) => easing, ease: {} },
     Modal: ({ children }: NativeProps) => createElement('div', null, children),

@@ -30,6 +30,7 @@ vi.mock('react-native', () => {
     Animated: {
       View: AnimatedView,
       Value: AnimatedValue,
+      createAnimatedComponent: <T,>(component: T): T => component,
       timing: () => ({ start: () => {} }),
     },
     AccessibilityInfo: {

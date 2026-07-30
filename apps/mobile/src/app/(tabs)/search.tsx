@@ -36,6 +36,7 @@ import { registerPresentedNoteOrigin } from '@/features/notes/presented-note-ori
 import { estimateNoteCardHeight } from '@/features/notes/note-card-estimate';
 import { SearchIdle } from '@/features/notes/search-idle';
 import { BrandHeader } from '@/features/auth/brand-header';
+import { AppHeader } from '@/ui/app-header';
 import { Screen } from '@/ui/screen';
 import { SearchField } from '@/ui/search-field';
 import { Button } from '@/ui/button';
@@ -628,33 +629,39 @@ function AuthenticatedSearchScreen({
   }
 
   return (
-    <Screen scroll={false}>
-      <View style={styles.header}>
-        <View style={styles.searchRow}>
-          <View style={styles.searchFieldSlot}>
-            <SearchField
-              value={query}
-              onChangeText={handleQueryChange}
-              onSubmit={handleSubmit}
-              onClear={handleClear}
-              placeholder="O que você tá procurando?"
-              autoFocus={false}
-              testID="search-field-input"
-            />
-          </View>
-          <Button
-            variant="ghost"
-            label="Buscar"
-            onPress={handleSubmit}
-            disabled={catalogState.status !== 'ready'}
+    <Screen
+      scroll={false}
+      header={
+        <View style={styles.headerBlock}>
+          <AppHeader
+            center={
+              <SearchField
+                value={query}
+                onChangeText={handleQueryChange}
+                onSubmit={handleSubmit}
+                onClear={handleClear}
+                placeholder="O que você tá procurando?"
+                autoFocus={false}
+                testID="search-field-input"
+              />
+            }
+            right={
+              <Button
+                variant="ghost"
+                label="Buscar"
+                onPress={handleSubmit}
+                disabled={catalogState.status !== 'ready'}
+              />
+            }
+          />
+          <CategoryFilterControls
+            catalog={catalogState.status === 'ready' ? catalogState.catalog : null}
+            onSelectCategorySlug={handleSelectCategorySlug}
+            selectedCategorySlug={selectedCategorySlug}
           />
         </View>
-        <CategoryFilterControls
-          catalog={catalogState.status === 'ready' ? catalogState.catalog : null}
-          onSelectCategorySlug={handleSelectCategorySlug}
-          selectedCategorySlug={selectedCategorySlug}
-        />
-      </View>
+      }
+    >
       <ScrollView
         style={styles.resultsScroll}
         contentContainerStyle={styles.resultsContent}

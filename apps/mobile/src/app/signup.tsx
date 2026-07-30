@@ -15,6 +15,7 @@ import {
 import { AuthAPIRequestError } from '@/lib/api/auth';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { conflictStatus } from '@/lib/api/status';
+import { AppHeader } from '@/ui/app-header';
 import { Button } from '@/ui/button';
 import { Screen } from '@/ui/screen';
 import { AppText } from '@/ui/text';
@@ -66,7 +67,7 @@ export default function SignupScreen() {
   }
 
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} header={<AppHeader showWordmark />}>
       <View style={styles.shell}>
         <View style={styles.sunrise} />
         <ScrollView
@@ -74,7 +75,7 @@ export default function SignupScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.form}
         >
-          <BrandHeader />
+          <BrandHeader showWordmark={false} />
           <TextField
             accessibilityLabel="Seu nome"
             label="Nome de exibição"

@@ -14,6 +14,7 @@ import {
 import { AuthAPIRequestError } from '@/lib/api/auth';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { unauthorizedStatus } from '@/lib/api/status';
+import { AppHeader } from '@/ui/app-header';
 import { Button } from '@/ui/button';
 import { Screen } from '@/ui/screen';
 import { AppText } from '@/ui/text';
@@ -61,7 +62,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} header={<AppHeader showWordmark />}>
       <View style={styles.shell}>
         <View style={styles.sunrise} />
         <ScrollView
@@ -69,7 +70,7 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.form}
         >
-          <BrandHeader />
+          <BrandHeader showWordmark={false} />
           <TextField
             accessibilityLabel="Nome de usuário"
             autoCapitalize="none"

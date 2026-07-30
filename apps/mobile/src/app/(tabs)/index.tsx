@@ -405,19 +405,23 @@ function AuthenticatedHomeScreen({
   );
 
   return (
-    <Screen scroll={false}>
-      <HomeHeader
-        onScrollToTop={() => {
-          scrollRef.current?.scrollTo({ y: 0, animated: true });
-        }}
-        filterRail={
-          <CategoryFilterControls
-            catalog={catalogState.status === 'ready' ? catalogState.catalog : null}
-            onSelectCategorySlug={selectCategorySlug}
-            selectedCategorySlug={selectedCategorySlug}
-          />
-        }
-      />
+    <Screen
+      scroll={false}
+      header={
+        <HomeHeader
+          onScrollToTop={() => {
+            scrollRef.current?.scrollTo({ y: 0, animated: true });
+          }}
+          filterRail={
+            <CategoryFilterControls
+              catalog={catalogState.status === 'ready' ? catalogState.catalog : null}
+              onSelectCategorySlug={selectCategorySlug}
+              selectedCategorySlug={selectedCategorySlug}
+            />
+          }
+        />
+      }
+    >
       <ScrollView
         ref={scrollRef}
         style={styles.feedScroll}

@@ -7,8 +7,7 @@ import { ReadAuthGate } from '@/components/read-auth-gate';
 import { EmptyState } from '@/ui/empty-state';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { Screen } from '@/ui/screen';
-import { IconButton } from '@/ui/icon-button';
-import { IconChevronLeft } from '@/ui/icons';
+import { AppHeader } from '@/ui/app-header';
 
 import { styles } from './author-profile-screen.styles';
 
@@ -63,14 +62,7 @@ export default function AuthorProfileScreen() {
   }
 
   return (
-    <Screen scroll={false}>
-      <View style={styles.backRow}>
-        <IconButton
-          icon={<IconChevronLeft />}
-          accessibilityLabel="Voltar"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-        />
-      </View>
+    <Screen scroll={false} header={<AppHeader back />}>
       {content}
     </Screen>
   );

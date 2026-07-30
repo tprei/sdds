@@ -1,24 +1,13 @@
 import { StyleSheet } from 'react-native';
 
-import { semanticColors, spacing } from '@sdds/tokens';
+import { spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
-  header: {
-    backgroundColor: semanticColors.appBackground,
-    borderBottomColor: semanticColors.borderSubtle,
-    borderBottomWidth: 1,
+  // AppHeader owns the paper0 background, hairline, and horizontal inset;
+  // this only restores the gap that used to sit between the search row
+  // and the category rail.
+  headerBlock: {
     gap: spacing.sp3,
-    paddingBottom: spacing.sp3,
-    paddingHorizontal: spacing.sp3,
-    paddingTop: spacing.sp2,
-  },
-  searchRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sp2,
-  },
-  searchFieldSlot: {
-    flex: 1,
   },
   resultsScroll: {
     flex: 1,

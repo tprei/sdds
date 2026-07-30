@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { radius, semanticColors, spacing } from '@sdds/tokens';
+import { componentMetrics, radius, semanticColors, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   row: {
@@ -13,7 +13,7 @@ export const styles = StyleSheet.create({
     gap: spacing.sp2,
   },
   ringHost: {
-    padding: 3,
+    padding: componentMetrics.field.ringPadding,
     borderRadius: radius.pill,
   },
   ring: {
@@ -24,8 +24,8 @@ export const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   clear: {
-    width: 24,
-    height: 24,
+    width: componentMetrics.field.clearButtonSize,
+    height: componentMetrics.field.clearButtonSize,
     borderRadius: radius.pill,
     backgroundColor: semanticColors.sunkenBackground,
     alignItems: 'center',

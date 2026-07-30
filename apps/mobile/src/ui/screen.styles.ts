@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { semanticColors, spacing } from '@sdds/tokens';
+import { componentMetrics, semanticColors, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   container: {
@@ -11,7 +11,7 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingBottom: spacing.bottomNavHeight + spacing.sp7,
+    paddingBottom: componentMetrics.nav.height + spacing.sp7,
   },
   body: {
     flex: 1,

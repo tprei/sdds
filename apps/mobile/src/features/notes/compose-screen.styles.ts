@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { radius, semanticColors, spacing } from '@sdds/tokens';
+import { componentMetrics, radius, semanticColors, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   headerRow: {
@@ -27,7 +27,7 @@ export const styles = StyleSheet.create({
     borderWidth: 1.5,
     flexDirection: 'row',
     gap: spacing.sp3,
-    height: 88,
+    height: componentMetrics.compose.placeholder,
     justifyContent: 'center',
   },
   photoRow: {
@@ -40,8 +40,8 @@ export const styles = StyleSheet.create({
   },
   photoThumb: {
     borderRadius: radius.md,
-    height: 132,
-    width: 132,
+    height: componentMetrics.compose.thumb,
+    width: componentMetrics.compose.thumb,
   },
   removeImageChip: {
     alignItems: 'center',
@@ -49,12 +49,12 @@ export const styles = StyleSheet.create({
     // directly instead of duplicating the color as a new rgba literal.
     backgroundColor: semanticColors.scrim,
     borderRadius: radius.pill,
-    height: 24,
+    height: componentMetrics.compose.removeChipSize,
     justifyContent: 'center',
     position: 'absolute',
     right: spacing.sp2,
     top: spacing.sp2,
-    width: 24,
+    width: componentMetrics.compose.removeChipSize,
   },
   photoActions: {
     alignItems: 'flex-start',
@@ -66,12 +66,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: semanticColors.sunkenBackground,
     borderRadius: radius.pill,
-    // Height/padding match CategoryChip's `sm` size
-    // (ui/category-chip.styles.ts) so this action reads as the same
-    // chip family rather than a differently sized one-off.
-    height: 28,
+    height: componentMetrics.chip.sm.height,
     justifyContent: 'center',
-    paddingHorizontal: 11,
+    paddingHorizontal: componentMetrics.chip.sm.paddingHorizontal,
   },
   disabledChip: {
     opacity: 0.45,

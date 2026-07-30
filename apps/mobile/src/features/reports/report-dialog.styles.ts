@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { radius, semanticColors, spacing } from '@sdds/tokens';
+import { componentMetrics, radius, semanticColors, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   actions: {
@@ -25,7 +25,7 @@ export const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     justifyContent: 'center',
-    minHeight: 44,
+    minHeight: componentMetrics.minTarget,
     paddingHorizontal: spacing.sp4,
     paddingVertical: spacing.sp3,
   },

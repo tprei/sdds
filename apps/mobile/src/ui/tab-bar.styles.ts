@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { radius, semanticColors, shadows, spacing } from '@sdds/tokens';
+import { componentMetrics, radius, semanticColors, shadows, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   bar: {
@@ -22,13 +22,13 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fab: {
-    width: 54,
-    height: 38,
+    width: componentMetrics.fab.width,
+    height: componentMetrics.fab.height,
     borderRadius: radius.fab,
     backgroundColor: semanticColors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -4,
+    marginTop: componentMetrics.fab.marginTop,
     ...shadows.fab,
   },
 });

@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { colors, radius, semanticColors, shadows, spacing } from '@sdds/tokens';
+import { colors, componentMetrics, radius, semanticColors, shadows, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   card: {
@@ -25,24 +25,24 @@ export const styles = StyleSheet.create({
     borderBottomColor: colors.yellow200,
     borderBottomWidth: 1,
     overflow: 'hidden',
-    padding: 14,
+    padding: componentMetrics.card.headerPadding,
     position: 'relative',
   },
   chipTopLeft: {
-    left: 8,
+    left: spacing.sp3,
     position: 'absolute',
-    top: 8,
+    top: spacing.sp3,
     zIndex: 1,
   },
   chipTopRight: {
     position: 'absolute',
-    right: 8,
-    top: 8,
+    right: spacing.sp3,
+    top: spacing.sp3,
     zIndex: 1,
   },
   quoteMark: {
-    fontSize: 34,
-    lineHeight: 34,
+    fontSize: componentMetrics.card.quoteMarkSize,
+    lineHeight: componentMetrics.card.quoteMarkSize,
   },
   bodyExcerpt: {
     color: colors.ink700,
@@ -50,8 +50,8 @@ export const styles = StyleSheet.create({
   },
   titleBlock: {
     paddingBottom: spacing.sp3,
-    paddingHorizontal: 12,
-    paddingTop: 10,
+    paddingHorizontal: spacing.sp4,
+    paddingTop: componentMetrics.card.titlePaddingTop,
   },
   title: {
     color: semanticColors.textStrong,
@@ -60,23 +60,23 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sp2,
-    paddingBottom: 11,
-    paddingHorizontal: 12,
+    paddingBottom: componentMetrics.card.footerPaddingBottom,
+    paddingHorizontal: spacing.sp4,
   },
   authorTarget: {
     alignItems: 'center',
     flexShrink: 1,
     flexDirection: 'row',
     gap: spacing.sp2,
-    minHeight: 44,
+    minHeight: componentMetrics.minTarget,
   },
   authorName: {
     color: semanticColors.textMuted,
     flexShrink: 1,
   },
   errorBlock: {
-    paddingBottom: 10,
-    paddingHorizontal: 12,
+    paddingBottom: componentMetrics.card.errorPaddingBottom,
+    paddingHorizontal: spacing.sp4,
   },
   usefulError: {
     color: colors.danger500,

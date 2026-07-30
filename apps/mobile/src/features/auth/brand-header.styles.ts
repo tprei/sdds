@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { spacing } from '@sdds/tokens';
+import { componentMetrics, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   column: {
@@ -12,7 +12,7 @@ export const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   manifesto: {
-    maxWidth: 308,
+    maxWidth: componentMetrics.brandHeader.manifestoMaxWidth,
     textAlign: 'center',
   },
 });

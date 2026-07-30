@@ -1,13 +1,13 @@
 import { StyleSheet } from 'react-native';
 
-import { spacing } from '@sdds/tokens';
+import { componentMetrics, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   authorControl: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sp2,
-    minHeight: 44,
+    minHeight: componentMetrics.minTarget,
   },
   comment: {
     gap: spacing.sp3,

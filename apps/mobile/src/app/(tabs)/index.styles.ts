@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { spacing } from '@sdds/tokens';
+import { componentMetrics, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   errorWrap: {
@@ -11,7 +11,7 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   feedContent: {
-    paddingBottom: spacing.bottomNavHeight + spacing.sp7,
+    paddingBottom: componentMetrics.nav.height + spacing.sp7,
     paddingTop: spacing.sp3,
   },
   skeletonRow: {

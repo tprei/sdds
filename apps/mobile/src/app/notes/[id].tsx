@@ -10,7 +10,7 @@ import { ScrollView, View } from 'react-native';
 import type { TextInput } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
-import { colors, semanticColors } from '@sdds/tokens';
+import { colors, componentMetrics, semanticColors } from '@sdds/tokens';
 
 import { Screen } from '@/ui/screen';
 import { AppHeader } from '@/ui/app-header';
@@ -677,7 +677,7 @@ function AuthenticatedNoteDetailScreen({
                 }}
                 style={styles.authorControl}
               >
-                <Avatar name={readyNote.author.displayName} size={34} />
+                <Avatar name={readyNote.author.displayName} size={componentMetrics.avatar.md} />
                 <AppText color={semanticColors.textStrong} variant="body" weight="bold">
                   {readyNote.author.displayName}
                 </AppText>

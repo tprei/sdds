@@ -2,7 +2,7 @@ import type { Ref } from 'react';
 import type { TextInput } from 'react-native';
 import { View } from 'react-native';
 
-import { colors, semanticColors } from '@sdds/tokens';
+import { colors, componentMetrics, semanticColors } from '@sdds/tokens';
 
 import type { Comment } from '@/lib/api/comments';
 import { Avatar } from '@/ui/avatar';
@@ -276,7 +276,7 @@ function CommentList({
           onPress={() => onPressAuthor(comment.author.id)}
           style={styles.authorControl}
         >
-          <Avatar name={comment.author.displayName} size={32} />
+          <Avatar name={comment.author.displayName} size={componentMetrics.avatar.sm} />
           <AppText color={semanticColors.textMuted} variant="sm" weight="bold">
             {comment.author.displayName}
           </AppText>

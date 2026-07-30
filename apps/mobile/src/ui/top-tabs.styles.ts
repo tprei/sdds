@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { semanticColors, spacing } from '@sdds/tokens';
+import { componentMetrics, semanticColors, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   row: {
@@ -13,7 +13,7 @@ export const styles = StyleSheet.create({
     paddingBottom: spacing.sp2,
   },
   underline: {
-    borderRadius: 3,
+    borderRadius: componentMetrics.topTabs.underlineRadius,
     backgroundColor: semanticColors.accent,
     marginTop: spacing.sp1,
   },

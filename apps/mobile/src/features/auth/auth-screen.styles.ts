@@ -1,17 +1,17 @@
 import { StyleSheet } from 'react-native';
 
-import { colors, semanticColors, spacing, typography } from '@sdds/tokens';
+import { colors, componentMetrics, semanticColors, spacing, typography } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   metaText: {
     color: semanticColors.textBody,
     fontSize: typography.sizeBody,
-    lineHeight: 22,
+    lineHeight: componentMetrics.auth.metaLineHeight,
   },
   statusError: {
     color: colors.danger500,
     fontSize: typography.sizeSmall,
-    lineHeight: 19,
+    lineHeight: componentMetrics.auth.errorLineHeight,
   },
   shell: {
     flex: 1,

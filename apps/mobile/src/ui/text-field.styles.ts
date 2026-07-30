@@ -1,16 +1,16 @@
 import { StyleSheet } from 'react-native';
 
-import { radius, semanticColors, spacing } from '@sdds/tokens';
+import { componentMetrics, radius, semanticColors, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   field: {
     alignSelf: 'stretch',
   },
   label: {
-    marginBottom: 6,
+    marginBottom: componentMetrics.field.labelMarginBottom,
   },
   ringHost: {
-    padding: 3,
+    padding: componentMetrics.field.ringPadding,
     borderRadius: radius.md + 3,
   },
   ring: {
@@ -25,10 +25,10 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.sp3,
   },
   fieldRowFixed: {
-    height: 48,
+    height: componentMetrics.field.rowHeight,
   },
   fieldRowMultiline: {
-    minHeight: 160,
+    minHeight: componentMetrics.field.multilineMinHeight,
     alignItems: 'flex-start',
     paddingTop: spacing.sp3,
   },
@@ -38,7 +38,7 @@ export const styles = StyleSheet.create({
   },
   inputMultiline: {
     textAlignVertical: 'top',
-    minHeight: 160,
+    minHeight: componentMetrics.field.multilineMinHeight,
   },
   footnoteRow: {
     flexDirection: 'row',

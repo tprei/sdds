@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { radius, semanticColors, shadows, spacing } from '@sdds/tokens';
+import { componentMetrics, radius, semanticColors, shadows, spacing } from '@sdds/tokens';
 
 const primaryShadow = {
   shadowColor: '#06552C',
@@ -22,18 +22,18 @@ export const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   sm: {
-    height: 36,
-    paddingHorizontal: 14,
+    height: componentMetrics.button.sm.height,
+    paddingHorizontal: componentMetrics.button.sm.paddingHorizontal,
     borderRadius: radius.md,
   },
   md: {
-    height: 46,
+    height: componentMetrics.button.md.height,
     paddingHorizontal: spacing.sp6,
     borderRadius: radius.md,
   },
   lg: {
-    height: 54,
-    paddingHorizontal: 26,
+    height: componentMetrics.button.lg.height,
+    paddingHorizontal: componentMetrics.button.lg.paddingHorizontal,
     borderRadius: radius.lg,
   },
   primary: {

@@ -93,7 +93,6 @@ export const spacing = {
   sp12: 64,
   gutter: 16,
   masonryGap: 12,
-  bottomNavHeight: 64,
   maxAppWidth: 430,
 } as const;
 
@@ -202,10 +201,11 @@ export const motion = {
 } as const;
 
 // Pixel-exact layout metrics transcribed from the design spec (issue #180
-// comment 4), not derived from any component or style file. Consumers that
-// hardcode one of these numbers as a raw literal should read it from here
-// instead; `apps/mobile/src/ui/ds-metrics.test.ts` locks the real resolved
-// `.styles.ts` values against this list to catch silent drift.
+// comment 4), not derived from any component or style file. This is the
+// single source `.styles.ts` files and components read for a spec-locked
+// spacing, radius, or font-size value that isn't already covered by
+// `spacing`, `radius`, or `typography` (see `WRITING_REACT_NATIVE.md:72`).
+// Grouped per component; every key here has a real consumer.
 export const componentMetrics = {
   nav: {
     height: 64,
@@ -213,7 +213,6 @@ export const componentMetrics = {
   fab: {
     width: 54,
     height: 38,
-    radius: 13,
     marginTop: -4,
   },
   chip: {
@@ -233,10 +232,53 @@ export const componentMetrics = {
   compose: {
     thumb: 132,
     placeholder: 88,
+    removeChipSize: 24,
   },
   sheet: {
     handleWidth: 40,
     handleHeight: 4,
   },
   minTarget: 44,
+  card: {
+    headerPadding: 14,
+    quoteMarkSize: 34,
+    titlePaddingTop: 10,
+    footerPaddingBottom: 11,
+    errorPaddingBottom: 10,
+  },
+  auth: {
+    metaLineHeight: 22,
+    errorLineHeight: 19,
+  },
+  brandHeader: {
+    manifestoMaxWidth: 308,
+  },
+  actionBar: {
+    paddingVertical: 10,
+    pillHeight: 40,
+  },
+  composer: {
+    sheetPaddingHorizontal: 18,
+    quoteSize: 46,
+    bodyLineHeight: 24,
+    bodyMinHeight: 140,
+  },
+  badge: {
+    paddingHorizontal: 6,
+  },
+  button: {
+    sm: { height: 36, paddingHorizontal: 14 },
+    md: { height: 46 },
+    lg: { height: 54, paddingHorizontal: 26 },
+  },
+  field: {
+    ringPadding: 3,
+    clearButtonSize: 24,
+    labelMarginBottom: 6,
+    rowHeight: 48,
+    multilineMinHeight: 160,
+  },
+  topTabs: {
+    underlineRadius: 3,
+  },
 } as const;

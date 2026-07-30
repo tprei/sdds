@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { radius, shadows } from '@sdds/tokens';
+import { componentMetrics, radius, shadows } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   base: {
@@ -9,12 +9,12 @@ export const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   md: {
-    height: 34,
-    paddingHorizontal: 14,
+    height: componentMetrics.chip.md.height,
+    paddingHorizontal: componentMetrics.chip.md.paddingHorizontal,
   },
   sm: {
-    height: 28,
-    paddingHorizontal: 11,
+    height: componentMetrics.chip.sm.height,
+    paddingHorizontal: componentMetrics.chip.sm.paddingHorizontal,
   },
   selected: {
     ...shadows.xs,

@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { radius, semanticColors, spacing } from '@sdds/tokens';
+import { componentMetrics, radius, semanticColors, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   root: {
@@ -10,16 +10,16 @@ export const styles = StyleSheet.create({
     backgroundColor: semanticColors.cardSurface,
     borderTopWidth: 1,
     borderTopColor: semanticColors.borderSubtle,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: componentMetrics.chip.md.paddingHorizontal,
+    paddingVertical: componentMetrics.actionBar.paddingVertical,
   },
   pill: {
     flex: 1,
-    height: 40,
+    height: componentMetrics.actionBar.pillHeight,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sp3,
-    paddingHorizontal: 14,
+    paddingHorizontal: componentMetrics.chip.md.paddingHorizontal,
     backgroundColor: semanticColors.sunkenBackground,
     borderRadius: radius.pill,
   },

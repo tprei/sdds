@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { motion, semanticColors, spacing } from '@sdds/tokens';
+import { componentMetrics, motion, semanticColors } from '@sdds/tokens';
 
 import {
   IconBookmark,
@@ -48,7 +48,7 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
       style={[
         styles.bar,
         {
-          height: spacing.bottomNavHeight + insets.bottom,
+          height: componentMetrics.nav.height + insets.bottom,
           paddingBottom: insets.bottom,
         },
       ]}

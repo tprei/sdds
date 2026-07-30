@@ -219,4 +219,31 @@ describe('NoteCard', () => {
     expect(strings).not.toContain('sao-paulo');
     expect(strings).not.toContain('Mundo todo');
   });
+
+  it('puts note-card on the outermost card view, not the open-target pressable', () => {
+    const renderer = render(
+      <NoteCard
+        note={note()}
+        categoryLabel="Comida"
+        onPress={() => undefined}
+        onPressUseful={() => undefined}
+        usefulPending={false}
+        usefulError={null}
+      />,
+    );
+
+    // The card testID must sit above the footer row (author + useful), which
+    // OpenTarget's pressable never wraps, so a geometry check reading this
+    // node's boundingBox sees the whole visible card, not just the open target.
+    const json = renderer.toJSON();
+    expect(Array.isArray(json)).toBe(false);
+    const root = json as { props: { testID?: string } };
+    expect(root.props.testID).toBe('note-card');
+    expect(renderer.root.findByProps({ testID: 'note-card' })).toBeDefined();
+
+    const openTarget = renderer.root.findByProps({
+      accessibilityLabel: `Abrir nota: ${note().title}`,
+    });
+    expect(openTarget.props.testID).toBeUndefined();
+  });
 });

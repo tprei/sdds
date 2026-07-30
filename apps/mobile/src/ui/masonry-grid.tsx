@@ -21,9 +21,13 @@ export function MasonryGrid<T>({
 }: MasonryGridProps<T>) {
   const columns = splitIntoColumns(items, estimateHeight, columnCount);
   return (
-    <View style={styles.row}>
+    <View style={styles.row} testID="masonry-grid">
       {columns.map((column, columnIndex) => (
-        <View key={columnIndex} style={styles.column}>
+        <View
+          key={columnIndex}
+          style={styles.column}
+          testID={`masonry-column-${columnIndex}`}
+        >
           {column.map((item) => (
             <View key={keyFor(item)}>{renderItem(item)}</View>
           ))}

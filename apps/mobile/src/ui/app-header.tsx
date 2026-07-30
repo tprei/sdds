@@ -58,8 +58,8 @@ export function AppHeader({
   }
 
   return (
-    <View style={styles.container} testID={testID}>
-      <View style={styles.row}>
+    <View style={styles.container} testID={testID ?? 'app-header'}>
+      <View style={styles.row} testID="app-header-row">
         {back ? (
           <IconButton
             accessibilityLabel="Voltar"

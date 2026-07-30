@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { View } from 'react-native';
-import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { act, create, type ReactTestRenderer, type ReactTestRendererJSON } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AppHeader } from './app-header';
@@ -155,5 +155,20 @@ describe('AppHeader', () => {
     );
     expect(renderer.root.findByProps({ testID: 'center-slot' })).toBeDefined();
     expect(renderer.root.findByProps({ testID: 'right-slot' })).toBeDefined();
+  });
+
+  it('defaults the container testID to app-header, and lets a caller-supplied testID win', () => {
+    const defaulted = render(createElement(AppHeader, {}));
+    expect((defaulted.toJSON() as ReactTestRendererJSON).props.testID).toBe('app-header');
+
+    const overridden = render(createElement(AppHeader, { testID: 'custom-header' }));
+    expect((overridden.toJSON() as ReactTestRendererJSON).props.testID).toBe(
+      'custom-header',
+    );
+  });
+
+  it('marks the inset-capped inner row with app-header-row', () => {
+    const renderer = render(createElement(AppHeader, {}));
+    expect(renderer.root.findByProps({ testID: 'app-header-row' })).toBeDefined();
   });
 });

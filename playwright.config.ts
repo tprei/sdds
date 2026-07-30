@@ -11,7 +11,38 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      testIgnore: 'layout.spec.ts',
       use: { ...devices['Desktop Chrome'], ...(process.env.CI ? { channel: 'chrome' } : {}) },
+    },
+    {
+      name: 'layout-390x844',
+      testMatch: 'layout.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 390, height: 844 },
+        deviceScaleFactor: 1,
+        ...(process.env.CI ? { channel: 'chrome' } : {}),
+      },
+    },
+    {
+      name: 'layout-430x932',
+      testMatch: 'layout.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 430, height: 932 },
+        deviceScaleFactor: 1,
+        ...(process.env.CI ? { channel: 'chrome' } : {}),
+      },
+    },
+    {
+      name: 'layout-820x1180',
+      testMatch: 'layout.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 820, height: 1180 },
+        deviceScaleFactor: 1,
+        ...(process.env.CI ? { channel: 'chrome' } : {}),
+      },
     },
   ],
   reporter: [

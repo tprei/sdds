@@ -6,6 +6,8 @@ const expoConfig = require('eslint-config-expo/flat');
 const lintedFiles = [
   'apps/mobile/**/*.{ts,tsx}',
   'packages/tokens/src/**/*.ts',
+  'tests/synthetics/**/*.ts',
+  'playwright.config.ts',
 ];
 
 export default [
@@ -35,6 +37,7 @@ export default [
           project: [
             './apps/mobile/tsconfig.json',
             './packages/tokens/tsconfig.json',
+            './tsconfig.json',
           ],
         },
       },

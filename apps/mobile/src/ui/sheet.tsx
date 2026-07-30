@@ -37,15 +37,26 @@ export function Sheet({ visible, onClose, children, testID }: SheetProps) {
 
   return (
     <Modal transparent animationType="none" visible={visible} onRequestClose={onClose}>
-      <Pressable style={styles.scrim} onPress={onClose}>
+      {/*
+        On web, a Pressable's onPress fires on the DOM click's first ancestor
+        that has a press responder. The scrim sits behind the sheet as a
+        sibling here, not a wrapper, so a click anywhere inside the sheet
+        (e.g. the report textarea) never bubbles into the scrim and closes it.
+      */}
+      <View style={styles.root}>
+        <Pressable
+          accessibilityLabel="Fechar"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.scrim}
+        />
         <Animated.View
-          onStartShouldSetResponder={() => true}
           style={[styles.sheet, reduced ? null : { transform: [{ translateY: offset }] }]}
         >
           <View style={styles.handle} />
           <View testID={testID}>{children}</View>
         </Animated.View>
-      </Pressable>
+      </View>
     </Modal>
   );
 }

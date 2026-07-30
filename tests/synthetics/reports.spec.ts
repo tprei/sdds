@@ -54,7 +54,15 @@ test('reports a note and a comment, then keeps the content visible', async ({
     page.getByRole('heading', { name: 'Denunciar nota' }),
   ).toBeVisible();
   await page.getByTestId('report-reason-harmful_or_misleading').click();
-  await page.getByTestId('report-details').fill('conteúdo enganoso');
+
+  // A real click (not a programmatic .fill()) on the details textarea must
+  // not bubble to the scrim and close the sheet.
+  const reportDetails = page.getByTestId('report-details');
+  await reportDetails.click();
+  await reportDetails.pressSequentially('conteúdo enganoso');
+  await expect(page.getByTestId('report-sheet')).toBeVisible();
+  await expect(page.getByText('17/1000', { exact: true })).toBeVisible();
+
   await page.getByTestId('report-submit').click();
   await expect(
     page.getByText('Valeu por avisar! A gente cuida pra rede seguir feita pra humanos.'),

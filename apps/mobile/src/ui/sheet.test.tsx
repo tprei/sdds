@@ -58,6 +58,15 @@ function flatten(
   return [json, ...flatten((json.children ?? []).filter((child): child is ReactTestRendererJSON => typeof child !== 'string'))];
 }
 
+function containsTestID(
+  node: ReactTestRendererJSON | string | null,
+  testID: string,
+): boolean {
+  if (!node || typeof node === 'string') return false;
+  if (node.props.testID === testID) return true;
+  return (node.children ?? []).some((child) => containsTestID(child, testID));
+}
+
 describe('Sheet', () => {
   it('renders nothing when hidden', () => {
     const renderer = render(
@@ -84,5 +93,20 @@ describe('Sheet', () => {
       scrim?.props.onPress();
     });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('keeps the sheet content out of the scrim subtree', () => {
+    const renderer = render(
+      createElement(
+        Sheet,
+        { visible: true, onClose: vi.fn(), testID: 'sheet-content' },
+        'sheet body',
+      ),
+    );
+    const json = renderer.toJSON() as unknown as ReactTestRendererJSON;
+    expect(containsTestID(json, 'sheet-content')).toBe(true);
+    const scrim = flatten(json).find((node) => 'onPress' in node.props);
+    expect(scrim).toBeTruthy();
+    expect(containsTestID(scrim ?? null, 'sheet-content')).toBe(false);
   });
 });

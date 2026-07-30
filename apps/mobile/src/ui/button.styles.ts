@@ -2,14 +2,6 @@ import { StyleSheet } from 'react-native';
 
 import { componentMetrics, radius, semanticColors, shadows, spacing } from '@sdds/tokens';
 
-const primaryShadow = {
-  shadowColor: '#06552C',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.24,
-  shadowRadius: 8,
-  elevation: 2,
-};
-
 export const styles = StyleSheet.create({
   base: {
     flexDirection: 'row',
@@ -38,7 +30,7 @@ export const styles = StyleSheet.create({
   },
   primary: {
     backgroundColor: semanticColors.accent,
-    ...primaryShadow,
+    ...shadows.primaryButton,
   },
   secondary: {
     backgroundColor: semanticColors.cardSurface,

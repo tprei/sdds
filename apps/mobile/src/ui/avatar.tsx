@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
- import { radius, semanticColors, spacing } from '@sdds/tokens';
+import { componentMetrics, radius, semanticColors, spacing } from '@sdds/tokens';
 
 import { AppText } from './text';
 import { avatarColorsFor, avatarInitials } from './avatar-palette';
@@ -33,7 +33,7 @@ export function Avatar({ name, size, ring = false, testID }: AvatarProps) {
         variant="meta"
         weight="bold"
         color={ink}
-        style={{ fontSize: Math.round(size * 0.4) }}
+        style={{ fontSize: Math.round(size * componentMetrics.avatar.initialsScale) }}
       >
         {initials}
       </AppText>

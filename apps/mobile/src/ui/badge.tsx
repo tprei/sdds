@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import { semanticColors } from '@sdds/tokens';
+import { componentMetrics, semanticColors } from '@sdds/tokens';
 
 import { AppText } from './text';
 import { styles } from './badge.styles';
@@ -20,7 +20,7 @@ export function Badge({ label, tone = 'accent' }: BadgeProps) {
 
   return (
     <View style={[styles.base, { backgroundColor }]}>
-      <AppText variant="meta" weight="bold" color={color} style={{ fontSize: 10 }}>
+      <AppText variant="meta" weight="bold" color={color} style={{ fontSize: componentMetrics.badge.fontSize }}>
         {label}
       </AppText>
     </View>

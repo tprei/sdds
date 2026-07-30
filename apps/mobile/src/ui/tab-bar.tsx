@@ -76,7 +76,7 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
         testID="tab-fab-slot"
       >
         <View style={styles.fab}>
-          <IconPlus size={24} color={semanticColors.textOnAccent} strokeWidth={2.8} />
+          <IconPlus size={componentMetrics.icon.md} color={semanticColors.textOnAccent} strokeWidth={2.8} />
         </View>
       </PressableScale>
       {tabs.slice(2).map((tab) => (
@@ -111,7 +111,7 @@ function TabButton({
       accessibilityState={{ selected: active }}
       testID={`tab-item-${tab.name}`}
     >
-      <Icon size={24} color={color} strokeWidth={strokeWidth} filled={active} />
+      <Icon size={componentMetrics.icon.md} color={color} strokeWidth={strokeWidth} filled={active} />
       <AppText variant="meta" weight={active ? 'bold' : 'medium'} color={color}>
         {tab.label}
       </AppText>

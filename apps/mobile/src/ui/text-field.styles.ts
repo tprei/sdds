@@ -11,7 +11,7 @@ export const styles = StyleSheet.create({
   },
   ringHost: {
     padding: componentMetrics.field.ringPadding,
-    borderRadius: radius.md + 3,
+    borderRadius: componentMetrics.field.ringRadius,
   },
   ring: {
     backgroundColor: semanticColors.accentTint,

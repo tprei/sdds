@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
-import { motion, semanticColors } from '@sdds/tokens';
+import { componentMetrics, motion, semanticColors } from '@sdds/tokens';
 
 import { resolveTextVariant } from './text';
 import { IconSearch, IconX } from './icons';
@@ -41,7 +41,7 @@ export function SearchField({
 
   const row = (
     <View style={[styles.row, { height, borderColor }]}>
-      <IconSearch size={20} color={semanticColors.textMeta} />
+      <IconSearch size={componentMetrics.icon.sm} color={semanticColors.textMeta} />
       <TextInput
         testID={testID}
         value={value}
@@ -63,7 +63,7 @@ export function SearchField({
           accessibilityLabel="Limpar busca"
           style={styles.clear}
         >
-          <IconX size={13} color={semanticColors.textMeta} />
+          <IconX size={componentMetrics.icon.clear} color={semanticColors.textMeta} />
         </PressableScale>
       ) : null}
     </View>

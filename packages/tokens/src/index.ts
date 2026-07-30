@@ -163,6 +163,13 @@ export const shadows = {
     shadowRadius: 20,
     elevation: 6,
   },
+  primaryButton: {
+    shadowColor: colors.green700,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.24,
+    shadowRadius: 8,
+    elevation: 2,
+  },
   lg: {
     shadowColor: '#4A3620',
     shadowOffset: { width: 0, height: 14 },
@@ -228,6 +235,15 @@ export const componentMetrics = {
     sm: 32,
     md: 34,
     lg: 84,
+    initialsScale: 0.4,
+  },
+  icon: {
+    clear: 13,
+    chipRemove: 14,
+    edit: 15,
+    sm: 20,
+    md: 24,
+    lg: 28,
   },
   compose: {
     thumb: 132,
@@ -265,6 +281,7 @@ export const componentMetrics = {
   },
   badge: {
     paddingHorizontal: 6,
+    fontSize: 10,
   },
   button: {
     sm: { height: 36, paddingHorizontal: 14 },
@@ -273,6 +290,7 @@ export const componentMetrics = {
   },
   field: {
     ringPadding: 3,
+    ringRadius: 17,
     clearButtonSize: 24,
     labelMarginBottom: 6,
     rowHeight: 48,

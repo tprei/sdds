@@ -56,7 +56,8 @@ export function MetricStat({
 }: MetricStatProps) {
   const Icon = kindIcon[kind];
   const color = activeColor(kind, active);
-  const iconSize = size === 'sm' ? componentMetrics.metric.iconSize.sm : componentMetrics.metric.iconSize.md;
+  const { sm, md } = componentMetrics.metric.iconSize;
+  const iconSize = size === 'sm' ? sm : md;
   const showCount = kind !== 'saved' && count !== undefined;
 
   const body = (

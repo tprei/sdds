@@ -1,4 +1,4 @@
-import { semanticColors } from '@sdds/tokens';
+import { componentMetrics, semanticColors } from '@sdds/tokens';
 
 import { Screen } from '@/ui/screen';
 import { EmptyState } from '@/ui/empty-state';
@@ -20,7 +20,7 @@ export default function SavedScreen() {
       </AppText>
       <EmptyState
         title="Nenhum salvo ainda"
-        glyph={<IconBookmark color={semanticColors.textMeta} size={28} />}
+        glyph={<IconBookmark color={semanticColors.textMeta} size={componentMetrics.icon.lg} />}
       />
     </Screen>
   );

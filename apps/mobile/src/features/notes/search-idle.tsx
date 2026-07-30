@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import { semanticColors } from '@sdds/tokens';
+import { componentMetrics, semanticColors } from '@sdds/tokens';
 
 import { AppText } from '@/ui/text';
 import { IconButton } from '@/ui/icon-button';
@@ -34,7 +34,7 @@ export function SearchIdle({
           </View>
           {recentQueries.length > 0 ? (
             <IconButton
-              icon={<IconTrash size={20} color={semanticColors.textMeta} />}
+              icon={<IconTrash size={componentMetrics.icon.sm} color={semanticColors.textMeta} />}
               accessibilityLabel="Limpar buscas recentes"
               onPress={onClearRecents}
             />

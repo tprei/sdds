@@ -293,14 +293,14 @@ function CommentList({
         {comment.author.id === currentAuthorID ? (
           <IconButton
             accessibilityLabel="Excluir comentário"
-            icon={<IconTrash color={semanticColors.textMeta} size={20} />}
+            icon={<IconTrash color={semanticColors.textMeta} size={componentMetrics.icon.sm} />}
             onPress={() => onDeleteComment(comment.id)}
             testID={`comment-delete-${comment.id}`}
           />
         ) : null}
         <IconButton
           accessibilityLabel="Denunciar comentário"
-          icon={<IconFlag color={semanticColors.textMeta} size={20} />}
+          icon={<IconFlag color={semanticColors.textMeta} size={componentMetrics.icon.sm} />}
           onPress={() => onReportComment(comment.id)}
           testID={`comment-report-${comment.id}`}
         />

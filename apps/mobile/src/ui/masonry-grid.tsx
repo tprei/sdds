@@ -6,6 +6,7 @@ import { styles } from './masonry-grid.styles';
 
 export type MasonryGridProps<T> = {
   items: readonly T[];
+  columnCount: number;
   estimateHeight: (item: T) => number;
   renderItem: (item: T) => ReactNode;
   keyFor: (item: T) => string;
@@ -13,11 +14,12 @@ export type MasonryGridProps<T> = {
 
 export function MasonryGrid<T>({
   items,
+  columnCount,
   estimateHeight,
   renderItem,
   keyFor,
 }: MasonryGridProps<T>) {
-  const columns = splitIntoColumns(items, estimateHeight, 2);
+  const columns = splitIntoColumns(items, estimateHeight, columnCount);
   return (
     <View style={styles.row}>
       {columns.map((column, columnIndex) => (

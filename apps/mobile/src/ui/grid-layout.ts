@@ -2,6 +2,13 @@ import { spacing } from '@sdds/tokens';
 
 const columnCount = 2;
 
+/** The masonry grid geometry every surface renders and estimates against. */
+export type GridLayout = {
+  contentWidth: number;
+  columnCount: number;
+  columnWidth: number;
+};
+
 /**
  * Resolves the two-column masonry grid geometry for a given viewport width.
  *
@@ -13,11 +20,7 @@ const columnCount = 2;
  * A viewport narrower than the combined gutters and gap has no room for
  * content; `columnWidth` clamps at 0 rather than going negative.
  */
-export function resolveGridLayout(viewportWidth: number): {
-  contentWidth: number;
-  columnCount: number;
-  columnWidth: number;
-} {
+export function resolveGridLayout(viewportWidth: number): GridLayout {
   const contentWidth = Math.max(0, Math.min(viewportWidth, spacing.maxAppWidth));
   const columnWidth = Math.max(
     0,

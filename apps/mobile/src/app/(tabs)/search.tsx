@@ -39,12 +39,13 @@ import { BrandHeader } from '@/features/auth/brand-header';
 import { Screen } from '@/ui/screen';
 import { SearchField } from '@/ui/search-field';
 import { Button } from '@/ui/button';
+import { type GridLayout, resolveGridLayout } from '@/ui/grid-layout';
 import { MasonryGrid } from '@/ui/masonry-grid';
 import { NoteCardSkeleton } from '@/ui/skeleton';
 import { EmptyState } from '@/ui/empty-state';
 import { lightTick } from '@/ui/haptics';
 import { AppText } from '@/ui/text';
-import { semanticColors, spacing } from '@sdds/tokens';
+import { semanticColors } from '@sdds/tokens';
 
 import { styles } from './search.styles';
 
@@ -121,7 +122,7 @@ function AuthenticatedSearchScreen({
 }: AuthenticatedSearchScreenProps) {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const columnWidth = (width - 2 * spacing.gutter - spacing.masonryGap) / 2;
+  const gridLayout = resolveGridLayout(width);
   const productEvents = useProductEvents();
   const catalogRequestIDRef = useRef(0);
   const searchRequestIDRef = useRef(0);
@@ -664,7 +665,7 @@ function AuthenticatedSearchScreen({
         ) : (
           <SearchStateContent
             catalogState={catalogState}
-            columnWidth={columnWidth}
+            gridLayout={gridLayout}
             onClearRecents={() => setRecentQueries([])}
             onCompose={() => router.push('/compose')}
             onOpenAuthor={openAuthor}
@@ -683,7 +684,7 @@ function AuthenticatedSearchScreen({
 }
 function SearchStateContent({
   catalogState,
-  columnWidth,
+  gridLayout,
   onClearRecents,
   onCompose,
   onOpenAuthor,
@@ -696,7 +697,7 @@ function SearchStateContent({
   usefulMutations,
 }: {
   catalogState: CatalogState;
-  columnWidth: number;
+  gridLayout: GridLayout;
   onClearRecents: () => void;
   onCompose: () => void;
   onOpenAuthor: (authorID: string) => void;
@@ -781,10 +782,11 @@ function SearchStateContent({
         query={state.context.query}
       />
       <MasonryGrid
+        columnCount={gridLayout.columnCount}
         items={state.results}
         keyFor={(result) => result.note.id}
         estimateHeight={(result) =>
-          estimateNoteCardHeight(result.note, columnWidth)
+          estimateNoteCardHeight(result.note, gridLayout.columnWidth)
         }
         renderItem={(result) => (
           <NoteCard

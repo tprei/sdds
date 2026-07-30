@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
-import { colors, semanticColors, spacing } from '@sdds/tokens';
+import { colors, semanticColors } from '@sdds/tokens';
 
 import {
   NoteCard,
@@ -33,6 +33,7 @@ import { Avatar } from '@/ui/avatar';
 import { Button } from '@/ui/button';
 import { EmptyState } from '@/ui/empty-state';
 import { lightTick } from '@/ui/haptics';
+import { type GridLayout, resolveGridLayout } from '@/ui/grid-layout';
 import { MasonryGrid } from '@/ui/masonry-grid';
 import { styles } from './author-profile-content.styles';
 
@@ -110,7 +111,7 @@ function InitialError({
 }
 
 function ProfileNotes({
-  columnWidth,
+  gridLayout,
   isOwnProfile,
   notes,
   onCompose,
@@ -118,7 +119,7 @@ function ProfileNotes({
   onToggleUseful,
   usefulMutations,
 }: {
-  columnWidth: number;
+  gridLayout: GridLayout;
   isOwnProfile: boolean;
   notes: LabelledNote[];
   onCompose?: () => void;
@@ -139,9 +140,10 @@ function ProfileNotes({
 
   return (
     <MasonryGrid
+      columnCount={gridLayout.columnCount}
       items={notes}
       keyFor={(note) => note.id}
-      estimateHeight={(note) => estimateNoteCardHeight(note, columnWidth)}
+      estimateHeight={(note) => estimateNoteCardHeight(note, gridLayout.columnWidth)}
       renderItem={(note) => (
         <NoteCard
           categoryLabel={note.categoryLabel}
@@ -209,7 +211,7 @@ export function AuthorProfileContent({
 }: Props) {
   const productEvents = useProductEvents();
   const { width } = useWindowDimensions();
-  const columnWidth = (width - 2 * spacing.gutter - spacing.masonryGap) / 2;
+  const gridLayout = resolveGridLayout(width);
   const [author, setAuthor] = useState<PublicAuthor | null>(null);
   const [catalog, setCatalog] = useState<NoteCatalog | null>(null);
   const [notes, setNotes] = useState<LabelledNote[]>([]);
@@ -463,7 +465,7 @@ export function AuthorProfileContent({
     >
       <ProfileHeader author={author} isOwnProfile={isOwnProfile} />
       <ProfileNotes
-        columnWidth={columnWidth}
+        gridLayout={gridLayout}
         isOwnProfile={isOwnProfile}
         notes={notes}
         onCompose={onCompose}

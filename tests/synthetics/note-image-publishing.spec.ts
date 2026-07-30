@@ -6,6 +6,7 @@ import type { Locator, Page } from '@playwright/test';
 import {
   expectFixtureComparatorRejectsCorruptions,
   expectFixtureImage,
+  expectNoteMediaSource,
   fixturePath,
 } from './note-image-visual';
 import { syntheticPassword } from './support';
@@ -27,7 +28,7 @@ test('publishes an image through the UI for another signed-in user', async ({
   await authorSignupAndPublish(page, scenario);
   await logoutAndSignupReader(page, scenario);
   const readerImage = await discoverPublishedImage(page, scenario);
-  const readerProof = await expectFixtureImage(page, readerImage);
+  const readerProof = await expectNoteMediaSource(readerImage);
   await expectFixtureComparatorRejectsCorruptions(page);
   await viewPublishedNoteDetail(page, scenario, readerProof.mediaURL);
   await logoutReader(page);

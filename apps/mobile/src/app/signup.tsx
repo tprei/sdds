@@ -65,7 +65,7 @@ export default function SignupScreen() {
   }
 
   return (
-    <Screen scroll={false} header={<AppHeader showWordmark />}>
+    <Screen scroll={false} header={<AppHeader back />}>
       <View style={styles.shell}>
         <View style={styles.sunrise} />
         <ScrollView
@@ -73,7 +73,7 @@ export default function SignupScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.form}
         >
-          <BrandHeader showWordmark={false} />
+          <BrandHeader />
           <TextField
             accessibilityLabel="Seu nome"
             label="Nome de exibição"

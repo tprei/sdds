@@ -60,7 +60,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <Screen scroll={false} header={<AppHeader showWordmark />}>
+    <Screen scroll={false} header={<AppHeader back />}>
       <View style={styles.shell}>
         <View style={styles.sunrise} />
         <ScrollView
@@ -68,7 +68,7 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.form}
         >
-          <BrandHeader showWordmark={false} />
+          <BrandHeader />
           <TextField
             accessibilityLabel="Nome de usuário"
             autoCapitalize="none"

@@ -20,6 +20,7 @@ import { estimateNoteCardHeight } from '@/features/notes/note-card-estimate';
 import { HomeHeader } from '@/features/notes/home-header';
 import { BrandHeader } from '@/features/auth/brand-header';
 import { Screen } from '@/ui/screen';
+import { AppHeader } from '@/ui/app-header';
 import { type GridLayout, resolveGridLayout } from '@/ui/grid-layout';
 import { MasonryGrid } from '@/ui/masonry-grid';
 import { NoteCardSkeleton } from '@/ui/skeleton';
@@ -92,8 +93,8 @@ export default function HomeScreen() {
   }
 
   return (
-    <Screen>
-      <BrandHeader compact />
+    <Screen header={<AppHeader showWordmark />}>
+      <BrandHeader compact showWordmark={false} />
       <ReadAuthGate
         onLogin={() =>
           router.push({

@@ -109,10 +109,6 @@ export const radius = {
 } as const;
 
 export const typography = {
-  fontDisplay: 'Plus Jakarta Sans',
-  fontSans: 'Plus Jakarta Sans',
-  fontHand: 'Caveat',
-  systemFontFallback: 'system-ui',
   sizeDisplay: 40,
   sizeH1: 30,
   sizeH2: 24,

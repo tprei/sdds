@@ -24,6 +24,7 @@ import { MasonryGrid } from '@/ui/masonry-grid';
 import { NoteCardSkeleton } from '@/ui/skeleton';
 import { Button } from '@/ui/button';
 import { EmptyState } from '@/ui/empty-state';
+import { lightTick } from '@/ui/haptics';
 import { semanticColors, spacing } from '@sdds/tokens';
 
 import { styles } from './index.styles';
@@ -322,6 +323,7 @@ function AuthenticatedHomeScreen({
         } else {
           await apiClient.markNoteUseful(note.id);
         }
+        lightTick();
         try {
           productEvents.record(
             action === 'marked'

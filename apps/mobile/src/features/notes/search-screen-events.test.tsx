@@ -88,6 +88,10 @@ vi.mock('react-native-svg', () => {
   }
   return { Svg: Node, Path: Node, Circle: Node, Rect: Node };
 });
+vi.mock('@/ui/haptics', () => ({
+  lightTick: () => {},
+  success: () => {},
+}));
 vi.mock('@/components/note-card', () => ({
   NOTE_USEFUL_ERROR_MESSAGE: 'Não deu pra atualizar o Útil. Tenta de novo.',
   NoteCard: ({ note, ...props }: { note: { id: string } } & NativeProps) =>

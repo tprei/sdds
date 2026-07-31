@@ -136,24 +136,9 @@ vi.mock('@/ui/icons', () => ({
   IconChevronLeft: () => createElement('svg', null),
   IconFlag: () => createElement('svg', null),
 }));
-
-vi.mock('@/components/foundation-screen', () => ({
-  EmptyStateCard: ({ body, title }: { body: string; title: string }) =>
-    createElement('div', { body, title }),
-  FoundationButton: ({
-    label,
-    onPress,
-    testID,
-    disabled,
-  }: {
-    label: string;
-    onPress?: () => void;
-    testID?: string;
-    disabled?: boolean;
-  }) => createElement('button', { disabled, onPress, testID: testID ?? label }, label),
-  FoundationTextInput: (props: NativeProps) => createElement('input', props),
-  FoundationScreen: ({ children }: { children: ReactNode }) =>
-    createElement('section', null, children),
+vi.mock('@/ui/haptics', () => ({
+  lightTick: () => {},
+  success: () => {},
 }));
 
 vi.mock('expo-router', async () => {

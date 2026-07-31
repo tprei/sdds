@@ -7,6 +7,10 @@ export const styles = StyleSheet.create({
     gap: spacing.sp4,
     paddingHorizontal: spacing.gutter,
   },
+  media: {
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+  },
   metaRow: {
     alignItems: 'center',
     flexDirection: 'row',

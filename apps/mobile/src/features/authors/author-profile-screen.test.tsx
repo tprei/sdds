@@ -15,7 +15,11 @@ type AuthStateMock =
   | { status: 'loading' }
   | { status: 'anonymous' }
   | { status: 'error' }
-  | { status: 'authenticated'; token: string; user: { id: string } };
+  | {
+      status: 'authenticated';
+      token: string;
+      user: { author: { id: string }; id: string };
+    };
 
 const mocks = vi.hoisted(() => ({
   apiClient: {
@@ -38,17 +42,33 @@ vi.mock('react-native', () => {
     const content = typeof children === 'function' ? null : children;
     return createElement('div', props, content);
   }
+  function NativePressable({ children, ...props }: NativeProps) {
+    const content =
+      typeof children === 'function' ? children({ pressed: false }) : children;
+    return createElement('button', props, content);
+  }
+  class AnimatedValue {
+    value: number;
+    constructor(value: number) {
+      this.value = value;
+    }
+  }
   return {
+    Pressable: NativePressable,
     StyleSheet: { create: (styles: Record<string, unknown>) => styles },
     Text: NativeView,
     View: NativeView,
+    Animated: {
+      View: NativeView,
+      Value: AnimatedValue,
+      timing: () => ({ start: () => {} }),
+    },
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => {} }),
+    },
   };
 });
-vi.mock('../../components/foundation-screen', () => ({
-  EmptyStateCard: ({ title }: { title: string }) => createElement('div', { title }),
-  FoundationButton: ({ label, onPress }: { label: string; onPress?: () => void }) => createElement('button', { onPress }, label),
-  FoundationScreen: ({ children }: { children: ReactNode }) => createElement('section', null, children),
-}));
 vi.mock('../../features/authors/author-profile-content', () => ({
   AuthorProfileContent: (props: unknown) => {
     mocks.authorProfileContent(props);
@@ -88,7 +108,7 @@ describe('AuthorProfileScreen auth gate', () => {
     mocks.authState = {
       status: 'authenticated',
       token: 'session-token',
-      user: { id: 'user-id' },
+      user: { author: { id: 'user-id' }, id: 'user-id' },
     };
     mocks.localParams = { id: 'author-id' };
     mocks.authorProfileContent.mockClear();

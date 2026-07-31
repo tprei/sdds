@@ -1,8 +1,7 @@
 import type { Note } from '@/lib/api/notes';
-import {
-  maxNoteMediaAspectRatio,
-  minNoteMediaAspectRatio,
-} from '@/components/note-media';
+
+export const minNoteMediaAspectRatio = 0.75;
+export const maxNoteMediaAspectRatio = 1.5;
 
 // Approximate pixel metrics for the masonry layout's height estimate, tuned
 // against the current note-card typography and spacing (title line height

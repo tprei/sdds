@@ -28,6 +28,13 @@ vi.mock('react-native', () => {
     return createElement('div', props, content);
   }
 
+  class AnimatedValue {
+    value: number;
+    constructor(value: number) {
+      this.value = value;
+    }
+  }
+
   return {
     Image: NativeView,
     Platform: { OS: 'ios' },
@@ -36,23 +43,23 @@ vi.mock('react-native', () => {
     StyleSheet: { create: (styles: Record<string, unknown>) => styles },
     Text: NativeView,
     View: NativeView,
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 1, fontScale: 1 }),
+    Animated: {
+      View: NativeView,
+      Value: AnimatedValue,
+      timing: () => ({ start: () => {} }),
+    },
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => {} }),
+    },
   };
 });
-
-vi.mock('../../components/foundation-screen', () => ({
-  FoundationButton: ({
-    label,
-    onPress,
-  }: {
-    label: string;
-    onPress?: () => void;
-  }) =>
-    createElement(
-      'button',
-      { dataAction: 'retry', onClick: onPress },
-      createElement('span', null, label),
-    ),
+vi.mock('@/ui/haptics', () => ({
+  lightTick: () => {},
+  success: () => {},
 }));
+
 vi.mock('../../components/note-card', () => ({
   NOTE_USEFUL_ERROR_MESSAGE: 'Não deu pra atualizar o Útil. Tenta de novo.',
   NoteCard: (props: { note: Note; [key: string]: unknown }) =>
@@ -165,11 +172,11 @@ describe('AuthorProfileContent', () => {
     });
     expect(mocks.listAuthorNotes).toHaveBeenCalledTimes(2);
 
-    const retryButton = renderer!.root.findByProps({ dataAction: 'retry' });
+    const retryButton = renderer!.root.findByProps({ label: 'Tentar de novo' });
     expect(retryButton).toBeDefined();
 
     await act(async () => {
-      retryButton.props.onClick();
+      retryButton.props.onPress();
       await flushPromises();
     });
 

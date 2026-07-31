@@ -18,7 +18,7 @@ import { PressableScale } from '@/ui/pressable-scale';
 import {
   maxNoteMediaAspectRatio,
   minNoteMediaAspectRatio,
-} from './note-media';
+} from '@/features/notes/note-card-estimate';
 import { styles } from './note-card.styles';
 
 export const NOTE_USEFUL_ERROR_MESSAGE =

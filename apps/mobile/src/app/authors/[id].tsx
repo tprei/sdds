@@ -1,24 +1,16 @@
 import type { ReactNode } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 
-import { spacing } from '@sdds/tokens';
-
-import { FoundationScreen } from '../../components/foundation-screen';
-import { ReadAuthGate } from '../../components/read-auth-gate';
-import { AuthorProfileContent } from '../../features/authors/author-profile-content';
-import { useAuth } from '../../lib/auth/auth-provider';
+import { AuthorProfileContent } from '@/features/authors/author-profile-content';
+import { ReadAuthGate } from '@/components/read-auth-gate';
+import { EmptyState } from '@/ui/empty-state';
+import { useAuth } from '@/lib/auth/auth-provider';
+import { Screen } from '@/ui/screen';
 import { IconButton } from '@/ui/icon-button';
 import { IconChevronLeft } from '@/ui/icons';
 
-const screenStyles = StyleSheet.create({
-  root: { flex: 1 },
-  backRow: {
-    paddingHorizontal: spacing.sp3,
-    paddingVertical: spacing.sp2,
-  },
-});
+import { styles } from './author-profile-screen.styles';
 
 export default function AuthorProfileScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
@@ -33,26 +25,24 @@ export default function AuthorProfileScreen() {
   let content: ReactNode;
   if (authorID.length === 0) {
     content = (
-      <View>
-        <Text>Perfil não encontrado.</Text>
+      <View style={styles.fallback}>
+        <EmptyState title="Perfil não encontrado" />
       </View>
     );
   } else if (state.status === 'authenticated') {
     content = (
       <AuthorProfileContent
+        apiClient={apiClient}
         authorID={authorID}
+        isOwnProfile={authorID === state.user.author.id}
+        onCompose={() => router.push('/compose')}
         onPressNote={openNote}
         onSessionExpired={logout}
-        apiClient={apiClient}
       />
     );
   } else {
     content = (
-      <FoundationScreen
-        eyebrow="Autor"
-        title="Perfil"
-        description="Veja as notas publicadas por essa pessoa."
-      >
+      <View style={styles.fallback}>
         <ReadAuthGate
           onLogin={() =>
             router.push({
@@ -68,13 +58,13 @@ export default function AuthorProfileScreen() {
           }
           status={state.status}
         />
-      </FoundationScreen>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={screenStyles.root}>
-      <View style={screenStyles.backRow}>
+    <Screen scroll={false}>
+      <View style={styles.backRow}>
         <IconButton
           icon={<IconChevronLeft />}
           accessibilityLabel="Voltar"
@@ -82,6 +72,6 @@ export default function AuthorProfileScreen() {
         />
       </View>
       {content}
-    </SafeAreaView>
+    </Screen>
   );
 }

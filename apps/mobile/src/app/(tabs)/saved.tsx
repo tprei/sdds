@@ -1,16 +1,27 @@
-import { EmptyStateCard, FoundationScreen } from '@/components/foundation-screen';
+import { semanticColors } from '@sdds/tokens';
+
+import { Screen } from '@/ui/screen';
+import { EmptyState } from '@/ui/empty-state';
+import { AppText } from '@/ui/text';
+import { IconBookmark } from '@/ui/icons';
+
+import { styles } from './saved.styles';
 
 export default function SavedScreen() {
   return (
-    <FoundationScreen
-      eyebrow="Salvos"
-      title="Guarda o que vale voltar"
-      description="Cadernos e notas salvas entram aqui."
-    >
-      <EmptyStateCard
+    <Screen>
+      <AppText
+        color={semanticColors.textStrong}
+        style={styles.title}
+        variant="h1"
+        weight="extraBold"
+      >
+        Salvos
+      </AppText>
+      <EmptyState
         title="Nenhum salvo ainda"
-        body="Quando uma nota for útil pra depois, ela ganha lugar por aqui."
+        glyph={<IconBookmark color={semanticColors.textMeta} size={28} />}
       />
-    </FoundationScreen>
+    </Screen>
   );
 }

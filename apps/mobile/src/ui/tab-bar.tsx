@@ -83,7 +83,7 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
         testID="tab-fab-slot"
       >
         <View style={styles.fab}>
-          <IconPlus size={componentMetrics.icon.md} color={semanticColors.textOnAccent} strokeWidth={2.8} />
+          <IconPlus size={componentMetrics.icon.md} color={semanticColors.textOnAccent} />
         </View>
       </PressableScale>
       {tabs.slice(2).map((tab) => (
@@ -109,7 +109,6 @@ function TabButton({
 }) {
   const color = active ? semanticColors.accent : semanticColors.textMeta;
   const Icon = tab.Icon;
-  const strokeWidth = tab.name === 'search' && active ? 2.6 : 2;
   return (
     <PressableScale
       style={styles.item}
@@ -118,7 +117,7 @@ function TabButton({
       accessibilityState={{ selected: active }}
       testID={`tab-item-${tab.name}`}
     >
-      <Icon size={componentMetrics.icon.md} color={color} strokeWidth={strokeWidth} filled={active} />
+      <Icon size={componentMetrics.icon.md} color={color} filled={active} />
       <AppText variant="meta" weight={active ? 'bold' : 'medium'} color={color}>
         {tab.label}
       </AppText>

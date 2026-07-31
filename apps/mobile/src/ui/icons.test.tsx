@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { semanticColors } from '@sdds/tokens';
 
+import * as Icons from './icons';
 import { IconHeart, IconHome } from './icons';
 
 const { createElement } = React;
@@ -71,5 +72,27 @@ describe('icons', () => {
     const renderer = render(createElement(IconHome));
     const json = renderer.toJSON() as unknown as ReactTestRendererJSON;
     expect(json.children?.length).toBe(3);
+  });
+
+  it('every icon uses the 2px stroke and the 24×24 box', () => {
+    const iconFns = Object.values(Icons).filter(
+      (value) => typeof value === 'function',
+    ) as React.ComponentType[];
+    expect(iconFns.length).toBeGreaterThan(0);
+    for (const Icon of iconFns) {
+      const renderer = render(createElement(Icon as React.ComponentType));
+      const json = renderer.toJSON() as unknown as ReactTestRendererJSON;
+      const nodes = flatten(json);
+      const stroked = nodes.filter((node) => 'strokeWidth' in node.props);
+      // An icon with no stroked element is a structural mistake; a stroked
+      // element at anything but 2 breaks the uniform stroke language.
+      expect(stroked.length).toBeGreaterThan(0);
+      for (const node of stroked) {
+        expect(node.props.strokeWidth).toBe(2);
+      }
+      const boxes = nodes.filter((node) => 'viewBox' in node.props);
+      expect(boxes).toHaveLength(1);
+      expect(boxes[0].props.viewBox).toBe('0 0 24 24');
+    }
   });
 });

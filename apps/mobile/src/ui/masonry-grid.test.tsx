@@ -8,7 +8,10 @@ import {
 } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
+import { spacing } from '@sdds/tokens';
+
 import { MasonryGrid, type MasonryGridProps } from './masonry-grid';
+import { styles } from './masonry-grid.styles';
 
 const { createElement } = React;
 type ReactNode = React.ReactNode;
@@ -43,25 +46,37 @@ function texts(json: ReactTestRendererNode | ReactTestRendererNode[] | null): st
 type Item = { id: string };
 
 describe('MasonryGrid', () => {
-  it('balances four items across two columns preserving API order', () => {
+  function renderGrid(columnCount: number, ids: string[]): ReactTestRendererJSON {
     const Grid = MasonryGrid as (props: MasonryGridProps<Item>) => React.ReactElement;
     const renderer = render(
       createElement(Grid, {
-        items: [
-          { id: 'one' },
-          { id: 'two' },
-          { id: 'three' },
-          { id: 'four' },
-        ],
+        items: ids.map((id) => ({ id })),
+        columnCount,
         estimateHeight: () => 10,
         keyFor: (item: Item) => item.id,
         renderItem: (item: Item) => createElement('x-text', null, item.id),
       }),
     );
-    const json = renderer.toJSON() as unknown as ReactTestRendererJSON;
-    const columns = json.children ?? [];
+    return renderer.toJSON() as unknown as ReactTestRendererJSON;
+  }
+
+  it('balances four items across two columns preserving API order', () => {
+    const columns = renderGrid(2, ['one', 'two', 'three', 'four']).children ?? [];
     expect(columns.length).toBe(2);
     expect(texts(columns[0])).toEqual(['one', 'three']);
     expect(texts(columns[1])).toEqual(['two', 'four']);
+  });
+
+  it('renders the column count it is given rather than a fixed two', () => {
+    const columns = renderGrid(3, ['one', 'two', 'three']).children ?? [];
+    expect(columns.length).toBe(3);
+  });
+
+  it('caps the grid at maxAppWidth and centers the leftover space', () => {
+    // Every other surface is full-bleed, so the cap lives here; without it a
+    // wide viewport stretches two cards instead of widening the outer margin.
+    expect(styles.row.maxWidth).toBe(spacing.maxAppWidth);
+    expect(styles.row.alignSelf).toBe('center');
+    expect(styles.row.width).toBe('100%');
   });
 });

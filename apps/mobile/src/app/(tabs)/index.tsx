@@ -20,12 +20,13 @@ import { estimateNoteCardHeight } from '@/features/notes/note-card-estimate';
 import { HomeHeader } from '@/features/notes/home-header';
 import { BrandHeader } from '@/features/auth/brand-header';
 import { Screen } from '@/ui/screen';
+import { type GridLayout, resolveGridLayout } from '@/ui/grid-layout';
 import { MasonryGrid } from '@/ui/masonry-grid';
 import { NoteCardSkeleton } from '@/ui/skeleton';
 import { Button } from '@/ui/button';
 import { EmptyState } from '@/ui/empty-state';
 import { lightTick } from '@/ui/haptics';
-import { semanticColors, spacing } from '@sdds/tokens';
+import { semanticColors } from '@sdds/tokens';
 
 import { styles } from './index.styles';
 
@@ -118,8 +119,7 @@ function AuthenticatedHomeScreen({
 }: AuthenticatedHomeScreenProps) {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const columnWidth =
-    (width - 2 * spacing.gutter - spacing.masonryGap) / 2;
+  const gridLayout = resolveGridLayout(width);
   const scrollRef = useRef<ScrollView>(null);
   const requestIDRef = useRef(0);
   const selectedCategorySlugRef = useRef<string | null>(null);
@@ -435,7 +435,7 @@ function AuthenticatedHomeScreen({
         ) : (
           <FeedContent
             catalogState={catalogState}
-            columnWidth={columnWidth}
+            gridLayout={gridLayout}
             onCompose={() => router.push('/compose')}
             onOpenAuthor={(authorID) => {
               router.push({ pathname: '/authors/[id]', params: { id: authorID } });
@@ -483,7 +483,7 @@ function CatalogError() {
 
 function FeedContent({
   catalogState,
-  columnWidth,
+  gridLayout,
   onCompose,
   onOpenAuthor,
   onOpenNote,
@@ -494,7 +494,7 @@ function FeedContent({
   usefulMutations,
 }: {
   catalogState: CatalogState;
-  columnWidth: number;
+  gridLayout: GridLayout;
   onCompose: () => void;
   onOpenAuthor: (authorID: string) => void;
   onOpenNote: (presented: PresentedExploreNote) => void;
@@ -542,10 +542,11 @@ function FeedContent({
 
   return (
     <MasonryGrid
+      columnCount={gridLayout.columnCount}
       items={state.notes}
       keyFor={(presented) => presented.note.id}
       estimateHeight={(presented) =>
-        estimateNoteCardHeight(presented.note, columnWidth)
+        estimateNoteCardHeight(presented.note, gridLayout.columnWidth)
       }
       renderItem={(presented) => (
         <NoteCard

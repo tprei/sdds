@@ -12,7 +12,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sp2,
-    paddingHorizontal: spacing.sp3,
+    paddingHorizontal: spacing.gutter,
     paddingVertical: spacing.sp2,
   },
   wordmark: {

@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { colors, componentMetrics, semanticColors, spacing, typography } from '@sdds/tokens';
+import { componentMetrics, radius, semanticColors, spacing, typography } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   metaText: {
@@ -9,9 +9,13 @@ export const styles = StyleSheet.create({
     lineHeight: componentMetrics.auth.metaLineHeight,
   },
   statusError: {
-    color: colors.danger500,
+    color: semanticColors.danger,
     fontSize: typography.sizeSmall,
     lineHeight: componentMetrics.auth.errorLineHeight,
+    backgroundColor: semanticColors.dangerBg,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sp4,
+    paddingVertical: spacing.sp3,
   },
   shell: {
     flex: 1,
@@ -22,7 +26,7 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: '40%',
-    backgroundColor: colors.yellow200,
+    backgroundColor: semanticColors.brandWash,
     opacity: 0.55,
   },
   scroll: {

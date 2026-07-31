@@ -10,7 +10,7 @@ import { ScrollView, View } from 'react-native';
 import type { TextInput } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
-import { colors, componentMetrics, semanticColors } from '@sdds/tokens';
+import { componentMetrics, semanticColors } from '@sdds/tokens';
 
 import { Screen } from '@/ui/screen';
 import { AppHeader } from '@/ui/app-header';
@@ -738,7 +738,7 @@ function AuthenticatedNoteDetailScreen({
           {getMutationState(state.note.id) === 'error' ? (
             <AppText
               accessibilityRole="alert"
-              color={colors.danger500}
+              color={semanticColors.danger}
               style={styles.usefulError}
               testID="useful-error"
               variant="sm"

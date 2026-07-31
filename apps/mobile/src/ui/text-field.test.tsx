@@ -8,7 +8,7 @@ import {
 } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { colors, semanticColors } from '@sdds/tokens';
+import { semanticColors } from '@sdds/tokens';
 
 import { TextField } from './text-field';
 
@@ -81,7 +81,7 @@ describe('TextField', () => {
       }),
     );
     expect(nodeWithText(invalid, 'Campo obrigatório').props.color).toBe(
-      colors.danger500,
+      semanticColors.danger,
     );
 
     const valid = render(

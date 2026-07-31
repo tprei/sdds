@@ -3,7 +3,7 @@ import { Animated } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { colors } from '@sdds/tokens';
+import { semanticColors } from '@sdds/tokens';
 
 import { NoteCardSkeleton, Skeleton } from './skeleton';
 import { styles } from './skeleton.styles';
@@ -56,7 +56,7 @@ describe('Skeleton', () => {
     const renderer = render(React.createElement(Skeleton, { height: 80 }));
     const block = renderer.root.findByType(Animated.View);
     expect(block.props.style).toEqual(
-      expect.arrayContaining([expect.objectContaining({ backgroundColor: colors.paper2 })]),
+      expect.arrayContaining([expect.objectContaining({ backgroundColor: semanticColors.placeholderSurface })]),
     );
   });
 
@@ -84,7 +84,7 @@ describe('Skeleton', () => {
   });
 
   it('gives the card a paper surface so the paper2 bars stand out, never white', () => {
-    expect(styles.card.backgroundColor).not.toBe(colors.white);
-    expect(styles.card.backgroundColor).not.toBe(colors.paper2);
+    expect(styles.card.backgroundColor).not.toBe(semanticColors.cardSurface);
+    expect(styles.card.backgroundColor).not.toBe(semanticColors.placeholderSurface);
   });
 });

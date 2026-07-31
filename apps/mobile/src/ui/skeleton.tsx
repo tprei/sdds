@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Animated, View } from 'react-native';
 
-import { colors, motion, radius, spacing } from '@sdds/tokens';
+import { motion, radius, semanticColors, spacing } from '@sdds/tokens';
 
 import { styles } from './skeleton.styles';
 import { useReducedMotion } from './use-reduced-motion';
@@ -36,7 +36,7 @@ export function Skeleton({
         {
           height,
           borderRadius: radiusOverride,
-          backgroundColor: colors.paper2,
+          backgroundColor: semanticColors.placeholderSurface,
           opacity,
         },
       ]}

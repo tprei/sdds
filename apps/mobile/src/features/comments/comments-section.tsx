@@ -2,7 +2,7 @@ import type { Ref } from 'react';
 import type { TextInput } from 'react-native';
 import { View } from 'react-native';
 
-import { colors, componentMetrics, semanticColors } from '@sdds/tokens';
+import { componentMetrics, semanticColors } from '@sdds/tokens';
 
 import type { Comment } from '@/lib/api/comments';
 import { Avatar } from '@/ui/avatar';
@@ -89,12 +89,12 @@ export function CommentsSection({
           value={thread.draft}
         />
         {draftError === null ? null : (
-          <AppText accessibilityRole="alert" color={colors.danger500} variant="sm" weight="semibold">
+          <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm" weight="semibold">
             {draftErrorMessage(draftError)}
           </AppText>
         )}
         {thread.submitStatus === 'error' ? (
-          <AppText accessibilityRole="alert" color={colors.danger500} variant="sm" weight="semibold">
+          <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm" weight="semibold">
             Não deu pra publicar o comentário. Tenta de novo.
           </AppText>
         ) : null}
@@ -203,7 +203,7 @@ function LoadMoreControl({
   if (thread.loadMoreStatus === 'error') {
     return (
       <View style={styles.statusGroup}>
-        <AppText accessibilityRole="alert" color={colors.danger500} variant="body" weight="semibold">
+        <AppText accessibilityRole="alert" color={semanticColors.danger} variant="body" weight="semibold">
           Não deu pra carregar mais comentários. Tenta de novo.
         </AppText>
         <Button
@@ -229,7 +229,7 @@ function LoadMoreControl({
 function InitialLoadError({ onRetry }: { onRetry: () => void }) {
   return (
     <View style={styles.statusGroup}>
-      <AppText accessibilityRole="alert" color={colors.danger500} variant="body" weight="semibold">
+        <AppText accessibilityRole="alert" color={semanticColors.danger} variant="body" weight="semibold">
         Não deu pra carregar os comentários.
       </AppText>
       <Button
@@ -306,7 +306,7 @@ function CommentList({
         />
       </View>
       {deleteStatusByCommentID.get(comment.id) === 'error' ? (
-        <AppText accessibilityRole="alert" color={colors.danger500} variant="sm" weight="semibold">
+        <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm" weight="semibold">
           Não deu pra excluir o comentário. Tenta de novo.
         </AppText>
       ) : null}

@@ -1,10 +1,10 @@
 import { StyleSheet } from 'react-native';
 
-import { colors, componentMetrics, radius, semanticColors, shadows, spacing } from '@sdds/tokens';
+import { componentMetrics, radius, semanticColors, shadows, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   sheet: {
-    backgroundColor: colors.yellow100,
+    backgroundColor: semanticColors.postItSurface,
     borderRadius: radius.lg,
     overflow: 'hidden',
     paddingHorizontal: componentMetrics.composer.sheetPaddingHorizontal,

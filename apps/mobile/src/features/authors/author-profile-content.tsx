@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
-import { colors, componentMetrics, semanticColors } from '@sdds/tokens';
+import { componentMetrics, semanticColors } from '@sdds/tokens';
 
 import {
   NoteCard,
@@ -177,7 +177,7 @@ function PaginationStatus({
   if (error) {
     return (
       <View style={styles.statusGroup}>
-        <AppText accessibilityRole="alert" color={colors.danger500} variant="sm">
+        <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm">
           Não foi possível carregar mais notas.
         </AppText>
         <Button label="Tentar de novo" onPress={onRetry} variant="secondary" />

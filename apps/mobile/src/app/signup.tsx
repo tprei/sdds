@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { colors } from '@sdds/tokens';
-
 import { BrandHeader } from '@/features/auth/brand-header';
 import { styles } from '@/features/auth/auth-screen.styles';
 import {
@@ -106,7 +104,7 @@ export default function SignupScreen() {
           {submitState.status === 'error' ? (
             <AppText
               variant="sm"
-              color={colors.danger500}
+              style={styles.statusError}
               accessibilityRole="alert"
             >
               {submitState.message}

@@ -1,6 +1,6 @@
 import { ScrollView, View } from 'react-native';
 
-import { colors, semanticColors } from '@sdds/tokens';
+import { semanticColors } from '@sdds/tokens';
 import type { ReportReason, ReportTargetType } from '@/lib/api/reports';
 import { Button } from '@/ui/button';
 import { PressableScale } from '@/ui/pressable-scale';
@@ -86,18 +86,18 @@ export function ReportDialog({
             value={state.details}
           />
           {validation.error === 'too_long' ? (
-            <AppText accessibilityRole="alert" color={colors.danger500} variant="sm">
+            <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm">
               Pode ter até 1.000 caracteres.
             </AppText>
           ) : null}
         </View>
         {state.status === 'error' ? (
-          <AppText accessibilityRole="alert" color={colors.danger500} variant="sm">
+            <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm">
             Não deu pra enviar a denúncia. Tenta de novo.
           </AppText>
         ) : null}
         {state.status === 'missing' ? (
-          <AppText accessibilityRole="alert" color={colors.danger500} variant="sm">
+            <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm">
             Esse conteúdo não está mais disponível.
           </AppText>
         ) : null}

@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { colors, componentMetrics, radius, semanticColors, shadows, spacing } from '@sdds/tokens';
+import { componentMetrics, radius, semanticColors, shadows, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   card: {
@@ -12,7 +12,7 @@ export const styles = StyleSheet.create({
     ...shadows.xs,
   },
   photoFrame: {
-    backgroundColor: colors.paper2,
+    backgroundColor: semanticColors.placeholderSurface,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -21,8 +21,8 @@ export const styles = StyleSheet.create({
     width: '100%',
   },
   postItHeader: {
-    backgroundColor: colors.yellow100,
-    borderBottomColor: colors.yellow200,
+    backgroundColor: semanticColors.postItSurface,
+    borderBottomColor: semanticColors.postItBorder,
     borderBottomWidth: 1,
     overflow: 'hidden',
     padding: componentMetrics.card.headerPadding,
@@ -45,7 +45,7 @@ export const styles = StyleSheet.create({
     lineHeight: componentMetrics.card.quoteMarkSize,
   },
   bodyExcerpt: {
-    color: colors.ink700,
+    color: semanticColors.textBody,
     marginTop: spacing.sp1,
   },
   titleBlock: {
@@ -79,6 +79,6 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.sp4,
   },
   usefulError: {
-    color: colors.danger500,
+    color: semanticColors.danger,
   },
 });

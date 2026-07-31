@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import { colors, semanticColors } from '@sdds/tokens';
+import { semanticColors } from '@sdds/tokens';
 
 import { AppText } from '@/ui/text';
 
@@ -34,7 +34,7 @@ export function BrandHeader({ compact = false, showWordmark = true }: BrandHeade
           </AppText>
         </View>
       ) : null}
-      <AppText variant="hand" color={colors.green600}>
+      <AppText variant="hand" color={semanticColors.brandInk}>
         {TAGLINE}
       </AppText>
       {compact ? null : (

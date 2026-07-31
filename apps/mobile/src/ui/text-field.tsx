@@ -2,7 +2,7 @@ import { forwardRef, useState } from 'react';
 import type { TextInputProps } from 'react-native';
 import { TextInput, View } from 'react-native';
 
-import { colors, semanticColors } from '@sdds/tokens';
+import { semanticColors } from '@sdds/tokens';
 
 import { AppText, resolveTextVariant } from './text';
 import { styles } from './text-field.styles';
@@ -32,7 +32,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
   const [focused, setFocused] = useState(false);
   const body = resolveTextVariant('body');
   const borderColor = invalid
-    ? colors.danger500
+    ? semanticColors.danger
     : focused
       ? semanticColors.accent
       : semanticColors.borderSubtle;
@@ -84,7 +84,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
           {hint ? (
             <AppText
               variant="xs"
-              color={invalid ? colors.danger500 : semanticColors.textMeta}
+              color={invalid ? semanticColors.danger : semanticColors.textMeta}
               style={styles.hint}
             >
               {hint}

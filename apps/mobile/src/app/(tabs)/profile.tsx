@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { colors } from '@sdds/tokens';
+import { semanticColors } from '@sdds/tokens';
 
 import { AuthorProfileContent } from '@/features/authors/author-profile-content';
 import { Screen } from '@/ui/screen';
@@ -59,7 +59,7 @@ export default function ProfileScreen() {
         </View>
         <View style={styles.logoutSection}>
           {logoutState.status === 'error' ? (
-            <AppText accessibilityRole="alert" color={colors.danger500} variant="sm">
+            <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm">
               {logoutState.message}
             </AppText>
           ) : null}

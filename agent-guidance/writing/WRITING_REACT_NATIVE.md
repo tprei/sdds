@@ -12,6 +12,7 @@ This guide follows:
 - React Native Style: https://reactnative.dev/docs/style
 - React Native Accessibility: https://reactnative.dev/docs/accessibility
 - Airbnb React/JSX Style Guide: https://github.com/airbnb/javascript/tree/master/react
+- sdds design system: [canonical artifact](../../artifacts/design-system/DESIGN_SYSTEM.html), [design-system guide](../DESIGN_SYSTEM.md), and [frontend coding guide](WRITING_FRONTEND_CODE.md)
 
 ## Component design
 
@@ -54,7 +55,7 @@ This guide follows:
 
 ## Styling
 
-- DO use design-system tokens.
+- DO start with the [frontend coding guide](WRITING_FRONTEND_CODE.md) and use the canonical design-system artifact and tokens.
 - DO NOT scatter raw colors, spacing, font sizes, or radii.
 - DO use `StyleSheet.create` or small typed style objects.
 - DO keep style names concrete: `header`, `title`, `noteBody`, `actionRow`.
@@ -81,6 +82,7 @@ This guide follows:
 - DO NOT store derived state.
 - Feature state transitions MUST remain explicit: loading, success, empty, error, retry, cancellation, and cleanup where applicable.
 - Feature workflows MUST own stable request identity, receipt reuse/invalidation, retry/backoff, cancellation, and cleanup responsibility.
+- DO treat the canonical artifact as the review reference for the current visual language; future direction marked there is not shipped behavior.
 - A state machine MUST document allowed transitions, terminal states, retry/idempotency identity, time units, and cleanup responsibility when names and types do not make those contracts self-evident.
 - DO document platform lifecycle constraints and cancellation/cleanup ownership when they are not self-evident.
 

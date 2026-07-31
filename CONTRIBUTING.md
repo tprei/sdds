@@ -23,7 +23,7 @@ This project values small, reviewable changes. The goal is not only to make code
 
 ## Language-Specific Guidance
 
-Use the relevant [Go](agent-guidance/writing/WRITING_GO.md), [Expo and React Native](agent-guidance/writing/WRITING_REACT_NATIVE.md), or [TypeScript](agent-guidance/writing/WRITING_TYPESCRIPT.md) guide. For dependent PRs, use the [stacked-diffs guide](agent-guidance/writing/STACKED_DIFFS.md).
+Use the relevant [Go](agent-guidance/writing/WRITING_GO.md), [Expo and React Native](agent-guidance/writing/WRITING_REACT_NATIVE.md), [frontend coding](agent-guidance/writing/WRITING_FRONTEND_CODE.md), [TypeScript](agent-guidance/writing/WRITING_TYPESCRIPT.md), or [design-system](agent-guidance/DESIGN_SYSTEM.md) guide. For dependent PRs, use the [stacked-diffs guide](agent-guidance/writing/STACKED_DIFFS.md).
 
 ## Stacked Diffs
 

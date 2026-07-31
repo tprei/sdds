@@ -109,6 +109,7 @@ const author: PublicAuthor = {
   displayName: 'Marina Alves',
   id: 'author-id',
   noteCount: 2,
+  usefulReceivedCount: 14,
 };
 
 const catalogs: Catalogs = {
@@ -121,6 +122,48 @@ describe('AuthorProfileContent', () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
+
+  it('renders both the note count and the useful-received count as static stats', async () => {
+    mocks.getPublicAuthor.mockResolvedValue(author);
+    mocks.listCatalogs.mockResolvedValue(catalogs);
+    mocks.listAuthorNotes.mockResolvedValue({ notes: [], nextCursor: null });
+
+    let renderer: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <AuthorProfileContent
+          authorID="author-id"
+          onPressNote={() => undefined}
+          onSessionExpired={onSessionExpired}
+          apiClient={mockClient}
+        />,
+      );
+      await flushPromises();
+    });
+
+    expect(
+      renderer!.root.findByProps({ testID: 'author-profile-note-count' }),
+    ).toBeDefined();
+    expect(
+      renderer!.root.findAll(
+        (node) => node.props.children === author.noteCount,
+      ).length,
+    ).toBeGreaterThan(0);
+
+    const usefulStat = renderer!.root.findByProps({
+      testID: 'author-profile-useful-count',
+    });
+    expect(usefulStat).toBeDefined();
+    expect(
+      renderer!.root.findAll(
+        (node) => node.props.children === author.usefulReceivedCount,
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(textNodes(renderer!, 'úteis').length).toBeGreaterThan(0);
+
+    renderer!.unmount();
+  });
+
 
   it('waits for explicit retry after a pagination failure', async () => {
     mocks.getPublicAuthor.mockResolvedValue(author);
@@ -203,6 +246,7 @@ describe('AuthorProfileContent', () => {
       displayName: 'João Silva',
       id: 'next-author',
       noteCount: 1,
+      usefulReceivedCount: 3,
     };
     const nextProfile = deferred<PublicAuthor>();
     const nextPage = deferred<AuthorNotesPage>();
@@ -273,6 +317,7 @@ describe('AuthorProfileContent', () => {
       displayName: 'João Silva',
       id: 'next-author',
       noteCount: 1,
+      usefulReceivedCount: 3,
     };
     const nextProfile = deferred<PublicAuthor>();
     const nextPage = deferred<AuthorNotesPage>();

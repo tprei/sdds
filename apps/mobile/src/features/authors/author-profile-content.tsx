@@ -69,17 +69,31 @@ function ProfileHeader({
       >
         {author.displayName}
       </AppText>
-      <View style={styles.stat} testID="author-profile-note-count">
-        <AppText
-          color={semanticColors.textStrong}
-          variant="h3"
-          weight="extraBold"
-        >
-          {author.noteCount}
-        </AppText>
-        <AppText color={semanticColors.textMeta} variant="xs">
-          {noteCountLabel(author.noteCount)}
-        </AppText>
+      <View style={styles.statsRow}>
+        <View style={styles.stat} testID="author-profile-note-count">
+          <AppText
+            color={semanticColors.textStrong}
+            variant="h3"
+            weight="extraBold"
+          >
+            {author.noteCount}
+          </AppText>
+          <AppText color={semanticColors.textMeta} variant="xs">
+            {noteCountLabel(author.noteCount)}
+          </AppText>
+        </View>
+        <View style={styles.stat} testID="author-profile-useful-count">
+          <AppText
+            color={semanticColors.useful}
+            variant="h3"
+            weight="extraBold"
+          >
+            {author.usefulReceivedCount}
+          </AppText>
+          <AppText color={semanticColors.textMeta} variant="xs">
+            úteis
+          </AppText>
+        </View>
       </View>
     </View>
   );

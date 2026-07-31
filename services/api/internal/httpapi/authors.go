@@ -107,9 +107,10 @@ func decodeAuthorNotesCursor(encoded *string) (*note.AuthorNotePosition, []note.
 
 func newPublicAuthorResponse(profile author.PublicAuthor) openapi.PublicAuthor {
 	return openapi.PublicAuthor{
-		Id:          string(profile.ID),
-		DisplayName: profile.DisplayName,
-		NoteCount:   profile.NoteCount,
+		Id:                  string(profile.ID),
+		DisplayName:         profile.DisplayName,
+		NoteCount:           profile.NoteCount,
+		UsefulReceivedCount: profile.UsefulReceivedCount,
 	}
 }
 

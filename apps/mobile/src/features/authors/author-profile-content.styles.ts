@@ -14,6 +14,10 @@ export const styles = StyleSheet.create({
     paddingBottom: spacing.sp4,
     paddingHorizontal: spacing.gutter,
   },
+  statsRow: {
+    flexDirection: 'row',
+    gap: spacing.sp5,
+  },
   stat: {
     alignItems: 'center',
     marginTop: spacing.sp2,

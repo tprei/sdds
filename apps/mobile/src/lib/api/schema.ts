@@ -76,6 +76,7 @@ export const publicAuthorSchema = z.object({
   id: z.string(),
   display_name: z.string(),
   note_count: z.number().int().nonnegative(),
+  useful_received_count: z.number().int().nonnegative(),
 }) satisfies z.ZodType<GeneratedSchemas['PublicAuthor']>;
 
 export const noteImageSchema = z.object({

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { colors, semanticColors } from '@sdds/tokens';
+import { semanticColors } from '@sdds/tokens';
 import type { TextVariant } from './text';
 
 import { AppText } from './text';
@@ -44,7 +44,7 @@ const variantColor: Record<ButtonVariant, string> = {
   primary: semanticColors.textOnAccent,
   secondary: semanticColors.textStrong,
   ghost: semanticColors.textBody,
-  soft: colors.green600,
+  soft: semanticColors.accentSoftInk,
 };
 
 export function Button({

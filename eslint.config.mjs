@@ -57,6 +57,24 @@ const metricLiteralMessage =
   'Raw metric. Read this value from componentMetrics, spacing, radius, or ' +
   'typography in @sdds/tokens instead of writing the number here.';
 
+const rawColorMessage =
+  'Raw color. Read it from semanticColors in @sdds/tokens instead of writing the hex here.';
+
+// The raw palette is banned from app source: components must read the semantic
+// layer, never `colors.*`. `avatar-palette.ts` is the one intentional holder of
+// hex literals: the avatar background/ink pairs are hashed from a name and have
+// no semantic meaning to name. It is plain `.ts`, so the hex ban scoped to
+// `.tsx`/`.styles.ts` leaves it alone.
+const rawPaletteImport = [
+  {
+    name: '@sdds/tokens',
+    importNames: ['colors'],
+    message:
+      'Raw palette. Read the meaning from semanticColors in @sdds/tokens; ' +
+      'add a semantic name there if none fits.',
+  },
+];
+
 // `patterns`, not `paths`: `paths` matches an exact specifier, so
 // `vitest/config` and `react-test-renderer/shallow` would slip through.
 const testFrameworkPatterns = [
@@ -120,6 +138,14 @@ export default [
           selector: `${gatedStyleKey} ${gatedNumber}`,
           message: metricLiteralMessage,
         },
+        {
+          selector: `Literal[value=/^#[0-9a-fA-F]{3,8}$/]`,
+          message: rawColorMessage,
+        },
+        {
+          selector: `Literal[value=/^rgba?\\(/]`,
+          message: rawColorMessage,
+        },
       ],
     },
   },
@@ -139,13 +165,24 @@ export default [
           selector: `JSXAttribute[name.name='style'] ${gatedStyleKey} ${gatedNumber}`,
           message: metricLiteralMessage,
         },
+        {
+          selector: `Literal[value=/^#[0-9a-fA-F]{3,8}$/]`,
+          message: rawColorMessage,
+        },
+        {
+          selector: `Literal[value=/^rgba?\\(/]`,
+          message: rawColorMessage,
+        },
       ],
     },
   },
   {
     files: ['apps/mobile/src/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: testFrameworkPatterns }],
+      'no-restricted-imports': [
+        'error',
+        { patterns: testFrameworkPatterns, paths: rawPaletteImport },
+      ],
     },
   },
   {
@@ -154,7 +191,7 @@ export default [
       'apps/mobile/src/test-support/**/*.{ts,tsx}',
     ],
     rules: {
-      'no-restricted-imports': 'off',
+      'no-restricted-imports': ['error', { paths: rawPaletteImport }],
     },
   },
 ];

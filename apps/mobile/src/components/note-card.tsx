@@ -3,7 +3,6 @@ import { Image, Pressable, View } from 'react-native';
 
 import type { Note } from '@/lib/api/notes';
 import {
-  colors,
   componentMetrics,
   motion,
   semanticColors,
@@ -97,7 +96,7 @@ export function NoteCard({
           <AppText
             variant="sm"
             weight="semibold"
-            color={colors.danger500}
+            color={semanticColors.danger}
             accessibilityRole="alert"
           >
             {usefulError}
@@ -221,14 +220,14 @@ function PostItVariant({
       <AppText
         variant="h1"
         weight="extraBold"
-        color={colors.yellow500}
+        color={semanticColors.postItQuote}
         style={styles.quoteMark}
       >
         {QUOTE_MARK}
       </AppText>
       <AppText
         variant="sm"
-        color={colors.ink700}
+        color={semanticColors.textBody}
         numberOfLines={4}
         style={styles.bodyExcerpt}
       >

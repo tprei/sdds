@@ -6,7 +6,7 @@ import {
   UIImagePickerPreferredAssetRepresentationMode,
 } from 'expo-image-picker';
 
-import { colors, componentMetrics, semanticColors } from '@sdds/tokens';
+import { componentMetrics, semanticColors } from '@sdds/tokens';
 
 import { createComposeController } from '@/features/notes/compose-controller';
 import {
@@ -213,7 +213,7 @@ function AuthenticatedComposeScreen({
           </AppText>
         ) : null}
         {catalogState.status === 'error' ? (
-          <AppText color={colors.danger500} variant="sm">
+          <AppText color={semanticColors.danger} variant="sm">
             Não deu pra carregar categorias e lugares.
           </AppText>
         ) : null}
@@ -309,7 +309,7 @@ function AuthenticatedComposeScreen({
           </AppText>
         ) : null}
         {submitState.status === 'error' ? (
-          <AppText color={colors.danger500} variant="sm">
+          <AppText color={semanticColors.danger} variant="sm">
             {submitState.message}
           </AppText>
         ) : null}

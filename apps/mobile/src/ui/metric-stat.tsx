@@ -2,7 +2,7 @@ import { View } from 'react-native';
 
  import type { ComponentType } from 'react';
 
-import { colors, componentMetrics, motion, semanticColors, spacing } from '@sdds/tokens';
+import { componentMetrics, motion, semanticColors, spacing } from '@sdds/tokens';
 
 import { AppText } from './text';
 import {
@@ -40,7 +40,7 @@ function activeColor(kind: MetricKind, active: boolean): string {
   if (!active) return semanticColors.textMeta;
   if (kind === 'useful') return semanticColors.useful;
   if (kind === 'saved') return semanticColors.saved;
-  if (kind === 'endorse') return colors.yellow600;
+  if (kind === 'endorse') return semanticColors.warning;
   return semanticColors.textMeta;
 }
 

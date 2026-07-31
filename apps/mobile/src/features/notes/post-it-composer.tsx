@@ -1,6 +1,6 @@
 import { TextInput, View } from 'react-native';
 
-import { colors, semanticColors } from '@sdds/tokens';
+import { semanticColors } from '@sdds/tokens';
 
 import { AppText, resolveTextVariant } from '@/ui/text';
 
@@ -35,7 +35,7 @@ export function PostItComposer({
   return (
     <View style={styles.sheet}>
       <AppText
-        color={colors.yellow400}
+        color={semanticColors.postItQuote}
         style={styles.quote}
         variant="h1"
         weight="extraBold"

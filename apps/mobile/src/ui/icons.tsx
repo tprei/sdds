@@ -1,6 +1,6 @@
 import { Circle, Path, Rect, Svg } from 'react-native-svg';
 
-import { colors, semanticColors } from '@sdds/tokens';
+import { semanticColors } from '@sdds/tokens';
 
 export type IconProps = {
   size?: number;
@@ -36,7 +36,7 @@ export function IconHome({
       />
       <Path
         d="M9.5 21v-6h5v6"
-        stroke={filled ? colors.paper0 : color}
+        stroke={filled ? semanticColors.appBackground : color}
         strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"

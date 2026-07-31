@@ -100,7 +100,7 @@ export function CommentsSection({
         ) : null}
         <Button
           disabled={submitDisabled}
-          label={thread.submitStatus === 'pending' ? 'Publicando...' : 'Comentar'}
+          label={thread.submitStatus === 'pending' ? 'Publicando…' : 'Comentar'}
           onPress={() => onSubmit(validation.body)}
           testID="comment-submit"
           variant="primary"
@@ -133,7 +133,7 @@ function CommentThread({
   const count = displayedCommentCount(thread);
 
   if (thread.initialLoadStatus === 'loading' && count === 0) {
-    return <StatusMessage>Carregando comentários...</StatusMessage>;
+    return <StatusMessage>Carregando comentários…</StatusMessage>;
   }
 
   if (thread.initialLoadStatus === 'error' && count === 0) {
@@ -151,7 +151,7 @@ function CommentThread({
   return (
     <View style={styles.commentList}>
       {thread.initialLoadStatus === 'loading' ? (
-        <StatusMessage>Carregando comentários...</StatusMessage>
+        <StatusMessage>Carregando comentários…</StatusMessage>
       ) : null}
       {thread.initialLoadStatus === 'error' ? (
         <InitialLoadError onRetry={onRetryInitial} />
@@ -197,7 +197,7 @@ function LoadMoreControl({
   }
 
   if (thread.loadMoreStatus === 'pending') {
-    return <StatusMessage>Carregando comentários...</StatusMessage>;
+    return <StatusMessage>Carregando comentários…</StatusMessage>;
   }
 
   if (thread.loadMoreStatus === 'error') {

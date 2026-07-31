@@ -87,9 +87,9 @@ async function authorSignupAndPublish(
   await uploadFixture(page);
   await page.getByRole('button', { exact: true, name: 'Comida' }).click();
   await expect(
-    page.getByRole('button', { exact: true, name: 'Publicar' }),
+    page.getByRole('button', { exact: true, name: 'Publicar achado' }),
   ).toBeEnabled();
-  await page.getByRole('button', { exact: true, name: 'Publicar' }).click();
+  await page.getByRole('button', { exact: true, name: 'Publicar achado' }).click();
   await expectExplore(page);
   const authorCard = noteCard(page, scenario);
   await expectVisible(authorCard, 30_000);
@@ -121,8 +121,8 @@ async function logoutAndSignupReader(
     }),
     30_000,
   );
-  await expectVisible(page.getByRole('button', { exact: true, name: 'Sair' }));
-  await page.getByRole('button', { exact: true, name: 'Sair' }).click();
+  await expectVisible(page.getByRole('button', { exact: true, name: 'Sair da conta' }));
+  await page.getByRole('button', { exact: true, name: 'Sair da conta' }).click();
   await expectVisible(
     page.getByText('Entre para continuar', { exact: true }).first(),
     30_000,
@@ -139,7 +139,7 @@ async function logoutAndSignupReader(
     }),
     30_000,
   );
-  await expectVisible(page.getByRole('button', { exact: true, name: 'Sair' }));
+  await expectVisible(page.getByRole('button', { exact: true, name: 'Sair da conta' }));
 }
 async function discoverPublishedImage(
   page: Page,
@@ -211,10 +211,10 @@ async function logoutReader(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/(?:[?#]|$)/);
   await clickTab(page, 'Perfil');
   await expectVisible(
-    page.getByRole('button', { exact: true, name: 'Sair' }),
+    page.getByRole('button', { exact: true, name: 'Sair da conta' }),
     30_000,
   );
-  await page.getByRole('button', { exact: true, name: 'Sair' }).click();
+  await page.getByRole('button', { exact: true, name: 'Sair da conta' }).click();
   await expectVisible(
     page.getByRole('button', { exact: true, name: 'Criar conta' }),
     30_000,

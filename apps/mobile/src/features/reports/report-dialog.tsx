@@ -28,8 +28,8 @@ export type ReportDialogProps = {
 };
 
 const headingByTargetType: Record<ReportTargetType, string> = {
-  note: 'Denunciar nota',
-  comment: 'Denunciar comentário',
+  note: 'Denunciar esta nota?',
+  comment: 'Denunciar este comentário?',
 };
 
 export function ReportDialog({
@@ -55,7 +55,7 @@ export function ReportDialog({
           {heading}
         </AppText>
         <AppText color={semanticColors.textMuted} variant="sm">
-          Conta pra gente o que aconteceu. A denúncia não fica pública.
+          A gente olha toda denúncia. Nada é automático.
         </AppText>
         <View style={styles.reasonGroup}>
           {REPORT_REASON_OPTIONS.map((option) => {
@@ -111,7 +111,7 @@ export function ReportDialog({
           />
           <Button
             disabled={!canSubmitReport(state)}
-            label={pending ? 'Enviando...' : 'Enviar denúncia'}
+            label={pending ? 'Enviando…' : 'Enviar denúncia'}
             onPress={onSubmit}
             testID="report-submit"
             variant="primary"

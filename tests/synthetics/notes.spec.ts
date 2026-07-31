@@ -161,7 +161,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await page.getByLabel('Texto da nota').fill(body);
   await expect(page.getByRole('button', { name: 'Comida' })).toBeVisible();
   await page.getByRole('button', { name: 'Comida' }).click();
-  await page.getByRole('button', { name: 'Publicar' }).click();
+  await page.getByRole('button', { name: 'Publicar achado' }).click();
 
   await expect(
     page.getByRole('tab', { name: /^Explorar$/ }),
@@ -186,7 +186,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
     .getByRole('button', { name: `Abrir perfil do autor: ${displayName}` })
     .click();
   await expect(page).toHaveURL(/\/authors\/[^/?#]+$/);
-  await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sair da conta' })).toHaveCount(0);
   await expect(
     page.getByText(`Nome de usuário: ${username}`, { exact: true }),
   ).toHaveCount(0);
@@ -200,7 +200,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
 
   await clickTab(page, 'Buscar');
   await expect(
-    page.getByPlaceholder('O que você tá procurando?'),
+    page.getByPlaceholder('Buscar notas…'),
   ).toBeVisible();
 
   await page.getByTestId('search-field-input').fill(title);
@@ -281,9 +281,9 @@ test('creates a note and reads it from the API-backed home feed', async ({
     profileRoot.getByRole('button', { name: `Abrir nota: ${title}` }),
   ).toContainText(body);
   await expect(page.getByText(`Nome de usuário: ${username}`)).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Sair' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sair da conta' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Sair' }).click();
+  await page.getByRole('button', { name: 'Sair da conta' }).click();
   await expect(page.getByTestId('profile-signup-button')).toBeVisible({
     timeout: 30000,
   });
@@ -503,7 +503,7 @@ test('narrows the mobile search results by category and clears stale cards', asy
 
   await loginUser(page, session.user.username, '/search');
   await expect(
-    page.getByPlaceholder('O que você tá procurando?'),
+    page.getByPlaceholder('Buscar notas…'),
   ).toBeVisible();
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
@@ -593,7 +593,7 @@ test('orders search results by weighted title matches and handles punctuation-on
 
   await loginUser(page, session.user.username, '/search');
   await expect(
-    page.getByPlaceholder('O que você tá procurando?'),
+    page.getByPlaceholder('Buscar notas…'),
   ).toBeVisible();
 
   await page.getByTestId('search-field-input').fill(marker);
@@ -807,7 +807,7 @@ test('opens a public author profile and appends paginated notes', async ({
   await expect(
     page.getByText(`Nome de usuário: ${username}`, { exact: true }),
   ).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sair da conta' })).toHaveCount(0);
   const firstPage = await request.get(
     `${apiBaseURL}/v1/authors/${author.id}/notes?limit=20`,
     {

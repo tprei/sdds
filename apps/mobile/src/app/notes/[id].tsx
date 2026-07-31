@@ -686,7 +686,7 @@ function AuthenticatedNoteDetailScreen({
                 }}
                 style={styles.authorControl}
               >
-                <Avatar name={readyNote.author.displayName} size={componentMetrics.avatar.md} />
+                <Avatar name={readyNote.author.displayName} size={componentMetrics.avatar.sm} />
                 <AppText color={semanticColors.textStrong} variant="body" weight="bold">
                   {readyNote.author.displayName}
                 </AppText>

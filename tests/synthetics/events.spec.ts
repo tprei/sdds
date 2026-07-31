@@ -64,7 +64,7 @@ test('exports the authenticated search event lineage', async ({
 
   await loginUser(page, username, '/search');
   await expect(
-    page.getByPlaceholder('O que você tá procurando?'),
+    page.getByPlaceholder('Buscar notas…'),
   ).toBeVisible();
   await page.getByTestId('search-field-input').fill(marker);
 

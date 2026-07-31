@@ -115,7 +115,7 @@ export default function SignupScreen() {
             size="lg"
             block
             disabled={!canSubmit || isSubmitting}
-            label={isSubmitting ? 'Criando...' : 'Criar conta'}
+            label={isSubmitting ? 'Criando…' : 'Criar conta'}
             onPress={handleSubmit}
             testID="signup-submit-button"
           />

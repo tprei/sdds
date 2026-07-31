@@ -69,7 +69,7 @@ This guide follows:
 - Screenshots MUST be generated outside the repository, uploaded with `gh gist create --secret`, and embedded in the PR body as raw URLs. Screenshot artifacts MUST NOT be committed.
 - A screen with an approved mock MUST be shown side by side with that mock at the same viewport. The mock source is issue #180 comment 4.
 - When the mock and the written spec disagree, the spec's numbers win. The mock proves composition, hierarchy, and proportion, not exact metrics.
-- Spec-locked component metrics MUST come from `componentMetrics` in `@sdds/tokens`. DO NOT write a raw literal for a spacing, radius, or font-size value.
+- Spec-locked component metrics MUST come from `componentMetrics` in `@sdds/tokens`. DO NOT write a raw literal for a spacing, radius, or font-size value. This is lint-enforced: the `no-restricted-syntax` gate in `eslint.config.mjs` rejects a numeric metric in a `.styles.ts` stylesheet and in JSX — a numeric `size` prop, or a gated property inside an inline `style={{ … }}`. A value laundered through a local `const` is a known, documented hole; DO NOT use it to get around the gate. When the gate fires, move the value into `@sdds/tokens` and read it; DO NOT satisfy it with a test that asserts the literal is correct.
 - Layout MUST be judged against react-native-web semantics, not native. `flex: 1` resolves to `flexGrow: 1; flexShrink: 1; flexBasis: 0%`, `gap` and percentage heights differ from native, `shadow*` becomes `box-shadow`, and `hitSlop` is not implemented for `Pressable` on web. A web-only layout break is a real defect.
 - Touch targets MUST reach 44×44 through real box size on web. DO NOT rely on `hitSlop` to satisfy a target-size requirement.
 
@@ -114,3 +114,6 @@ This guide follows:
 - DO NOT use snapshot-only unit tests. A committed Playwright visual baseline is an appearance contract, not a snapshot-only test, and is required for approved design surfaces.
 - DO use durable accessibility contracts or a focused `testID`; DO NOT use broad order-dependent locators.
 - DO NOT test internal hook state directly when a user action can prove the behavior.
+- A guard whose expected value is a second transcription of the constant under test, or which reimplements the code under test, is not a test. It agrees with itself no matter what the code does. Fix the duplication instead.
+- Deleting a test that cannot fail on a real defect is a fix and needs no replacement. DO NOT preserve it for the coverage count.
+- Test helpers MUST live in `apps/mobile/src/test-support/`, never beside a production module. `vitest`, `react-test-renderer`, and `@playwright/test` are lint-banned elsewhere under `apps/mobile/src`.

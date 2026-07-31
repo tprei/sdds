@@ -44,12 +44,14 @@ sdds/
     api/             # Go HTTP API
   packages/
     tokens/          # shared design tokens for production code
+  artifacts/
+    design-system/   # versioned visual reference and source export
   openapi/           # source-of-truth HTTP JSON contract
   infra/
     compose/         # Docker Compose / Portainer deployment
 ```
 
-The local `design-system/` folder is ignored by Git. Production code should use the audited subset committed in `packages/tokens`.
+The canonical visual reference lives in [`artifacts/design-system/DESIGN_SYSTEM.html`](artifacts/design-system/DESIGN_SYSTEM.html) with its adjacent runtime asset. The source export ZIP is kept beside it for provenance. Production code should use the audited subset committed in `packages/tokens`; local `design-system/` exports remain ignored.
 
 ### Frontend
 

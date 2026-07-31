@@ -42,7 +42,7 @@ AI code must be easy for a human to audit.
 - Do not hide business rules in UI components, hooks, middleware, or database triggers.
 - Do not mix unrelated refactors into feature work.
 - Comments should represent the current world state, not describe changes over time. Do not write comments like "previously unauthenticated" or "now behind requireAuth" — write what the code does today.
-- Follow the writing guides in `agent-guidance/writing/WRITING_GO.md`, `agent-guidance/writing/WRITING_REACT_NATIVE.md`, `agent-guidance/writing/WRITING_TYPESCRIPT.md`, and `agent-guidance/writing/STACKED_DIFFS.md`.
+- Follow the [design-system guide](agent-guidance/DESIGN_SYSTEM.md) and the writing guides in `agent-guidance/writing/WRITING_GO.md`, `agent-guidance/writing/WRITING_REACT_NATIVE.md`, `agent-guidance/writing/WRITING_TYPESCRIPT.md`, and `agent-guidance/writing/STACKED_DIFFS.md`.
 
 ## Domain-Driven Design
 
@@ -72,7 +72,7 @@ Do not create generic `manager`, `processor`, `util`, or `service` packages when
 - Avoid global state libraries at first.
 - Avoid animation libraries at first.
 - Avoid Tailwind/NativeWind at first.
-- Use design-system tokens and small local primitives.
+- Use the canonical design-system artifact in `artifacts/design-system/DESIGN_SYSTEM.html`, design-system tokens, and small local primitives.
 - Prefer generated TypeScript types, or a thin generated client, from the OpenAPI contract for API boundaries.
 - Put API calls in `lib/api` or feature-specific API modules.
 - Keep screens mostly orchestration; move reusable presentation into components.

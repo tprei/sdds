@@ -1,4 +1,6 @@
 design-system
+!artifacts/design-system/
+!artifacts/design-system/**
 
 .DS_Store
 .env

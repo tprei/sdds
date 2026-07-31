@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FBEDB6;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#31241A;-webkit-font-smoothing:antialiased}
+a{color:#0B8043;text-decoration:none}a:hover{color:#06552C;text-decoration:underline}
+::selection{background:#F5C51C;color:#3A2E10}
+</style>
+</helmet>
+
+<div style="min-height:100vh">
+
+<!-- ============ CAPA ============ -->
+<header data-screen-label="Capa" style="background:#123722;color:#F2EFDC;padding:72px 24px 64px;position:relative;overflow:hidden">
+  <div style="position:absolute;top:-60px;right:6%;width:220px;height:220px;border-radius:999px;border:12px solid rgba(245,197,28,.09)"></div>
+  <div style="position:absolute;top:-30px;right:12%;width:150px;height:150px;border-radius:999px;border:7px solid rgba(245,197,28,.07)"></div>
+  <div style="position:absolute;bottom:-70px;left:4%;width:180px;height:180px;border-radius:999px;border:10px solid rgba(255,253,246,.05)"></div>
+  <div style="max-width:1060px;margin:0 auto;display:flex;flex-direction:column;gap:20px;position:relative">
+    <div style="display:flex;align-items:baseline;gap:2px">
+      <span style="font-size:64px;font-weight:800;letter-spacing:-0.02em;color:#FFFDF6">sdds</span>
+      <span style="font-size:64px;font-weight:800;color:#3FB56F">.</span>
+    </div>
+    <div style="font-family:Caveat,cursive;font-weight:600;font-size:34px;color:#F5C51C">Mata a saudade do que é bom.</div>
+    <p style="margin:0;max-width:640px;font-size:17px;line-height:1.6;color:rgba(247,233,207,.82)">Este é o <strong style="color:#FFFDF6">norte de design do sdds</strong> — a referência canônica e versionada que toda mudança de frontend segue. Vale para gente e para agentes de código: se o que você vai escrever contradiz este documento, ou o documento muda primeiro, ou o PR não entra.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:12px;font-weight:600">
+      <span style="background:rgba(255,253,246,.1);border:1px solid rgba(255,253,246,.18);border-radius:999px;padding:6px 14px">v1 · julho 2026</span>
+      <span style="background:rgba(255,253,246,.1);border:1px solid rgba(255,253,246,.18);border-radius:999px;padding:6px 14px">fonte: código versionado do sdds</span>
+      <span style="background:rgba(255,253,246,.1);border:1px solid rgba(255,253,246,.18);border-radius:999px;padding:6px 14px">tokens: packages/tokens/src/index.ts</span>
+    </div>
+    <nav style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+      <a href="#sentimento" style="color:#F7E9CF;background:rgba(255,253,246,.08);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600">1 · Sentimento</a>
+      <a href="#principios" style="color:#F7E9CF;background:rgba(255,253,246,.08);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600">2 · Princípios</a>
+      <a href="#cor" style="color:#F7E9CF;background:rgba(255,253,246,.08);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600">3 · Cor</a>
+      <a href="#tipografia" style="color:#F7E9CF;background:rgba(255,253,246,.08);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600">4 · Tipografia</a>
+      <a href="#metricas" style="color:#F7E9CF;background:rgba(255,253,246,.08);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600">5 · Espaço &amp; movimento</a>
+      <a href="#componentes" style="color:#F7E9CF;background:rgba(255,253,246,.08);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600">6 · Componentes</a>
+      <a href="#telas" style="color:#F7E9CF;background:rgba(255,253,246,.08);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600">7 · Telas</a>
+      <a href="#norte" style="color:#F7E9CF;background:rgba(255,253,246,.08);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600">8 · Norte de 1 ano</a>
+      <a href="#agentes" style="color:#F7E9CF;background:rgba(255,253,246,.08);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600">9 · Regras para agentes</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ============ 1 SENTIMENTO ============ -->
+<section id="sentimento" data-screen-label="Sentimento" style="max-width:1060px;margin:0 auto;padding:64px 24px 8px">
+  <div style="font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#2F55A4">01 · Sentimento</div>
+  <h2 style="margin:8px 0 0;font-size:34px;font-weight:800;letter-spacing:-0.02em;line-height:1.15">Café de domingo, com a família por perto</h2>
+  <p style="margin:14px 0 0;max-width:680px;font-size:17px;line-height:1.6;color:#55432F">O sdds existe pra matar saudade. Quem abre o app — muitas vezes um brasileiro morando fora — precisa sentir, em dois segundos, um pedacinho de casa: a mesa da tarde de domingo, o cheiro de café passado, gente de verdade recomendando coisa boa. Cada decisão visual serve a esse sentimento. Nada aqui é neutro, frio ou "de plataforma".</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:28px">
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:8px;box-shadow:0 2px 6px rgba(74,54,32,.07)">
+      <div style="font-family:Caveat,cursive;font-size:26px;font-weight:600;color:#0B8043">Saudade, não nostalgia genérica</div>
+      <p style="margin:0;font-size:14px;line-height:1.55;color:#55432F">O app fala com quem está longe. Cores de cozinha brasileira — madeira, café, azulejo, fruta madura — e não pastel escandinavo nem neon genérico. Referência é a nossa memória.</p>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:8px;box-shadow:0 2px 6px rgba(74,54,32,.07)">
+      <div style="font-family:Caveat,cursive;font-size:26px;font-weight:600;color:#2F55A4">Feito por gente</div>
+      <p style="margin:0;font-size:14px;line-height:1.55;color:#55432F">Post-its, aspas desenhadas, letra de caneta (Caveat), cartões levemente tortos. O conteúdo parece escrito à mão porque foi: notas pessoais, não feed de algoritmo. Nunca esterilizar essa textura.</p>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:8px;box-shadow:0 2px 6px rgba(74,54,32,.07)">
+      <div style="font-family:Caveat,cursive;font-size:26px;font-weight:600;color:#C79417">Aconchego com vida</div>
+      <p style="margin:0;font-size:14px;line-height:1.55;color:#55432F">Cozy não é sem graça. O bege atual morre no norte: fundo amarelo-manteiga suave, tinta espresso, verde-bandeira vivo no primário e azul-royal no secundário — brasileiro na cor, doméstico no tom. Ver <a href="#cor">Cor</a>.</p>
+    </div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:16px">
+    <div style="flex:1;min-width:280px;background:#E9F3E7;border:1px solid #BFDECB;border-radius:16px;padding:18px 22px">
+      <div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#06552C">É sdds</div>
+      <ul style="margin:8px 0 0;padding-left:18px;font-size:14px;line-height:1.7;color:#2E4A38">
+        <li>Mesa de café da tarde: pão na chapa, toalha xadrez, bolo de fubá</li>
+        <li>Caderninho de receitas da avó, bilhete na geladeira</li>
+        <li>"Confia, esse mercadinho tem pão de queijo de verdade"</li>
+        <li>Cores quentes, sombras suaves, cantos generosos</li>
+      </ul>
+    </div>
+    <div style="flex:1;min-width:280px;background:#F6E0D8;border:1px solid #E5B8A8;border-radius:16px;padding:18px 22px">
+      <div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#A03A29">Não é sdds</div>
+      <ul style="margin:8px 0 0;padding-left:18px;font-size:14px;line-height:1.7;color:#6B3B2E">
+        <li>Visual de rede social genérica — outra cultura, outro produto</li>
+        <li>Verde-amarelo chapado de uniforme/carnaval — as cores do Brasil entram quentes e domésticas, nunca de bandeira hasteada</li>
+        <li>Bege lavado, cinza corporativo, dark-mode-tech</li>
+        <li>Gradientes berrantes, glassmorphism, emoji como decoração</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2 PRINCÍPIOS ============ -->
+<section id="principios" data-screen-label="Princípios" style="max-width:1060px;margin:0 auto;padding:64px 24px 8px">
+  <div style="font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#2F55A4">02 · Princípios</div>
+  <h2 style="margin:8px 0 0;font-size:34px;font-weight:800;letter-spacing:-0.02em">Sete regras que não se negociam</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:24px">
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:14px;padding:18px 20px;display:flex;gap:14px"><div style="font-size:22px;font-weight:800;color:#0B8043;min-width:32px">1</div><div><div style="font-size:15px;font-weight:700">PT-BR primeiro, informal e útil</div><p style="margin:6px 0 0;font-size:13.5px;line-height:1.55;color:#55432F">Todo texto de interface em português do Brasil, tom de conversa: "Não deu pra carregar", "Ainda tá quietinho", "Diz alguma coisa boa…". Nunca tom corporativo, nunca tradução literal do inglês.</p></div></div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:14px;padding:18px 20px;display:flex;gap:14px"><div style="font-size:22px;font-weight:800;color:#0B8043;min-width:32px">2</div><div><div style="font-size:15px;font-weight:700">Papel, caneta e post-it</div><p style="margin:6px 0 0;font-size:13.5px;line-height:1.55;color:#55432F">A metáfora do produto é física: notas em papel sobre uma mesa. Post-it amarelo pra texto puro, foto colada pra nota com imagem, aspas grandes, rotação de −0.5° no compositor. Novas superfícies estendem a metáfora, não a substituem.</p></div></div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:14px;padding:18px 20px;display:flex;gap:14px"><div style="font-size:22px;font-weight:800;color:#0B8043;min-width:32px">3</div><div><div style="font-size:15px;font-weight:700">Útil &gt; viral</div><p style="margin:6px 0 0;font-size:13.5px;line-height:1.55;color:#55432F">A moeda social é "Útil" (coração verde), não like de vaidade. Nada de contadores inflados, badges de streak, dark patterns de engajamento. Busca e categorias são superfícies de produto de primeira classe.</p></div></div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:14px;padding:18px 20px;display:flex;gap:14px"><div style="font-size:22px;font-weight:800;color:#0B8043;min-width:32px">4</div><div><div style="font-size:15px;font-weight:700">Tokens ou nada</div><p style="margin:6px 0 0;font-size:13.5px;line-height:1.55;color:#55432F">Nenhum literal de cor, espaçamento, raio ou fonte em componente. Tudo vem de <code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">@sdds/tokens</code>: <code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">semanticColors</code>, <code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">spacing</code>, <code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">componentMetrics</code>. O lint bloqueia literais (PR #212).</p></div></div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:14px;padding:18px 20px;display:flex;gap:14px"><div style="font-size:22px;font-weight:800;color:#0B8043;min-width:32px">5</div><div><div style="font-size:15px;font-weight:700">Toque generoso</div><p style="margin:6px 0 0;font-size:13.5px;line-height:1.55;color:#55432F">Alvo mínimo de 44px (<code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">componentMetrics.minTarget</code>), hitSlop quando o visual é menor, rótulo acessível em todo controle só-ícone. Texto nunca truncado a ponto de esconder sentido.</p></div></div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:14px;padding:18px 20px;display:flex;gap:14px"><div style="font-size:22px;font-weight:800;color:#0B8043;min-width:32px">6</div><div><div style="font-size:15px;font-weight:700">Movimento discreto</div><p style="margin:6px 0 0;font-size:13.5px;line-height:1.55;color:#55432F">Só três durações (120/160/200ms) e três escalas de toque (0.97 botão, 0.98 cartão, 0.92 ícone). Sheet sobe com ease-out. <code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">prefers-reduced-motion</code> sempre respeitado. Nada de parallax, confete ou bounce.</p></div></div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:14px;padding:18px 20px;display:flex;gap:14px"><div style="font-size:22px;font-weight:800;color:#0B8043;min-width:32px">7</div><div><div style="font-size:15px;font-weight:700">Uma tela = um dono</div><p style="margin:6px 0 0;font-size:13.5px;line-height:1.55;color:#55432F">Toda tela usa <code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">Screen</code> + <code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">AppHeader</code>; conteúdo de feed respeita o teto de 430px (<code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">appWidthCap</code>). Primitivos novos nascem em <code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">src/ui</code> com teste; telas só orquestram.</p></div></div>
+  </div>
+</section>
+
+<!-- ============ 3 COR ============ -->
+<section id="cor" data-screen-label="Cor" style="max-width:1060px;margin:0 auto;padding:64px 24px 8px">
+  <div style="font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#2F55A4">03 · Cor</div>
+  <h2 style="margin:8px 0 0;font-size:34px;font-weight:800;letter-spacing:-0.02em">Hoje no código — e o norte v2</h2>
+  <p style="margin:14px 0 0;max-width:680px;font-size:15px;line-height:1.55;color:#55432F">A paleta atual (esquerda) é a verdade do código e é o que os componentes abaixo usam. O <strong>norte v2</strong> (direita) é agressivo de propósito: verde primário, azul-royal secundário, fundo amarelo-manteiga — as três cores do Brasil em versão doméstica, com croma de verdade no lugar do bege. A migração é um PR único em <code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">packages/tokens</code>: mesmos nomes, novos valores.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:20px;margin-top:24px">
+    <!-- atual -->
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;overflow:hidden">
+      <div style="padding:14px 20px;border-bottom:1px solid #EFE2C1;display:flex;justify-content:space-between;align-items:center"><span style="font-size:14px;font-weight:800">Atual · código</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">packages/tokens</span></div>
+      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px">
+        <div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#7F6B54;margin-bottom:6px">Papéis</div>
+          <div style="display:flex;gap:6px">
+            <div style="flex:1"><div style="height:52px;border-radius:8px;background:#FBF1DC;border:1px solid #E5CD9E"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">paper0 #FBF1DC</div></div>
+            <div style="flex:1"><div style="height:52px;border-radius:8px;background:#F5E7C8"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">paper1 #F5E7C8</div></div>
+            <div style="flex:1"><div style="height:52px;border-radius:8px;background:#ECD9AE"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">paper2 #ECD9AE</div></div>
+            <div style="flex:1"><div style="height:52px;border-radius:8px;background:#DFC791"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">paper3 #DFC791</div></div>
+          </div></div>
+        <div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#7F6B54;margin-bottom:6px">Tinta (ink) — verde-acinzentada</div>
+          <div style="display:flex;gap:6px">
+            <div style="flex:1"><div style="height:40px;border-radius:8px;background:#25342B"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">900</div></div>
+            <div style="flex:1"><div style="height:40px;border-radius:8px;background:#45544A"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">700</div></div>
+            <div style="flex:1"><div style="height:40px;border-radius:8px;background:#6E7A70"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">500</div></div>
+            <div style="flex:1"><div style="height:40px;border-radius:8px;background:#99A39A"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">400</div></div>
+            <div style="flex:1"><div style="height:40px;border-radius:8px;background:#B6BEB4"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">300</div></div>
+          </div></div>
+        <div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#7F6B54;margin-bottom:6px">Acentos</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <div style="width:84px"><div style="height:40px;border-radius:8px;background:#0B8043"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">green500</div></div>
+            <div style="width:84px"><div style="height:40px;border-radius:8px;background:#06552C"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">green700</div></div>
+            <div style="width:84px"><div style="height:40px;border-radius:8px;background:#E1F5E8;border:1px solid #ADE3C4"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">green100</div></div>
+            <div style="width:84px"><div style="height:40px;border-radius:8px;background:#F5C51C"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">yellow500</div></div>
+            <div style="width:84px"><div style="height:40px;border-radius:8px;background:#FFF3C4"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">yellow100</div></div>
+            <div style="width:84px"><div style="height:40px;border-radius:8px;background:#3A5A9E"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">blue500</div></div>
+            <div style="width:84px"><div style="height:40px;border-radius:8px;background:#C94F3D"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">danger500</div></div>
+          </div></div>
+      </div>
+    </div>
+    <!-- norte v2 -->
+    <div style="background:#FFFDF6;border:2px solid #2F55A4;border-radius:16px;overflow:hidden;box-shadow:0 6px 18px rgba(74,54,32,.09)">
+      <div style="padding:14px 20px;border-bottom:1px solid #EFD98D;display:flex;justify-content:space-between;align-items:center;background:#FBEED3"><span style="font-size:14px;font-weight:800;color:#2F55A4">Norte v2 · proposta</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">mesmos nomes, novos valores</span></div>
+      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px">
+        <div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#7F6B54;margin-bottom:6px">Papéis — amarelo-manteiga suave, nada de bege</div>
+          <div style="display:flex;gap:6px">
+            <div style="flex:1"><div style="height:52px;border-radius:8px;background:#FBEDB6"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">paper0 #FBEDB6</div></div>
+            <div style="flex:1"><div style="height:52px;border-radius:8px;background:#F7E29B"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">paper1 #F7E29B</div></div>
+            <div style="flex:1"><div style="height:52px;border-radius:8px;background:#EFD37A"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">paper2 #EFD37A</div></div>
+            <div style="flex:1"><div style="height:52px;border-radius:8px;background:#E2BF52"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">paper3 #E2BF52</div></div>
+          </div></div>
+        <div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#7F6B54;margin-bottom:6px">Tinta — espresso quente no lugar do cinza-esverdeado</div>
+          <div style="display:flex;gap:6px">
+            <div style="flex:1"><div style="height:40px;border-radius:8px;background:#31241A"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">900 #31241A</div></div>
+            <div style="flex:1"><div style="height:40px;border-radius:8px;background:#55432F"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">700 #55432F</div></div>
+            <div style="flex:1"><div style="height:40px;border-radius:8px;background:#7F6B54"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">500 #7F6B54</div></div>
+            <div style="flex:1"><div style="height:40px;border-radius:8px;background:#A5917A"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">400 #A5917A</div></div>
+            <div style="flex:1"><div style="height:40px;border-radius:8px;background:#C2B09A"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">300 #C2B09A</div></div>
+          </div></div>
+        <div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#7F6B54;margin-bottom:6px">Acentos — verde primário, azul-royal secundário</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <div style="width:84px"><div style="height:40px;border-radius:8px;background:#0B8043"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">green500 =</div></div>
+            <div style="width:84px"><div style="height:40px;border-radius:8px;background:#2F55A4"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">blue500 ★</div></div>
+            <div style="width:84px"><div style="height:40px;border-radius:8px;background:#E3EAF8;border:1px solid #B9C8E8"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">blue100 ★</div></div>
+            <div style="width:84px"><div style="height:40px;border-radius:8px;background:#F5C51C"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">yellow500 =</div></div>
+            <div style="width:84px"><div style="height:40px;border-radius:8px;background:#FFF0B8"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">yellow100 ↑</div></div>
+            <div style="width:84px"><div style="height:40px;border-radius:8px;background:#FFFDF6;border:1px solid #EFD98D"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">card #FFFDF6 ★</div></div>
+          </div></div>
+        <p style="margin:0;font-size:13px;line-height:1.55;color:#55432F">Regras da v2 — <strong>as cores do Brasil, temperadas de cozinha</strong>: fundo amarelo-manteiga suave (nunca bege lavado), <strong>verde é o primário</strong> (ação, "Útil", FAB), <strong>azul-royal é o secundário</strong> (links, info, eyebrows e o domínio de Lugares), amarelo vivo #F5C51C segue dono de seleção e "Salvo". Tinta migra pra espresso (contraste AA preservado); cardSurface vira creme #FFFDF6 — e post-it amarelo sempre pousa em cartão creme, nunca direto no fundo amarelo: <strong>amarelo sobre amarelo é proibido</strong>. Terracota sai. E o fundo nunca fica nu: <strong>ornamentos de mesa</strong> — anel de xícara de café, rabisco de caneta em Caveat — entram como tempero discreto em cabeçalhos, vazios e cantos de tela, nunca atrás de texto denso. Nada além dessas famílias sem mudar este documento primeiro.</p>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:20px">
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:18px 20px">
+      <div style="font-size:13px;font-weight:800;margin-bottom:10px">Categorias (categoryColors)</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="background:#F8E2EC;color:#C0577F;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:600">Beleza</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">#C0577F / #F8E2EC</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="background:#E1F5E8;color:#086B37;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:600">Comida</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">#086B37 / #E1F5E8</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="background:#E8EDF6;color:#33508D;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:600">Viagem</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">#33508D / #E8EDF6</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="background:#E6E7F6;color:#4B57A8;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:600">Achadinhos</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">#4B57A8 / #E6E7F6</span></div>
+      </div>
+      <p style="margin:10px 0 0;font-size:12.5px;line-height:1.5;color:#7F6B54">Hue nova só via <code style="font-family:ui-monospace,monospace;font-size:11px;background:#F1D49E;border-radius:4px;padding:1px 4px">categoryHueFor()</code> — slug sem hue retorna <code style="font-family:ui-monospace,monospace;font-size:11px;background:#F1D49E;border-radius:4px;padding:1px 4px">null</code> e o chamador trata.</p>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:18px 20px">
+      <div style="font-size:13px;font-weight:800;margin-bottom:10px">Paleta de avatar (hash do nome)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div style="width:44px;height:44px;border-radius:999px;background:#F4E2D8;color:#B45B3E;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">AM</div>
+        <div style="width:44px;height:44px;border-radius:999px;background:#F1E0E6;color:#97516A;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">BC</div>
+        <div style="width:44px;height:44px;border-radius:999px;background:#E0EDE7;color:#46796A;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">DF</div>
+        <div style="width:44px;height:44px;border-radius:999px;background:#F3E8D2;color:#A8702B;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">GH</div>
+        <div style="width:44px;height:44px;border-radius:999px;background:#E1EAEF;color:#4F7388;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">JK</div>
+        <div style="width:44px;height:44px;border-radius:999px;background:#F4E3EA;color:#B06C86;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700">LM</div>
+      </div>
+      <p style="margin:10px 0 0;font-size:12.5px;line-height:1.5;color:#7F6B54">Iniciais = 40% do diâmetro, bold. Anel de destaque: borda 2px verde + padding 2px. Sem foto de perfil no MVP — o avatar é tipográfico de propósito.</p>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:18px 20px">
+      <div style="font-size:13px;font-weight:800;margin-bottom:10px">Semânticas que importam</div>
+      <div style="display:flex;flex-direction:column;gap:7px;font-size:13px">
+        <div style="display:flex;justify-content:space-between;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:12px">accent / useful</span><span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:16px;border-radius:4px;background:#0B8043;display:inline-block"></span>green500</span></div>
+        <div style="display:flex;justify-content:space-between;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:12px">selectionBackground</span><span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:16px;border-radius:4px;background:#F5C51C;display:inline-block"></span>yellow500</span></div>
+        <div style="display:flex;justify-content:space-between;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:12px">saved / savedTint</span><span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:16px;border-radius:4px;background:#F5C51C;display:inline-block"></span><span style="width:16px;height:16px;border-radius:4px;background:#FFE98F;border:1px solid #F7D558;display:inline-block"></span></span></div>
+        <div style="display:flex;justify-content:space-between;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:12px">textLink / info</span><span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:16px;border-radius:4px;background:#3A5A9E;display:inline-block"></span>blue500</span></div>
+        <div style="display:flex;justify-content:space-between;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:12px">danger / dangerBg</span><span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:16px;border-radius:4px;background:#C94F3D;display:inline-block"></span><span style="width:16px;height:16px;border-radius:4px;background:#F6E0D8;display:inline-block"></span></span></div>
+        <div style="display:flex;justify-content:space-between;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:12px">scrim</span><span style="font-family:ui-monospace,monospace;font-size:12px;color:#7F6B54">rgba(35,33,28,.45)</span></div>
+      </div>
+      <p style="margin:10px 0 0;font-size:12.5px;line-height:1.5;color:#7F6B54">Verde = ação e "Útil". Amarelo = seleção e "Salvo". Azul = link/informativo, raro. Vermelho = só erro. Componentes leem <em>sempre</em> a camada semântica, nunca a bruta.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4 TIPOGRAFIA ============ -->
+<section id="tipografia" data-screen-label="Tipografia" style="max-width:1060px;margin:0 auto;padding:64px 24px 8px">
+  <div style="font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#2F55A4">04 · Tipografia</div>
+  <h2 style="margin:8px 0 0;font-size:34px;font-weight:800;letter-spacing:-0.02em">Plus Jakarta Sans + Caveat</h2>
+  <p style="margin:14px 0 0;max-width:680px;font-size:15px;line-height:1.55;color:#55432F">Uma família pra tudo (Plus Jakarta Sans, 300–800) e uma letra de caneta (Caveat 600) reservada pra momentos de marca — a tagline e nada mais, sem banalizar. Onze variantes nomeadas em <code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">ui/text.tsx</code>; todo texto passa por <code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">&lt;AppText variant=…&gt;</code>, nunca por um <code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">&lt;Text&gt;</code> cru.</p>
+  <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;margin-top:24px;overflow:hidden">
+    <div style="display:grid;grid-template-columns:110px 1fr 210px;gap:12px;padding:10px 20px;border-bottom:1px solid #EFE2C1;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#7F6B54"><span>Variante</span><span>Amostra</span><span>Spec</span></div>
+    <div style="display:grid;grid-template-columns:110px 1fr 210px;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid #F5EAD2"><span style="font-family:ui-monospace,monospace;font-size:12px">display</span><span style="font-size:40px;font-weight:800;letter-spacing:-0.02em;line-height:1.08">Saudade</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">40 · extraBold · 1.08 · −2%</span></div>
+    <div style="display:grid;grid-template-columns:110px 1fr 210px;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid #F5EAD2"><span style="font-family:ui-monospace,monospace;font-size:12px">h1</span><span style="font-size:30px;font-weight:800;letter-spacing:-0.02em;line-height:1.08">Explorar achados</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">30 · extraBold · 1.08 · −2%</span></div>
+    <div style="display:grid;grid-template-columns:110px 1fr 210px;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid #F5EAD2"><span style="font-family:ui-monospace,monospace;font-size:12px">h2</span><span style="font-size:24px;font-weight:800;letter-spacing:-0.01em;line-height:1.22">Feira de sábado</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">24 · extraBold · 1.22 · −1%</span></div>
+    <div style="display:grid;grid-template-columns:110px 1fr 210px;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid #F5EAD2"><span style="font-family:ui-monospace,monospace;font-size:12px">h3</span><span style="font-size:20px;font-weight:800;letter-spacing:-0.01em;line-height:1.22">Buscas recentes</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">20 · extraBold · 1.22 · −1%</span></div>
+    <div style="display:grid;grid-template-columns:110px 1fr 210px;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid #F5EAD2"><span style="font-family:ui-monospace,monospace;font-size:12px">title</span><span style="font-size:18px;font-weight:700;letter-spacing:-0.01em;line-height:1.22">Pão de queijo que lembra Minas</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">18 · bold · 1.22 · −1%</span></div>
+    <div style="display:grid;grid-template-columns:110px 1fr 210px;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid #F5EAD2"><span style="font-family:ui-monospace,monospace;font-size:12px">bodyLg</span><span style="font-size:17px;font-weight:400;line-height:1.6">Conta como foi, o que ajudou, o que você gostaria de ter sabido antes…</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">17 · regular · 1.6</span></div>
+    <div style="display:grid;grid-template-columns:110px 1fr 210px;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid #F5EAD2"><span style="font-family:ui-monospace,monospace;font-size:12px">body</span><span style="font-size:15px;font-weight:400;line-height:1.45">Achei um mercadinho brasileiro em Dublin que vende polvilho de verdade.</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">15 · regular · 1.45</span></div>
+    <div style="display:grid;grid-template-columns:110px 1fr 210px;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid #F5EAD2"><span style="font-family:ui-monospace,monospace;font-size:12px">sm</span><span style="font-size:13px;font-weight:500;line-height:1.45">Ana Martins · há 2 dias</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">13 · medium · 1.45</span></div>
+    <div style="display:grid;grid-template-columns:110px 1fr 210px;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid #F5EAD2"><span style="font-family:ui-monospace,monospace;font-size:12px">xs</span><span style="font-size:12px;font-weight:500;line-height:1.45">128/1000</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">12 · medium · 1.45</span></div>
+    <div style="display:grid;grid-template-columns:110px 1fr 210px;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid #F5EAD2"><span style="font-family:ui-monospace,monospace;font-size:12px">meta</span><span style="font-size:11px;font-weight:500;line-height:1.45;text-transform:uppercase;letter-spacing:.04em">EXPLORAR</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">11 · medium · 1.45 · +4% qdo eyebrow</span></div>
+    <div style="display:grid;grid-template-columns:110px 1fr 210px;gap:12px;align-items:center;padding:12px 20px"><span style="font-family:ui-monospace,monospace;font-size:12px">hand</span><span style="font-family:Caveat,cursive;font-size:26px;font-weight:600;color:#086B37">Mata a saudade do que é bom.</span><span style="font-family:ui-monospace,monospace;font-size:11px;color:#7F6B54">Caveat 600 · 26 · só marca</span></div>
+  </div>
+</section>
+
+<!-- ============ 5 MÉTRICAS ============ -->
+<section id="metricas" data-screen-label="Espaço e movimento" style="max-width:1060px;margin:0 auto;padding:64px 24px 8px">
+  <div style="font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#2F55A4">05 · Espaço, raio, sombra, movimento</div>
+  <h2 style="margin:8px 0 0;font-size:34px;font-weight:800;letter-spacing:-0.02em">A régua é uma só</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:24px">
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:18px 20px">
+      <div style="font-size:13px;font-weight:800;margin-bottom:12px">Espaço (spacing)</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:11px;width:40px">sp1·2</span><span style="height:12px;width:2px;background:#0B8043;border-radius:2px"></span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:11px;width:40px">sp2·4</span><span style="height:12px;width:4px;background:#0B8043;border-radius:2px"></span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:11px;width:40px">sp3·8</span><span style="height:12px;width:8px;background:#0B8043;border-radius:2px"></span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:11px;width:40px">sp4·12</span><span style="height:12px;width:12px;background:#0B8043;border-radius:2px"></span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:11px;width:40px">sp5·16</span><span style="height:12px;width:16px;background:#0B8043;border-radius:2px"></span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:11px;width:40px">sp6·20</span><span style="height:12px;width:20px;background:#0B8043;border-radius:2px"></span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:11px;width:40px">sp7·24</span><span style="height:12px;width:24px;background:#0B8043;border-radius:2px"></span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:11px;width:40px">sp8·32</span><span style="height:12px;width:32px;background:#0B8043;border-radius:2px"></span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:11px;width:40px">sp10·48</span><span style="height:12px;width:48px;background:#0B8043;border-radius:2px"></span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-family:ui-monospace,monospace;font-size:11px;width:40px">sp12·64</span><span style="height:12px;width:64px;background:#0B8043;border-radius:2px"></span></div>
+      </div>
+      <p style="margin:12px 0 0;font-size:12.5px;line-height:1.5;color:#7F6B54">gutter 16 · masonryGap 12 · <strong>maxAppWidth 430</strong> (teto de todo conteúdo de feed). Valor fora da régua só via <code style="font-family:ui-monospace,monospace;font-size:11px;background:#F1D49E;border-radius:4px;padding:1px 4px">componentMetrics</code>, com consumidor real.</p>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:18px 20px">
+      <div style="font-size:13px;font-weight:800;margin-bottom:12px">Raio + sombra</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div style="text-align:center"><div style="width:56px;height:56px;background:#FBEDB6;border:1px solid #DECBA0;border-radius:6px"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">xs 6</div></div>
+        <div style="text-align:center"><div style="width:56px;height:56px;background:#FBEDB6;border:1px solid #DECBA0;border-radius:10px"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">sm 10</div></div>
+        <div style="text-align:center"><div style="width:56px;height:56px;background:#FBEDB6;border:1px solid #DECBA0;border-radius:14px"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">md 14</div></div>
+        <div style="text-align:center"><div style="width:56px;height:56px;background:#FBEDB6;border:1px solid #DECBA0;border-radius:18px"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">lg 18</div></div>
+        <div style="text-align:center"><div style="width:56px;height:56px;background:#FBEDB6;border:1px solid #DECBA0;border-radius:24px"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">xl 24</div></div>
+        <div style="text-align:center"><div style="width:56px;height:28px;background:#FBEDB6;border:1px solid #DECBA0;border-radius:999px"></div><div style="font-family:ui-monospace,monospace;font-size:10.5px;margin-top:4px">pill</div></div>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
+        <div style="width:88px;height:56px;background:#FFFDF6;border-radius:12px;box-shadow:0 1px 2px rgba(74,54,32,.06);display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:10.5px">xs</div>
+        <div style="width:88px;height:56px;background:#FFFDF6;border-radius:12px;box-shadow:0 2px 6px rgba(74,54,32,.07);display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:10.5px">sm</div>
+        <div style="width:88px;height:56px;background:#FFFDF6;border-radius:12px;box-shadow:0 6px 18px rgba(74,54,32,.09);display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:10.5px">md</div>
+        <div style="width:88px;height:56px;background:#FFFDF6;border-radius:12px;box-shadow:0 14px 34px rgba(74,54,32,.12);display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:10.5px">lg</div>
+      </div>
+      <p style="margin:12px 0 0;font-size:12.5px;line-height:1.5;color:#7F6B54">Sombras sempre no marrom quente #4A3620 — nunca preto puro. Especiais: <code style="font-family:ui-monospace,monospace;font-size:11px;background:#F1D49E;border-radius:4px;padding:1px 4px">fab</code> e <code style="font-family:ui-monospace,monospace;font-size:11px;background:#F1D49E;border-radius:4px;padding:1px 4px">primaryButton</code> em verde #06552C.</p>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:18px 20px">
+      <div style="font-size:13px;font-weight:800;margin-bottom:12px">Movimento (motion)</div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:13.5px;line-height:1.5;color:#55432F">
+        <div style="display:flex;justify-content:space-between"><span>durationFast — press in/out</span><span style="font-family:ui-monospace,monospace;font-size:12px">120ms</span></div>
+        <div style="display:flex;justify-content:space-between"><span>durationBase — fades, skeleton</span><span style="font-family:ui-monospace,monospace;font-size:12px">160ms</span></div>
+        <div style="display:flex;justify-content:space-between"><span>durationSheet — sheet, underline</span><span style="font-family:ui-monospace,monospace;font-size:12px">200ms</span></div>
+        <div style="display:flex;justify-content:space-between"><span>pressButtonScale</span><span style="font-family:ui-monospace,monospace;font-size:12px">0.97</span></div>
+        <div style="display:flex;justify-content:space-between"><span>pressCardScale</span><span style="font-family:ui-monospace,monospace;font-size:12px">0.98</span></div>
+        <div style="display:flex;justify-content:space-between"><span>pressIconScale</span><span style="font-family:ui-monospace,monospace;font-size:12px">0.92</span></div>
+      </div>
+      <p style="margin:12px 0 0;font-size:12.5px;line-height:1.5;color:#7F6B54">Todo toque passa por <code style="font-family:ui-monospace,monospace;font-size:11px;background:#F1D49E;border-radius:4px;padding:1px 4px">PressableScale</code> — um único elemento animado, nunca wrapper aninhado. Reduced motion desliga a escala sem remontar a subárvore.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6 COMPONENTES ============ -->
+<section id="componentes" data-screen-label="Componentes" style="max-width:1060px;margin:0 auto;padding:64px 24px 8px">
+  <div style="font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#2F55A4">06 · Componentes</div>
+  <h2 style="margin:8px 0 0;font-size:34px;font-weight:800;letter-spacing:-0.02em">O kit de apps/mobile/src/ui — pixel-fiel ao código</h2>
+  <p style="margin:14px 0 0;max-width:680px;font-size:15px;line-height:1.55;color:#55432F">Cada amostra abaixo reproduz o componente com os valores exatos dos tokens atuais. Antes de criar qualquer elemento novo, procure aqui. Se não existe, ele nasce em <code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">apps/mobile/src/ui</code> com <code style="font-family:ui-monospace,monospace;font-size:12px;background:#F1D49E;border-radius:4px;padding:1px 5px">.styles.ts</code> + teste, e entra neste documento no mesmo PR.
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:24px">
+
+    <!-- Button -->
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;overflow:hidden">
+      <div style="padding:12px 18px;border-bottom:1px solid #EFE2C1;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:800">Button</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">ui/button.tsx</span></div>
+      <div style="padding:18px;background:#FBF1DC;display:flex;flex-direction:column;gap:12px;align-items:flex-start">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <span style="display:inline-flex;align-items:center;justify-content:center;height:46px;padding:0 20px;border-radius:14px;background:#0B8043;color:#F3FAF5;font-size:15px;font-weight:600;box-shadow:0 2px 8px rgba(6,85,44,.24)">Publicar achado</span>
+          <span style="display:inline-flex;align-items:center;justify-content:center;height:46px;padding:0 20px;border-radius:14px;background:#FFFFFF;border:1px solid #DECBA0;color:#25342B;font-size:15px;font-weight:600;box-shadow:0 1px 2px rgba(74,54,32,.06)">Cancelar</span>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 14px;border-radius:14px;background:#E1F5E8;color:#086B37;font-size:13px;font-weight:600">Escrever a primeira</span>
+          <span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 14px;border-radius:14px;color:#45544A;font-size:13px;font-weight:600">Sair da conta</span>
+          <span style="display:inline-flex;align-items:center;justify-content:center;height:46px;padding:0 20px;border-radius:14px;background:#0B8043;color:#F3FAF5;font-size:15px;font-weight:600;opacity:.45">Publicando…</span>
+        </div>
+      </div>
+      <div style="padding:12px 18px;font-size:12.5px;line-height:1.55;color:#55432F">4 variantes (primary/secondary/ghost/soft) × 3 tamanhos (36/46/54). Primary é o único com sombra verde; um por tela, no máximo. Ghost pra ação destrutiva-leve. Rótulo sempre verbo em PT-BR.</div>
+    </div>
+
+    <!-- Chips -->
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;overflow:hidden">
+      <div style="padding:12px 18px;border-bottom:1px solid #EFE2C1;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:800">CategoryChip · NeutralChip · Badge</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">ui/category-chip.tsx</span></div>
+      <div style="padding:18px;background:#FBF1DC;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <span style="display:inline-flex;align-items:center;height:34px;padding:0 14px;border-radius:999px;background:#F5E7C8;color:#6E7A70;font-size:13px;font-weight:600">Tudo</span>
+          <span style="display:inline-flex;align-items:center;height:34px;padding:0 14px;border-radius:999px;background:#F5C51C;color:#3A2E10;font-size:13px;font-weight:600;box-shadow:0 1px 2px rgba(74,54,32,.06)">Comida</span>
+          <span style="display:inline-flex;align-items:center;height:34px;padding:0 14px;border-radius:999px;background:#F8E2EC;color:#C0577F;font-size:13px;font-weight:600">Beleza</span>
+          <span style="display:inline-flex;align-items:center;height:34px;padding:0 14px;border-radius:999px;background:#E8EDF6;color:#33508D;font-size:13px;font-weight:600">Viagem</span>
+          <span style="display:inline-flex;align-items:center;height:28px;padding:0 11px;border-radius:999px;background:#E6E7F6;color:#4B57A8;font-size:12px;font-weight:600">Achadinhos</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="display:inline-flex;align-items:center;border-radius:999px;background:#E1F5E8;color:#0B8043;font-size:10px;font-weight:700;padding:1px 6px">NOVO</span>
+          <span style="display:inline-flex;align-items:center;border-radius:999px;background:#F5E7C8;color:#6E7A70;font-size:10px;font-weight:700;padding:1px 6px">RASCUNHO</span>
+        </div>
+      </div>
+      <div style="padding:12px 18px;font-size:12.5px;line-height:1.55;color:#55432F">Seleção é <strong>sempre</strong> amarelo #F5C51C com tinta #3A2E10 + sombra xs — em qualquer chip, de qualquer hue. Chip md 34px, sm 28px, sempre pill. Rail de filtros rola horizontal, "Tudo" (neutro) primeiro.</div>
+    </div>
+
+    <!-- MetricStat -->
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;overflow:hidden">
+      <div style="padding:12px 18px;border-bottom:1px solid #EFE2C1;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:800">MetricStat</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">ui/metric-stat.tsx</span></div>
+      <div style="padding:18px;background:#FBF1DC;display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+        <span style="display:inline-flex;align-items:center;gap:2px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3 5.49 5.49 0 0 0 12 5.5 5.49 5.49 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" stroke="#99A39A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="min-width:18px;font-size:13px;font-weight:600;color:#99A39A">12</span></span>
+        <span style="display:inline-flex;align-items:center;gap:2px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3 5.49 5.49 0 0 0 12 5.5 5.49 5.49 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" stroke="#0B8043" stroke-width="2" fill="#0B8043" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="min-width:18px;font-size:13px;font-weight:600;color:#0B8043">13</span></span>
+        <span style="display:inline-flex;align-items:center;gap:2px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="#99A39A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="min-width:18px;font-size:13px;font-weight:600;color:#99A39A">4</span></span>
+        <span style="display:inline-flex;align-items:center;gap:2px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" stroke="#F5C51C" stroke-width="2" fill="#F5C51C" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      </div>
+      <div style="padding:12px 18px;font-size:12.5px;line-height:1.55;color:#55432F">Coração = Útil (verde quando ativo), marcador = Salvo (amarelo, sem contador), balão = comentários. Inativo é sempre textMeta. Slot de contagem tem largura mínima 18px pra não pular layout. HitSlop de 12/8.</div>
+    </div>
+
+    <!-- SearchField -->
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;overflow:hidden">
+      <div style="padding:12px 18px;border-bottom:1px solid #EFE2C1;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:800">SearchField · TextField</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">ui/search-field.tsx · ui/text-field.tsx</span></div>
+      <div style="padding:18px;background:#FBF1DC;display:flex;flex-direction:column;gap:12px">
+        <div style="padding:3px;border-radius:999px;background:#E1F5E8"><div style="display:flex;align-items:center;gap:4px;height:54px;background:#fff;border:1.5px solid #0B8043;border-radius:999px;padding:0 12px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#99A39A" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="#99A39A" stroke-width="2" stroke-linecap="round"/></svg><span style="flex:1;font-size:17px;color:#25342B">pão de queijo</span><span style="width:24px;height:24px;border-radius:999px;background:#F5E7C8;display:inline-flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="#99A39A" stroke-width="2" stroke-linecap="round"/></svg></span></div></div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#25342B;margin-bottom:6px">Título</div>
+          <div style="display:flex;align-items:center;height:48px;background:#fff;border:1.5px solid #EFE2C1;border-radius:14px;padding:0 8px"><span style="font-size:15px;color:#B6BEB4">Compartilhe seu achado</span></div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="font-size:12px;color:#99A39A">Um título curto ajuda a busca.</span><span style="font-size:12px;color:#99A39A">0/80</span></div>
+        </div>
+      </div>
+      <div style="padding:12px 18px;font-size:12.5px;line-height:1.55;color:#55432F">Foco = borda 1.5px verde + halo accentTint de 3px (nunca outline do browser). Busca é pill (54 grande, 46 média); campo de formulário é r14, 48px, label sm semibold acima, contagem à direita fica verde acima de 90%.</div>
+    </div>
+
+    <!-- Tab bar -->
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;overflow:hidden">
+      <div style="padding:12px 18px;border-bottom:1px solid #EFE2C1;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:800">AppTabBar + FAB</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">ui/tab-bar.tsx</span></div>
+      <div style="padding:18px;background:#F5E7C8">
+        <div style="height:64px;background:#FBF1DC;border-top:1px solid #EFE2C1;display:flex;align-items:center;padding:0 4px;border-radius:0 0 12px 12px">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M3 10.5 12 3l9 7.5" stroke="#0B8043" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5" stroke="#0B8043" stroke-width="2" fill="#0B8043" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 21v-6h5v6" stroke="#FCF2C9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="font-size:11px;font-weight:700;color:#0B8043">Início</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#99A39A" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="#99A39A" stroke-width="2" stroke-linecap="round"/></svg><span style="font-size:11px;font-weight:500;color:#99A39A">Buscar</span></div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center"><div style="width:54px;height:38px;margin-top:-4px;border-radius:13px;background:#0B8043;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(6,85,44,.3)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#F3FAF5" stroke-width="2.8" stroke-linecap="round"/></svg></div></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" stroke="#99A39A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="font-size:11px;font-weight:500;color:#99A39A">Salvos</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="#99A39A" stroke-width="2"/><path d="M4 21a8 8 0 0 1 16 0" stroke="#99A39A" stroke-width="2" stroke-linecap="round"/></svg><span style="font-size:11px;font-weight:500;color:#99A39A">Perfil</span></div>
+        </div>
+      </div>
+      <div style="padding:12px 18px;font-size:12.5px;line-height:1.55;color:#55432F">5 slots de peso igual (2 abas · FAB · 2 abas), altura 64 + safe area. FAB 54×38, r13, verde, sobe −4px, leva a Escrever. Aba ativa: ícone preenchido + rótulo bold verde. A geometria é verificada por synthetics no browser.</div>
+    </div>
+
+    <!-- AppHeader -->
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;overflow:hidden">
+      <div style="padding:12px 18px;border-bottom:1px solid #EFE2C1;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:800">AppHeader · TopTabs · SectionHeader</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">ui/app-header.tsx</span></div>
+      <div style="padding:18px;background:#F5E7C8;display:flex;flex-direction:column;gap:14px">
+        <div style="background:#FBF1DC;border-bottom:1px solid #EFE2C1;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:4px;padding:4px 16px">
+          <span style="display:flex;align-items:baseline;width:56px"><span style="font-size:20px;font-weight:800;letter-spacing:-0.01em;color:#25342B">sdds</span><span style="font-size:20px;font-weight:800;color:#0B8043">.</span></span>
+          <span style="flex:1;display:flex;justify-content:center"><span style="display:flex;flex-direction:column;align-items:center;padding-bottom:4px"><span style="font-size:20px;font-weight:800;letter-spacing:-0.01em;color:#25342B">Explorar</span><span style="width:22px;height:3px;border-radius:3px;background:#0B8043;margin-top:2px"></span></span></span>
+          <span style="width:56px;height:40px;display:flex;align-items:center;justify-content:flex-end"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#45544A" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="#45544A" stroke-width="2" stroke-linecap="round"/></svg></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding:0 4px">
+          <div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#0B8043">DESCUBRA</div><div style="font-size:20px;font-weight:700;color:#25342B">Buscas recentes</div></div>
+          <span style="font-size:13px;font-weight:600;color:#0B8043">Limpar</span>
+        </div>
+      </div>
+      <div style="padding:12px 18px;font-size:12.5px;line-height:1.55;color:#55432F">Wordmark "sdds" tinta + ponto verde, sempre. Voltar é um só (chevron, pop ou Início). TopTabs: ativa h3 extraBold + sublinhado 22×3 verde animado. Toda tela usa o mesmo header — nunca um header próprio.</div>
+    </div>
+
+    <!-- NoteCard foto -->
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;overflow:hidden">
+      <div style="padding:12px 18px;border-bottom:1px solid #EFE2C1;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:800">NoteCard — variante foto</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">components/note-card.tsx</span></div>
+      <div style="padding:18px;background:#FBF1DC;display:flex;justify-content:center">
+        <div style="width:186px;background:#fff;border:1px solid #EFE2C1;border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(74,54,32,.06)">
+          <div style="position:relative;aspect-ratio:4/5;background:repeating-linear-gradient(45deg,#F0D57E,#F0D57E 8px,#E6C55C 8px,#E6C55C 16px);display:flex;align-items:center;justify-content:center">
+            <span style="position:absolute;top:8px;left:8px;display:inline-flex;align-items:center;height:28px;padding:0 11px;border-radius:999px;background:#E1F5E8;color:#086B37;font-size:12px;font-weight:600">Comida</span>
+            <span style="font-family:ui-monospace,monospace;font-size:10px;color:#7F6B54;background:rgba(255,253,246,.8);padding:2px 8px;border-radius:6px">foto da nota</span>
+          </div>
+          <div style="padding:10px 12px 8px"><span style="font-size:15px;font-weight:700;line-height:1.35;color:#25342B;display:block">Pão de queijo que lembra Minas</span></div>
+          <div style="display:flex;align-items:center;gap:4px;padding:0 12px 11px">
+            <span style="display:flex;align-items:center;gap:4px;flex:1;min-width:0"><span style="width:20px;height:20px;border-radius:999px;background:#F4E2D8;color:#B45B3E;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700">AM</span><span style="font-size:12px;color:#6E7A70;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ana Martins</span></span>
+            <span style="display:inline-flex;align-items:center;gap:2px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3 5.49 5.49 0 0 0 12 5.5 5.49 5.49 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" stroke="#0B8043" stroke-width="2" fill="#0B8043"/></svg><span style="font-size:12px;font-weight:600;color:#0B8043">12</span></span>
+          </div>
+        </div>
+      </div>
+      <div style="padding:12px 18px;font-size:12.5px;line-height:1.55;color:#55432F">Foto cobre o topo (aspect ratio livre, clampado 3:4–4:5-ish pelos limites de <code style="font-family:ui-monospace,monospace;font-size:11px;background:#F1D49E;border-radius:4px;padding:1px 4px">note-card-estimate</code>), chip sm no canto sup-esquerdo. Título máx. 2 linhas, bold. Rodapé: avatar 20 + nome xs + Útil sm.</div>
+    </div>
+
+    <!-- NoteCard postit -->
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;overflow:hidden">
+      <div style="padding:12px 18px;border-bottom:1px solid #EFE2C1;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:800">NoteCard — variante post-it</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">components/note-card.tsx</span></div>
+      <div style="padding:18px;background:#FBF1DC;display:flex;justify-content:center">
+        <div style="width:186px;background:#fff;border:1px solid #EFE2C1;border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(74,54,32,.06)">
+          <div style="position:relative;background:#FFE98F;border-bottom:1px solid #F7D558;padding:14px">
+            <span style="position:absolute;top:8px;right:8px;display:inline-flex;align-items:center;height:28px;padding:0 11px;border-radius:999px;background:#E8EDF6;color:#33508D;font-size:12px;font-weight:600">Viagem</span>
+            <div style="font-size:34px;line-height:34px;font-weight:800;color:#F5C51C">“</div>
+            <div style="font-size:13px;line-height:1.45;color:#3A2E10;margin-top:2px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">Ônibus de Dublin pro aeroporto às 4h da manhã existe sim, sai do Busáras e aceita cartão. Ninguém me contou, então tô contando.</div>
+          </div>
+          <div style="padding:10px 12px 8px"><span style="font-size:15px;font-weight:700;line-height:1.35;color:#25342B;display:block">Voo cedo em Dublin sem táxi</span></div>
+          <div style="display:flex;align-items:center;gap:4px;padding:0 12px 11px">
+            <span style="display:flex;align-items:center;gap:4px;flex:1;min-width:0"><span style="width:20px;height:20px;border-radius:999px;background:#E0EDE7;color:#46796A;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700">RC</span><span style="font-size:12px;color:#6E7A70;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Rafa Costa</span></span>
+            <span style="display:inline-flex;align-items:center;gap:2px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3 5.49 5.49 0 0 0 12 5.5 5.49 5.49 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" stroke="#99A39A" stroke-width="2"/></svg><span style="font-size:12px;font-weight:600;color:#99A39A">3</span></span>
+          </div>
+        </div>
+      </div>
+      <div style="padding:12px 18px;font-size:12.5px;line-height:1.55;color:#55432F">Nota sem foto vira post-it: cabeçalho amarelo #FFE98F, aspas 34px em yellow500, trecho do corpo em sm (máx. 4 linhas), chip no canto sup-direito. As duas variantes convivem no mural — é o ritmo visual do feed.</div>
+    </div>
+
+    <!-- Post-it composer -->
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;overflow:hidden">
+      <div style="padding:12px 18px;border-bottom:1px solid #EFE2C1;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:800">PostItComposer</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">features/notes/post-it-composer.tsx</span></div>
+      <div style="padding:22px;background:#FBF1DC;display:flex;justify-content:center">
+        <div style="width:280px;background:#FFE98F;border-radius:18px;padding:20px 18px;transform:rotate(-0.5deg);box-shadow:0 6px 18px rgba(74,54,32,.09);position:relative;overflow:hidden">
+          <div style="position:absolute;top:2px;left:8px;font-size:46px;line-height:46px;font-weight:800;color:#F5C51C">“</div>
+          <div style="margin-top:32px;font-size:20px;font-weight:800;letter-spacing:-0.01em;color:#25342B">Farmácia que entrega manipulado</div>
+          <div style="margin-top:8px;min-height:80px;font-size:17px;line-height:24px;color:#3A2E10">Fica na rua do mercado municipal, aceita receita digital e entrega no mesmo dia se pedir até meio-dia…</div>
+          <div style="text-align:right;font-size:12px;color:#99A39A;margin-top:8px">96/1000</div>
+        </div>
+      </div>
+      <div style="padding:12px 18px;font-size:12.5px;line-height:1.55;color:#55432F">Escrever É um post-it: rotação −0.5°, sombra md, aspas 46px. Título h3, corpo bodyLg lh24 (mín. 140), contador vira verde perto do limite. A célula de foto (132px) e o chip de remover (24px) vêm de componentMetrics.compose.</div>
+    </div>
+
+    <!-- Sheet + action bar -->
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;overflow:hidden">
+      <div style="padding:12px 18px;border-bottom:1px solid #EFE2C1;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:800">Sheet · NoteActionBar</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">ui/sheet.tsx · features/notes/note-action-bar.tsx</span></div>
+      <div style="padding:18px;background:#F5E7C8;display:flex;flex-direction:column;gap:14px">
+        <div style="background:rgba(35,33,28,.45);border-radius:12px;padding:26px 14px 0">
+          <div style="background:#fff;border-radius:24px 24px 0 0;padding:16px 16px 14px">
+            <div style="width:40px;height:4px;border-radius:999px;background:#DECBA0;margin:0 auto 12px"></div>
+            <div style="font-size:18px;font-weight:700;color:#25342B">Denunciar esta nota?</div>
+            <div style="font-size:13px;color:#6E7A70;margin-top:4px">A gente olha toda denúncia. Nada é automático.</div>
+          </div>
+        </div>
+        <div style="background:#fff;border-top:1px solid #EFE2C1;border-radius:0 0 12px 12px;display:flex;align-items:center;gap:12px;padding:10px 14px">
+          <span style="flex:1;display:flex;align-items:center;gap:8px;height:40px;background:#F5E7C8;border-radius:999px;padding:0 14px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 20h9" stroke="#99A39A" stroke-width="2" stroke-linecap="round"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" stroke="#99A39A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span style="font-size:13px;color:#99A39A">Diz alguma coisa boa…</span></span>
+          <span style="display:inline-flex;align-items:center;gap:2px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3 5.49 5.49 0 0 0 12 5.5 5.49 5.49 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" stroke="#0B8043" stroke-width="2" fill="#0B8043"/></svg><span style="font-size:13px;font-weight:600;color:#0B8043">27</span></span>
+          <span style="display:inline-flex;align-items:center;gap:2px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="#99A39A" stroke-width="2"/></svg><span style="font-size:13px;font-weight:600;color:#99A39A">8</span></span>
+        </div>
+      </div>
+      <div style="padding:12px 18px;font-size:12.5px;line-height:1.55;color:#55432F">Sheet: raio superior 24, alça 40×4, scrim é irmão do conteúdo (clique dentro nunca fecha), sobe 200ms ease-out. Action bar da nota: pill de comentário "Diz alguma coisa boa…" + métricas, sempre colada ao rodapé com hairline.</div>
+    </div>
+
+    <!-- Empty + skeleton -->
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;overflow:hidden">
+      <div style="padding:12px 18px;border-bottom:1px solid #EFE2C1;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:800">EmptyState · Skeleton</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">ui/empty-state.tsx · ui/skeleton.tsx</span></div>
+      <div style="padding:18px;background:#FBF1DC;display:flex;gap:14px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px;background:#F5E7C8;border-radius:18px;padding:26px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" stroke="#99A39A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div style="font-size:20px;font-weight:800;letter-spacing:-0.01em;color:#25342B">Nenhum salvo ainda</div>
+          <div style="font-size:15px;line-height:1.45;color:#6E7A70">Guarde achados pra matar a saudade depois.</div>
+          <span style="display:inline-flex;align-items:center;height:46px;padding:0 20px;border-radius:14px;background:#E1F5E8;color:#086B37;font-size:15px;font-weight:600">Explorar notas</span>
+        </div>
+        <div style="width:150px;display:flex;flex-direction:column;gap:8px">
+          <div style="height:110px;border-radius:14px;background:#ECD9AE"></div>
+          <div style="height:12px;border-radius:10px;background:#ECD9AE"></div>
+          <div style="height:12px;border-radius:10px;background:#ECD9AE;width:70%"></div>
+        </div>
+      </div>
+      <div style="padding:12px 18px;font-size:12.5px;line-height:1.55;color:#55432F">Vazio nunca é branco: painel sunken r18 centrado, título h3, corpo curto e caloroso, ação soft opcional. Skeleton: blocos paper2 com fade 160ms — sem shimmer. Erros seguem o mesmo tom: "Não deu pra carregar. Confere a conexão e tenta de novo."</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ 7 TELAS ============ -->
+<section id="telas" data-screen-label="Telas" style="max-width:1060px;margin:0 auto;padding:64px 24px 8px">
+  <div style="font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#2F55A4">07 · Telas</div>
+  <h2 style="margin:8px 0 0;font-size:34px;font-weight:800;letter-spacing:-0.02em">Anatomia de cada superfície</h2>
+  <p style="margin:14px 0 0;max-width:680px;font-size:15px;line-height:1.55;color:#55432F">O contrato de composição de cada tela: quais primitivos, em que ordem, com que dono. Mudança de anatomia = mudança neste documento primeiro. Os mockups já usam o fundo amarelo-manteiga do norte v2 (o bege do código atual está aposentado no norte); medidas e componentes seguem os tokens atuais.</p>
+
+  <div style="display:flex;flex-wrap:wrap;gap:22px;margin-top:28px;align-items:flex-start">
+
+    <!-- MOCK Início -->
+    <div style="width:252px;flex:none;display:flex;flex-direction:column;gap:8px">
+      <div style="border:1px solid #DECBA0;border-radius:22px;overflow:hidden;background:#FCF2C9;box-shadow:0 6px 18px rgba(74,54,32,.09);min-height:512px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:4px;padding:8px 12px 6px;border-bottom:1px solid #EFE2C1">
+          <span style="display:flex;align-items:baseline"><span style="font-size:15px;font-weight:800;color:#25342B">sdds</span><span style="font-size:15px;font-weight:800;color:#0B8043">.</span></span>
+          <span style="flex:1;display:flex;justify-content:center"><span style="display:flex;flex-direction:column;align-items:center"><span style="font-size:14px;font-weight:800;color:#25342B">Explorar</span><span style="width:18px;height:3px;border-radius:3px;background:#0B8043;margin-top:1px"></span></span></span>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#45544A" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="#45544A" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <div style="display:flex;gap:5px;padding:8px 12px;overflow:hidden">
+          <span style="display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:#F5C51C;color:#3A2E10;font-size:10.5px;font-weight:700;box-shadow:0 1px 2px rgba(74,54,32,.06)">Tudo</span>
+          <span style="display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:#E1F5E8;color:#086B37;font-size:10.5px;font-weight:600">Comida</span>
+          <span style="display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:#F8E2EC;color:#C0577F;font-size:10.5px;font-weight:600">Beleza</span>
+          <span style="display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:#E8EDF6;color:#33508D;font-size:10.5px;font-weight:600">Viagem</span>
+        </div>
+        <div style="display:flex;gap:8px;padding:2px 12px 10px">
+          <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+            <div style="background:#fff;border:1px solid #EFE2C1;border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(74,54,32,.06)">
+              <div style="position:relative;aspect-ratio:4/5;background:repeating-linear-gradient(45deg,#F0D57E,#F0D57E 6px,#E6C55C 6px,#E6C55C 12px)"><span style="position:absolute;top:5px;left:5px;height:16px;padding:0 7px;border-radius:999px;background:#E1F5E8;color:#086B37;font-size:8px;font-weight:700;display:inline-flex;align-items:center">Comida</span></div>
+              <div style="padding:6px 8px 4px;font-size:10px;font-weight:700;line-height:1.3;color:#25342B">Pão de queijo que lembra Minas</div>
+              <div style="display:flex;align-items:center;gap:3px;padding:0 8px 7px"><span style="width:12px;height:12px;border-radius:999px;background:#F4E2D8;color:#B45B3E;font-size:5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center">AM</span><span style="flex:1;font-size:8px;color:#6E7A70">Ana Martins</span><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3 5.49 5.49 0 0 0 12 5.5 5.49 5.49 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" stroke="#0B8043" stroke-width="2" fill="#0B8043"/></svg><span style="font-size:8px;font-weight:700;color:#0B8043">12</span></div>
+            </div>
+            <div style="background:#fff;border:1px solid #EFE2C1;border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(74,54,32,.06)">
+              <div style="position:relative;background:#FFE98F;border-bottom:1px solid #F7D558;padding:8px"><span style="position:absolute;top:5px;right:5px;height:16px;padding:0 7px;border-radius:999px;background:#E6E7F6;color:#4B57A8;font-size:8px;font-weight:700;display:inline-flex;align-items:center">Achadinhos</span><div style="font-size:18px;line-height:18px;font-weight:800;color:#F5C51C">“</div><div style="font-size:8.5px;line-height:1.45;color:#3A2E10">Panela de pressão elétrica da feira do Bom Retiro por metade do preço…</div></div>
+              <div style="padding:6px 8px 4px;font-size:10px;font-weight:700;line-height:1.3;color:#25342B">Achado da semana</div>
+              <div style="display:flex;align-items:center;gap:3px;padding:0 8px 7px"><span style="width:12px;height:12px;border-radius:999px;background:#E1EAEF;color:#4F7388;font-size:5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center">JK</span><span style="flex:1;font-size:8px;color:#6E7A70">João Kléber</span><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3 5.49 5.49 0 0 0 12 5.5 5.49 5.49 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" stroke="#99A39A" stroke-width="2"/></svg><span style="font-size:8px;font-weight:700;color:#99A39A">3</span></div>
+            </div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+            <div style="background:#fff;border:1px solid #EFE2C1;border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(74,54,32,.06)">
+              <div style="position:relative;background:#FFE98F;border-bottom:1px solid #F7D558;padding:8px"><span style="position:absolute;top:5px;right:5px;height:16px;padding:0 7px;border-radius:999px;background:#E8EDF6;color:#33508D;font-size:8px;font-weight:700;display:inline-flex;align-items:center">Viagem</span><div style="font-size:18px;line-height:18px;font-weight:800;color:#F5C51C">“</div><div style="font-size:8.5px;line-height:1.45;color:#3A2E10">Ônibus de Dublin pro aeroporto às 4h existe sim, sai do Busáras e aceita cartão.</div></div>
+              <div style="padding:6px 8px 4px;font-size:10px;font-weight:700;line-height:1.3;color:#25342B">Voo cedo sem táxi</div>
+              <div style="display:flex;align-items:center;gap:3px;padding:0 8px 7px"><span style="width:12px;height:12px;border-radius:999px;background:#E0EDE7;color:#46796A;font-size:5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center">RC</span><span style="flex:1;font-size:8px;color:#6E7A70">Rafa Costa</span><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3 5.49 5.49 0 0 0 12 5.5 5.49 5.49 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" stroke="#0B8043" stroke-width="2" fill="#0B8043"/></svg><span style="font-size:8px;font-weight:700;color:#0B8043">27</span></div>
+            </div>
+            <div style="background:#fff;border:1px solid #EFE2C1;border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(74,54,32,.06)">
+              <div style="position:relative;aspect-ratio:1/1;background:repeating-linear-gradient(45deg,#F0D57E,#F0D57E 6px,#E6C55C 6px,#E6C55C 12px)"><span style="position:absolute;top:5px;left:5px;height:16px;padding:0 7px;border-radius:999px;background:#F8E2EC;color:#C0577F;font-size:8px;font-weight:700;display:inline-flex;align-items:center">Beleza</span></div>
+              <div style="padding:6px 8px 4px;font-size:10px;font-weight:700;line-height:1.3;color:#25342B">Creme que segura o frizz no inverno</div>
+              <div style="display:flex;align-items:center;gap:3px;padding:0 8px 7px"><span style="width:12px;height:12px;border-radius:999px;background:#F1E0E6;color:#97516A;font-size:5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center">BC</span><span style="flex:1;font-size:8px;color:#6E7A70">Bia Cruz</span><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3 5.49 5.49 0 0 0 12 5.5 5.49 5.49 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" stroke="#99A39A" stroke-width="2"/></svg><span style="font-size:8px;font-weight:700;color:#99A39A">8</span></div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:auto;height:44px;background:#FCF2C9;border-top:1px solid #EFE2C1;display:flex;align-items:center;padding:0 4px">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 10.5 12 3l9 7.5" stroke="#0B8043" stroke-width="2" stroke-linecap="round"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5" stroke="#0B8043" stroke-width="2" fill="#0B8043"/></svg><span style="font-size:7.5px;font-weight:700;color:#0B8043">Início</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#99A39A" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="#99A39A" stroke-width="2" stroke-linecap="round"/></svg><span style="font-size:7.5px;color:#99A39A">Buscar</span></div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center"><div style="width:36px;height:26px;margin-top:-3px;border-radius:9px;background:#0B8043;display:flex;align-items:center;justify-content:center;box-shadow:0 5px 12px rgba(6,85,44,.3)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#F3FAF5" stroke-width="2.8" stroke-linecap="round"/></svg></div></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" stroke="#99A39A" stroke-width="2"/></svg><span style="font-size:7.5px;color:#99A39A">Salvos</span></div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="#99A39A" stroke-width="2"/><path d="M4 21a8 8 0 0 1 16 0" stroke="#99A39A" stroke-width="2" stroke-linecap="round"/></svg><span style="font-size:7.5px;color:#99A39A">Perfil</span></div>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:800;text-align:center">Início — o mural</div>
+    </div>
+
+    <!-- MOCK Buscar -->
+    <div style="width:252px;flex:none;display:flex;flex-direction:column;gap:8px">
+      <div style="border:1px solid #DECBA0;border-radius:22px;overflow:hidden;background:#FCF2C9;box-shadow:0 6px 18px rgba(74,54,32,.09);min-height:512px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid #EFE2C1">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m15 18-6-6 6-6" stroke="#45544A" stroke-width="2" stroke-linecap="round"/></svg>
+          <div style="flex:1;padding:2px;border-radius:999px;background:#E1F5E8"><div style="display:flex;align-items:center;gap:4px;height:30px;background:#fff;border:1px solid #0B8043;border-radius:999px;padding:0 9px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#99A39A" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="#99A39A" stroke-width="2" stroke-linecap="round"/></svg><span style="flex:1;font-size:11px;color:#B6BEB4">Buscar notas…</span></div></div>
+        </div>
+        <div style="padding:12px;display:flex;flex-direction:column;gap:14px">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:800;color:#25342B">Buscas recentes</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M3 6h18" stroke="#99A39A" stroke-width="2" stroke-linecap="round"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="#99A39A" stroke-width="2"/></svg></div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">
+              <span style="height:24px;padding:0 10px;border-radius:999px;background:#fff;border:1px solid #DECBA0;color:#45544A;font-size:10px;font-weight:600;display:inline-flex;align-items:center">pão de queijo</span>
+              <span style="height:24px;padding:0 10px;border-radius:999px;background:#fff;border:1px solid #DECBA0;color:#45544A;font-size:10px;font-weight:600;display:inline-flex;align-items:center">dentista br dublin</span>
+              <span style="height:24px;padding:0 10px;border-radius:999px;background:#fff;border:1px solid #DECBA0;color:#45544A;font-size:10px;font-weight:600;display:inline-flex;align-items:center">guaraná</span>
+            </div>
+          </div>
+          <div>
+            <span style="font-size:13px;font-weight:800;color:#25342B">Descubra</span>
+            <div style="display:flex;flex-wrap:wrap;margin-top:4px">
+              <div style="flex-basis:50%;display:flex;align-items:center;gap:5px;padding:5px 0"><span style="font-size:10px;font-weight:800;color:#3A5A9E">1</span><span style="font-size:10px;color:#45544A">Achados de comida</span></div>
+              <div style="flex-basis:50%;display:flex;align-items:center;gap:5px;padding:5px 0"><span style="font-size:10px;font-weight:800;color:#3A5A9E">2</span><span style="font-size:10px;color:#45544A">Achados de beleza</span></div>
+              <div style="flex-basis:50%;display:flex;align-items:center;gap:5px;padding:5px 0"><span style="font-size:10px;font-weight:800;color:#3A5A9E">3</span><span style="font-size:10px;color:#45544A">Achados de viagem</span></div>
+              <div style="flex-basis:50%;display:flex;align-items:center;gap:5px;padding:5px 0"><span style="font-size:10px;font-weight:800;color:#3A5A9E">4</span><span style="font-size:10px;color:#45544A">Achadinhos</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:800;text-align:center">Buscar — ocioso</div>
+    </div>
+
+    <!-- MOCK Escrever -->
+    <div style="width:252px;flex:none;display:flex;flex-direction:column;gap:8px">
+      <div style="border:1px solid #DECBA0;border-radius:22px;overflow:hidden;background:#FCF2C9;box-shadow:0 6px 18px rgba(74,54,32,.09);min-height:512px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid #EFE2C1">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m15 18-6-6 6-6" stroke="#45544A" stroke-width="2" stroke-linecap="round"/></svg>
+          <span style="font-size:14px;font-weight:800;color:#25342B">Escrever</span>
+        </div>
+        <div style="padding:14px 12px;display:flex;flex-direction:column;gap:12px">
+          <div style="background:#FFE98F;border-radius:13px;padding:14px 13px;transform:rotate(-0.5deg);box-shadow:0 4px 12px rgba(74,54,32,.09);position:relative;overflow:hidden">
+            <div style="position:absolute;top:1px;left:6px;font-size:30px;line-height:30px;font-weight:800;color:#F5C51C">“</div>
+            <div style="margin-top:20px;font-size:14px;font-weight:800;letter-spacing:-0.01em;color:#25342B">Farmácia que entrega manipulado</div>
+            <div style="margin-top:5px;min-height:52px;font-size:11px;line-height:1.5;color:#3A2E10">Fica na rua do mercado municipal, aceita receita digital e entrega no mesmo dia…</div>
+            <div style="text-align:right;font-size:8.5px;color:#99A39A;margin-top:5px">96/1000</div>
+          </div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            <span style="height:22px;padding:0 9px;border-radius:999px;background:#E1F5E8;color:#086B37;font-size:9.5px;font-weight:700;display:inline-flex;align-items:center">Comida</span>
+            <span style="height:22px;padding:0 9px;border-radius:999px;background:#F5C51C;color:#3A2E10;font-size:9.5px;font-weight:700;display:inline-flex;align-items:center;box-shadow:0 1px 2px rgba(74,54,32,.06)">Achadinhos</span>
+            <span style="height:22px;padding:0 9px;border-radius:999px;background:#F8E2EC;color:#C0577F;font-size:9.5px;font-weight:700;display:inline-flex;align-items:center">Beleza</span>
+          </div>
+          <div style="width:88px;height:88px;border:1.5px dashed #2FA163;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;background:#E1F5E8"><span style="width:24px;height:24px;border-radius:999px;background:#0B8043;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(6,85,44,.25)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#F3FAF5" stroke-width="2.8" stroke-linecap="round"/></svg></span><span style="font-size:8px;font-weight:700;color:#086B37">Adicionar foto</span></div>
+          <div style="height:36px;border-radius:11px;background:#0B8043;color:#F3FAF5;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(6,85,44,.24)">Publicar achado</div>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:800;text-align:center">Escrever — o post-it</div>
+    </div>
+
+    <!-- MOCK Nota -->
+    <div style="width:252px;flex:none;display:flex;flex-direction:column;gap:8px">
+      <div style="border:1px solid #DECBA0;border-radius:22px;overflow:hidden;background:#FCF2C9;box-shadow:0 6px 18px rgba(74,54,32,.09);min-height:512px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid #EFE2C1">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m15 18-6-6 6-6" stroke="#45544A" stroke-width="2" stroke-linecap="round"/></svg>
+          <span style="width:20px;height:20px;border-radius:999px;background:#F4E2D8;color:#B45B3E;font-size:8px;font-weight:700;display:inline-flex;align-items:center;justify-content:center">AM</span>
+          <span style="flex:1;font-size:11px;font-weight:600;color:#45544A">Ana Martins</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" stroke="#99A39A" stroke-width="2"/><path d="M4 22v-7" stroke="#99A39A" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <div style="aspect-ratio:4/3;background:repeating-linear-gradient(45deg,#F0D57E,#F0D57E 7px,#E6C55C 7px,#E6C55C 14px);display:flex;align-items:center;justify-content:center"><span style="font-family:ui-monospace,monospace;font-size:9px;color:#55432F;background:rgba(255,253,246,.85);padding:2px 7px;border-radius:5px">foto da nota</span></div>
+        <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+          <span style="align-self:flex-start;height:20px;padding:0 9px;border-radius:999px;background:#E1F5E8;color:#086B37;font-size:9px;font-weight:700;display:inline-flex;align-items:center">Comida</span>
+          <div style="font-size:16px;font-weight:800;letter-spacing:-0.01em;line-height:1.2;color:#25342B">Pão de queijo que lembra Minas</div>
+          <div style="font-size:11px;line-height:1.6;color:#45544A">Congelado, assa em 20 min e a casa inteira cheira a café da tarde na casa da vó. Fica no freezer do fundo, perto dos açaís.</div>
+        </div>
+        <div style="padding:0 12px 12px;display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:11px;font-weight:800;color:#25342B">Comentários · 8</div>
+          <div style="display:flex;gap:6px">
+            <span style="width:18px;height:18px;border-radius:999px;background:#E0EDE7;color:#46796A;font-size:7px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none">RC</span>
+            <div style="flex:1">
+              <div style="font-size:9px;font-weight:700;color:#25342B">Rafa Costa <span style="font-weight:500;color:#99A39A">· há 2h</span></div>
+              <div style="font-size:9.5px;line-height:1.5;color:#45544A">Fui hoje por sua causa. Chorei no corredor do freezer, obrigado.</div>
+              <div style="display:flex;gap:10px;margin-top:2px;align-items:center"><svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3 5.49 5.49 0 0 0 12 5.5 5.49 5.49 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" stroke="#0B8043" stroke-width="2" fill="#0B8043"/></svg><span style="font-size:8px;font-weight:700;color:#0B8043">4</span><span style="font-size:8px;font-weight:700;color:#6E7A70">Responder</span></div>
+              <div style="border-left:2px solid #EFE2C1;margin-top:6px;padding-left:8px;display:flex;gap:5px">
+                <span style="width:15px;height:15px;border-radius:999px;background:#F4E2D8;color:#B45B3E;font-size:6px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none">AM</span>
+                <div>
+                  <div style="font-size:8.5px;font-weight:700;color:#25342B">Ana Martins <span style="display:inline-flex;align-items:center;border-radius:999px;background:#E1F5E8;color:#0B8043;font-size:6.5px;font-weight:800;padding:0 4px;vertical-align:1px">AUTORA</span></div>
+                  <div style="font-size:9px;line-height:1.5;color:#45544A">Hahaha leva marmita que o açaí de lá também vale!</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:auto;border-top:1px solid #EFE2C1;background:#fff;display:flex;align-items:center;gap:8px;padding:7px 10px">
+          <span style="flex:1;display:flex;align-items:center;gap:5px;height:28px;background:#F5E7C8;border-radius:999px;padding:0 10px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M12 20h9" stroke="#99A39A" stroke-width="2" stroke-linecap="round"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" stroke="#99A39A" stroke-width="2"/></svg><span style="font-size:9.5px;color:#99A39A">Diz alguma coisa boa…</span></span>
+          <span style="display:inline-flex;align-items:center;gap:2px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3 5.49 5.49 0 0 0 12 5.5 5.49 5.49 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" stroke="#0B8043" stroke-width="2" fill="#0B8043"/></svg><span style="font-size:10px;font-weight:700;color:#0B8043">27</span></span>
+          <span style="display:inline-flex;align-items:center;gap:2px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="#99A39A" stroke-width="2"/></svg><span style="font-size:10px;font-weight:700;color:#99A39A">8</span></span>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:800;text-align:center">Nota — a leitura <span style="font-weight:600;color:#7F6B54">(respostas aninhadas: norte)</span></div>
+    </div>
+
+    <!-- MOCK Perfil -->
+    <div style="width:252px;flex:none;display:flex;flex-direction:column;gap:8px">
+      <div style="border:1px solid #DECBA0;border-radius:22px;overflow:hidden;background:#FCF2C9;box-shadow:0 6px 18px rgba(74,54,32,.09);min-height:512px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:4px;padding:8px 12px;border-bottom:1px solid #EFE2C1"><span style="display:flex;align-items:baseline"><span style="font-size:15px;font-weight:800;color:#25342B">sdds</span><span style="font-size:15px;font-weight:800;color:#0B8043">.</span></span></div>
+        <div style="padding:16px 12px;display:flex;flex-direction:column;align-items:center;gap:8px">
+          <span style="border:2px solid #0B8043;border-radius:999px;padding:2px;background:#FCF2C9"><span style="width:56px;height:56px;border-radius:999px;background:#F4E2D8;color:#B45B3E;font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center">AM</span></span>
+          <div style="font-size:17px;font-weight:800;letter-spacing:-0.01em;color:#25342B">Ana Martins</div>
+          <div style="display:flex;gap:16px">
+            <span style="display:flex;flex-direction:column;align-items:center"><span style="font-size:13px;font-weight:800;color:#25342B">14</span><span style="font-size:8.5px;color:#6E7A70">notas</span></span>
+            <span style="display:flex;flex-direction:column;align-items:center"><span style="font-size:13px;font-weight:800;color:#0B8043">89</span><span style="font-size:8.5px;color:#6E7A70">úteis</span></span>
+          </div>
+          <div style="display:flex;gap:6px;width:100%;margin-top:4px">
+            <div style="flex:1;background:#fff;border:1px solid #EFE2C1;border-radius:9px;height:64px;overflow:hidden"><div style="height:38px;background:repeating-linear-gradient(45deg,#F0D57E,#F0D57E 6px,#E6C55C 6px,#E6C55C 12px)"></div><div style="padding:4px 6px;font-size:8px;font-weight:700;color:#25342B">Pão de queijo…</div></div>
+            <div style="flex:1;background:#fff;border:1px solid #EFE2C1;border-radius:9px;height:64px;overflow:hidden"><div style="height:38px;background:#FFE98F;border-bottom:1px solid #F7D558;padding:4px"><span style="font-size:12px;font-weight:800;color:#F5C51C">“</span></div><div style="padding:4px 6px;font-size:8px;font-weight:700;color:#25342B">Feira de sábado…</div></div>
+          </div>
+          <span style="font-size:10.5px;font-weight:600;color:#45544A;margin-top:4px">Sair da conta</span>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:800;text-align:center">Perfil &amp; Autor</div>
+    </div>
+
+    <!-- MOCK Salvos -->
+    <div style="width:252px;flex:none;display:flex;flex-direction:column;gap:8px">
+      <div style="border:1px solid #DECBA0;border-radius:22px;overflow:hidden;background:#FCF2C9;box-shadow:0 6px 18px rgba(74,54,32,.09);min-height:512px;display:flex;flex-direction:column">
+        <div style="padding:16px 14px 20px;display:flex;flex-direction:column;gap:12px">
+          <div style="font-size:20px;font-weight:800;letter-spacing:-0.02em;color:#25342B">Salvos</div>
+          <div style="background:#F5E7C8;border-radius:13px;padding:22px 16px;display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" stroke="#99A39A" stroke-width="2"/></svg>
+            <div style="font-size:14px;font-weight:800;color:#25342B">Nenhum salvo ainda</div>
+          </div>
+          <div style="align-self:center;width:76px;height:76px;border-radius:999px;border:7px solid rgba(199,148,23,.13);margin-top:14px"></div>
+          <div style="align-self:center;font-family:Caveat,cursive;font-size:15px;color:rgba(110,90,40,.55);transform:rotate(-2deg)">guarda um cadinho pra depois…</div>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:800;text-align:center">Salvos — hoje (alvo do <a href="#norte">norte</a>)</div>
+    </div>
+
+    <!-- MOCK Login -->
+    <div style="width:252px;flex:none;display:flex;flex-direction:column;gap:8px">
+      <div style="border:1px solid #DECBA0;border-radius:22px;overflow:hidden;background:#FCF2C9;box-shadow:0 6px 18px rgba(74,54,32,.09);min-height:512px;display:flex;flex-direction:column">
+        <div style="padding:24px 16px 20px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+            <span style="display:flex;align-items:baseline"><span style="font-size:27px;font-weight:800;letter-spacing:-0.02em;color:#25342B">sdds</span><span style="font-size:27px;font-weight:800;color:#0B8043">.</span></span>
+            <span style="font-family:Caveat,cursive;font-size:17px;font-weight:600;color:#086B37">Mata a saudade do que é bom.</span>
+            <span style="font-size:9.5px;line-height:1.55;color:#6E7A70;text-align:center;max-width:200px">A rede dos brasileiros — daqui e de fora: beleza, comida, viagem e tudo que gente real recomenda.</span>
+          </div>
+          <div>
+            <div style="font-size:9.5px;font-weight:700;color:#25342B;margin-bottom:3px">Usuário</div>
+            <div style="height:32px;background:#fff;border:1px solid #EFE2C1;border-radius:10px;display:flex;align-items:center;padding:0 8px"><span style="font-size:10px;color:#B6BEB4">seu_usuario</span></div>
+          </div>
+          <div>
+            <div style="font-size:9.5px;font-weight:700;color:#25342B;margin-bottom:3px">Senha</div>
+            <div style="height:32px;background:#fff;border:1px solid #EFE2C1;border-radius:10px;display:flex;align-items:center;padding:0 8px"><span style="font-size:10px;color:#B6BEB4">••••••••</span></div>
+          </div>
+          <div style="height:34px;border-radius:11px;background:#0B8043;color:#F3FAF5;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(6,85,44,.24)">Entrar</div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="flex:1;height:1px;background:#EFE2C1"></span><span style="font-size:8.5px;color:#99A39A">ou entre com</span><span style="flex:1;height:1px;background:#EFE2C1"></span></div>
+          <div style="display:flex;gap:6px">
+            <div style="flex:1;height:32px;border-radius:10px;background:#fff;border:1px solid #DECBA0;display:flex;align-items:center;justify-content:center;gap:5px;box-shadow:0 1px 2px rgba(74,54,32,.06)"><span style="width:12px;height:12px;border-radius:999px;background:#E8EDF6;color:#33508D;font-size:7.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center">G</span><span style="font-size:10px;font-weight:700;color:#25342B">Google</span></div>
+            <div style="flex:1;height:32px;border-radius:10px;background:#fff;border:1px solid #DECBA0;display:flex;align-items:center;justify-content:center;gap:5px;box-shadow:0 1px 2px rgba(74,54,32,.06)"><span style="width:12px;height:12px;border-radius:999px;background:#25342B;color:#FFFDF6;font-size:7.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center"></span><span style="font-size:10px;font-weight:700;color:#25342B">Apple</span></div>
+          </div>
+          <div style="text-align:center;font-size:9.5px;color:#45544A">Primeira vez? <span style="color:#0B8043;font-weight:700">Criar conta</span></div>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:800;text-align:center">Entrar / Criar conta <span style="font-weight:600;color:#7F6B54">(social login: norte)</span></div>
+    </div>
+
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:28px">
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:18px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px"><span style="font-size:15px;font-weight:800">Início — o mural</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">(tabs)/index.tsx</span></div>
+      <ol style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:#55432F">
+        <li>AppHeader: wordmark (toque = topo) · TopTabs "Explorar" · lupa</li>
+        <li>Rail de chips: NeutralChip "Tudo" + CategoryChips, rolagem horizontal</li>
+        <li>MasonryGrid 2 colunas fixas, gap 12, gutter 16, teto 430 — balanceado por estimativa de altura (<code style="font-family:ui-monospace,monospace;font-size:11px;background:#F1D49E;border-radius:4px;padding:1px 4px">splitIntoColumns</code>)</li>
+        <li>Estados: skeleton 2 colunas → mural / vazio caloroso / erro</li>
+        <li>AppTabBar com FAB</li>
+      </ol>
+      <p style="margin:8px 0 0;font-size:12px;color:#7F6B54">Impressões do explore são eventos de produto — a lista renderizada é o que se registra, nunca a resposta HTTP.</p>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:18px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px"><span style="font-size:15px;font-weight:800">Buscar</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">(tabs)/search.tsx</span></div>
+      <ol style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:#55432F">
+        <li>AppHeader + SearchField lg (54) com foco automático e halo verde</li>
+        <li>Ocioso: "Buscas recentes" (pills sunken + lixeira) e "Descubra" (grade 2 col numerada em azul info)</li>
+        <li>Resultados: mesmos NoteCards do mural, rail de categoria mantido</li>
+        <li>Sem resultado: vazio com sugestão de reformular — registra <code style="font-family:ui-monospace,monospace;font-size:11px;background:#F1D49E;border-radius:4px;padding:1px 4px">search_no_results</code></li>
+      </ol>
+      <p style="margin:8px 0 0;font-size:12px;color:#7F6B54">Proveniência de busca (search_id, rank, retrieval_source) viaja com o resultado renderizado e nunca é recalculada.</p>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:18px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px"><span style="font-size:15px;font-weight:800">Escrever — o post-it</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">app/compose.tsx</span></div>
+      <ol style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:#55432F">
+        <li>Modal fora das tabs, AppHeader com voltar</li>
+        <li>PostItComposer (título + corpo no post-it torto)</li>
+        <li>Seletor de categoria (chips) + célula de foto 132px (1 JPEG/PNG)</li>
+        <li>Button primary lg "Publicar achado" — único primary da tela</li>
+        <li>Rascunho persiste; publicar navega pra nota criada</li>
+      </ol>
+      <p style="margin:8px 0 0;font-size:12px;color:#7F6B54">Identidade de upload (upload_request_id) é do feature module, nunca da tela.</p>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:18px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px"><span style="font-size:15px;font-weight:800">Nota — a leitura</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">app/notes/[id].tsx</span></div>
+      <ol style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:#55432F">
+        <li>AppHeader: voltar + autor (avatar sm + nome) no centro + bandeira de denúncia</li>
+        <li>Foto full-bleed (se houver) → chip de categoria → título h2 → corpo bodyLg</li>
+        <li>NoteActionBar fixa: pill "Diz alguma coisa boa…" + Útil + comentários</li>
+        <li>Comentários: avatar + nome + sm, ações por ícone; denúncia via Sheet</li>
+      </ol>
+      <p style="margin:8px 0 0;font-size:12px;color:#7F6B54">A origem (explore/busca/perfil) chega por parâmetro e alimenta o contexto de "Útil".</p>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:18px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px"><span style="font-size:15px;font-weight:800">Perfil &amp; Autor</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">(tabs)/profile.tsx · app/authors/[id].tsx</span></div>
+      <ol style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:#55432F">
+        <li>Avatar lg 84 com anel verde + display name h2</li>
+        <li>Contadores (notas, úteis recebidos) como MetricStat estático</li>
+        <li>Notas do autor no mesmo mural de 2 colunas</li>
+        <li>Perfil próprio: sair da conta como Button ghost, no fim</li>
+      </ol>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #E5CD9E;border-radius:16px;padding:18px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px"><span style="font-size:15px;font-weight:800">Salvos · Entrar · Criar conta</span><span style="font-family:ui-monospace,monospace;font-size:10.5px;color:#7F6B54">(tabs)/saved.tsx · app/login.tsx</span></div>
+      <ol style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:#55432F">
+        <li>Salvos hoje: h1 + EmptyState com marcador — é o alvo nº1 do <a href="#norte">norte</a></li>
+        <li>Auth: BrandHeader (wordmark display + tagline Caveat + manifesto ≤308px)</li>
+        <li>TextFields empilhados, Button primary block, link pro outro fluxo</li>
+        <li>Erros de auth em PT-BR humano, dangerBg, nunca código de erro cru</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 8 NORTE ============ -->
+<section id="norte" data-screen-label="Norte de 1 ano" style="max-width:1060px;margin:0 auto;padding:64px 24px 8px">
+  <div style="font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#2F55A4">08 · Norte de 1 ano</div>
+  <h2 style="margin:8px 0 0;font-size:34px;font-weight:800;letter-spacing:-0.02em">Pra onde o mural cresce</h2>
+  <p style="margin:14px 0 0;max-width:680px;font-size:15px;line-height:1.55;color:#55432F">Quatro apostas pro próximo ano, na paleta norte v2. São contratos de direção, não specs: cada uma vira sua própria rodada de design antes de virar código. O que elas têm em comum: aprofundam saudade, lugar e confiança — nunca viralidade.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:24px">
+    <div style="background:#FFFDF6;border:1px solid #B9C8E8;border-radius:16px;overflow:hidden;box-shadow:0 2px 6px rgba(74,54,32,.07)">
+      <div style="background:#FBEDB6;padding:18px 20px 14px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><span style="background:#2F55A4;color:#F4F7FD;border-radius:999px;padding:3px 10px;font-size:10.5px;font-weight:800">T1–T2</span><span style="font-size:16px;font-weight:800">Salvos vira Pastas</span></div>
+        <div style="display:flex;gap:10px">
+          <div style="flex:1;background:#FFFDF6;border:1px solid #EFD98D;border-radius:12px;padding:10px;position:relative"><div style="height:44px;border-radius:8px;background:#FFF0B8;transform:rotate(-2deg);border:1px solid #F5C51C"></div><div style="height:44px;border-radius:8px;background:#E3EAF8;transform:rotate(1.5deg);margin-top:-32px;border:1px solid #B9C8E8"></div><div style="font-size:12px;font-weight:700;margin-top:8px">Quando eu voltar 🇧🇷*</div><div style="font-size:10.5px;color:#7F6B54">14 achados</div></div>
+          <div style="flex:1;background:#FFFDF6;border:1px solid #EFD98D;border-radius:12px;padding:10px;position:relative"><div style="height:44px;border-radius:8px;background:#E1F5E8;transform:rotate(2deg);border:1px solid #ADE3C4"></div><div style="height:44px;border-radius:8px;background:#FFF0B8;transform:rotate(-1deg);margin-top:-32px;border:1px solid #F5C51C"></div><div style="font-size:12px;font-weight:700;margin-top:8px">Casa nova em Dublin</div><div style="font-size:10.5px;color:#7F6B54">6 achados</div></div>
+        </div>
+      </div>
+      <div style="padding:14px 20px;font-size:13px;line-height:1.55;color:#55432F">Salvar = guardar num caderninho, não dar like. Pastas são pilhas de post-its com nomes do usuário; a metáfora física continua. Privadas por padrão; compartilhar uma pasta é o primeiro gesto social novo. <span style="font-size:11px;color:#7F6B54">*emoji só se o usuário digitar.</span></div>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #B9C8E8;border-radius:16px;overflow:hidden;box-shadow:0 2px 6px rgba(74,54,32,.07)">
+      <div style="background:#FBEDB6;padding:18px 20px 14px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><span style="background:#2F55A4;color:#F4F7FD;border-radius:999px;padding:3px 10px;font-size:10.5px;font-weight:800">T2</span><span style="font-size:16px;font-weight:800">Nota com várias fotos</span></div>
+        <div style="background:#FFFDF6;border:1px solid #EFD98D;border-radius:12px;overflow:hidden"><div style="aspect-ratio:16/8;background:repeating-linear-gradient(45deg,#EFD37A,#EFD37A 8px,#E3C24F 8px,#E3C24F 16px);display:flex;align-items:center;justify-content:center"><span style="font-family:ui-monospace,monospace;font-size:10px;color:#55432F;background:rgba(255,253,246,.85);padding:2px 8px;border-radius:6px">carrossel 1/4</span></div><div style="display:flex;gap:4px;justify-content:center;padding:8px"><span style="width:6px;height:6px;border-radius:999px;background:#0B8043"></span><span style="width:6px;height:6px;border-radius:999px;background:#C2B09A"></span><span style="width:6px;height:6px;border-radius:999px;background:#C2B09A"></span><span style="width:6px;height:6px;border-radius:999px;background:#C2B09A"></span></div></div>
+      </div>
+      <div style="padding:14px 20px;font-size:13px;line-height:1.55;color:#55432F">A API já serve lista ordenada de imagens; o compose só permite uma. Norte: até 6 fotos, carrossel com pontos verdes, sem crop forçado. O cartão do mural continua mostrando só a primeira — o mural não vira grid de álbuns.</div>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #B9C8E8;border-radius:16px;overflow:hidden;box-shadow:0 2px 6px rgba(74,54,32,.07)">
+      <div style="background:#FBEDB6;padding:18px 20px 14px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><span style="background:#2F55A4;color:#F4F7FD;border-radius:999px;padding:3px 10px;font-size:10.5px;font-weight:800">T3</span><span style="font-size:16px;font-weight:800">Lugares, do jeito certo</span></div>
+        <div style="background:#FFFDF6;border:1px solid #EFD98D;border-radius:12px;padding:12px;display:flex;gap:10px;align-items:center">
+          <span style="width:44px;height:44px;border-radius:12px;background:#E3EAF8;display:flex;align-items:center;justify-content:center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" stroke="#2F55A4" stroke-width="2"/><circle cx="12" cy="10" r="3" stroke="#2F55A4" stroke-width="2"/></svg></span>
+          <div style="flex:1"><div style="font-size:14px;font-weight:700">Mercadinho Brasil, Cork St.</div><div style="font-size:11.5px;color:#7F6B54">23 notas · 41 acharam útil · Dublin</div></div>
+          <span style="font-size:12px;font-weight:700;color:#2F55A4">Seguir</span>
+        </div>
+      </div>
+      <div style="padding:14px 20px;font-size:13px;line-height:1.55;color:#55432F">O domínio de lugar foi removido de propósito — volta desenhado pra saudade: páginas de lugar nascem das notas ("onde os brasileiros de Dublin acham as coisas"), Brasil e diáspora primeiro. Azul-royal é a cor do domínio. Nunca ranking por GPS — sempre por gente.</div>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #B9C8E8;border-radius:16px;overflow:hidden;box-shadow:0 2px 6px rgba(74,54,32,.07)">
+      <div style="background:#FBEDB6;padding:18px 20px 14px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><span style="background:#2F55A4;color:#F4F7FD;border-radius:999px;padding:3px 10px;font-size:10.5px;font-weight:800">T3–T4</span><span style="font-size:16px;font-weight:800">Gente de confiança</span></div>
+        <div style="background:#FFFDF6;border:1px solid #EFD98D;border-radius:12px;padding:12px;display:flex;gap:10px;align-items:center">
+          <span style="border:2px solid #0B8043;border-radius:999px;padding:2px;background:#FBEDB6"><span style="width:36px;height:36px;border-radius:999px;background:#F4E2D8;color:#B45B3E;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">AM</span></span>
+          <div style="flex:1"><div style="font-size:14px;font-weight:700">Ana Martins</div><div style="font-size:11.5px;color:#7F6B54">Cozinha mineira · 89 úteis · vizinha de bairro</div></div>
+          <span style="display:inline-flex;align-items:center;height:36px;padding:0 14px;border-radius:14px;background:#E1F5E8;color:#086B37;font-size:13px;font-weight:600">Acompanhar</span>
+        </div>
+      </div>
+      <div style="padding:14px 20px;font-size:13px;line-height:1.55;color:#55432F">"Acompanhar" (nunca "seguir de influencer"): o feed ganha uma aba "Dos seus" ao lado de "Explorar" nos TopTabs. Confiança é mostrada pelo que a pessoa achou útil, não por contagem de seguidores — contadores de seguidores não aparecem em lugar nenhum.</div>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #B9C8E8;border-radius:16px;overflow:hidden;box-shadow:0 2px 6px rgba(74,54,32,.07)">
+      <div style="background:#FBEDB6;padding:18px 20px 14px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><span style="background:#2F55A4;color:#F4F7FD;border-radius:999px;padding:3px 10px;font-size:10.5px;font-weight:800">T2</span><span style="font-size:16px;font-weight:800">Conversas de verdade</span></div>
+        <div style="background:#FFFDF6;border:1px solid #EFD98D;border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;gap:6px"><span style="width:18px;height:18px;border-radius:999px;background:#E0EDE7;color:#46796A;font-size:7px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none">RC</span><div style="flex:1"><div style="font-size:9px;font-weight:700;color:#31241A">Rafa Costa</div><div style="font-size:9.5px;line-height:1.5;color:#55432F">Tem estacionamento perto? Vou de carro com as crianças.</div></div></div>
+          <div style="border-left:2px solid #B9C8E8;margin-left:9px;padding-left:8px;display:flex;gap:5px"><span style="width:15px;height:15px;border-radius:999px;background:#F4E2D8;color:#B45B3E;font-size:6px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none">AM</span><div><div style="font-size:8.5px;font-weight:700;color:#31241A">Ana Martins <span style="display:inline-flex;align-items:center;border-radius:999px;background:#E1F5E8;color:#0B8043;font-size:6.5px;font-weight:800;padding:0 4px;vertical-align:1px">AUTORA</span></div><div style="font-size:9px;line-height:1.5;color:#55432F">Tem sim, <span style="color:#2F55A4;font-weight:700">@rafa</span> — atrás do mercado, grátis 1h.</div></div></div>
+        </div>
+      </div>
+      <div style="padding:14px 20px;font-size:13px;line-height:1.55;color:#55432F">Respostas aninhadas (1 nível, sem thread infinita), menção <span style="color:#2F55A4;font-weight:700">@nome</span>, "Útil" em comentário e o selo AUTORA. A conversa continua a nota — dúvida prática, complemento, obrigado — e nunca vira palco: sem repost, sem quote, denúncia a um toque.</div>
+    </div>
+    <div style="background:#FFFDF6;border:1px solid #B9C8E8;border-radius:16px;overflow:hidden;box-shadow:0 2px 6px rgba(74,54,32,.07)">
+      <div style="background:#FBEDB6;padding:18px 20px 14px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><span style="background:#2F55A4;color:#F4F7FD;border-radius:999px;padding:3px 10px;font-size:10.5px;font-weight:800">T4</span><span style="font-size:16px;font-weight:800">Publicar é um gesto</span></div>
+        <div style="background:#FFFDF6;border:1px solid #EFD98D;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:10px;font-weight:700;color:#31241A;text-align:center">Leva o caramelo até a sombra pra publicar</div>
+          <div style="position:relative;height:34px;border-radius:999px;background:#F7E29B;border:1px solid #E2BF52;display:flex;align-items:center;padding:0 4px">
+            <span style="width:26px;height:26px;border-radius:999px;background:#C98A3B;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(74,54,32,.25)"><span style="font-family:ui-monospace,monospace;font-size:7px;color:#FFE98F">dog</span></span>
+            <span style="flex:1;text-align:center;font-size:9px;color:#7F6B54">arrasta →</span>
+            <span style="width:26px;height:26px;border-radius:999px;border:2px dashed #2F55A4;display:inline-flex;align-items:center;justify-content:center"><span style="width:14px;height:14px;border-radius:999px;background:rgba(47,85,164,.25)"></span></span>
+          </div>
+          <div style="font-family:Caveat,cursive;font-size:14px;color:rgba(110,90,40,.6);text-align:center;transform:rotate(-1.5deg)">ou gira o globo até o Cruzeiro do Sul encaixar ✦</div>
+        </div>
+      </div>
+      <div style="padding:14px 20px;font-size:13px;line-height:1.55;color:#55432F">Anti-bot disfarçado de carinho: publicar exige um micro-gesto brasileiro — deslizar o cachorro caramelo até a sombra, ou girar o globo da bandeira até as estrelas alinharem. Humano acha charmoso e leva 1 segundo; bot erra. Nunca um captcha de grade de semáforo. O gesto certo do dia varia, e "conteúdo feito por gente" vira garantia de produto, não promessa.</div>
+    </div>
+  </div>
+
+  <h3 style="margin:44px 0 0;font-size:22px;font-weight:800;letter-spacing:-0.01em">As telas do futuro, renderizadas</h3>
+  <p style="margin:10px 0 0;max-width:680px;font-size:14px;line-height:1.55;color:#55432F">Como o app parece daqui a um ano, já na paleta norte v2. Nada disso existe no código hoje — são os alvos que cada rodada de design vai detalhar.</p>
+  <div style="display:flex;flex-wrap:wrap;gap:22px;margin-top:22px;align-items:flex-start">
+
+    <!-- FUTURO Pastas -->
+    <div style="width:252px;flex:none;display:flex;flex-direction:column;gap:8px">
+      <div style="border:1px solid #D9C161;border-radius:22px;overflow:hidden;background:#FCF2C9;box-shadow:0 6px 18px rgba(74,54,32,.09);min-height:512px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:4px;padding:8px 12px;border-bottom:1px solid #EFD98D">
+          <span style="display:flex;align-items:baseline"><span style="font-size:15px;font-weight:800;color:#31241A">sdds</span><span style="font-size:15px;font-weight:800;color:#0B8043">.</span></span>
+          <span style="flex:1;display:flex;justify-content:center;gap:12px">
+            <span style="display:flex;flex-direction:column;align-items:center"><span style="font-size:13px;font-weight:800;color:#31241A">Pastas</span><span style="width:18px;height:3px;border-radius:3px;background:#0B8043;margin-top:1px"></span></span>
+            <span style="font-size:12px;font-weight:600;color:#7F6B54;padding-top:1px">Todos</span>
+          </span>
+        </div>
+        <div style="padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="background:#FFFDF6;border:1px solid #EFD98D;border-radius:11px;padding:9px">
+            <div style="height:38px;position:relative"><div style="position:absolute;inset:0 8px auto 0;height:32px;border-radius:6px;background:#FFF0B8;border:1px solid #F5C51C;transform:rotate(-2deg)"></div><div style="position:absolute;inset:4px 0 auto 8px;height:32px;border-radius:6px;background:#E3EAF8;border:1px solid #B9C8E8;transform:rotate(1.5deg)"></div></div>
+            <div style="font-size:10px;font-weight:800;color:#31241A;margin-top:7px">Quando eu voltar</div>
+            <div style="font-size:8px;color:#7F6B54">14 achados</div>
+          </div>
+          <div style="background:#FFFDF6;border:1px solid #EFD98D;border-radius:11px;padding:9px">
+            <div style="height:38px;position:relative"><div style="position:absolute;inset:0 8px auto 0;height:32px;border-radius:6px;background:#E1F5E8;border:1px solid #ADE3C4;transform:rotate(2deg)"></div><div style="position:absolute;inset:4px 0 auto 8px;height:32px;border-radius:6px;background:#FFF0B8;border:1px solid #F5C51C;transform:rotate(-1deg)"></div></div>
+            <div style="font-size:10px;font-weight:800;color:#31241A;margin-top:7px">Casa nova em Dublin</div>
+            <div style="font-size:8px;color:#7F6B54">6 achados · compartilhada</div>
+          </div>
+          <div style="background:#FFFDF6;border:1px solid #EFD98D;border-radius:11px;padding:9px">
+            <div style="height:38px;position:relative"><div style="position:absolute;inset:0 8px auto 0;height:32px;border-radius:6px;background:#E3EAF8;border:1px solid #B9C8E8;transform:rotate(-1.5deg)"></div><div style="position:absolute;inset:4px 0 auto 8px;height:32px;border-radius:6px;background:#E1F5E8;border:1px solid #ADE3C4;transform:rotate(2deg)"></div></div>
+            <div style="font-size:10px;font-weight:800;color:#31241A;margin-top:7px">Presentes pra mãe</div>
+            <div style="font-size:8px;color:#7F6B54">3 achados · privada</div>
+          </div>
+          <div style="border:1.5px dashed #D9C161;border-radius:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:92px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#7F6B54" stroke-width="2" stroke-linecap="round"/></svg>
+            <span style="font-size:9px;font-weight:700;color:#7F6B54">Nova pasta</span>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:800;text-align:center">Salvos → Pastas <span style="color:#2F55A4">· T1–T2</span></div>
+    </div>
+
+    <!-- FUTURO Dos seus -->
+    <div style="width:252px;flex:none;display:flex;flex-direction:column;gap:8px">
+      <div style="border:1px solid #D9C161;border-radius:22px;overflow:hidden;background:#FCF2C9;box-shadow:0 6px 18px rgba(74,54,32,.09);min-height:512px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:4px;padding:8px 12px;border-bottom:1px solid #EFD98D">
+          <span style="display:flex;align-items:baseline"><span style="font-size:15px;font-weight:800;color:#31241A">sdds</span><span style="font-size:15px;font-weight:800;color:#0B8043">.</span></span>
+          <span style="flex:1;display:flex;justify-content:center;gap:12px">
+            <span style="font-size:12px;font-weight:600;color:#7F6B54;padding-top:1px">Explorar</span>
+            <span style="display:flex;flex-direction:column;align-items:center"><span style="font-size:13px;font-weight:800;color:#31241A">Dos seus</span><span style="width:18px;height:3px;border-radius:3px;background:#0B8043;margin-top:1px"></span></span>
+          </span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#55432F" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="#55432F" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="border:1.5px solid #0B8043;border-radius:999px;padding:1.5px;background:#FCF2C9"><span style="width:22px;height:22px;border-radius:999px;background:#F4E2D8;color:#B45B3E;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">AM</span></span>
+            <span style="font-size:9.5px;color:#55432F"><strong style="color:#31241A">Ana</strong> achou um lugar novo · há 1h</span>
+          </div>
+          <div style="background:#FFFDF6;border:1px solid #EFD98D;border-radius:11px;overflow:hidden;box-shadow:0 1px 2px rgba(74,54,32,.06)">
+            <div style="position:relative;aspect-ratio:16/9;background:repeating-linear-gradient(45deg,#EFD37A,#EFD37A 7px,#E3C24F 7px,#E3C24F 14px)"><span style="position:absolute;top:6px;left:6px;height:16px;padding:0 7px;border-radius:999px;background:#E3EAF8;color:#2F55A4;font-size:8px;font-weight:700;display:inline-flex;align-items:center;gap:2px"><svg width="8" height="8" viewBox="0 0 24 24" fill="none"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" stroke="#2F55A4" stroke-width="2.5"/></svg>Lugar</span></div>
+            <div style="padding:8px 9px 9px"><div style="font-size:11px;font-weight:700;color:#31241A">Mercadinho Brasil, Cork St.</div><div style="font-size:8.5px;color:#7F6B54;margin-top:2px">"Chegou queijo canastra de verdade" · 3 pessoas que você acompanha úteis aqui</div></div>
+          </div>
+          <div style="height:1px;background:#EFD98D;margin:4px 0"></div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="border:1.5px solid #0B8043;border-radius:999px;padding:1.5px;background:#FCF2C9"><span style="width:22px;height:22px;border-radius:999px;background:#E0EDE7;color:#46796A;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">RC</span></span>
+            <span style="font-size:9.5px;color:#55432F"><strong style="color:#31241A">Rafa</strong> salvou na pasta <strong style="color:#2F55A4">Casa nova</strong> · há 3h</span>
+          </div>
+          <div style="background:#FFFDF6;border:1px solid #EFD98D;border-radius:11px;overflow:hidden">
+            <div style="position:relative;background:#FFF0B8;border-bottom:1px solid #F5C51C;padding:8px"><div style="font-size:16px;line-height:16px;font-weight:800;color:#F5C51C">“</div><div style="font-size:8.5px;line-height:1.45;color:#3A2E10">Loja de segunda mão com panela de ferro igual da roça…</div></div>
+            <div style="padding:6px 9px 8px;font-size:10px;font-weight:700;color:#31241A">Panela de ferro em Dublin</div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:800;text-align:center">Feed "Dos seus" <span style="color:#2F55A4">· T3–T4</span></div>
+    </div>
+
+    <!-- FUTURO Lugar -->
+    <div style="width:252px;flex:none;display:flex;flex-direction:column;gap:8px">
+      <div style="border:1px solid #D9C161;border-radius:22px;overflow:hidden;background:#FCF2C9;box-shadow:0 6px 18px rgba(74,54,32,.09);min-height:512px;display:flex;flex-direction:column">
+        <div style="position:relative;aspect-ratio:16/7;background:repeating-linear-gradient(45deg,#EFD37A,#EFD37A 7px,#E3C24F 7px,#E3C24F 14px)">
+          <span style="position:absolute;top:8px;left:8px;width:24px;height:24px;border-radius:999px;background:rgba(255,253,246,.9);display:flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="m15 18-6-6 6-6" stroke="#31241A" stroke-width="2" stroke-linecap="round"/></svg></span>
+          <span style="position:absolute;bottom:8px;right:8px;font-family:ui-monospace,monospace;font-size:8px;color:#55432F;background:rgba(255,253,246,.85);padding:2px 6px;border-radius:5px">fotos das notas</span>
+        </div>
+        <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:8px;align-items:flex-start">
+            <span style="width:34px;height:34px;border-radius:10px;background:#E3EAF8;display:flex;align-items:center;justify-content:center;flex:none"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" stroke="#2F55A4" stroke-width="2"/><circle cx="12" cy="10" r="3" stroke="#2F55A4" stroke-width="2"/></svg></span>
+            <div style="flex:1"><div style="font-size:14px;font-weight:800;letter-spacing:-0.01em;color:#31241A">Mercadinho Brasil</div><div style="font-size:9px;color:#7F6B54">Cork St., Dublin · mercado brasileiro</div></div>
+            <span style="height:26px;padding:0 10px;border-radius:9px;background:#2F55A4;color:#F4F7FD;font-size:10px;font-weight:700;display:inline-flex;align-items:center;box-shadow:0 2px 6px rgba(24,50,110,.3)">Seguir</span>
+          </div>
+          <div style="display:flex;gap:12px;padding:7px 0;border-top:1px solid #EFD98D;border-bottom:1px solid #EFD98D">
+            <span style="display:flex;flex-direction:column"><span style="font-size:12px;font-weight:800;color:#31241A">23</span><span style="font-size:7.5px;color:#7F6B54">notas</span></span>
+            <span style="display:flex;flex-direction:column"><span style="font-size:12px;font-weight:800;color:#0B8043">41</span><span style="font-size:7.5px;color:#7F6B54">úteis</span></span>
+            <span style="display:flex;flex-direction:column"><span style="font-size:12px;font-weight:800;color:#2F55A4">9</span><span style="font-size:7.5px;color:#7F6B54">de quem você acompanha</span></span>
+          </div>
+          <div style="font-size:10.5px;font-weight:800;color:#31241A">O que os brasileiros acham aqui</div>
+          <div style="display:flex;gap:6px">
+            <div style="flex:1;background:#FFFDF6;border:1px solid #EFD98D;border-radius:9px;overflow:hidden"><div style="height:34px;background:repeating-linear-gradient(45deg,#EFD37A,#EFD37A 6px,#E3C24F 6px,#E3C24F 12px)"></div><div style="padding:4px 6px;font-size:8px;font-weight:700;color:#31241A">Queijo canastra…</div></div>
+            <div style="flex:1;background:#FFFDF6;border:1px solid #EFD98D;border-radius:9px;overflow:hidden"><div style="height:34px;background:#FFF0B8;border-bottom:1px solid #F5C51C;padding:3px"><span style="font-size:11px;font-weight:800;color:#F5C51C">“</span></div><div style="padding:4px 6px;font-size:8px;font-weight:700;color:#31241A">Pede o pão na chapa…</div></div>
+            <div style="flex:1;background:#FFFDF6;border:1px solid #EFD98D;border-radius:9px;overflow:hidden"><div style="height:34px;background:repeating-linear-gradient(45deg,#EFD37A,#EFD37A 6px,#E3C24F 6px,#E3C24F 12px)"></div><div style="padding:4px 6px;font-size:8px;font-weight:700;color:#31241A">Açaí de verdade…</div></div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:800;text-align:center">Página de Lugar <span style="color:#2F55A4">· T3</span></div>
+    </div>
+
+    <!-- FUTURO Nota multi-foto -->
+    <div style="width:252px;flex:none;display:flex;flex-direction:column;gap:8px">
+      <div style="border:1px solid #D9C161;border-radius:22px;overflow:hidden;background:#FCF2C9;box-shadow:0 6px 18px rgba(74,54,32,.09);min-height:512px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid #EFD98D">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="m15 18-6-6 6-6" stroke="#55432F" stroke-width="2" stroke-linecap="round"/></svg>
+          <span style="width:20px;height:20px;border-radius:999px;background:#F4E2D8;color:#B45B3E;font-size:8px;font-weight:700;display:inline-flex;align-items:center;justify-content:center">AM</span>
+          <span style="flex:1;font-size:11px;font-weight:600;color:#55432F">Ana Martins</span>
+          <span style="height:22px;padding:0 9px;border-radius:8px;background:#E1F5E8;color:#086B37;font-size:9px;font-weight:700;display:inline-flex;align-items:center">Acompanhar</span>
+        </div>
+        <div style="position:relative;aspect-ratio:4/3;background:repeating-linear-gradient(45deg,#EFD37A,#EFD37A 7px,#E3C24F 7px,#E3C24F 14px);display:flex;align-items:center;justify-content:center">
+          <span style="font-family:ui-monospace,monospace;font-size:9px;color:#55432F;background:rgba(255,253,246,.85);padding:2px 7px;border-radius:5px">foto 2 de 5</span>
+          <span style="position:absolute;top:8px;right:8px;background:rgba(49,36,26,.55);color:#FFFDF6;border-radius:999px;padding:2px 7px;font-size:8px;font-weight:700">2/5</span>
+        </div>
+        <div style="display:flex;gap:4px;justify-content:center;padding:7px 0 3px"><span style="width:5px;height:5px;border-radius:999px;background:#C2B09A"></span><span style="width:5px;height:5px;border-radius:999px;background:#0B8043"></span><span style="width:5px;height:5px;border-radius:999px;background:#C2B09A"></span><span style="width:5px;height:5px;border-radius:999px;background:#C2B09A"></span><span style="width:5px;height:5px;border-radius:999px;background:#C2B09A"></span></div>
+        <div style="padding:8px 12px 12px;display:flex;flex-direction:column;gap:7px">
+          <div style="display:flex;gap:5px;align-items:center">
+            <span style="height:20px;padding:0 9px;border-radius:999px;background:#E1F5E8;color:#086B37;font-size:9px;font-weight:700;display:inline-flex;align-items:center">Comida</span>
+            <span style="height:20px;padding:0 9px;border-radius:999px;background:#E3EAF8;color:#2F55A4;font-size:9px;font-weight:700;display:inline-flex;align-items:center;gap:2px"><svg width="8" height="8" viewBox="0 0 24 24" fill="none"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" stroke="#2F55A4" stroke-width="2.5"/></svg>Mercadinho Brasil</span>
+          </div>
+          <div style="font-size:15px;font-weight:800;letter-spacing:-0.01em;line-height:1.2;color:#31241A">Tarde de sábado que virou Brasil</div>
+          <div style="font-size:10.5px;line-height:1.55;color:#55432F">Passo a passo do café da tarde completo: pão na chapa, queijo canastra, goiabada e o guaraná que faltava.</div>
+          <div style="display:flex;align-items:center;gap:10px;border-top:1px solid #EFD98D;padding-top:7px">
+            <span style="flex:1;display:flex;align-items:center;gap:5px;height:26px;background:#F7E29B;border-radius:999px;padding:0 10px"><span style="font-size:9px;color:#7F6B54">Diz alguma coisa boa…</span></span>
+            <span style="display:inline-flex;align-items:center;gap:2px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3 5.49 5.49 0 0 0 12 5.5 5.49 5.49 0 0 0 7.5 3 5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" stroke="#0B8043" stroke-width="2" fill="#0B8043"/></svg><span style="font-size:9.5px;font-weight:700;color:#0B8043">54</span></span>
+            <span style="display:inline-flex;align-items:center;gap:2px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" stroke="#F5C51C" stroke-width="2" fill="#F5C51C"/></svg></span>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:800;text-align:center">Nota multi-foto + lugar <span style="color:#2F55A4">· T2–T3</span></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ 9 AGENTES ============ -->
+<section id="agentes" data-screen-label="Regras para agentes" style="max-width:1060px;margin:0 auto;padding:64px 24px 80px">
+  <div style="font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#2F55A4">09 · Regras para agentes de frontend</div>
+  <h2 style="margin:8px 0 0;font-size:34px;font-weight:800;letter-spacing:-0.02em">O contrato de quem escreve UI</h2>
+  <p style="margin:14px 0 0;max-width:680px;font-size:15px;line-height:1.55;color:#55432F">Qualquer pessoa ou agente pegando uma tarefa de frontend, em qualquer ponto do backlog, segue exatamente isto. Em conflito, a ordem de autoridade é: <strong>este documento → packages/tokens → o componente existente em apps/mobile/src/ui</strong>. Nunca a memória de como "apps parecidos" fazem.</p>
+  <div style="background:#123722;border-radius:16px;padding:26px 28px;margin-top:24px;color:#F2EFDC">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px">
+      <div>
+        <div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#3FB56F;margin-bottom:10px">Antes de codar</div>
+        <ol style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.75;color:rgba(247,233,207,.9)">
+          <li>Leia este documento e a seção da tela que vai tocar.</li>
+          <li>Procure o primitivo em <code style="font-family:ui-monospace,monospace;font-size:12px;background:rgba(255,253,246,.12);border-radius:4px;padding:1px 5px">apps/mobile/src/ui</code> antes de criar qualquer elemento.</li>
+          <li>Todo valor visual sai de <code style="font-family:ui-monospace,monospace;font-size:12px;background:rgba(255,253,246,.12);border-radius:4px;padding:1px 5px">@sdds/tokens</code>; valor de spec fora da régua entra em <code style="font-family:ui-monospace,monospace;font-size:12px;background:rgba(255,253,246,.12);border-radius:4px;padding:1px 5px">componentMetrics</code> com consumidor real.</li>
+          <li>Copy nova em PT-BR informal e útil — na dúvida, imite os textos existentes.</li>
+        </ol>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#3FB56F;margin-bottom:10px">Enquanto coda</div>
+        <ol style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.75;color:rgba(247,233,207,.9)">
+          <li>Texto só via <code style="font-family:ui-monospace,monospace;font-size:12px;background:rgba(255,253,246,.12);border-radius:4px;padding:1px 5px">AppText</code>; toque só via <code style="font-family:ui-monospace,monospace;font-size:12px;background:rgba(255,253,246,.12);border-radius:4px;padding:1px 5px">PressableScale</code>/<code style="font-family:ui-monospace,monospace;font-size:12px;background:rgba(255,253,246,.12);border-radius:4px;padding:1px 5px">IconButton</code>; ícone novo entra em <code style="font-family:ui-monospace,monospace;font-size:12px;background:rgba(255,253,246,.12);border-radius:4px;padding:1px 5px">apps/mobile/src/ui/icons.tsx</code> no mesmo traço 2px, 24×24.</li>
+          <li>Alvo ≥44px, rótulo acessível em controle só-ícone, reduced-motion respeitado.</li>
+          <li>Estilos em <code style="font-family:ui-monospace,monospace;font-size:12px;background:rgba(255,253,246,.12);border-radius:4px;padding:1px 5px">.styles.ts</code> com nomes concretos; tela orquestra, feature module guarda estado, adapter valida a rede. Nada de utils genérico, nada de dependência nova de UI sem aprovação humana.</li>
+          <li>Estados obrigatórios em toda superfície: loading (skeleton), vazio (caloroso), erro (humano), sucesso.</li>
+        </ol>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#3FB56F;margin-bottom:10px">Antes do PR</div>
+        <ol style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.75;color:rgba(247,233,207,.9)">
+          <li><code style="font-family:ui-monospace,monospace;font-size:12px;background:rgba(255,253,246,.12);border-radius:4px;padding:1px 5px">pnpm check</code> verde; primitivo novo tem teste de comportamento (nunca snapshot-only).</li>
+          <li>PR pequeno, um assunto; mudança visual mostra antes/depois.</li>
+          <li>Se mudou anatomia de tela, token ou primitivo: <strong>atualize este documento no mesmo PR</strong>. Doc e código nunca divergem.</li>
+          <li>Eventos de produto: só o vocabulário fechado do schema v1 — payload novo exige migração explícita de schema, nunca "só mais um campo".</li>
+        </ol>
+      </div>
+    </div>
+    <div style="margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,253,246,.14);display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+      <span style="font-family:Caveat,cursive;font-size:26px;font-weight:600;color:#F5C51C">Na dúvida, pergunte: "isso mata saudade ou só ocupa tela?"</span>
+    </div>
+  </div>
+  <p style="margin:20px 0 0;font-size:12.5px;color:#7F6B54">sdds. · Sistema de Design v1 · Fonte da verdade visual: <code style="font-family:ui-monospace,monospace;font-size:11px;background:#F1D49E;border-radius:4px;padding:1px 4px">packages/tokens/src/index.ts</code> + <code style="font-family:ui-monospace,monospace;font-size:11px;background:#F1D49E;border-radius:4px;padding:1px 4px">apps/mobile/src/ui/</code> · Artefato versionado em <code style="font-family:ui-monospace,monospace;font-size:11px;background:#F1D49E;border-radius:4px;padding:1px 4px">artifacts/design-system/</code>.</p>
+</section>
+
+</div>
+
+</x-dc>
+</body>
+</html>

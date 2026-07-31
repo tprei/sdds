@@ -1,118 +1,64 @@
-import { Pressable, Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { NoteMedia } from '@/components/note-media';
+import { semanticColors, type CategorySlug } from '@sdds/tokens';
+
+import { AppText } from '@/ui/text';
+import { CategoryChip } from '@/ui/category-chip';
+import { relativeTimeLabel } from '@/ui/relative-time';
 
 import type { LabelledNote } from './catalog';
-import { UsefulButton } from './useful-button';
 import { styles } from './detail-screen.styles';
-
-const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
 
 type NoteDetailContentProps = {
   note: LabelledNote;
-  onPressAuthor: (authorID: string) => void;
-  onReportNote?: () => void;
-  onPressUseful?: () => void;
-  usefulError?: boolean;
-  usefulPending?: boolean;
 };
 
-export function NoteDetailContent({
-  note,
-  onPressAuthor,
-  onPressUseful = () => undefined,
-  onReportNote = () => undefined,
-  usefulError = false,
-  usefulPending = false,
-}: NoteDetailContentProps) {
+export function NoteDetailContent({ note }: NoteDetailContentProps) {
+  const timeLabel = relativeTimeLabel(
+    new Date(note.createdAt).toISOString(),
+    new Date(),
+  );
+  const timeText =
+    note.updatedAt === note.createdAt ? timeLabel : `${timeLabel} · editado`;
+
   return (
     <>
-      <View style={styles.metaRow}>
-        <View
-          accessibilityLabel={`Categoria da nota: ${note.categoryLabel}`}
-          style={styles.pill}
-        >
-          <Text style={styles.pillText}>{note.categoryLabel}</Text>
-        </View>
-        {note.placeLabel === null ? null : (
-          <Text
-            accessibilityLabel={`Lugar da nota: ${note.placeLabel}`}
-            style={styles.place}
-          >
-            {note.placeLabel}
-          </Text>
-        )}
-      </View>
-      <Text accessibilityRole="header" style={styles.title}>
-        {note.title}
-      </Text>
-      <Pressable
-        accessibilityLabel={`Abrir perfil do autor: ${note.author.displayName}`}
-        accessibilityRole="button"
-        onPress={() => onPressAuthor(note.author.id)}
-        style={({ pressed }) => [
-          styles.authorControl,
-          pressed ? styles.authorPressed : null,
-        ]}
-      >
-        <Text style={styles.author}>{note.author.displayName}</Text>
-      </Pressable>
-      <Text
-        accessibilityLabel={`Texto da nota: ${note.body}`}
-        style={styles.body}
-      >
-        {note.body}
-      </Text>
       <NoteMedia
         accessibilityLabel={`Imagem da nota: ${note.title}`}
         images={note.images}
       />
-      <View style={styles.dateCard}>
-        <View style={styles.dateRow}>
-          <Text style={styles.dateLabel}>Publicado</Text>
-          <Text style={styles.dateValue}>
-            {formatTimestamp(note.createdAt)}
-          </Text>
-        </View>
-        <View style={styles.dateRow}>
-          <Text style={styles.dateLabel}>Atualizado</Text>
-          <Text style={styles.dateValue}>
-            {formatTimestamp(note.updatedAt)}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.usefulSection}>
-        <UsefulButton
-          count={note.usefulCount}
-          marked={note.usefulByCurrentUser}
-          onPress={onPressUseful}
-          pending={usefulPending}
-        />
-        {usefulError ? (
-          <Text accessibilityRole="alert" style={styles.usefulError}>
-            Não deu pra atualizar o Útil. Tenta de novo.
-          </Text>
-        ) : null}
-        <Pressable
-          accessibilityLabel="Denunciar nota"
-          accessibilityRole="button"
-          onPress={onReportNote}
-          style={({ pressed }) => [
-            styles.reportControl,
-            pressed ? styles.reportPressed : null,
-          ]}
-          testID="note-report"
+      <View style={styles.container}>
+        <AppText
+          accessibilityRole="header"
+          color={semanticColors.textStrong}
+          variant="h2"
         >
-          <Text style={styles.reportText}>Denunciar nota</Text>
-        </Pressable>
+          {note.title}
+        </AppText>
+        <AppText
+          accessibilityLabel={`Texto da nota: ${note.body}`}
+          color={semanticColors.textBody}
+          variant="bodyLg"
+        >
+          {note.body}
+        </AppText>
+        <View style={styles.metaRow}>
+          <View
+            accessible
+            accessibilityLabel={`Categoria da nota: ${note.categoryLabel}`}
+          >
+            <CategoryChip
+              label={note.categoryLabel}
+              size="sm"
+              slug={note.categorySlug as CategorySlug}
+            />
+          </View>
+          <AppText color={semanticColors.textMeta} variant="sm">
+            {timeText}
+          </AppText>
+        </View>
       </View>
     </>
   );
-}
-
-function formatTimestamp(timestamp: number): string {
-  return dateFormatter.format(new Date(timestamp));
 }

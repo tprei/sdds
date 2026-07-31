@@ -1,5 +1,5 @@
-import { useState } from 'react';
- import type { TextInputProps } from 'react-native';
+import { forwardRef, useState } from 'react';
+import type { TextInputProps } from 'react-native';
 import { TextInput, View } from 'react-native';
 
 import { colors, semanticColors } from '@sdds/tokens';
@@ -14,18 +14,21 @@ type TextFieldProps = TextInputProps & {
   counter?: { count: number; max: number };
 };
 
-export function TextField({
-  label,
-  hint,
-  invalid = false,
-  counter,
-  onFocus,
-  onBlur,
-  multiline,
-  testID,
-  style,
-  ...props
-}: TextFieldProps) {
+export const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
+  {
+    label,
+    hint,
+    invalid = false,
+    counter,
+    onFocus,
+    onBlur,
+    multiline,
+    testID,
+    style,
+    ...props
+  }: TextFieldProps,
+  ref,
+) {
   const [focused, setFocused] = useState(false);
   const body = resolveTextVariant('body');
   const borderColor = invalid
@@ -36,6 +39,7 @@ export function TextField({
 
   const input = (
     <TextInput
+      ref={ref}
       testID={testID}
       onFocus={(event) => {
         setFocused(true);
@@ -103,4 +107,4 @@ export function TextField({
       ) : null}
     </View>
   );
-}
+});

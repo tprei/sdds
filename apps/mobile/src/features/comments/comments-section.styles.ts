@@ -1,20 +1,13 @@
 import { StyleSheet } from 'react-native';
 
-import { colors, radius, semanticColors, spacing, typography } from '@sdds/tokens';
+import { radius, semanticColors, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
-  author: {
-    color: semanticColors.textMuted,
-    fontSize: typography.sizeBody,
-    fontWeight: typography.weightSemibold,
-  },
   authorControl: {
-    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sp2,
     minHeight: 44,
-    minWidth: 44,
-  },
-  authorPressed: {
-    opacity: 0.7,
   },
   comment: {
     backgroundColor: semanticColors.cardSurface,
@@ -24,16 +17,15 @@ export const styles = StyleSheet.create({
     gap: spacing.sp3,
     padding: spacing.sp4,
   },
-  commentBody: {
-    color: semanticColors.textBody,
-    fontSize: typography.sizeBody,
-    lineHeight: 22,
+  commentActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sp4,
   },
   commentHeader: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.sp3,
-    justifyContent: 'space-between',
+    gap: spacing.sp2,
   },
   commentList: {
     gap: spacing.sp3,
@@ -41,78 +33,18 @@ export const styles = StyleSheet.create({
   composer: {
     gap: spacing.sp3,
   },
-  composerLabel: {
-    color: semanticColors.textStrong,
-    fontSize: typography.sizeBody,
-    fontWeight: typography.weightBold,
-  },
-  counter: {
-    alignSelf: 'flex-end',
-    color: semanticColors.textMuted,
-    fontSize: typography.sizeSmall,
-  },
   deleteControl: {
     alignSelf: 'flex-start',
     justifyContent: 'center',
     minHeight: 44,
-    minWidth: 44,
-  },
-  deleteError: {
-    color: colors.danger500,
-    fontSize: typography.sizeSmall,
-    fontWeight: typography.weightSemibold,
-  },
-  deletePressed: {
-    opacity: 0.7,
   },
   reportControl: {
     alignSelf: 'flex-start',
     justifyContent: 'center',
     minHeight: 44,
-    minWidth: 44,
-  },
-  reportPressed: {
-    opacity: 0.7,
-  },
-  reportText: {
-    color: colors.danger500,
-    fontSize: typography.sizeSmall,
-    fontWeight: typography.weightSemibold,
-  },
-  deleteText: {
-    color: colors.danger500,
-    fontSize: typography.sizeSmall,
-    fontWeight: typography.weightSemibold,
-  },
-  date: {
-    color: semanticColors.textMuted,
-    fontSize: typography.sizeSmall,
-  },
-  draftError: {
-    color: colors.danger500,
-    fontSize: typography.sizeSmall,
-    fontWeight: typography.weightSemibold,
-  },
-  heading: {
-    color: semanticColors.textStrong,
-    fontSize: typography.sizeH2,
-    fontWeight: typography.weightExtraBold,
-    lineHeight: 31,
-  },
-  input: {
-    minHeight: 96,
   },
   section: {
     gap: spacing.sp5,
-  },
-  status: {
-    color: semanticColors.textMuted,
-    fontSize: typography.sizeBody,
-    lineHeight: 22,
-  },
-  statusError: {
-    color: colors.danger500,
-    fontWeight: typography.weightSemibold,
   },
   statusGroup: {
     gap: spacing.sp3,

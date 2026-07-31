@@ -241,7 +241,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
 
   await expect(page).toHaveURL(/\/notes\/[^/?#]+(?:[?#]|$)/);
   await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Nota$/ }),
+    page.getByRole('heading', { name: title }),
   ).toBeVisible();
   const noteURL = page.url();
   await page

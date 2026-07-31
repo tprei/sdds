@@ -1,10 +1,12 @@
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
-import {
-  FoundationButton,
-  FoundationTextInput,
-} from '@/components/foundation-screen';
+import { colors, semanticColors } from '@sdds/tokens';
 import type { ReportReason, ReportTargetType } from '@/lib/api/reports';
+import { Button } from '@/ui/button';
+import { PressableScale } from '@/ui/pressable-scale';
+import { Sheet } from '@/ui/sheet';
+import { AppText } from '@/ui/text';
+import { TextField } from '@/ui/text-field';
 
 import {
   canSubmitReport,
@@ -30,12 +32,6 @@ const headingByTargetType: Record<ReportTargetType, string> = {
   comment: 'Denunciar comentário',
 };
 
-// The card is a pressable so it absorbs taps that would otherwise dismiss the
-// dialog through the backdrop; the backdrop itself owns the cancel behavior.
-function absorbPress(): void {
-  /* no-op: keep the press inside the dialog */
-}
-
 export function ReportDialog({
   target,
   state,
@@ -53,111 +49,75 @@ export function ReportDialog({
   const heading = headingByTargetType[target.type];
 
   return (
-    <Modal
-      animationType="fade"
-      accessibilityViewIsModal
-      transparent
-      visible
-      onRequestClose={pending ? undefined : onCancel}
-    >
-      <Pressable
-        accessible={false}
-        disabled={pending}
-        onPress={onCancel}
-        style={styles.backdrop}
-        testID="report-backdrop"
-      >
-        <Pressable
-          accessibilityLabel={heading}
-          accessibilityRole="none"
-          onPress={absorbPress}
-          style={styles.dialog}
-        >
-          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-            <Text accessibilityRole="header" style={styles.heading}>
-              {heading}
-            </Text>
-            <Text style={styles.intro}>
-              Conta pra gente o que aconteceu. A denúncia não fica pública.
-            </Text>
-            <View style={styles.reasonGroup}>
-              {REPORT_REASON_OPTIONS.map((option) => {
-                const checked = state.reason === option.value;
-                return (
-                  <Pressable
-                    key={option.value}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked }}
-                    disabled={pending}
-                    onPress={() => onReasonChange(option.value)}
-                    style={({ pressed }) => [
-                      styles.reasonOption,
-                      checked ? styles.reasonOptionSelected : null,
-                      pressed ? styles.reasonOptionPressed : null,
-                    ]}
-                    testID={`report-reason-${option.value}`}
-                  >
-                    <Text
-                      style={[
-                        styles.reasonLabel,
-                        checked ? styles.reasonLabelSelected : null,
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <View style={styles.field}>
-              <Text style={styles.detailsLabel}>
-                Quer explicar melhor? (opcional)
-              </Text>
-              <FoundationTextInput
-                accessibilityLabel="Quer explicar melhor? (opcional)"
-                multiline
-                onChangeText={onDetailsChange}
-                placeholder="Quer explicar melhor? (opcional)"
-                style={styles.detailsInput}
-                testID="report-details"
-                value={state.details}
-              />
-              <Text style={styles.counter}>
-                {validation.codePointCount}/{REPORT_DETAILS_MAX_CODE_POINTS}
-              </Text>
-              {validation.error === 'too_long' ? (
-                <Text accessibilityRole="alert" style={styles.detailsError}>
-                  Pode ter até 1.000 caracteres.
-                </Text>
-              ) : null}
-            </View>
-            {state.status === 'error' ? (
-              <Text accessibilityRole="alert" style={styles.inlineNotice}>
-                Não deu pra enviar a denúncia. Tenta de novo.
-              </Text>
-            ) : null}
-            {state.status === 'missing' ? (
-              <Text accessibilityRole="alert" style={styles.inlineNotice}>
-                Esse conteúdo não está mais disponível.
-              </Text>
-            ) : null}
-            <View style={styles.actions}>
-              <FoundationButton
+    <Sheet visible onClose={onCancel} testID="report-sheet">
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <AppText accessibilityRole="header" variant="h3" weight="extraBold">
+          {heading}
+        </AppText>
+        <AppText color={semanticColors.textMuted} variant="sm">
+          Conta pra gente o que aconteceu. A denúncia não fica pública.
+        </AppText>
+        <View style={styles.reasonGroup}>
+          {REPORT_REASON_OPTIONS.map((option) => {
+            const checked = state.reason === option.value;
+            return (
+              <PressableScale
+                key={option.value}
+                accessibilityRole="radio"
+                accessibilityState={{ checked }}
                 disabled={pending}
-                label="Cancelar"
-                onPress={onCancel}
-                testID="report-cancel"
-              />
-              <FoundationButton
-                disabled={!canSubmitReport(state)}
-                label={pending ? 'Enviando...' : 'Enviar denúncia'}
-                onPress={onSubmit}
-                testID="report-submit"
-              />
-            </View>
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+                onPress={() => onReasonChange(option.value)}
+                style={[styles.reasonOption, checked ? styles.reasonOptionSelected : null]}
+                testID={`report-reason-${option.value}`}
+              >
+                <AppText variant="body">{option.label}</AppText>
+              </PressableScale>
+            );
+          })}
+        </View>
+        <View style={styles.field}>
+          <TextField
+            counter={{ count: validation.codePointCount, max: REPORT_DETAILS_MAX_CODE_POINTS }}
+            label="Quer explicar melhor? (opcional)"
+            multiline
+            onChangeText={onDetailsChange}
+            placeholder="Quer explicar melhor? (opcional)"
+            testID="report-details"
+            value={state.details}
+          />
+          {validation.error === 'too_long' ? (
+            <AppText accessibilityRole="alert" color={colors.danger500} variant="sm">
+              Pode ter até 1.000 caracteres.
+            </AppText>
+          ) : null}
+        </View>
+        {state.status === 'error' ? (
+          <AppText accessibilityRole="alert" color={colors.danger500} variant="sm">
+            Não deu pra enviar a denúncia. Tenta de novo.
+          </AppText>
+        ) : null}
+        {state.status === 'missing' ? (
+          <AppText accessibilityRole="alert" color={colors.danger500} variant="sm">
+            Esse conteúdo não está mais disponível.
+          </AppText>
+        ) : null}
+        <View style={styles.actions}>
+          <Button
+            disabled={pending}
+            label="Cancelar"
+            onPress={onCancel}
+            testID="report-cancel"
+            variant="ghost"
+          />
+          <Button
+            disabled={!canSubmitReport(state)}
+            label={pending ? 'Enviando...' : 'Enviar denúncia'}
+            onPress={onSubmit}
+            testID="report-submit"
+            variant="primary"
+          />
+        </View>
+      </ScrollView>
+    </Sheet>
   );
 }

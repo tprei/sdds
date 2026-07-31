@@ -8,6 +8,7 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Comment } from '@/lib/api/comments';
+import { avatarInitials } from '@/ui/avatar-palette';
 
 import {
   commentThreadReducer,
@@ -41,20 +42,36 @@ vi.mock('react-native', () => {
     return createElement('button', props, content);
   }
 
+  function NativeTextInput(props: NativeProps) {
+    return createElement('input', props);
+  }
+
+  class AnimatedValue {
+    value: number;
+    constructor(value: number) {
+      this.value = value;
+    }
+  }
+
   return {
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => {} }),
+    },
+    Animated: {
+      View: NativeView,
+      Value: AnimatedValue,
+      timing: () => ({ start: () => {} }),
+    },
     Pressable: NativePressable,
     StyleSheet: { create: (styles: Record<string, unknown>) => styles },
     Text: NativeText,
+    TextInput: NativeTextInput,
     View: NativeView,
   };
 });
 
-vi.mock('@/components/foundation-screen', () => ({
-  FoundationButton: ({ label, ...props }: { label: string } & NativeProps) =>
-    createElement('button', props, label),
-  FoundationTextInput: (props: NativeProps) => createElement('input', props),
-}));
-
+const noteAuthorID = 'note-author-id';
 const firstComment = comment('comment-1', 'Primeiro comentário');
 const localComment = comment('comment-new', 'Comentário recém-publicado');
 
@@ -85,6 +102,7 @@ describe('CommentsSection', () => {
     const onPressAuthor = vi.fn();
     const empty = renderSection({ thread: readyThread() });
     expect(textNodes(empty, 'Ainda não tem comentário. Quer começar?')).toHaveLength(1);
+    expect(textNodes(empty, '0 comentários')).toHaveLength(1);
 
     const nonterminalEmpty = renderSection({
       onLoadMore,
@@ -109,6 +127,7 @@ describe('CommentsSection', () => {
       thread: readyThread({ comments: [firstComment] }),
     });
     expect(textNodes(populated, firstComment.body)).toHaveLength(1);
+    expect(textNodes(populated, '1 comentários')).toHaveLength(1);
 
     act(() => {
       populated.root
@@ -118,6 +137,19 @@ describe('CommentsSection', () => {
         .props.onPress();
     });
     expect(onPressAuthor).toHaveBeenCalledWith(firstComment.author.id);
+  });
+
+  it('shows an Autor badge only for the comment matching the note author', () => {
+    const matching = renderSection({
+      noteAuthorID: firstComment.author.id,
+      thread: readyThread({ comments: [firstComment] }),
+    });
+    expect(textNodes(matching, 'Autor')).toHaveLength(1);
+
+    const nonMatching = renderSection({
+      thread: readyThread({ comments: [firstComment] }),
+    });
+    expect(textNodes(nonMatching, 'Autor')).toHaveLength(0);
   });
 
   it('keeps a local tail visible after the load-more control and retries a failed page', () => {
@@ -148,12 +180,13 @@ describe('CommentsSection', () => {
         nextCursor: 'cursor-2',
       }),
     });
+    const authorLabel = `${avatarInitials('Thiago')}Thiago`;
     expect(buttonLabels(idleRenderer)).toEqual([
-      'Thiago',
+      authorLabel,
       'Excluir comentário',
       'Denunciar comentário',
       'Ver mais comentários',
-      'Thiago',
+      authorLabel,
       'Excluir comentário',
       'Denunciar comentário',
       'Comentar',
@@ -303,6 +336,7 @@ function ComposerHarness({ onSubmit }: { onSubmit: (body: string) => void }) {
   return (
     <CommentsSection
       currentAuthorID="author-id"
+      noteAuthorID={noteAuthorID}
       onDraftChange={(draft) => dispatch({ type: 'draft_changed', draft })}
       onLoadMore={() => undefined}
       onPressAuthor={() => undefined}
@@ -323,6 +357,7 @@ function renderSection(
   return render(
     <CommentsSection
       currentAuthorID="author-id"
+      noteAuthorID={noteAuthorID}
       onDraftChange={() => undefined}
       onLoadMore={() => undefined}
       onPressAuthor={() => undefined}

@@ -57,7 +57,7 @@ test('reports a note and a comment, then keeps the content visible', async ({
   await page.getByTestId('report-details').fill('conteúdo enganoso');
   await page.getByTestId('report-submit').click();
   await expect(
-    page.getByText('Denúncia recebida. Obrigado por avisar.'),
+    page.getByText('Valeu por avisar! A gente cuida pra rede seguir feita pra humanos.'),
   ).toBeVisible();
 
   // Report a comment. Opening a new report clears the prior success notice.
@@ -68,7 +68,7 @@ test('reports a note and a comment, then keeps the content visible', async ({
   await page.getByTestId('report-reason-spam').click();
   await page.getByTestId('report-submit').click();
   await expect(
-    page.getByText('Denúncia recebida. Obrigado por avisar.'),
+    page.getByText('Valeu por avisar! A gente cuida pra rede seguir feita pra humanos.'),
   ).toBeVisible();
 
   // Reload: the reported content is still visible and no report metadata
@@ -77,7 +77,7 @@ test('reports a note and a comment, then keeps the content visible', async ({
   await expect(page.getByRole('heading', { name: noteTitle })).toBeVisible();
   await expect(page.getByText(commentBody, { exact: true })).toBeVisible();
   await expect(
-    page.getByText('Denúncia recebida. Obrigado por avisar.'),
+    page.getByText('Valeu por avisar! A gente cuida pra rede seguir feita pra humanos.'),
   ).toHaveCount(0);
   await expect(page.getByText(/denúncias\b/i)).toHaveCount(0);
 });

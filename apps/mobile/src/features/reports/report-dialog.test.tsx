@@ -37,26 +37,44 @@ vi.mock('react-native', () => {
     return React.createElement('button', props, content);
   }
 
+  function NativeTextInput(props: NativeProps) {
+    return React.createElement('input', props);
+  }
+
   function NativeModal({ children }: { children?: React.ReactNode }) {
     return React.createElement('div', { 'data-modal': true }, children);
   }
 
+  class AnimatedValue {
+    value: number;
+    constructor(value: number) {
+      this.value = value;
+    }
+    setValue(value: number) {
+      this.value = value;
+    }
+  }
+
   return {
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => {} }),
+    },
+    Animated: {
+      View: NativeView,
+      Value: AnimatedValue,
+      timing: () => ({ start: () => {} }),
+    },
+    Easing: { out: (easing: unknown) => easing, ease: {} },
     Modal: NativeModal,
     Pressable: NativePressable,
     ScrollView: NativeView,
     StyleSheet: { create: (styles: Record<string, unknown>) => styles },
     Text: NativeText,
+    TextInput: NativeTextInput,
     View: NativeView,
   };
 });
-
-vi.mock('@/components/foundation-screen', () => ({
-  FoundationButton: ({ label, ...props }: { label: string } & NativeProps) =>
-    React.createElement('button', props, label),
-  FoundationTextInput: (props: NativeProps) =>
-    React.createElement('input', props),
-}));
 
 const noteTarget: ReportTarget = { type: 'note', id: 'note-1' };
 const commentTarget: ReportTarget = { type: 'comment', id: 'comment-1' };
@@ -136,12 +154,9 @@ describe('ReportDialog', () => {
     expect(onDetailsChange).toHaveBeenCalledWith('contexto');
   });
 
-  it('keeps dialog controls accessible and its content scrollable', () => {
+  it('keeps its content scrollable', () => {
     const renderer = renderDialog({ target: noteTarget });
 
-    expect(
-      renderer.root.findByProps({ testID: 'report-backdrop' }).props.accessible,
-    ).toBe(false);
     expect(
       renderer.root.findByProps({ keyboardShouldPersistTaps: 'handled' }).props
         .contentContainerStyle,
@@ -182,7 +197,7 @@ describe('ReportDialog', () => {
     ).toHaveLength(1);
   });
 
-  it('shows the pending label and disables cancel, submit, and backdrop while submitting', () => {
+  it('shows the pending label and disables cancel and submit while submitting', () => {
     const renderer = renderDialog({
       target: noteTarget,
       state: openState({ reason: 'spam', status: 'pending' }),
@@ -195,12 +210,9 @@ describe('ReportDialog', () => {
     expect(
       renderer.root.findByProps({ testID: 'report-cancel' }).props.disabled,
     ).toBe(true);
-    expect(
-      renderer.root.findByProps({ testID: 'report-backdrop' }).props.disabled,
-    ).toBe(true);
   });
 
-  it('calls onCancel from the cancel button and the backdrop when not pending', () => {
+  it('calls onCancel from the cancel button', () => {
     const onCancel = vi.fn();
     const renderer = renderDialog({ target: noteTarget, onCancel });
 
@@ -208,11 +220,6 @@ describe('ReportDialog', () => {
       renderer.root.findByProps({ testID: 'report-cancel' }).props.onPress();
     });
     expect(onCancel).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      renderer.root.findByProps({ testID: 'report-backdrop' }).props.onPress();
-    });
-    expect(onCancel).toHaveBeenCalledTimes(2);
   });
 
   it('calls onSubmit when the submit control is pressed', () => {

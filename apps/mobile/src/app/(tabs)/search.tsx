@@ -126,6 +126,7 @@ function AuthenticatedSearchScreen({
   const catalogRequestIDRef = useRef(0);
   const searchRequestIDRef = useRef(0);
   const catalogRef = useRef<NoteCatalog | null>(null);
+  const hasLoadedCatalogRef = useRef(false);
   const selectedCategorySlugRef = useRef<string | null>(null);
   const stateRef = useRef<SearchScreenState>(idleSearchState);
   const submittedQueryRef = useRef<string | null>(null);
@@ -415,7 +416,10 @@ function AuthenticatedSearchScreen({
   const loadCatalogs = useCallback(() => {
     catalogRequestIDRef.current += 1;
     const requestID = catalogRequestIDRef.current;
-    setCatalogState({ status: 'loading' });
+    if (!hasLoadedCatalogRef.current) {
+      hasLoadedCatalogRef.current = true;
+      setCatalogState({ status: 'loading' });
+    }
     setUsefulMutations({});
 
     apiClient.listCatalogs()

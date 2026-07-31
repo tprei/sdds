@@ -1,8 +1,10 @@
 import * as React from 'react';
-import { act, create } from 'react-test-renderer';
+import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import SearchScreen from '@/app/(tabs)/search';
+import { assertLoadingFirstCommit } from '@/ui/assert-loading-first-commit';
+import { Button } from '@/ui/button';
 
 const { createElement } = React;
 type ReactNode = React.ReactNode;
@@ -25,6 +27,7 @@ const mocks = vi.hoisted(() => ({
     unmarkNoteUseful: vi.fn(),
   },
   authState: { status: 'loading' } as AuthStateMock,
+  focusEffect: null as (() => void | (() => void)) | null,
   logout: vi.fn(async () => undefined),
   productEvents: { record: vi.fn() },
   push: vi.fn(),
@@ -112,6 +115,7 @@ vi.mock('expo-router', async () => {
   const react = (await vi.importActual('react')) as typeof React;
   return {
     useFocusEffect(effect: () => void | (() => void)) {
+      mocks.focusEffect = effect;
       react.useEffect(effect, [effect]);
     },
     useRouter: () => ({ push: mocks.push }),
@@ -165,5 +169,30 @@ describe('SearchScreen auth gate', () => {
     });
 
     expect(mocks.logout).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the catalog ready on a second focus, refreshing without a loading flash', async () => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(createElement(SearchScreen));
+      await settle();
+    });
+
+    expect(mocks.apiClient.listCatalogs).toHaveBeenCalledTimes(1);
+    expect(renderer.root.findByType(Button).props.disabled).toBe(false);
+    expect(mocks.focusEffect).not.toBeNull();
+
+    assertLoadingFirstCommit(
+      () => {
+        mocks.focusEffect?.();
+        return renderer;
+      },
+      [],
+      (r) => {
+        expect(r.root.findByType(Button).props.disabled).toBe(false);
+      },
+    );
+
+    expect(mocks.apiClient.listCatalogs).toHaveBeenCalledTimes(2);
   });
 });

@@ -3,6 +3,8 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import SearchScreen from '@/app/(tabs)/search';
+import { assertLoadingFirstCommit } from '@/ui/assert-loading-first-commit';
+import { NoteCardSkeleton } from '@/ui/skeleton';
 
 const { createElement } = React;
 type ReactNode = React.ReactNode;
@@ -56,6 +58,7 @@ vi.mock('react-native', () => {
     constructor(value: number) {
       this.value = value;
     }
+    stopAnimation() {}
   }
   return {
     Pressable: NativePressable,
@@ -315,6 +318,32 @@ describe('SearchScreen product events', () => {
         ([kind]) => kind === 'search_no_results',
       ),
     ).toHaveLength(1);
+  });
+
+  it('shows the skeleton grid the instant a search is submitted, before any promise flushes', async () => {
+    const response = deferred<{ searchVersion: 'fts5-v1'; results: [] }>();
+    mocks.apiClient.searchNotes.mockReturnValueOnce(response.promise);
+
+    await renderSearch();
+    await act(async () => {
+      const matches = renderer.root.findAllByProps({ testID: 'search-field-input' });
+      const input = matches[matches.length - 1];
+      input.props.onChangeText('café');
+      await settle();
+    });
+
+    assertLoadingFirstCommit(
+      () => {
+        const matches = renderer.root.findAllByProps({ testID: 'search-field-input' });
+        const input = matches[matches.length - 1];
+        input.props.onSubmitEditing();
+        return renderer;
+      },
+      ['Nada por aqui ainda', 'Não deu pra buscar'],
+      (r) => {
+        expect(r.root.findAllByType(NoteCardSkeleton)).toHaveLength(4);
+      },
+    );
   });
 });
 

@@ -16,7 +16,7 @@ export function Skeleton({
   radius: radiusOverride = radius.md,
 }: SkeletonProps) {
   const reduced = useReducedMotion();
-  const [opacity] = useState(() => new Animated.Value(0));
+  const [opacity] = useState(() => new Animated.Value(0.4));
   useEffect(() => {
     if (reduced) {
       opacity.setValue(1);
@@ -27,6 +27,7 @@ export function Skeleton({
       duration: motion.durationBase,
       useNativeDriver: true,
     }).start();
+    return () => opacity.stopAnimation();
   }, [opacity, reduced]);
   return (
     <Animated.View

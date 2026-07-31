@@ -3,6 +3,8 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import HomeScreen from '@/app/(tabs)/index';
+import { assertLoadingFirstCommit } from '@/ui/assert-loading-first-commit';
+import { NoteCardSkeleton } from '@/ui/skeleton';
 
 const { createElement } = React;
 type ReactNode = React.ReactNode;
@@ -30,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   record: vi.fn(),
   productEventsReady: true,
+  focusEffect: null as (() => void | (() => void)) | null,
 }));
 vi.mock('expo-crypto', () => ({
   randomUUID: () => '018ff5b8-0000-7000-8000-000000000001',
@@ -54,6 +57,7 @@ vi.mock('react-native', () => {
     constructor(value: number) {
       this.value = value;
     }
+    stopAnimation() {}
   }
   return {
     View: NativeView,
@@ -114,6 +118,7 @@ vi.mock('expo-router', async () => {
   const react = (await vi.importActual('react')) as typeof React;
   return {
     useFocusEffect(effect: () => void | (() => void)) {
+      mocks.focusEffect = effect;
       react.useEffect(effect, [effect]);
     },
     useRouter: () => ({ push: mocks.push, navigate: mocks.navigate }),
@@ -361,5 +366,43 @@ describe('HomeScreen auth gate', () => {
       cards.map((card) => card.parent?.parent?.parent?.parent),
     );
     expect(columns.size).toBe(2);
+  });
+
+  it('shows the skeleton grid on the first commit, before any promise flushes', () => {
+    assertLoadingFirstCommit(
+      () => create(createElement(HomeScreen)),
+      [
+        'Nada por aqui ainda',
+        'Não deu pra carregar agora.',
+        'Não deu pra carregar as categorias',
+      ],
+      (renderer) => {
+        expect(renderer.root.findAllByType(NoteCardSkeleton)).toHaveLength(6);
+      },
+    );
+  });
+
+  it('keeps ready content warm on a second focus, with no loading flash before the refresh settles', async () => {
+    mocks.apiClient.listNotes.mockResolvedValue([exploreNote('note-id')]);
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(createElement(HomeScreen));
+      await settle();
+    });
+    expect(renderer.root.findAllByProps({ testID: 'note-card' })).toHaveLength(1);
+    expect(mocks.focusEffect).not.toBeNull();
+
+    act(() => {
+      mocks.focusEffect?.();
+    });
+
+    expect(renderer.root.findAllByType(NoteCardSkeleton)).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ testID: 'note-card' })).toHaveLength(1);
+
+    await act(async () => {
+      await settle();
+    });
+    expect(renderer.root.findAllByProps({ testID: 'note-card' })).toHaveLength(1);
   });
 });

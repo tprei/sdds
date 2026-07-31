@@ -7,6 +7,7 @@ import type { Catalogs } from '../../lib/api/catalogs';
 import type { Note } from '../../lib/api/notes';
 import type { APIClient } from '../../lib/api/client';
 import { AuthorProfileContent } from './author-profile-content';
+import { assertLoadingFirstCommit } from '@/ui/assert-loading-first-commit';
 
 const { createElement } = React;
 type ReactNode = React.ReactNode;
@@ -77,6 +78,7 @@ vi.mock('expo-router', async () => {
   const react = (await vi.importActual('react')) as typeof React;
   return {
     useFocusEffect(effect: FocusEffect) {
+      mocks.focusEffect = effect;
       react.useEffect(effect, [effect]);
     },
   };
@@ -98,6 +100,7 @@ const mocks = vi.hoisted(() => ({
   markNoteUseful: vi.fn<(noteID: string) => Promise<void>>(),
   record: vi.fn(),
   unmarkNoteUseful: vi.fn<(noteID: string) => Promise<void>>(),
+  focusEffect: null as FocusEffect | null,
 }));
 
 const mockClient = mocks as unknown as APIClient;
@@ -399,6 +402,51 @@ describe('AuthorProfileContent', () => {
     });
 
     expect(mocks.record).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('keeps the profile ready on a second focus for the same author, refreshing without a loading flash', async () => {
+    mocks.getPublicAuthor.mockResolvedValue(author);
+    mocks.listCatalogs.mockResolvedValue(catalogs);
+    mocks.listAuthorNotes.mockResolvedValue({
+      notes: [note('first-note', 'Primeira nota')],
+      nextCursor: null,
+    });
+
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <AuthorProfileContent
+          authorID="author-id"
+          onPressNote={() => undefined}
+          onSessionExpired={onSessionExpired}
+          apiClient={mockClient}
+        />,
+      );
+      await flushPromises();
+    });
+
+    expect(textNodes(renderer, 'Primeira nota')).not.toHaveLength(0);
+    expect(mocks.listAuthorNotes).toHaveBeenCalledTimes(1);
+    expect(mocks.focusEffect).not.toBeNull();
+
+    assertLoadingFirstCommit(
+      () => {
+        mocks.focusEffect?.();
+        return renderer;
+      },
+      ['Carregando perfil…'],
+      (r) => {
+        expect(textNodes(r, 'Primeira nota')).not.toHaveLength(0);
+      },
+    );
+
+    await act(async () => {
+      await flushPromises();
+    });
+    expect(mocks.listAuthorNotes).toHaveBeenCalledTimes(2);
+    expect(textNodes(renderer, 'Primeira nota')).not.toHaveLength(0);
+
     renderer.unmount();
   });
 });

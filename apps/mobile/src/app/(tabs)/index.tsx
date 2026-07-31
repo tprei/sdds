@@ -124,6 +124,7 @@ function AuthenticatedHomeScreen({
   const requestIDRef = useRef(0);
   const selectedCategorySlugRef = useRef<string | null>(null);
   const catalogRef = useRef<NoteCatalog | null>(null);
+  const hasLoadedRef = useRef(false);
   const [selectedCategorySlug, setSelectedCategorySlug] = useState<
     string | null
   >(null);
@@ -208,11 +209,14 @@ function AuthenticatedHomeScreen({
     [apiClient, onSessionExpired],
   );
 
-  const loadCatalogAndFeed = useCallback(() => {
+  const loadCatalogAndFeed = useCallback((options?: { showLoading?: boolean }) => {
+    const showLoading = options?.showLoading ?? true;
     requestIDRef.current += 1;
     const requestID = requestIDRef.current;
-    setCatalogState({ status: 'loading' });
-    setFeedState({ status: 'loading' });
+    if (showLoading) {
+      setCatalogState({ status: 'loading' });
+      setFeedState({ status: 'loading' });
+    }
     setUsefulMutations({});
 
     apiClient.listCatalogs()
@@ -391,7 +395,8 @@ function AuthenticatedHomeScreen({
 
   useFocusEffect(
     useCallback(() => {
-      loadCatalogAndFeed();
+      loadCatalogAndFeed({ showLoading: !hasLoadedRef.current });
+      hasLoadedRef.current = true;
 
       return () => {
         requestIDRef.current += 1;

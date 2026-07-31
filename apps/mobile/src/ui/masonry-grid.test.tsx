@@ -72,6 +72,18 @@ describe('MasonryGrid', () => {
     expect(columns.length).toBe(3);
   });
 
+  it('seeds masonry-grid on the outer row and exactly columnCount masonry-column-<index> testIDs', () => {
+    const columnCount = 3;
+    const grid = renderGrid(columnCount, ['one', 'two', 'three']);
+    expect(grid.props.testID).toBe('masonry-grid');
+
+    const columns = (grid.children ?? []) as ReactTestRendererJSON[];
+    expect(columns).toHaveLength(columnCount);
+    expect(columns.map((column) => column.props.testID)).toEqual(
+      Array.from({ length: columnCount }, (_, index) => `masonry-column-${index}`),
+    );
+  });
+
   it('caps the grid at maxAppWidth and centers the leftover space', () => {
     // Every other surface is full-bleed, so the cap lives here; without it a
     // wide viewport stretches two cards instead of widening the outer margin.

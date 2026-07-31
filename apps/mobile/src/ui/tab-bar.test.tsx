@@ -145,4 +145,19 @@ describe('AppTabBar', () => {
       'justifyContent',
     ]);
   });
+
+  it('seeds testIDs for geometry checks: the bar, one per route, and the FAB slot', () => {
+    const renderer = renderBar(0);
+    const json = renderer.toJSON() as unknown as ReactTestRendererJSON;
+    expect(json.props.testID).toBe('tab-bar');
+
+    const testIDs = flatten(json)
+      .map((node) => node.props.testID)
+      .filter((testID): testID is string => typeof testID === 'string');
+    const tabItemIDs = testIDs.filter((testID) => testID.startsWith('tab-item-'));
+    expect(tabItemIDs.sort()).toEqual(
+      routes.map((route) => `tab-item-${route.name}`).sort(),
+    );
+    expect(testIDs).toContain('tab-fab-slot');
+  });
 });

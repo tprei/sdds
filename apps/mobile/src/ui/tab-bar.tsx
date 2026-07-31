@@ -44,6 +44,7 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
   const activeName = state.routes[state.index]?.name;
   return (
     <View
+      testID="tab-bar"
       style={[
         styles.bar,
         {
@@ -72,6 +73,7 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
         onPress={() => router.push('/compose')}
         accessibilityLabel="Escrever um achado"
         accessibilityRole="button"
+        testID="tab-fab-slot"
       >
         <View style={styles.fab}>
           <IconPlus size={24} color={semanticColors.textOnAccent} strokeWidth={2.8} />
@@ -107,6 +109,7 @@ function TabButton({
       onPress={onPress}
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
+      testID={`tab-item-${tab.name}`}
     >
       <Icon size={24} color={color} strokeWidth={strokeWidth} filled={active} />
       <AppText variant="meta" weight={active ? 'bold' : 'medium'} color={color}>

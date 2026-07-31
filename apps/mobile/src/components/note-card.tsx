@@ -51,7 +51,7 @@ export function NoteCard({
     : 'Marcar como útil';
 
   return (
-    <View style={styles.card}>
+    <View style={styles.card} testID="note-card">
       <OpenTarget onPress={onPress} openLabel={openLabel}>
         {note.images.length > 0 ? (
           <PhotoVariant note={note} categoryLabel={categoryLabel} />

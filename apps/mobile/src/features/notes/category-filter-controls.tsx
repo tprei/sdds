@@ -25,6 +25,7 @@ export function CategoryFilterControls({
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryRow}
+          testID="category-rail"
         >
           <NeutralChip
             label="Tudo"

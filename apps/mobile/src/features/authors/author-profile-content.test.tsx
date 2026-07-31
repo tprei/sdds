@@ -7,7 +7,7 @@ import type { Catalogs } from '../../lib/api/catalogs';
 import type { Note } from '../../lib/api/notes';
 import type { APIClient } from '../../lib/api/client';
 import { AuthorProfileContent } from './author-profile-content';
-import { assertLoadingFirstCommit } from '@/ui/assert-loading-first-commit';
+import { assertLoadingFirstCommit } from '@/test-support/assert-loading-first-commit';
 
 const { createElement } = React;
 type ReactNode = React.ReactNode;

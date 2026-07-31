@@ -7,8 +7,7 @@ import {
 } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { AppTabBar } from './tab-bar';
-import { TAB_BAR_SLOT_COUNT } from './tab-bar.geometry';
+import { AppTabBar, TAB_BAR_SLOT_COUNT } from './tab-bar';
 import { styles } from './tab-bar.styles';
 
 const { createElement } = React;
@@ -136,8 +135,8 @@ describe('AppTabBar', () => {
     expect(slotStyle(fabSlot)).toBe(styles.fabSlot);
     expect(slotStyle(tabItem)).toBe(styles.item);
 
-    // The equal-flex weight below is what makes tab-bar.geometry.ts's
-    // formula match this component's real rendered layout.
+    // Equal flex weight is what tests/synthetics/geometry.ts verifies
+    // against this component's real rendered layout in a browser.
     expect(styles.fabSlot.flex).toBe(styles.item.flex);
     expect(Object.keys(styles.fabSlot).sort()).toEqual([
       'alignItems',

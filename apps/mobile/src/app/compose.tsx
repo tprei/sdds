@@ -1,29 +1,36 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Image, ScrollView, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
   launchImageLibraryAsync,
   UIImagePickerPreferredAssetRepresentationMode,
 } from 'expo-image-picker';
 
-import {
-  EmptyStateCard,
-  FoundationButton,
-  FoundationScreen,
-  FoundationTextInput,
-} from '@/components/foundation-screen';
+import { colors, semanticColors, type CategorySlug } from '@sdds/tokens';
+
 import { createComposeController } from '@/features/notes/compose-controller';
 import {
   composeDraftStore,
   type ComposeDraftStore,
 } from '@/features/notes/compose-draft';
+import { PostItComposer } from '@/features/notes/post-it-composer';
 import { useAuth } from '@/lib/auth/auth-provider';
 import type { APIClient } from '@/lib/api/client';
 import type { CreateNoteInput } from '@/lib/api/notes';
 import { useProductEvents } from '@/lib/events/product-event-provider';
 import { productEventKinds } from '@/lib/events/event-types';
+import { Screen } from '@/ui/screen';
+import { EmptyState } from '@/ui/empty-state';
+import { Button } from '@/ui/button';
+import { IconButton } from '@/ui/icon-button';
+import { IconImage, IconX } from '@/ui/icons';
+import { CategoryChip } from '@/ui/category-chip';
+import { PressableScale } from '@/ui/pressable-scale';
+import { AppText } from '@/ui/text';
 
 import { styles } from '@/features/notes/compose-screen.styles';
+
+const composeBodyMax = 4000;
 
 type ComposeScreenProps = {
   draftStore?: ComposeDraftStore;
@@ -55,11 +62,7 @@ export default function ComposeScreen({
   }
 
   return (
-    <FoundationScreen
-      eyebrow="Escrever"
-      title="Conta uma dica"
-      description="Uma nota curta, útil e com cara de indicação de amigo."
-    >
+    <Screen>
       <ComposeAuthGate
         status={state.status}
         onLogin={() => {
@@ -75,7 +78,7 @@ export default function ComposeScreen({
           });
         }}
       />
-    </FoundationScreen>
+    </Screen>
   );
 }
 
@@ -91,6 +94,9 @@ function AuthenticatedComposeScreen({
   const createNote = useCallback(
     async (input: CreateNoteInput) => {
       const note = await apiClient.createNote(input);
+      // Best-effort telemetry: publishing must succeed even if event
+      // recording fails (matches the pattern used across the app's other
+      // product-event call sites).
       try {
         productEvents.record(
           productEventKinds.notePublished,
@@ -153,179 +159,144 @@ function AuthenticatedComposeScreen({
     submitState,
     title,
     categorySlug,
-    placeSlug,
   } = state;
   const {
     pickImage,
     removeImage,
     selectCategorySlug,
-    selectPlaceSlug,
     submit: handleSubmit,
     updateBody,
     updateTitle,
   } = controller;
 
   return (
-    <FoundationScreen
-      eyebrow="Escrever"
-      title="Conta uma dica"
-      description="Uma nota curta, útil e com cara de indicação de amigo."
+    <Screen
+      header={
+        <View style={styles.headerRow}>
+          <IconButton
+            accessibilityLabel="Fechar"
+            icon={<IconX />}
+            onPress={() => router.back()}
+          />
+          <Button
+            disabled={!canSubmit}
+            label={isSubmitting ? 'Publicando...' : 'Publicar'}
+            onPress={handleSubmit}
+            size="sm"
+            testID="compose-submit"
+            variant="primary"
+          />
+        </View>
+      }
     >
-      <>
-        <FoundationTextInput
-          accessibilityLabel="Título da nota"
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        style={styles.scroll}
+      >
+        <PostItComposer
+          body={body}
+          bodyMax={composeBodyMax}
           editable={!isSubmitting}
-          onChangeText={updateTitle}
-          placeholder="Título"
-          value={title}
-        />
-        <FoundationTextInput
-          accessibilityLabel="Texto da nota"
-          multiline
-          editable={!isSubmitting}
-          onChangeText={updateBody}
-          placeholder="O que você quer compartilhar?"
-          value={body}
+          onChangeBody={updateBody}
+          onChangeTitle={updateTitle}
+          title={title}
         />
         {catalogState.status === 'loading' ? (
-          <Text style={styles.statusSuccess}>Carregando categorias...</Text>
+          <AppText color={semanticColors.accentPress} variant="sm">
+            Carregando categorias...
+          </AppText>
         ) : null}
         {catalogState.status === 'error' ? (
-          <Text style={styles.statusError}>
+          <AppText color={colors.danger500} variant="sm">
             Não deu pra carregar categorias e lugares.
-          </Text>
-        ) : null}
-        {catalogState.status === 'ready' ? (
-          <>
-            <View style={styles.field}>
-              <Text style={styles.label}>Categoria</Text>
-              <View style={styles.optionRow}>
-                {catalogState.catalog.activeCategories.map((option) => (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{
-                      selected: option.slug === categorySlug,
-                    }}
-                    key={option.slug}
-                    onPress={() => selectCategorySlug(option.slug)}
-                    style={[
-                      styles.option,
-                      option.slug === categorySlug
-                        ? styles.optionSelected
-                        : null,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.optionText,
-                        option.slug === categorySlug
-                          ? styles.optionTextSelected
-                          : null,
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-            <View style={styles.field}>
-              <Text style={styles.label}>Lugar</Text>
-              <View style={styles.optionRow}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: placeSlug === null }}
-                  onPress={() => selectPlaceSlug(null)}
-                  style={[
-                    styles.option,
-                    placeSlug === null ? styles.optionSelected : null,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      placeSlug === null ? styles.optionTextSelected : null,
-                    ]}
-                  >
-                    Sem lugar específico
-                  </Text>
-                </Pressable>
-                {catalogState.catalog.activePlaces.map((option) => (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{
-                      selected: option.slug === placeSlug,
-                    }}
-                    key={option.slug}
-                    onPress={() => selectPlaceSlug(option.slug)}
-                    style={[
-                      styles.option,
-                      option.slug === placeSlug ? styles.optionSelected : null,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.optionText,
-                        option.slug === placeSlug
-                          ? styles.optionTextSelected
-                          : null,
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          </>
+          </AppText>
         ) : null}
         <View style={styles.field}>
-          <Text style={styles.label}>Imagem</Text>
+          <AppText color={semanticColors.textStrong} variant="sm" weight="bold">
+            Foto
+          </AppText>
           {image === null ? (
-            <FoundationButton
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Adicionar 1 foto (opcional)"
               disabled={isSubmitting}
-              label="Adicionar imagem"
               onPress={pickImage}
+              style={styles.photoDashed}
               testID="compose-add-image"
-            />
+            >
+              <IconImage color={semanticColors.textMuted} size={24} />
+              <AppText
+                color={semanticColors.textMuted}
+                variant="sm"
+                weight="semibold"
+              >
+                Adicionar 1 foto (opcional)
+              </AppText>
+            </PressableScale>
           ) : (
-            <>
-              <Text testID="compose-image-name">
-                {image.asset.fileName ?? image.asset.uri}
-              </Text>
-              <View style={styles.optionRow}>
-                <FoundationButton
-                  disabled={isSubmitting}
-                  label="Trocar imagem"
-                  onPress={pickImage}
-                  testID="compose-replace-image"
-                />
-                <FoundationButton
-                  disabled={isSubmitting}
-                  label="Remover imagem"
-                  onPress={removeImage}
-                  testID="compose-remove-image"
-                />
+            <View style={styles.photoRow}>
+              <Image source={{ uri: image.asset.uri }} style={styles.photoThumb} />
+              <View style={styles.photoActions}>
+                <AppText
+                  color={semanticColors.textMeta}
+                  testID="compose-image-name"
+                  variant="xs"
+                >
+                  {image.asset.fileName ?? image.asset.uri}
+                </AppText>
+                <View style={styles.photoActionsRow}>
+                  <Button
+                    disabled={isSubmitting}
+                    label="Trocar imagem"
+                    onPress={pickImage}
+                    size="sm"
+                    testID="compose-replace-image"
+                    variant="secondary"
+                  />
+                  <Button
+                    disabled={isSubmitting}
+                    label="Remover imagem"
+                    onPress={removeImage}
+                    size="sm"
+                    testID="compose-remove-image"
+                    variant="ghost"
+                  />
+                </View>
               </View>
-            </>
+            </View>
           )}
         </View>
+        {catalogState.status === 'ready' ? (
+          <View style={styles.field}>
+            <AppText color={semanticColors.textStrong} variant="sm" weight="bold">
+              Categoria
+            </AppText>
+            <View style={styles.categoryRow}>
+              {catalogState.catalog.activeCategories.map((option) => (
+                <CategoryChip
+                  key={option.slug}
+                  label={option.label}
+                  onPress={() => selectCategorySlug(option.slug)}
+                  selected={option.slug === categorySlug}
+                  slug={option.slug as CategorySlug}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
         {submitState.status === 'success' ? (
-          <Text style={styles.statusSuccess}>
+          <AppText color={semanticColors.accentPress} variant="sm">
             Publicado. Indo pro início...
-          </Text>
+          </AppText>
         ) : null}
         {submitState.status === 'error' ? (
-          <Text style={styles.statusError}>{submitState.message}</Text>
+          <AppText color={colors.danger500} variant="sm">
+            {submitState.message}
+          </AppText>
         ) : null}
-        <FoundationButton
-          testID="compose-submit"
-          disabled={!canSubmit}
-          label={isSubmitting ? 'Publicando...' : 'Publicar'}
-          onPress={handleSubmit}
-        />
-      </>
-    </FoundationScreen>
+      </ScrollView>
+    </Screen>
   );
 }
 
@@ -340,7 +311,7 @@ function ComposeAuthGate({
 }) {
   if (status === 'loading') {
     return (
-      <EmptyStateCard
+      <EmptyState
         title="Conferindo sua sessão"
         body="A gente já libera o formulário se você estiver com uma conta ativa."
       />
@@ -350,23 +321,23 @@ function ComposeAuthGate({
   if (status === 'error') {
     return (
       <>
-        <EmptyStateCard
+        <EmptyState
           title="Não deu pra confirmar sua sessão"
           body="Verifique sua conexão e entre de novo para publicar."
         />
-        <FoundationButton label="Entrar" onPress={onLogin} />
+        <Button label="Entrar" onPress={onLogin} />
       </>
     );
   }
 
   return (
     <>
-      <EmptyStateCard
+      <EmptyState
         title="Entre para continuar"
         body="Entre ou crie uma conta para acessar as notas."
       />
-      <FoundationButton label="Criar conta" onPress={onSignup} />
-      <FoundationButton label="Entrar" onPress={onLogin} />
+      <Button label="Criar conta" onPress={onSignup} />
+      <Button label="Entrar" onPress={onLogin} variant="secondary" />
     </>
   );
 }

@@ -143,7 +143,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
     page.getByRole('tab', { name: /^Explorar$/ }),
   ).toBeVisible();
   await openCompose(page);
-  await expect(page.getByText('Conta uma dica')).toBeVisible();
+  await expect(page.getByPlaceholder('Compartilhe seu achado')).toBeVisible();
   await expect(page).toHaveURL(/\/compose(?:[?#]|$)/);
   await page.goBack();
   await expect(page).toHaveURL(/\/(?:[?#]|$)/);
@@ -156,7 +156,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   ).toBeVisible({ timeout: 30000 });
   await expect(page.getByText('0 Notas')).toBeVisible();
   await openCompose(page);
-  await expect(page.getByText('Conta uma dica')).toBeVisible();
+  await expect(page.getByPlaceholder('Compartilhe seu achado')).toBeVisible();
   await expect(page).toHaveURL(/\/compose(?:[?#]|$)/);
 
   await page.getByLabel('Título da nota').fill(title);

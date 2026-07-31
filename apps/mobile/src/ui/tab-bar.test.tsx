@@ -41,6 +41,7 @@ vi.mock('react-native', () => {
       View: NativeView,
       Value: function Value() {},
       timing: () => ({ start: () => {} }),
+      createAnimatedComponent: <T,>(component: T): T => component,
     },
     Pressable: NativePressable,
     StyleSheet: { create: (styles: Record<string, unknown>) => styles },

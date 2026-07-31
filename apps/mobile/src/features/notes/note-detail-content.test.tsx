@@ -28,6 +28,12 @@ vi.mock('react-native', () => {
   }
 
   return {
+    Animated: {
+      View: NativeView,
+      Value: function Value() {},
+      timing: () => ({ start: () => {} }),
+      createAnimatedComponent: <T,>(component: T): T => component,
+    },
     Image: ({ children, ...props }: NativeProps) => {
       const content = typeof children === 'function' ? null : children;
       return createElement('img', props, content);

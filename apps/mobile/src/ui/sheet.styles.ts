@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { radius, semanticColors, spacing } from '@sdds/tokens';
+import { componentMetrics, radius, semanticColors, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   root: {
@@ -22,8 +22,8 @@ export const styles = StyleSheet.create({
     paddingTop: spacing.sp5,
   },
   handle: {
-    width: 40,
-    height: 4,
+    width: componentMetrics.sheet.handleWidth,
+    height: componentMetrics.sheet.handleHeight,
     borderRadius: radius.pill,
     backgroundColor: semanticColors.borderStrong,
     alignSelf: 'center',

@@ -1,21 +1,21 @@
 import { StyleSheet } from 'react-native';
 
-import { colors, radius, semanticColors, shadows, spacing } from '@sdds/tokens';
+import { colors, componentMetrics, radius, semanticColors, shadows, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   sheet: {
     backgroundColor: colors.yellow100,
     borderRadius: radius.lg,
     overflow: 'hidden',
-    paddingHorizontal: 18,
-    paddingVertical: 20,
+    paddingHorizontal: componentMetrics.composer.sheetPaddingHorizontal,
+    paddingVertical: spacing.sp6,
     transform: [{ rotate: '-0.5deg' }],
     ...shadows.md,
   },
   quote: {
-    fontSize: 46,
+    fontSize: componentMetrics.composer.quoteSize,
     left: spacing.sp3,
-    lineHeight: 46,
+    lineHeight: componentMetrics.composer.quoteSize,
     position: 'absolute',
     top: spacing.sp1,
   },
@@ -26,9 +26,9 @@ export const styles = StyleSheet.create({
   },
   body: {
     color: semanticColors.textBody,
-    lineHeight: 24,
+    lineHeight: componentMetrics.composer.bodyLineHeight,
     marginTop: spacing.sp3,
-    minHeight: 140,
+    minHeight: componentMetrics.composer.bodyMinHeight,
     padding: 0,
     textAlignVertical: 'top',
   },

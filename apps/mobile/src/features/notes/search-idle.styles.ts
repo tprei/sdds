@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { radius, semanticColors, spacing } from '@sdds/tokens';
+import { componentMetrics, radius, semanticColors, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   container: {
@@ -28,9 +28,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: semanticColors.sunkenBackground,
     borderRadius: radius.pill,
-    height: 34,
+    height: componentMetrics.chip.md.height,
     justifyContent: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: componentMetrics.chip.md.paddingHorizontal,
   },
   discoverGrid: {
     flexDirection: 'row',

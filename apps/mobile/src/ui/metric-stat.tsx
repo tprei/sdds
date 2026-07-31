@@ -2,7 +2,7 @@ import { View } from 'react-native';
 
  import type { ComponentType } from 'react';
 
-import { colors, motion, semanticColors, spacing } from '@sdds/tokens';
+import { colors, componentMetrics, motion, semanticColors, spacing } from '@sdds/tokens';
 
 import { AppText } from './text';
 import {
@@ -56,7 +56,8 @@ export function MetricStat({
 }: MetricStatProps) {
   const Icon = kindIcon[kind];
   const color = activeColor(kind, active);
-  const iconSize = size === 'sm' ? 16 : 18;
+  const { sm, md } = componentMetrics.metric.iconSize;
+  const iconSize = size === 'sm' ? sm : md;
   const showCount = kind !== 'saved' && count !== undefined;
 
   const body = (

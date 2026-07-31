@@ -1,14 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { radius, semanticColors, shadows, spacing } from '@sdds/tokens';
-
-const primaryShadow = {
-  shadowColor: '#06552C',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.24,
-  shadowRadius: 8,
-  elevation: 2,
-};
+import { componentMetrics, radius, semanticColors, shadows, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   base: {
@@ -22,23 +14,23 @@ export const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   sm: {
-    height: 36,
-    paddingHorizontal: 14,
+    height: componentMetrics.button.sm.height,
+    paddingHorizontal: componentMetrics.button.sm.paddingHorizontal,
     borderRadius: radius.md,
   },
   md: {
-    height: 46,
+    height: componentMetrics.button.md.height,
     paddingHorizontal: spacing.sp6,
     borderRadius: radius.md,
   },
   lg: {
-    height: 54,
-    paddingHorizontal: 26,
+    height: componentMetrics.button.lg.height,
+    paddingHorizontal: componentMetrics.button.lg.paddingHorizontal,
     borderRadius: radius.lg,
   },
   primary: {
     backgroundColor: semanticColors.accent,
-    ...primaryShadow,
+    ...shadows.primaryButton,
   },
   secondary: {
     backgroundColor: semanticColors.cardSurface,

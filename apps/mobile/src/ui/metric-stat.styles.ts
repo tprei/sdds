@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { spacing } from '@sdds/tokens';
+import { componentMetrics, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   row: {
@@ -9,6 +9,6 @@ export const styles = StyleSheet.create({
     gap: spacing.sp1,
   },
   countSlot: {
-    minWidth: 18,
+    minWidth: componentMetrics.metric.countSlotWidth,
   },
 });

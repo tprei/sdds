@@ -6,7 +6,7 @@ import {
   UIImagePickerPreferredAssetRepresentationMode,
 } from 'expo-image-picker';
 
-import { colors, semanticColors, type CategorySlug } from '@sdds/tokens';
+import { colors, componentMetrics, semanticColors, type CategorySlug } from '@sdds/tokens';
 
 import { createComposeController } from '@/features/notes/compose-controller';
 import {
@@ -230,7 +230,7 @@ function AuthenticatedComposeScreen({
               style={styles.photoDashed}
               testID="compose-add-image"
             >
-              <IconImage color={semanticColors.textMuted} size={24} />
+              <IconImage color={semanticColors.textMuted} size={componentMetrics.icon.md} />
               <AppText
                 color={semanticColors.textMuted}
                 variant="sm"
@@ -258,7 +258,7 @@ function AuthenticatedComposeScreen({
                   ]}
                   testID="compose-remove-image"
                 >
-                  <IconX color={semanticColors.textOnAccent} size={14} />
+                  <IconX color={semanticColors.textOnAccent} size={componentMetrics.icon.chipRemove} />
                 </PressableScale>
               </View>
               <View style={styles.photoActions}>

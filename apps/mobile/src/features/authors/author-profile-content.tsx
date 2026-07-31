@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
-import { colors, semanticColors } from '@sdds/tokens';
+import { colors, componentMetrics, semanticColors } from '@sdds/tokens';
 
 import {
   NoteCard,
@@ -61,7 +61,7 @@ function ProfileHeader({
 }) {
   return (
     <View style={styles.header} testID="author-profile-header">
-      <Avatar name={author.displayName} ring={isOwnProfile} size={84} />
+      <Avatar name={author.displayName} ring={isOwnProfile} size={componentMetrics.avatar.lg} />
       <AppText
         accessibilityRole="header"
         color={semanticColors.textStrong}

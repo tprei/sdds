@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { spacing } from '@sdds/tokens';
+import { componentMetrics, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   // AppHeader owns the paper0 background, hairline, and horizontal inset;
@@ -14,7 +14,7 @@ export const styles = StyleSheet.create({
   },
   resultsContent: {
     gap: spacing.sp4,
-    paddingBottom: spacing.bottomNavHeight + spacing.sp7,
+    paddingBottom: componentMetrics.nav.height + spacing.sp7,
     paddingTop: spacing.sp4,
   },
   feedback: {

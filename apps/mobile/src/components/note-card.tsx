@@ -8,6 +8,7 @@ import {
   semanticColors,
   type CategorySlug,
 } from '@sdds/tokens';
+import { componentMetrics } from '@sdds/tokens';
 
 import { AppText } from '@/ui/text';
 import { Avatar } from '@/ui/avatar';
@@ -131,7 +132,7 @@ function AuthorTarget({
 }) {
   const content = (
     <>
-      <Avatar name={note.author.displayName} size={20} />
+      <Avatar name={note.author.displayName} size={componentMetrics.avatar.xs} />
       <AppText
         variant="xs"
         color={semanticColors.textMuted}

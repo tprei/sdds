@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import { semanticColors } from '@sdds/tokens';
+import { componentMetrics, semanticColors } from '@sdds/tokens';
 
 import { AppText } from '@/ui/text';
 import { IconPencil } from '@/ui/icons';
@@ -33,7 +33,7 @@ export function NoteActionBar({
         accessibilityLabel="Diz alguma coisa boa…"
         onPress={onFocusComposer}
       >
-        <IconPencil size={15} color={semanticColors.textMeta} />
+        <IconPencil size={componentMetrics.icon.edit} color={semanticColors.textMeta} />
         <AppText variant="sm" color={semanticColors.textMeta}>
           Diz alguma coisa boa…
         </AppText>

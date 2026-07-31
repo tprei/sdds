@@ -3,7 +3,7 @@ import { ScrollView } from 'react-native';
 import { describe, expect, it, vi } from 'vitest';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
-import { spacing } from '@sdds/tokens';
+import { componentMetrics, spacing } from '@sdds/tokens';
 
 import { Screen } from './screen';
 
@@ -50,7 +50,7 @@ describe('Screen', () => {
     const scroll = renderer.root.findByType(ScrollView);
     expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
     expect(scroll.props.contentContainerStyle.paddingBottom).toBe(
-      spacing.bottomNavHeight + spacing.sp7,
+      componentMetrics.nav.height + spacing.sp7,
     );
   });
 

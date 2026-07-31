@@ -1,7 +1,6 @@
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
 import type { NoteCatalog } from './catalog';
-import { searchScopeLabel } from './search-screen';
 import type { CategorySlug } from '@sdds/tokens';
 
 import { CategoryChip, NeutralChip } from '@/ui/category-chip';
@@ -43,18 +42,6 @@ export function CategoryFilterControls({
           ))}
         </ScrollView>
       )}
-    </View>
-  );
-}
-
-export function SearchScopeBadge() {
-  return (
-    <View
-      accessible
-      accessibilityLabel={`Escopo atual: ${searchScopeLabel}`}
-      style={styles.scopeBadge}
-    >
-      <Text style={styles.scopeLabel}>{searchScopeLabel}</Text>
     </View>
   );
 }

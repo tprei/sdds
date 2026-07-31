@@ -69,5 +69,7 @@ export function SearchField({
     </View>
   );
 
-  return <View>{focused ? <View style={styles.ring}>{row}</View> : row}</View>;
+  return (
+    <View style={[styles.ringHost, focused ? styles.ring : null]}>{row}</View>
+  );
 }

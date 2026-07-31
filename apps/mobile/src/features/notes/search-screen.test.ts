@@ -136,7 +136,7 @@ describe('search screen helpers', () => {
     expect(selectedSearchCategory(catalog, null)).toBeNull();
   });
 
-  it('builds result context with count, category, and global scope', () => {
+  it('builds result context with count and category', () => {
     expect(
       searchResultContext({
         catalog: buildNoteCatalog(catalogs()),
@@ -148,7 +148,6 @@ describe('search screen helpers', () => {
       categoryLabel: 'Comida',
       query: 'café brasileiro',
       resultCount: 2,
-      scopeLabel: 'Mundo todo',
     });
   });
 
@@ -237,8 +236,8 @@ describe('search screen helpers', () => {
     ]);
   });
   it('labels singular and plural result counts', () => {
-    expect(searchResultCountLabel(1)).toBe('1 nota');
-    expect(searchResultCountLabel(2)).toBe('2 notas');
+    expect(searchResultCountLabel(1)).toBe('1 achado');
+    expect(searchResultCountLabel(2)).toBe('2 achados');
   });
 });
 

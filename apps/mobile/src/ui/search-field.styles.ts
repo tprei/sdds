@@ -12,9 +12,11 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.sp4,
     gap: spacing.sp2,
   },
-  ring: {
+  ringHost: {
     padding: 3,
     borderRadius: radius.pill,
+  },
+  ring: {
     backgroundColor: semanticColors.accentTint,
   },
   input: {

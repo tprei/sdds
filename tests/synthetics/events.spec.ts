@@ -65,9 +65,9 @@ test('exports the authenticated search event lineage', async ({
 
   await loginUser(page, username, '/search');
   await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
+    page.getByPlaceholder('O que você tá procurando?'),
   ).toBeVisible();
-  await page.getByPlaceholder('Buscar uma dica').fill(marker);
+  await page.getByTestId('search-field-input').fill(marker);
 
   const impressionResponse = waitForEventsResponse(page);
   await page.getByRole('button', { name: 'Buscar', exact: true }).click();

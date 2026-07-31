@@ -339,7 +339,7 @@ func TestPrepareImageUploadRejectsInvalidMultipart(t *testing.T) {
 			return writeUploadParts(writer, "not-a-uuid", "photo.jpg", true, []byte("image"))
 		}, noFileBytes: true, field: openapi.ValidationFieldUploadRequestID},
 		{name: "raw32 request ID", write: func(writer *multipart.Writer) error {
-			return writeUploadParts(writer, strings.ReplaceAll(testUploadRequestID, "-", ""), "photo.jpg", true, []byte("image"))
+			return writeUploadParts(writer, strings.Join(strings.Split(testUploadRequestID, "-"), ""), "photo.jpg", true, []byte("image"))
 		}, noFileBytes: true, field: openapi.ValidationFieldUploadRequestID},
 		{name: "braced request ID", write: func(writer *multipart.Writer) error {
 			return writeUploadParts(writer, "{"+testUploadRequestID+"}", "photo.jpg", true, []byte("image"))

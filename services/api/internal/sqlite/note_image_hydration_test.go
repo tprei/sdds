@@ -111,8 +111,7 @@ func TestNoteStoreHydratesOrderedImagesForEveryReadPath(t *testing.T) {
 
 	created, err := store.CreateNote(ctx, testCreateInput(note.CreateInput{Title: "Imagem de comida",
 		Body:         "Um lugar com fotos.",
-		CategorySlug: note.CategorySlugFood,
-		PlaceSlug:    note.PlaceSlugSaoPaulo}))
+		CategorySlug: note.CategorySlugFood}))
 	if err != nil {
 		t.Fatalf("create note: %v", err)
 	}
@@ -189,8 +188,7 @@ func TestNoteStoreHydratesOrderedImagesForEveryReadPath(t *testing.T) {
 
 	textOnly, err := store.CreateNote(ctx, testCreateInput(note.CreateInput{Title: "Nota sem imagem",
 		Body:         "Sem mídia.",
-		CategorySlug: note.CategorySlugFood,
-		PlaceSlug:    note.PlaceSlugSaoPaulo}))
+		CategorySlug: note.CategorySlugFood}))
 	if err != nil {
 		t.Fatalf("create text-only note: %v", err)
 	}

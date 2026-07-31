@@ -38,7 +38,6 @@ test('exports the authenticated search event lineage', async ({
     body: `Nota pesquisável ${marker}.`,
     category_slug: 'food',
     client_request_id: `synthetic-event-note-${timestamp}`,
-    place_slug: 'sao-paulo',
     title,
   });
 

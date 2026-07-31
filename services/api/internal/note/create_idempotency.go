@@ -28,12 +28,6 @@ func CreateRequestFingerprint(input CreateInput) string {
 	writeFrame([]byte(input.Title))
 	writeFrame([]byte(input.Body))
 	writeFrame([]byte(input.CategorySlug))
-	if input.PlaceSlug == "" {
-		_, _ = hasher.Write([]byte{0})
-	} else {
-		_, _ = hasher.Write([]byte{1})
-		writeFrame([]byte(input.PlaceSlug))
-	}
 	writeUint64(uint64(len(input.ImageUploadIDs)))
 	for _, imageUploadID := range input.ImageUploadIDs {
 		writeFrame([]byte(imageUploadID))

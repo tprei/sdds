@@ -38,7 +38,6 @@ test('reports a note and a comment, then keeps the content visible', async ({
     body: `Texto da nota que será denunciado ${timestamp}.`,
     category_slug: 'food',
     client_request_id: `synthetic-report-note-${timestamp}`,
-    place_slug: 'sao-paulo',
     title: noteTitle,
   });
   const commentBody = `Comentário que será denunciado ${timestamp}`;

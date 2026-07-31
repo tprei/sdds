@@ -153,8 +153,6 @@ func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, validationErrorResponse(openapi.ErrorCodeInvalidNote, []note.ValidationProblem{{Field: "image_upload_ids", Message: "invalid"}}))
 		case errors.Is(err, note.ErrCategoryNotFound):
 			writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, []note.ValidationProblem{{Field: "category_slug", Message: "unknown"}}))
-		case errors.Is(err, note.ErrPlaceNotFound):
-			writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, []note.ValidationProblem{{Field: "place_slug", Message: "unknown"}}))
 		default:
 			writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		}
@@ -216,10 +214,6 @@ func listNotesInput(params openapi.ListNotesParams) note.ListInput {
 }
 
 func createNoteInput(request openapi.CreateNoteRequest, userID user.UserID) note.CreateInput {
-	placeSlug := note.PlaceSlug("")
-	if request.PlaceSlug != nil {
-		placeSlug = note.PlaceSlug(*request.PlaceSlug)
-	}
 	imageUploadIDs := []string(nil)
 	if request.ImageUploadIds != nil {
 		imageUploadIDs = *request.ImageUploadIds
@@ -229,7 +223,6 @@ func createNoteInput(request openapi.CreateNoteRequest, userID user.UserID) note
 		Title:           request.Title,
 		Body:            request.Body,
 		CategorySlug:    note.CategorySlug(request.CategorySlug),
-		PlaceSlug:       placeSlug,
 		ClientRequestID: request.ClientRequestId,
 		ImageUploadIDs:  imageUploadIDs,
 	})
@@ -287,12 +280,6 @@ func newSearchNotesResponse(notes []note.Note) openapi.SearchNotesResponse {
 }
 
 func newNoteResponse(found note.Note) openapi.Note {
-	placeSlug := openapi.PlaceSlug(found.PlaceSlug)
-	placeSlugPointer := &placeSlug
-	if found.PlaceSlug == "" {
-		placeSlugPointer = nil
-	}
-
 	images := make([]openapi.NoteImage, 0, len(found.Images))
 	for _, image := range found.Images {
 		images = append(images, openapi.NoteImage{
@@ -313,7 +300,6 @@ func newNoteResponse(found note.Note) openapi.Note {
 		Title:        found.Title,
 		Body:         found.Body,
 		CategorySlug: openapi.CategorySlug(found.CategorySlug),
-		PlaceSlug:    placeSlugPointer,
 		Author: openapi.AuthorSummary{
 			Id:          string(found.Author.ID),
 			DisplayName: found.Author.DisplayName,

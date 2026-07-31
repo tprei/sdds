@@ -5,14 +5,12 @@ import {
   authorSummarySchema,
   authSessionResponseSchema,
   catalogCategorySchema,
-  catalogPlaceSchema,
   currentSessionResponseSchema,
   currentUserSchema,
   errorCodeSchema,
   errorResponseSchema,
   listCategoriesResponseSchema,
   listNotesResponseSchema,
-  listPlacesResponseSchema,
   noteSchema,
   publicAuthorSchema,
   validationFieldSchema,
@@ -25,13 +23,11 @@ type AuthSessionResponse = Schemas['AuthSessionResponse'];
 type AuthorNotesPageResponse = Schemas['AuthorNotesPage'];
 type AuthorSummaryResponse = Schemas['AuthorSummary'];
 type CatalogCategoryResponse = Schemas['CatalogCategory'];
-type CatalogPlaceResponse = Schemas['CatalogPlace'];
 type CurrentSessionResponse = Schemas['CurrentSessionResponse'];
 type CurrentUserResponse = Schemas['CurrentUser'];
 type ErrorResponse = Schemas['ErrorResponse'];
 type ListCategoriesResponse = Schemas['ListCategoriesResponse'];
 type ListNotesResponse = Schemas['ListNotesResponse'];
-type ListPlacesResponse = Schemas['ListPlacesResponse'];
 type NoteResponse = Schemas['Note'];
 type PublicAuthorResponse = Schemas['PublicAuthor'];
 type ValidationProblemResponse = Schemas['ValidationProblem'];
@@ -59,7 +55,6 @@ function makeNote(): NoteResponse {
     created_at: 1700000000000,
     id: 'note-1',
     images: [],
-    place_slug: null,
     title: 'A note',
     updated_at: 1700000001000,
     useful_count: 0,
@@ -85,25 +80,12 @@ function makeCatalogCategory(): CatalogCategoryResponse {
   };
 }
 
-function makeCatalogPlace(): CatalogPlaceResponse {
-  return {
-    active: true,
-    display_order: 3,
-    label: 'Remote',
-    slug: 'remote',
-  };
-}
-
 function makeListNotesResponse(): ListNotesResponse {
   return { notes: [makeNote()] };
 }
 
 function makeListCategoriesResponse(): ListCategoriesResponse {
   return { categories: [makeCatalogCategory()] };
-}
-
-function makeListPlacesResponse(): ListPlacesResponse {
-  return { places: [makeCatalogPlace()] };
 }
 
 function makeCurrentUser(): CurrentUserResponse {
@@ -166,11 +148,6 @@ const validSchemaCases = [
     value: makeCatalogCategory(),
   },
   {
-    name: 'catalog place',
-    schema: catalogPlaceSchema,
-    value: makeCatalogPlace(),
-  },
-  {
     name: 'list notes response',
     schema: listNotesResponseSchema,
     value: makeListNotesResponse(),
@@ -179,11 +156,6 @@ const validSchemaCases = [
     name: 'list categories response',
     schema: listCategoriesResponseSchema,
     value: makeListCategoriesResponse(),
-  },
-  {
-    name: 'list places response',
-    schema: listPlacesResponseSchema,
-    value: makeListPlacesResponse(),
   },
   { name: 'current user', schema: currentUserSchema, value: makeCurrentUser() },
   {
@@ -249,7 +221,6 @@ describe('API response schemas', () => {
         category_slug: 'engineering',
         created_at: 0,
         id: 'note-1',
-        place_slug: null,
         title: 'A note',
         updated_at: 1,
       },
@@ -265,11 +236,6 @@ describe('API response schemas', () => {
       value: { active: true, display_order: 0, slug: 'engineering' },
     },
     {
-      name: 'catalog place',
-      schema: catalogPlaceSchema,
-      value: { active: true, display_order: 0, label: 'Remote' },
-    },
-    {
       name: 'list notes response',
       schema: listNotesResponseSchema,
       value: {},
@@ -277,11 +243,6 @@ describe('API response schemas', () => {
     {
       name: 'list categories response',
       schema: listCategoriesResponseSchema,
-      value: {},
-    },
-    {
-      name: 'list places response',
-      schema: listPlacesResponseSchema,
       value: {},
     },
     {
@@ -340,11 +301,6 @@ describe('API response schemas', () => {
       value: { ...makeCatalogCategory(), active: 'true' },
     },
     {
-      name: 'catalog place',
-      schema: catalogPlaceSchema,
-      value: { ...makeCatalogPlace(), active: 'true' },
-    },
-    {
       name: 'list notes response',
       schema: listNotesResponseSchema,
       value: { notes: 'none' },
@@ -353,11 +309,6 @@ describe('API response schemas', () => {
       name: 'list categories response',
       schema: listCategoriesResponseSchema,
       value: { categories: 'none' },
-    },
-    {
-      name: 'list places response',
-      schema: listPlacesResponseSchema,
-      value: { places: null },
     },
     {
       name: 'current user',
@@ -425,11 +376,6 @@ describe('API response schemas', () => {
       value: { ...makeCatalogCategory(), display_order: 1.5 },
     },
     {
-      name: 'catalog place display_order is fractional',
-      schema: catalogPlaceSchema,
-      value: { ...makeCatalogPlace(), display_order: 1.5 },
-    },
-    {
       name: 'auth session expires_at below zero',
       schema: authSessionResponseSchema,
       value: { ...makeAuthSession(), expires_at: -1 },
@@ -479,11 +425,6 @@ describe('API response schemas', () => {
       schema: catalogCategorySchema,
       value: { ...makeCatalogCategory(), display_order: -1 },
     },
-    {
-      name: 'catalog place negative integer display_order',
-      schema: catalogPlaceSchema,
-      value: { ...makeCatalogPlace(), display_order: -1 },
-    },
   ])('accepts $name', ({ schema, value }) => {
     const parsed = schema.safeParse(value);
 
@@ -494,19 +435,9 @@ describe('API response schemas', () => {
   });
   it.each([
     {
-      name: 'note with a non-null place_slug',
-      schema: noteSchema,
-      value: { ...makeNote(), place_slug: 'remote' },
-    },
-    {
       name: 'inactive catalog category',
       schema: catalogCategorySchema,
       value: { ...makeCatalogCategory(), active: false },
-    },
-    {
-      name: 'inactive catalog place',
-      schema: catalogPlaceSchema,
-      value: { ...makeCatalogPlace(), active: false },
     },
     {
       name: 'empty author notes page',
@@ -522,11 +453,6 @@ describe('API response schemas', () => {
       name: 'empty category list',
       schema: listCategoriesResponseSchema,
       value: { categories: [] },
-    },
-    {
-      name: 'empty place list',
-      schema: listPlacesResponseSchema,
-      value: { places: [] },
     },
   ])('accepts $name', ({ schema, value }) => {
     const parsed = schema.safeParse(value);
@@ -632,12 +558,6 @@ describe('API response schemas', () => {
       expected: makeCatalogCategory(),
     },
     {
-      name: 'catalog place',
-      schema: catalogPlaceSchema,
-      input: { ...makeCatalogPlace(), private_key: 'private' },
-      expected: makeCatalogPlace(),
-    },
-    {
       name: 'list notes response',
       schema: listNotesResponseSchema,
       input: { ...makeListNotesResponse(), private_key: 'private' },
@@ -648,12 +568,6 @@ describe('API response schemas', () => {
       schema: listCategoriesResponseSchema,
       input: { ...makeListCategoriesResponse(), private_key: 'private' },
       expected: makeListCategoriesResponse(),
-    },
-    {
-      name: 'list places response',
-      schema: listPlacesResponseSchema,
-      input: { ...makeListPlacesResponse(), private_key: 'private' },
-      expected: makeListPlacesResponse(),
     },
     {
       name: 'current user',

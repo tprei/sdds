@@ -48,7 +48,6 @@ describe('notes API client', () => {
         body: 'Tem pao de queijo decente.',
         categorySlug: 'food',
         clientRequestId: 'mobile-create-note-wire',
-        placeSlug: 'sao-paulo',
         title: 'Cafe bom',
       },
     );
@@ -62,30 +61,7 @@ describe('notes API client', () => {
       body: 'Tem pao de queijo decente.',
       category_slug: 'food',
       client_request_id: 'mobile-create-note-wire',
-      place_slug: 'sao-paulo',
       title: 'Cafe bom',
-    });
-  });
-
-  it('sends null place when create note input omits place', async () => {
-    const calls: FetchCall[] = [];
-    stubFetch(async (request) => {
-      calls.push({ request });
-      return jsonResponse(apiNote({ place_slug: null }), httpStatusCreated);
-    });
-
-    const client = createAPIClient(exampleToken);
-    await client.createNote(
-      {
-        body: 'Tem pao de queijo decente.',
-        categorySlug: 'food',
-        clientRequestId: 'mobile-create-note-without-place',
-        title: 'Cafe bom',
-      },
-    );
-
-    await expect(requestJSON(onlyFetchCall(calls))).resolves.toMatchObject({
-      place_slug: null,
     });
   });
 
@@ -98,7 +74,6 @@ describe('notes API client', () => {
         body: 'Tem pao de queijo decente.',
         categorySlug: 'food',
         clientRequestId: 'mobile-create-note-response',
-        placeSlug: 'sao-paulo',
         title: 'Cafe bom',
       },
     );
@@ -113,7 +88,6 @@ describe('notes API client', () => {
       createdAt: 1782993600000,
       id: exampleNoteID,
       images: [],
-      placeSlug: 'sao-paulo',
       title: 'Cafe bom',
       updatedAt: 1782993600000,
       usefulCount: 0,
@@ -121,14 +95,6 @@ describe('notes API client', () => {
     });
   });
 
-  it('parses notes without a place', async () => {
-    stubFetch(async () => jsonResponse(apiNote({ place_slug: null })));
-
-    const client = createAPIClient(exampleToken);
-    await expect(client.getNote(exampleNoteID)).resolves.toMatchObject({
-      placeSlug: null,
-    });
-  });
   it('raises request errors from status even when the error body fails', async () => {
     stubFetch(async () => unreadableResponse(httpStatusBadRequest));
 
@@ -139,7 +105,6 @@ describe('notes API client', () => {
           body: 'Tem pao de queijo decente.',
           categorySlug: 'food',
           clientRequestId: 'mobile-create-note-error',
-          placeSlug: 'sao-paulo',
           title: 'Cafe bom',
         },
       ),
@@ -339,7 +304,6 @@ describe('notes API client', () => {
       jsonResponse(
         apiNote({
           category_slug: 'future-category',
-          place_slug: 'future-place',
         }),
       ),
     );
@@ -347,7 +311,6 @@ describe('notes API client', () => {
     const client = createAPIClient(exampleToken);
     await expect(client.getNote(exampleNoteID)).resolves.toMatchObject({
       categorySlug: 'future-category',
-      placeSlug: 'future-place',
     });
   });
 
@@ -476,7 +439,6 @@ describe('notes API client', () => {
         notes: [
           {
             ...apiNote(),
-            place_slug: 42,
           },
         ],
       }),
@@ -497,7 +459,6 @@ describe('notes API client', () => {
             category: 'food',
             created_at: 1782993600000,
             id: exampleNoteID,
-            place: 'sao-paulo',
             title: 'Cafe bom',
             updated_at: 1782993600000,
           },
@@ -600,7 +561,6 @@ function apiNote(overrides: Partial<NoteResponse> = {}): NoteResponse {
     created_at: 1782993600000,
     id: exampleNoteID,
     images: [],
-    place_slug: 'sao-paulo',
     useful_count: 0,
     useful_by_current_user: false,
     title: 'Cafe bom',
@@ -636,7 +596,6 @@ function expectedNote() {
     createdAt: 1782993600000,
     id: exampleNoteID,
     images: [],
-    placeSlug: 'sao-paulo',
     title: 'Cafe bom',
     updatedAt: 1782993600000,
     usefulCount: 0,

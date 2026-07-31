@@ -35,28 +35,6 @@ func TestListCategoriesReturnsCatalogRows(t *testing.T) {
 	}
 }
 
-func TestListPlacesReturnsCatalogRows(t *testing.T) {
-	router := newTestRouter(fakeNoteStore{})
-	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/v1/places", nil)
-
-	router.ServeHTTP(response, request)
-	requireOpenAPIResponse(t, request, response)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
-	}
-
-	var body openapi.ListPlacesResponse
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	want := newListPlacesResponse(note.Places)
-	if diff := cmp.Diff(want, body); diff != "" {
-		t.Fatalf("response body mismatch (-want +got):\n%s", diff)
-	}
-}
-
 func TestListCategoriesReturnsInternalError(t *testing.T) {
 	router := withCurrentSessionHeader(newRouterForTest(fakeNoteStore{}, fakeCatalog{
 		listCategories: func(context.Context) ([]note.Category, error) {
@@ -65,23 +43,6 @@ func TestListCategoriesReturnsInternalError(t *testing.T) {
 	}, authenticatedFakeUserStore(fakeUserStore{}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/categories", nil)
-
-	router.ServeHTTP(response, request)
-	requireOpenAPIResponse(t, request, response)
-
-	if response.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusInternalServerError)
-	}
-}
-
-func TestListPlacesReturnsInternalError(t *testing.T) {
-	router := withCurrentSessionHeader(newRouterForTest(fakeNoteStore{}, fakeCatalog{
-		listPlaces: func(context.Context) ([]note.Place, error) {
-			return nil, errors.New("catalog unavailable")
-		},
-	}, authenticatedFakeUserStore(fakeUserStore{}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
-	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/v1/places", nil)
 
 	router.ServeHTTP(response, request)
 	requireOpenAPIResponse(t, request, response)

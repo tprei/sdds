@@ -205,7 +205,6 @@ type mediaLifecycleNote struct {
 	Title        string
 	Body         string
 	CategorySlug openapi.CategorySlug
-	PlaceSlug    *openapi.PlaceSlug
 	Author       openapi.AuthorSummary
 	Images       []openapi.NoteImage
 	CreatedAt    int64
@@ -218,7 +217,6 @@ func durableMediaNote(note openapi.Note) mediaLifecycleNote {
 		Title:        note.Title,
 		Body:         note.Body,
 		CategorySlug: note.CategorySlug,
-		PlaceSlug:    note.PlaceSlug,
 		Author:       note.Author,
 		Images:       note.Images,
 		CreatedAt:    note.CreatedAt,

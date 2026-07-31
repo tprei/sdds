@@ -1,7 +1,4 @@
-import {
-  listCategoriesResponseSchema,
-  listPlacesResponseSchema,
-} from './schema';
+import { listCategoriesResponseSchema } from './schema';
 import type { TypedTransport } from './client';
 
 export type CatalogCategory = {
@@ -11,16 +8,8 @@ export type CatalogCategory = {
   slug: string;
 };
 
-export type CatalogPlace = {
-  active: boolean;
-  displayOrder: number;
-  label: string;
-  slug: string;
-};
-
 export type Catalogs = {
   categories: CatalogCategory[];
-  places: CatalogPlace[];
 };
 
 export class CatalogAPIResponseError extends Error {
@@ -32,25 +21,17 @@ export class CatalogAPIResponseError extends Error {
 export type CatalogsAPI = {
   listCatalogs(): Promise<Catalogs>;
   listCategories(): Promise<CatalogCategory[]>;
-  listPlaces(): Promise<CatalogPlace[]>;
 };
 
 export function bindCatalogsAPI(transport: TypedTransport): CatalogsAPI {
   return {
     async listCatalogs() {
-      const [categories, places] = await Promise.all([
-        listCategoriesImpl(transport),
-        listPlacesImpl(transport),
-      ]);
-      return { categories, places };
+      const categories = await listCategoriesImpl(transport);
+      return { categories };
     },
 
     async listCategories() {
       return listCategoriesImpl(transport);
-    },
-
-    async listPlaces() {
-      return listPlacesImpl(transport);
     },
   };
 }
@@ -62,13 +43,6 @@ async function listCategoriesImpl(
   return parseListCategoriesResponse(data);
 }
 
-async function listPlacesImpl(
-  transport: TypedTransport,
-): Promise<CatalogPlace[]> {
-  const { data } = await transport.GET('/v1/places');
-  return parseListPlacesResponse(data);
-}
-
 function parseListCategoriesResponse(value: unknown): CatalogCategory[] {
   const categoriesResponse = listCategoriesResponseSchema.safeParse(value);
   if (!categoriesResponse.success) {
@@ -76,20 +50,6 @@ function parseListCategoriesResponse(value: unknown): CatalogCategory[] {
   }
 
   return categoriesResponse.data.categories.map((value) => ({
-    active: value.active,
-    displayOrder: value.display_order,
-    label: value.label,
-    slug: value.slug,
-  }));
-}
-
-function parseListPlacesResponse(value: unknown): CatalogPlace[] {
-  const placesResponse = listPlacesResponseSchema.safeParse(value);
-  if (!placesResponse.success) {
-    throw new CatalogAPIResponseError();
-  }
-
-  return placesResponse.data.places.map((value) => ({
     active: value.active,
     displayOrder: value.display_order,
     label: value.label,

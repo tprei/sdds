@@ -12,8 +12,8 @@ import type { ImageUploadAsset, ImageUploadReceipt } from '@/lib/api/image-uploa
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'singleton-request' }));
 
 const ownerID = 'owner-1';
-const catalogs: Catalogs = { categories: [{ active: true, displayOrder: 1, label: 'Comida', slug: 'food' }], places: [] };
-const noVisibleCatalogs: Catalogs = { categories: [{ active: false, displayOrder: 1, label: 'Comida', slug: 'food' }], places: [] };
+const catalogs: Catalogs = { categories: [{ active: true, displayOrder: 1, label: 'Comida', slug: 'food' }] };
+const noVisibleCatalogs: Catalogs = { categories: [{ active: false, displayOrder: 1, label: 'Comida', slug: 'food' }] };
 const asset: ImageUploadAsset = { fileName: 'photo.jpg', height: 800, mimeType: 'image/jpeg', uri: 'file:///photo.jpg', width: 1200 };
 const replacementAsset: ImageUploadAsset = { ...asset, fileName: 'next.jpg', uri: 'file:///next.jpg' };
 const receipt: ImageUploadReceipt = { byteSize: 1, contentType: 'image/jpeg', expiresAt: 4102444800000, height: 800, imageUploadId: 'image-1', width: 1200 };
@@ -156,7 +156,6 @@ describe('Compose controller transitions', () => {
       canSubmit: false,
       catalogState: { status: 'ready' },
       categorySlug: null,
-      placeSlug: null,
     });
   });
 
@@ -222,7 +221,6 @@ describe('Compose controller transitions', () => {
         { active: false, displayOrder: 1, label: 'Comida', slug: 'food' },
         { active: true, displayOrder: 2, label: 'Viagem', slug: 'travel' },
       ],
-      places: [],
     });
     await tick(); expect(controller.getState().catalogState).toEqual({ status: 'loading' });
     failed.reject({ code: 'upload_expired', status: 409 }); await publishing;
@@ -278,7 +276,7 @@ async function ready(store: ComposeDraftStore, overrides: Partial<ComposeControl
 
 function draft(...ids: string[]): ComposeDraftStore {
   const store = createComposeDraftStore(uuidSequence(...ids));
-  store.update(ownerID, { body: 'Corpo', categorySlug: 'food', image: null, placeSlug: null, title: 'Título' });
+  store.update(ownerID, { body: 'Corpo', categorySlug: 'food', image: null, title: 'Título' });
   return store;
 }
 

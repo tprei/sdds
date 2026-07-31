@@ -24,7 +24,6 @@ func NormalizeCreateInput(input CreateInput) CreateInput {
 		Title:           strings.TrimSpace(input.Title),
 		Body:            strings.TrimSpace(input.Body),
 		CategorySlug:    NormalizeCategorySlug(input.CategorySlug),
-		PlaceSlug:       NormalizePlaceSlug(input.PlaceSlug),
 		ClientRequestID: input.ClientRequestID,
 		ImageUploadIDs:  input.ImageUploadIDs,
 	}

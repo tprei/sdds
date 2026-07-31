@@ -49,7 +49,6 @@ async function signInWithNotes(
       body: `Corpo da nota de layout ${suffix} numero ${index + 1}.`,
       category_slug: 'food',
       client_request_id: randomUUID(),
-      place_slug: null,
       title,
     });
   }

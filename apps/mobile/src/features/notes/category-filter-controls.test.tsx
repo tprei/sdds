@@ -55,13 +55,11 @@ const catalog: NoteCatalog = {
     { hue: categoryColors.food, label: 'Comida', slug: 'food' },
     { hue: categoryColors.travel, label: 'Viagem', slug: 'travel' },
   ],
-  activePlaces: [],
   categoryHues: new Map([
     ['food', categoryColors.food],
     ['travel', categoryColors.travel],
   ]),
   categoryLabels: new Map(),
-  placeLabels: new Map(),
 };
 
 describe('CategoryFilterControls', () => {

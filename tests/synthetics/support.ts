@@ -72,7 +72,6 @@ export type CreateNoteInput = {
   body: string;
   category_slug: string;
   client_request_id: string;
-  place_slug: string | null;
   title: string;
 };
 

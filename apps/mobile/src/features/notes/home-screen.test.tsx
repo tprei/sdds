@@ -162,7 +162,6 @@ function exploreNote(id: string) {
     createdAt: 1782993600000,
     id,
     images: [],
-    placeSlug: null,
     title: `Nota ${id}`,
     updatedAt: 1782993600000,
     usefulByCurrentUser: false,
@@ -173,7 +172,7 @@ function exploreNote(id: string) {
 describe('HomeScreen auth gate', () => {
   beforeEach(() => {
     mocks.authState = { status: 'authenticated', token: 'session-token', user: { id: 'user-id' } };
-    mocks.apiClient.listCatalogs.mockResolvedValue({ categories: [], places: [] });
+    mocks.apiClient.listCatalogs.mockResolvedValue({ categories: [] });
     mocks.apiClient.listNotes.mockResolvedValue([]);
     mocks.logout.mockClear();
     mocks.push.mockClear();

@@ -205,7 +205,6 @@ func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandl
 			router.Use(requireCurrentSession)
 			router.Use(validateOpenAPIRequest)
 			router.Get("/categories", wrapper.ListCategories)
-			router.Get("/places", wrapper.ListPlaces)
 			router.Get("/notes", wrapper.ListNotes)
 			router.Get("/authors/{author_id}", wrapper.GetAuthor)
 			router.Get("/authors/{author_id}/notes", wrapper.ListAuthorNotes)

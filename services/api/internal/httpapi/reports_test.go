@@ -248,7 +248,7 @@ func TestCreateReportRejectsInvalidFields(t *testing.T) {
 		},
 		{
 			name:       "invalid target_type",
-			body:       `{"target_type":"place","target_id":"` + exampleNoteID + `","reason":"spam"}`,
+			body:       `{"target_type":"album","target_id":"` + exampleNoteID + `","reason":"spam"}`,
 			wantFields: []openapi.ValidationProblem{{Field: openapi.ValidationFieldTargetType, Code: openapi.ValidationProblemCodeInvalid}},
 		},
 		{

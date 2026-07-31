@@ -25,7 +25,6 @@ const baseNote: Note = {
   createdAt: 0,
   id: 'note-1',
   images: [],
-  placeSlug: null,
   title: 't',
   updatedAt: 0,
   usefulCount: 0,

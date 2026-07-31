@@ -18,7 +18,6 @@ export type Note = {
   createdAt: number;
   id: string;
   images: NoteImage[];
-  placeSlug: string | null;
   title: string;
   updatedAt: number;
   usefulCount: number;
@@ -47,7 +46,6 @@ export type CreateNoteInput = {
   categorySlug: string;
   clientRequestId: string;
   imageUploadIds?: string[];
-  placeSlug?: string | null;
   title: string;
 };
 
@@ -171,7 +169,6 @@ export function bindNotesAPI(transport: TypedTransport): NotesAPI {
         category_slug: input.categorySlug,
         client_request_id: input.clientRequestId,
         image_upload_ids: input.imageUploadIds,
-        place_slug: input.placeSlug ?? null,
         title: input.title,
       };
       try {
@@ -243,7 +240,6 @@ export function mapNoteResponse(value: NoteResponse): Note {
     createdAt: value.created_at,
     id: value.id,
     images: value.images.map(parseNoteImage),
-    placeSlug: value.place_slug,
     title: value.title,
     updatedAt: value.updated_at,
     usefulCount: value.useful_count,

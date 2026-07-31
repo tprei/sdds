@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Animated, Pressable, View } from 'react-native';
+import { Animated, View } from 'react-native';
 
-import { motion, semanticColors } from '@sdds/tokens';
+import { componentMetrics, motion, semanticColors } from '@sdds/tokens';
 
 import { AppText } from './text';
 import { useReducedMotion } from './use-reduced-motion';
+import { PressableScale } from './pressable-scale';
 import { styles } from './top-tabs.styles';
 
 type TopTab = { id: string; label: string };
@@ -32,8 +33,6 @@ export function TopTabs({ tabs, value, onChange }: TopTabsProps) {
   );
 }
 
-const UNDERLINE_WIDTH = 22;
-const UNDERLINE_HEIGHT = 3;
 
 function TabItem({
   label,
@@ -49,18 +48,19 @@ function TabItem({
   const [underlineWidth] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (reduced) {
-      underlineWidth.setValue(active ? UNDERLINE_WIDTH : 0);
+      underlineWidth.setValue(active ? componentMetrics.topTabs.underlineWidth : 0);
       return;
     }
     Animated.timing(underlineWidth, {
-      toValue: active ? UNDERLINE_WIDTH : 0,
+      toValue: active ? componentMetrics.topTabs.underlineWidth : 0,
       duration: motion.durationSheet,
       useNativeDriver: false,
     }).start();
   }, [active, reduced, underlineWidth]);
 
   return (
-    <Pressable
+    <PressableScale
+      scaleTo={motion.pressButtonScale}
       onPress={onPress}
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
@@ -74,8 +74,8 @@ function TabItem({
         {label}
       </AppText>
       <Animated.View
-        style={[styles.underline, { width: underlineWidth, height: UNDERLINE_HEIGHT }]}
+        style={[styles.underline, { width: underlineWidth, height: componentMetrics.topTabs.underlineHeight }]}
       />
-    </Pressable>
+    </PressableScale>
   );
 }

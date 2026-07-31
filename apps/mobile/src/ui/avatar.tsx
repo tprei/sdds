@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import { componentMetrics, radius, semanticColors, spacing } from '@sdds/tokens';
+import { componentMetrics, radius } from '@sdds/tokens';
 
 import { AppText } from './text';
 import { avatarColorsFor, avatarInitials } from './avatar-palette';
@@ -47,16 +47,7 @@ export function Avatar({ name, size, ring = false, testID }: AvatarProps) {
   }
 
   return (
-    <View
-      testID={testID}
-      style={{
-        backgroundColor: semanticColors.appBackground,
-        borderRadius: radius.pill,
-        padding: spacing.sp1,
-        borderWidth: 2,
-        borderColor: semanticColors.accent,
-      }}
-    >
+    <View testID={testID} style={styles.ring}>
       {circle}
     </View>
   );

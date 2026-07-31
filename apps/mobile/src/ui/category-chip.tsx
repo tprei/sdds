@@ -1,11 +1,19 @@
 import { View } from 'react-native';
-import { categoryFilterChipAccessibility } from '@/features/notes/category-filter';
 import { semanticColors } from '@sdds/tokens';
 import type { CategoryHue } from '@sdds/tokens';
 
 import { AppText } from './text';
 import { PressableScale } from './pressable-scale';
 import { styles } from './category-chip.styles';
+
+// Accessibility label/state for a selection chip. Local to the primitive so
+// `ui/` never imports from `features/`.
+function chipAccessibility(label: string, selected: boolean) {
+  return {
+    accessibilityLabel: selected ? `${label}, selecionado` : label,
+    accessibilityState: { selected },
+  };
+}
 
 type ChipSize = 'md' | 'sm';
 
@@ -61,7 +69,7 @@ export function CategoryChip({
       testID={testID}
       onPress={onPress}
       accessibilityRole="button"
-      {...categoryFilterChipAccessibility(label, selected)}
+      {...chipAccessibility(label, selected)}
       style={chipStyle}
     >
       {content}
@@ -113,7 +121,7 @@ export function NeutralChip({
       testID={testID}
       onPress={onPress}
       accessibilityRole="button"
-      {...categoryFilterChipAccessibility(label, selected)}
+      {...chipAccessibility(label, selected)}
       style={chipStyle}
     >
       {content}

@@ -3,7 +3,7 @@ import { TextInput } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { semanticColors } from '@sdds/tokens';
+import { componentMetrics, semanticColors } from '@sdds/tokens';
 
 import { SearchField } from './search-field';
 
@@ -122,5 +122,20 @@ describe('SearchField', () => {
 
     const ringAfter = renderer.root.findAll(hasRing);
     expect(ringAfter.length).toBeGreaterThan(0);
+  });
+
+  it('gives the clear control a 44px target via hitSlop', () => {
+    const renderer = render(
+      React.createElement(SearchField, {
+        value: 'café',
+        onChangeText: vi.fn(),
+        onSubmit: vi.fn(),
+        onClear: vi.fn(),
+      }),
+    );
+    const clear = renderer.root.findByProps({ accessibilityLabel: 'Limpar busca' });
+    const { clearButtonSize, clearHitSlop } = componentMetrics.field;
+    expect(clear.props.hitSlop).toBe(clearHitSlop);
+    expect(clearButtonSize + 2 * clearHitSlop).toBe(componentMetrics.minTarget);
   });
 });

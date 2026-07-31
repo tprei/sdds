@@ -75,6 +75,30 @@ const rawPaletteImport = [
   },
 ];
 
+const rawPressableMessage =
+  'Raw Pressable. Every touch goes through PressableScale or IconButton; ' +
+ 'ui/sheet.tsx is the only exempt surface (its full-screen scrim).';
+
+// A `ui` primitive sits above features, screens, and components. It MUST NOT
+// import from them; a dependency in that direction inverts the authority order
+// the design system sets. `paths` re-bans `colors` here because flat config
+// replaces `no-restricted-imports` wholesale per matching block.
+const uiPrimitiveImportPatterns = [
+  {
+    group: [
+      '@/features/*',
+      '@/features/**',
+      '@/app/*',
+      '@/app/**',
+      '@/components/*',
+      '@/components/**',
+    ],
+    message:
+      'A ui primitive MUST NOT depend on a feature, screen, or component ' +
+      'module. Move the helper into apps/mobile/src/ui/ or pass it in as a prop.',
+  },
+];
+
 // `patterns`, not `paths`: `paths` matches an exact specifier, so
 // `vitest/config` and `react-test-renderer/shallow` would slip through.
 const testFrameworkPatterns = [
@@ -154,6 +178,10 @@ export default [
   // and a gated property inside an inline `style={{ … }}` object.
   {
     files: ['apps/mobile/src/**/*.tsx'],
+    // sheet.tsx owns the one legitimate raw Pressable (the full-screen scrim);
+    // it has no inline metric/color literals, so exempting it loses no real
+    // coverage.
+    ignores: ['apps/mobile/src/ui/sheet.tsx'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -173,6 +201,21 @@ export default [
           selector: `Literal[value=/^rgba?\\(/]`,
           message: rawColorMessage,
         },
+        {
+          selector: `JSXOpeningElement[name.name='Pressable']`,
+          message: rawPressableMessage,
+        },
+      ],
+    },
+  },
+  // A `ui` primitive must not depend on a feature, screen, or component
+  // module; `colors` is re-banned because flat config replaces the rule.
+  {
+    files: ['apps/mobile/src/ui/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: uiPrimitiveImportPatterns, paths: rawPaletteImport },
       ],
     },
   },

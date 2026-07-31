@@ -8,7 +8,10 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
-import { NoteCard } from '../../components/note-card';
+import {
+  NoteCard,
+  NOTE_USEFUL_ERROR_MESSAGE,
+} from '../../components/note-card';
 import { FoundationButton } from '../../components/foundation-screen';
 import { APIRequestError } from '../../lib/api/notes';
 import { requestStatus } from '../../lib/api/request-error';
@@ -119,8 +122,11 @@ function ProfileNotes({
           onPressUseful={() => {
             void onToggleUseful(note);
           }}
-          placeLabel={note.placeLabel}
-          usefulError={usefulMutations[note.id] === 'error'}
+          usefulError={
+            usefulMutations[note.id] === 'error'
+              ? NOTE_USEFUL_ERROR_MESSAGE
+              : null
+          }
           usefulPending={usefulMutations[note.id] === 'pending'}
         />
       ))}

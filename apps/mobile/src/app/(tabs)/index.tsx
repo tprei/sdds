@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { RefreshControl, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 
-import {
-  EmptyStateCard,
-  FoundationScreen,
-} from '@/components/foundation-screen';
-import { NoteCard } from '@/components/note-card';
+import { ReadAuthGate } from '@/components/read-auth-gate';
+import { NoteCard, NOTE_USEFUL_ERROR_MESSAGE } from '@/components/note-card';
 import { useAuth } from '@/lib/auth/auth-provider';
 import type { APIClient } from '@/lib/api/client';
 import { requestStatus } from '@/lib/api/request-error';
@@ -18,7 +16,17 @@ import type { ListNotesInput, Note } from '@/lib/api/notes';
 import { useProductEvents } from '@/lib/events/product-event-provider';
 import { productEventKinds } from '@/lib/events/event-types';
 import { registerPresentedNoteOrigin } from '@/features/notes/presented-note-origin';
-import { ReadAuthGate } from '@/components/read-auth-gate';
+import { estimateNoteCardHeight } from '@/features/notes/note-card-estimate';
+import { HomeHeader } from '@/features/notes/home-header';
+import { BrandHeader } from '@/features/auth/brand-header';
+import { Screen } from '@/ui/screen';
+import { MasonryGrid } from '@/ui/masonry-grid';
+import { NoteCardSkeleton } from '@/ui/skeleton';
+import { Button } from '@/ui/button';
+import { EmptyState } from '@/ui/empty-state';
+import { semanticColors, spacing } from '@sdds/tokens';
+
+import { styles } from './index.styles';
 
 type CatalogState =
   | { status: 'loading' }
@@ -82,11 +90,8 @@ export default function HomeScreen() {
   }
 
   return (
-    <FoundationScreen
-      eyebrow="sdds."
-      title="Explorar"
-      description="Um feed global de notas úteis pra descobrir dicas, lugares e achados."
-    >
+    <Screen>
+      <BrandHeader compact />
       <ReadAuthGate
         onLogin={() =>
           router.push({
@@ -102,7 +107,7 @@ export default function HomeScreen() {
         }
         status={state.status}
       />
-    </FoundationScreen>
+    </Screen>
   );
 }
 
@@ -111,6 +116,10 @@ function AuthenticatedHomeScreen({
   onSessionExpired,
 }: AuthenticatedHomeScreenProps) {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const columnWidth =
+    (width - 2 * spacing.gutter - spacing.masonryGap) / 2;
+  const scrollRef = useRef<ScrollView>(null);
   const requestIDRef = useRef(0);
   const selectedCategorySlugRef = useRef<string | null>(null);
   const catalogRef = useRef<NoteCatalog | null>(null);
@@ -389,57 +398,76 @@ function AuthenticatedHomeScreen({
   );
 
   return (
-    <FoundationScreen
-      eyebrow="sdds."
-      title="Explorar"
-      description="Um feed global de notas úteis pra descobrir dicas, lugares e achados."
-    >
-      <CategoryFilterControls
-        catalog={catalogState.status === 'ready' ? catalogState.catalog : null}
-        onSelectCategorySlug={selectCategorySlug}
-        selectedCategorySlug={selectedCategorySlug}
+    <Screen scroll={false}>
+      <HomeHeader
+        onScrollToTop={() => {
+          scrollRef.current?.scrollTo({ y: 0, animated: true });
+        }}
+        filterRail={
+          <CategoryFilterControls
+            catalog={catalogState.status === 'ready' ? catalogState.catalog : null}
+            onSelectCategorySlug={selectCategorySlug}
+            selectedCategorySlug={selectedCategorySlug}
+          />
+        }
       />
-      {catalogState.status === 'error' ? (
-        <CatalogError />
-      ) : (
-        <FeedContent
-          catalogState={catalogState}
-          onOpenAuthor={(authorID) => {
-            router.push({ pathname: '/authors/[id]', params: { id: authorID } });
-          }}
-          onOpenNote={(presented) => {
-            const origin = registerPresentedNoteOrigin(presented.note.id, {
-              categorySlug: presented.categorySlug,
-              rank: presented.rank,
-              source: 'explore',
-            });
-            try {
-              productEvents.record(productEventKinds.exploreNoteOpened, {
+      <ScrollView
+        ref={scrollRef}
+        style={styles.feedScroll}
+        contentContainerStyle={styles.feedContent}
+        refreshControl={
+          <RefreshControl
+            tintColor={semanticColors.accent}
+            refreshing={catalogState.status === 'loading'}
+            onRefresh={loadCatalogAndFeed}
+          />
+        }
+      >
+        {catalogState.status === 'error' ? (
+          <CatalogError />
+        ) : (
+          <FeedContent
+            catalogState={catalogState}
+            columnWidth={columnWidth}
+            onCompose={() => router.push('/compose')}
+            onOpenAuthor={(authorID) => {
+              router.push({ pathname: '/authors/[id]', params: { id: authorID } });
+            }}
+            onOpenNote={(presented) => {
+              const origin = registerPresentedNoteOrigin(presented.note.id, {
                 categorySlug: presented.categorySlug,
-                noteID: presented.note.id,
                 rank: presented.rank,
+                source: 'explore',
               });
-            } catch {}
-            const params: { id: string; origin?: string } = {
-              id: presented.note.id,
-            };
-            if (origin !== '') {
-              params.origin = origin;
-            }
-            router.push({ pathname: '/notes/[id]', params });
-          }}
-          onToggleUseful={toggleUseful}
-          selectedCategorySlug={selectedCategorySlug}
-          state={feedState}
-          usefulMutations={usefulMutations}
-        />
-      )}
-    </FoundationScreen>
+              try {
+                productEvents.record(productEventKinds.exploreNoteOpened, {
+                  categorySlug: presented.categorySlug,
+                  noteID: presented.note.id,
+                  rank: presented.rank,
+                });
+              } catch {}
+              const params: { id: string; origin?: string } = {
+                id: presented.note.id,
+              };
+              if (origin !== '') {
+                params.origin = origin;
+              }
+              router.push({ pathname: '/notes/[id]', params });
+            }}
+            onRetry={loadCatalogAndFeed}
+            onToggleUseful={toggleUseful}
+            selectedCategorySlug={selectedCategorySlug}
+            state={feedState}
+            usefulMutations={usefulMutations}
+          />
+        )}
+      </ScrollView>
+    </Screen>
   );
 }
 function CatalogError() {
   return (
-    <EmptyStateCard
+    <EmptyState
       title="Não deu pra carregar as categorias"
       body="A gente precisa delas pra mostrar as notas sem inventar rótulo. Fecha e abre de novo em instantes."
     />
@@ -448,16 +476,22 @@ function CatalogError() {
 
 function FeedContent({
   catalogState,
+  columnWidth,
+  onCompose,
   onOpenAuthor,
   onOpenNote,
+  onRetry,
   onToggleUseful,
   selectedCategorySlug,
   state,
   usefulMutations,
 }: {
   catalogState: CatalogState;
+  columnWidth: number;
+  onCompose: () => void;
   onOpenAuthor: (authorID: string) => void;
   onOpenNote: (presented: PresentedExploreNote) => void;
+  onRetry: () => void;
   onToggleUseful: (presented: PresentedExploreNote) => Promise<void>;
   selectedCategorySlug: string | null;
   state: FeedState;
@@ -465,49 +499,66 @@ function FeedContent({
 }) {
   if (state.status === 'loading') {
     return (
-      <EmptyStateCard
-        title="Carregando as notas"
-        body="Buscando as notas mais recentes do Mundo todo."
-      />
+      <View style={styles.skeletonRow}>
+        <View style={styles.skeletonColumn}>
+          <NoteCardSkeleton tall />
+          <NoteCardSkeleton />
+          <NoteCardSkeleton />
+        </View>
+        <View style={styles.skeletonColumn}>
+          <NoteCardSkeleton />
+          <NoteCardSkeleton tall />
+          <NoteCardSkeleton />
+        </View>
+      </View>
     );
   }
 
   if (state.status === 'error') {
     return (
-      <EmptyStateCard
-        title="Não deu pra carregar"
-        body="Confere sua conexão e tenta abrir o app de novo."
-      />
+      <View style={styles.errorWrap}>
+        <EmptyState title="Não deu pra carregar agora." />
+        <Button variant="secondary" label="Tentar de novo" onPress={onRetry} />
+      </View>
     );
   }
 
   if (state.status === 'empty') {
     return (
-      <EmptyStateCard
-        title="Ainda tá quietinho"
+      <EmptyState
+        title="Nada por aqui ainda"
         body={emptyBody(catalogState, selectedCategorySlug)}
+        action={{ label: 'Escrever', onPress: onCompose }}
       />
     );
   }
 
-  return state.notes.map((presented) => {
-    const labelledNote = presented.note;
-    return (
-      <NoteCard
-        categoryLabel={labelledNote.categoryLabel}
-        key={labelledNote.id}
-        note={labelledNote}
-        onPress={() => onOpenNote(presented)}
-        onPressAuthor={onOpenAuthor}
-        onPressUseful={() => {
-          void onToggleUseful(presented);
-        }}
-        placeLabel={labelledNote.placeLabel}
-        usefulError={usefulMutations[labelledNote.id] === 'error'}
-        usefulPending={usefulMutations[labelledNote.id] === 'pending'}
-      />
-    );
-  });
+  return (
+    <MasonryGrid
+      items={state.notes}
+      keyFor={(presented) => presented.note.id}
+      estimateHeight={(presented) =>
+        estimateNoteCardHeight(presented.note, columnWidth)
+      }
+      renderItem={(presented) => (
+        <NoteCard
+          categoryLabel={presented.note.categoryLabel}
+          note={presented.note}
+          onPress={() => onOpenNote(presented)}
+          onPressAuthor={() => onOpenAuthor(presented.note.author.id)}
+          onPressUseful={() => {
+            void onToggleUseful(presented);
+          }}
+          usefulError={
+            usefulMutations[presented.note.id] === 'error'
+              ? NOTE_USEFUL_ERROR_MESSAGE
+              : null
+          }
+          usefulPending={usefulMutations[presented.note.id] === 'pending'}
+        />
+      )}
+    />
+  );
 }
 
 function emptyBody(
@@ -515,14 +566,14 @@ function emptyBody(
   selectedCategorySlug: string | null,
 ): string {
   if (selectedCategorySlug === null || catalogState.status !== 'ready') {
-    return 'Seja a primeira pessoa a escrever uma nota útil.';
+    return 'Que tal escrever o primeiro achado?';
   }
 
   const category = catalogState.catalog.activeCategories.find(
     (option) => option.slug === selectedCategorySlug,
   );
   if (category === undefined) {
-    return 'Seja a primeira pessoa a escrever uma nota útil.';
+    return 'Que tal escrever o primeiro achado?';
   }
 
   return `Que tal escrever o primeiro achado em ${category.label}?`;

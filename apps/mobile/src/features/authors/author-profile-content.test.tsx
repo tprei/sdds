@@ -54,6 +54,7 @@ vi.mock('../../components/foundation-screen', () => ({
     ),
 }));
 vi.mock('../../components/note-card', () => ({
+  NOTE_USEFUL_ERROR_MESSAGE: 'Não deu pra atualizar o Útil. Tenta de novo.',
   NoteCard: (props: { note: Note; [key: string]: unknown }) =>
     createElement(
       'note-card',

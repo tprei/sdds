@@ -67,7 +67,7 @@ test('exports the authenticated search event lineage', async ({
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
   ).toBeVisible();
-  await page.getByLabel('Buscar').fill(marker);
+  await page.getByPlaceholder('Buscar uma dica').fill(marker);
 
   const impressionResponse = waitForEventsResponse(page);
   await page.getByRole('button', { name: 'Buscar', exact: true }).click();
@@ -93,7 +93,7 @@ test('exports the authenticated search event lineage', async ({
     .toBe(true);
 
   const usefulResponse = waitForEventsResponse(page);
-  await page.getByRole('button', { name: /^Útil 0$/ }).click();
+  await page.getByRole('button', { name: /^Marcar como útil$/ }).click();
   await usefulResponse;
   await expect
     .poll(() =>

@@ -1,8 +1,10 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import type { NoteCatalog } from './catalog';
-import { categoryFilterChipAccessibility } from './category-filter';
 import { searchScopeLabel } from './search-screen';
+import type { CategorySlug } from '@sdds/tokens';
+
+import { CategoryChip, NeutralChip } from '@/ui/category-chip';
 
 import { styles } from './category-filter-controls.styles';
 
@@ -19,24 +21,24 @@ export function CategoryFilterControls({
 }: CategoryFilterControlsProps) {
   return (
     <View style={styles.controls}>
-      <SearchScopeBadge />
       {catalog === null ? null : (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryRow}
         >
-          <CategoryFilterChip
+          <NeutralChip
             label="Tudo"
             onPress={() => onSelectCategorySlug(null)}
             selected={selectedCategorySlug === null}
           />
           {catalog.activeCategories.map((category) => (
-            <CategoryFilterChip
+            <CategoryChip
               key={category.slug}
               label={category.label}
               onPress={() => onSelectCategorySlug(category.slug)}
               selected={selectedCategorySlug === category.slug}
+              slug={category.slug as CategorySlug}
             />
           ))}
         </ScrollView>
@@ -54,40 +56,5 @@ export function SearchScopeBadge() {
     >
       <Text style={styles.scopeLabel}>{searchScopeLabel}</Text>
     </View>
-  );
-}
-
-function CategoryFilterChip({
-  label,
-  onPress,
-  selected,
-}: {
-  label: string;
-  onPress: () => void;
-  selected: boolean;
-}) {
-  const accessibility = categoryFilterChipAccessibility(label, selected);
-
-  return (
-    <Pressable
-      accessibilityLabel={accessibility.accessibilityLabel}
-      accessibilityRole="button"
-      accessibilityState={accessibility.accessibilityState}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.categoryChip,
-        selected ? styles.categoryChipSelected : null,
-        pressed ? styles.categoryChipPressed : null,
-      ]}
-    >
-      <Text
-        style={[
-          styles.categoryChipText,
-          selected ? styles.categoryChipTextSelected : null,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
   );
 }

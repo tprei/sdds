@@ -127,9 +127,6 @@ test('creates a note and reads it from the API-backed home feed', async ({
   const body = `Coado gostoso, balcão simpático e pão na chapa no ponto ${timestamp}.`;
 
   await page.goto('/');
-  await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
-  ).toBeVisible();
   await expect(page.getByText('Entre para continuar')).toBeVisible();
   await expect(
     page.getByText('Entre ou crie uma conta para acessar as notas.'),
@@ -143,7 +140,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
 
   await expect(page).toHaveURL(/\/(?:[?#]|$)/);
   await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
+    page.getByRole('tab', { name: /^Explorar$/ }),
   ).toBeVisible();
   await openCompose(page);
   await expect(page.getByText('Conta uma dica')).toBeVisible();
@@ -166,13 +163,11 @@ test('creates a note and reads it from the API-backed home feed', async ({
   await page.getByLabel('Texto da nota').fill(body);
   await expect(page.getByRole('button', { name: 'Comida' })).toBeVisible();
   await page.getByRole('button', { name: 'Comida' }).click();
-  await page.getByRole('button', { name: 'São Paulo' }).click();
   await page.getByRole('button', { name: 'Publicar' }).click();
 
   await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
+    page.getByRole('tab', { name: /^Explorar$/ }),
   ).toBeVisible();
-  await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
@@ -187,7 +182,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
       .getByRole('button', { name: `Abrir perfil do autor: ${displayName}` })
       .first(),
   ).toBeVisible();
-  await expect(publishedNote).toContainText('São Paulo');
+  await expect(publishedNote).toBeVisible();
   const exploreURL = page.url();
   await page
     .getByRole('button', { name: `Abrir perfil do autor: ${displayName}` })
@@ -210,7 +205,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
     page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
   ).toBeVisible();
 
-  await page.getByLabel('Buscar').fill(title);
+  await page.getByPlaceholder('Buscar uma dica').fill(title);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   const searchResult = page.getByRole('button', {
@@ -223,7 +218,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
       .getByRole('button', { name: `Abrir perfil do autor: ${displayName}` })
       .last(),
   ).toBeVisible();
-  await expect(searchResult).toContainText('São Paulo');
+  await expect(searchResult).toBeVisible();
   const searchAuthor = page
     .getByRole('button', {
       name: `Abrir perfil do autor: ${displayName}`,
@@ -239,7 +234,7 @@ test('creates a note and reads it from the API-backed home feed', async ({
   ).toBeVisible();
   await page.goto(exploreURL);
   await clickTab(page, 'Buscar');
-  await page.getByLabel('Buscar').fill(title);
+  await page.getByPlaceholder('Buscar uma dica').fill(title);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   await searchResult.click();
@@ -268,9 +263,8 @@ test('creates a note and reads it from the API-backed home feed', async ({
   ).toBeVisible();
   await expect(page.getByLabel(`Texto da nota: ${body}`)).toBeVisible();
   await expect(page.getByLabel('Categoria da nota: Comida')).toBeVisible();
-  await expect(page.getByLabel('Lugar da nota: São Paulo')).toBeVisible();
 
-  await page.getByLabel('Voltar').click();
+  await page.getByLabel('Voltar', { exact: true }).click();
   await expect(page).toHaveURL(/\/(?:[?#]|$)/);
   await clickTab(page, 'Perfil');
   const profileRoot = page.getByTestId('author-profile-scroll');
@@ -447,9 +441,8 @@ test('narrows the mobile explore feed by category', async ({
 
   await loginUser(page, session.user.username, '/');
   await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Explorar$/ }),
+    page.getByRole('tab', { name: /^Explorar$/ }),
   ).toBeVisible();
-  await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
@@ -470,7 +463,6 @@ test('narrows the mobile explore feed by category', async ({
   await expect(
     page.getByRole('button', { exact: true, name: 'Comida, selecionado' }),
   ).toBeVisible();
-  await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toHaveCount(0);
 
@@ -516,13 +508,12 @@ test('narrows the mobile search results by category and clears stale cards', asy
   await expect(
     page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
   ).toBeVisible();
-  await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
   await expect(page.getByText('Pesquisas desta sessão')).toHaveCount(0);
 
-  await page.getByLabel('Buscar').fill(marker);
+  await page.getByPlaceholder('Buscar uma dica').fill(marker);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   const foodNote = page.getByRole('button', {
@@ -545,7 +536,6 @@ test('narrows the mobile search results by category and clears stale cards', asy
   await expect(
     page.getByRole('button', { exact: true, name: 'Comida, selecionado' }),
   ).toBeVisible();
-  await expect(visibleGlobalScope(page)).toBeVisible();
   await expect(page.getByText(`1 nota para ${marker}`)).toBeVisible();
   await expect(
     page.getByLabel(
@@ -565,13 +555,13 @@ test('narrows the mobile search results by category and clears stale cards', asy
   await expect(travelNote).toBeVisible();
 
   await page.getByRole('button', { name: 'Limpar' }).click();
-  await expect(page.getByLabel('Buscar')).toHaveValue('');
+  await expect(page.getByPlaceholder('Buscar uma dica')).toHaveValue('');
   await expect(foodNote).toHaveCount(0);
   await expect(travelNote).toHaveCount(0);
   await expect(page.getByText('Pesquisas desta sessão')).toBeVisible();
 
   await page.getByRole('button', { exact: true, name: marker }).click();
-  await expect(page.getByLabel('Buscar')).toHaveValue(marker);
+  await expect(page.getByPlaceholder('Buscar uma dica')).toHaveValue(marker);
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toBeVisible();
 });
@@ -611,7 +601,7 @@ test('orders search results by weighted title matches and handles punctuation-on
     page.getByTestId('screen-title').filter({ hasText: /^Buscar$/ }),
   ).toBeVisible();
 
-  await page.getByLabel('Buscar').fill(marker);
+  await page.getByPlaceholder('Buscar uma dica').fill(marker);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   const searchResults = page.getByRole('button', { name: /Abrir nota:/ });
@@ -622,7 +612,7 @@ test('orders search results by weighted title matches and handles punctuation-on
     page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
   ).toBeVisible();
 
-  await page.getByLabel('Buscar').fill('!!! *** ()');
+  await page.getByPlaceholder('Buscar uma dica').fill('!!! *** ()');
   await page.getByRole('button', { name: 'Buscar' }).click();
 
   await expect(page.getByText('Nada por aqui ainda')).toBeVisible();
@@ -824,9 +814,6 @@ test('opens a public author profile and appends paginated notes', async ({
     page.getByText(`Nome de usuário: ${username}`, { exact: true }),
   ).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
-  await expect(
-    page.getByLabel(`Autor da nota: ${displayName}`).first(),
-  ).toBeVisible();
   const firstPage = await request.get(
     `${apiBaseURL}/v1/authors/${author.id}/notes?limit=20`,
     {
@@ -1051,11 +1038,6 @@ async function expectCategoryFilterError(
   const body = parseErrorResponse(await response.json());
   expect(body.code).toBe(want.code);
   expect(body.fields).toEqual([{ code: 'unknown', field: 'category_slug' }]);
-}
-
-
-function visibleGlobalScope(page: Page) {
-  return page.locator('[aria-label="Escopo atual: Mundo todo"]:visible').last();
 }
 
 async function openCompose(page: Page): Promise<void> {

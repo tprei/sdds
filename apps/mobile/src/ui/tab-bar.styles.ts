@@ -17,7 +17,7 @@ export const styles = StyleSheet.create({
     gap: spacing.sp1,
   },
   fabSlot: {
-    width: 64,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

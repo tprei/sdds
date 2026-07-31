@@ -1,6 +1,6 @@
 # sdds design system
 
-The canonical visual reference is [`artifacts/design-system/DESIGN_SYSTEM.html`](../artifacts/design-system/DESIGN_SYSTEM.html). Open that file in a browser when reviewing composition, color, typography, component anatomy, or screen structure. Its adjacent `support.js` is the runtime required by the exported document; do not hand-edit generated runtime code.
+The canonical visual reference is [`artifacts/design-system/DESIGN_SYSTEM.html`](../artifacts/design-system/DESIGN_SYSTEM.html). Every frontend task MUST start by reading and using it, together with the [frontend coding guide](writing/WRITING_FRONTEND_CODE.md). Open the HTML file in a browser when reviewing composition, color, typography, component anatomy, or screen structure. Its adjacent `support.js` is the runtime required by the exported document; do not hand-edit generated runtime code.
 
 ## Authority
 

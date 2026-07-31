@@ -12,7 +12,7 @@ This guide follows:
 - React Native Style: https://reactnative.dev/docs/style
 - React Native Accessibility: https://reactnative.dev/docs/accessibility
 - Airbnb React/JSX Style Guide: https://github.com/airbnb/javascript/tree/master/react
-- sdds design system: [canonical artifact](../../artifacts/design-system/DESIGN_SYSTEM.html) and [implementation guide](../DESIGN_SYSTEM.md)
+- sdds design system: [canonical artifact](../../artifacts/design-system/DESIGN_SYSTEM.html), [design-system guide](../DESIGN_SYSTEM.md), and [frontend coding guide](WRITING_FRONTEND_CODE.md)
 
 ## Component design
 
@@ -55,7 +55,7 @@ This guide follows:
 
 ## Styling
 
-- DO use the canonical design-system artifact and tokens.
+- DO start with the [frontend coding guide](WRITING_FRONTEND_CODE.md) and use the canonical design-system artifact and tokens.
 - DO NOT scatter raw colors, spacing, font sizes, or radii.
 - DO use `StyleSheet.create` or small typed style objects.
 - DO keep style names concrete: `header`, `title`, `noteBody`, `actionRow`.

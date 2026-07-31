@@ -51,7 +51,7 @@ sdds/
     compose/         # Docker Compose / Portainer deployment
 ```
 
-The canonical visual reference lives in [`artifacts/design-system/DESIGN_SYSTEM.html`](artifacts/design-system/DESIGN_SYSTEM.html) with its adjacent runtime asset. The source export ZIP is kept beside it for provenance. Production code should use the audited subset committed in `packages/tokens`; local `design-system/` exports remain ignored.
+The canonical visual reference lives in [`artifacts/design-system/DESIGN_SYSTEM.html`](artifacts/design-system/DESIGN_SYSTEM.html) with its adjacent runtime asset. Production code should use the audited subset committed in `packages/tokens`; local `design-system/` exports remain ignored.
 
 ### Frontend
 

@@ -102,8 +102,8 @@ export default function SearchScreen() {
   }
 
   return (
-    <Screen>
-      <BrandHeader compact />
+    <Screen header={<AppHeader showWordmark />}>
+      <BrandHeader compact showWordmark={false} />
       <ReadAuthGate
         onLogin={() =>
           router.push({ pathname: '/login', params: { next: '/search' } })

@@ -6,6 +6,7 @@ import { semanticColors } from '@sdds/tokens';
 
 import { AuthorProfileContent } from '@/features/authors/author-profile-content';
 import { Screen } from '@/ui/screen';
+import { AppHeader } from '@/ui/app-header';
 import { EmptyState } from '@/ui/empty-state';
 import { Button } from '@/ui/button';
 import { AppText } from '@/ui/text';
@@ -44,7 +45,7 @@ export default function ProfileScreen() {
 
   if (state.status === 'authenticated') {
     return (
-      <Screen scroll={false}>
+      <Screen scroll={false} header={<AppHeader showWordmark />}>
         <View style={styles.content}>
           <AuthorProfileContent
             apiClient={apiClient}
@@ -77,7 +78,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <Screen>
+    <Screen header={<AppHeader showWordmark />}>
       {state.status === 'loading' ? (
         <EmptyState
           title="Carregando sua sessão"

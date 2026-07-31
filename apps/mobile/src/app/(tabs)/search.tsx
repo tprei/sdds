@@ -645,8 +645,8 @@ function AuthenticatedSearchScreen({
                 onChangeText={handleQueryChange}
                 onSubmit={handleSubmit}
                 onClear={handleClear}
-                placeholder="O que você tá procurando?"
-                autoFocus={false}
+                placeholder="Buscar notas…"
+                autoFocus={true}
                 testID="search-field-input"
               />
             }

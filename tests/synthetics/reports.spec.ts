@@ -50,7 +50,7 @@ test('reports a note and a comment, then keeps the content visible', async ({
   // Report the note with a constrained reason and an optional explanation.
   await page.getByTestId('note-report').click();
   await expect(
-    page.getByRole('heading', { name: 'Denunciar nota' }),
+    page.getByRole('heading', { name: 'Denunciar esta nota?' }),
   ).toBeVisible();
   await page.getByTestId('report-reason-harmful_or_misleading').click();
 
@@ -70,7 +70,7 @@ test('reports a note and a comment, then keeps the content visible', async ({
   // Report a comment. Opening a new report clears the prior success notice.
   await page.getByTestId(`comment-report-${comment.id}`).click();
   await expect(
-    page.getByRole('heading', { name: 'Denunciar comentário' }),
+    page.getByRole('heading', { name: 'Denunciar este comentário?' }),
   ).toBeVisible();
   await page.getByTestId('report-reason-spam').click();
   await page.getByTestId('report-submit').click();

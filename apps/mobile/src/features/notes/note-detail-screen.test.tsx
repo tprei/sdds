@@ -751,7 +751,7 @@ describe('NoteDetailScreen route', () => {
         (node) =>
           typeof node.type === 'string' &&
           node.props.accessibilityRole === 'header' &&
-          node.props.children === 'Denunciar nota',
+          node.props.children === 'Denunciar esta nota?',
       ),
     ).toHaveLength(1);
     expect(mocks.apiClient.createReport).not.toHaveBeenCalled();
@@ -769,7 +769,7 @@ describe('NoteDetailScreen route', () => {
     });
 
     expect(hostCount(renderer, 'report-sheet')).toBe(1);
-    expect(hostTextCount(renderer, 'Denunciar comentário')).toBe(1);
+    expect(hostTextCount(renderer, 'Denunciar este comentário?')).toBe(1);
   });
 
   it('submits a note report, shows the success notice, and closes the dialog', async () => {

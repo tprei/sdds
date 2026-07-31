@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { NoteImage } from '@/lib/api/notes';
@@ -180,5 +180,37 @@ describe('NoteDetailContent meta row', () => {
           node.props.children.includes(' · editado'),
       ),
     ).not.toHaveLength(0);
+  });
+
+  it('renders the category chip above the title, not below it', () => {
+    const currentNote = note([]);
+    const renderer = render(<NoteDetailContent note={currentNote} />);
+
+    // Depth-first pre-order: the order children appear in the rendered tree.
+    const ordered: ReactTestInstance[] = [];
+    const walk = (node: { children?: unknown }) => {
+      const children = (node.children ?? []) as ReactTestInstance[];
+      for (const child of children) {
+        if (typeof child === 'string') continue;
+        ordered.push(child);
+        walk(child);
+      }
+    };
+    walk(renderer.root);
+
+    const chipIndex = ordered.findIndex(
+      (n) =>
+        n.props.accessibilityLabel ===
+        `Categoria da nota: ${currentNote.categoryLabel}`,
+    );
+    const titleIndex = ordered.findIndex(
+      (n) =>
+        n.props.accessibilityRole === 'header' &&
+        n.props.children === currentNote.title,
+    );
+    expect(chipIndex).toBeGreaterThan(-1);
+    expect(titleIndex).toBeGreaterThan(-1);
+    // Note anatomy is media, category chip, title, then body.
+    expect(chipIndex).toBeLessThan(titleIndex);
   });
 });

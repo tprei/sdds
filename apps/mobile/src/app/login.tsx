@@ -102,7 +102,7 @@ export default function LoginScreen() {
             size="lg"
             block
             disabled={!canSubmit || isSubmitting}
-            label={isSubmitting ? 'Entrando...' : 'Entrar'}
+            label={isSubmitting ? 'Entrando…' : 'Entrar'}
             onPress={handleSubmit}
             testID="login-submit-button"
           />

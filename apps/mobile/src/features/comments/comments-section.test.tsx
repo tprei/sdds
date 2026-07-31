@@ -94,7 +94,7 @@ describe('CommentsSection', () => {
     const loading = renderSection({
       thread: createCommentThreadState(),
     });
-    expect(textNodes(loading, 'Carregando comentários...')).toHaveLength(1);
+    expect(textNodes(loading, 'Carregando comentários…')).toHaveLength(1);
 
     const failed = renderSection({
       onRetryInitial,
@@ -315,7 +315,7 @@ describe('CommentsSection', () => {
     expect(onSubmit).toHaveBeenCalledWith('Comentário novo');
     const pendingSubmit = renderer.root.findByProps({ testID: 'comment-submit' });
     expect(pendingSubmit.props.disabled).toBe(true);
-    expect(pendingSubmit.props.label).toBe('Publicando...');
+    expect(pendingSubmit.props.label).toBe('Publicando…');
   });
 
   it('counts Unicode code points and blocks an overlong draft', () => {

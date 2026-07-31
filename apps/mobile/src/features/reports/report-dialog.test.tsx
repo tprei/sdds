@@ -88,11 +88,11 @@ describe('ReportDialog', () => {
 
   it('uses the note heading for a note target and the comment heading for a comment target', () => {
     expect(
-      textNodes(renderDialog({ target: noteTarget }), 'Denunciar nota'),
+      textNodes(renderDialog({ target: noteTarget }), 'Denunciar esta nota?'),
     ).toHaveLength(1);
 
     expect(
-      textNodes(renderDialog({ target: commentTarget }), 'Denunciar comentário'),
+      textNodes(renderDialog({ target: commentTarget }), 'Denunciar este comentário?'),
     ).toHaveLength(1);
   });
 
@@ -100,7 +100,7 @@ describe('ReportDialog', () => {
     expect(
       textNodes(
         renderDialog({ target: noteTarget }),
-        'Conta pra gente o que aconteceu. A denúncia não fica pública.',
+        'A gente olha toda denúncia. Nada é automático.',
       ),
     ).toHaveLength(1);
   });
@@ -205,7 +205,7 @@ describe('ReportDialog', () => {
     });
 
     const submit = renderer.root.findByProps({ testID: 'report-submit' });
-    expect(submit.props.label).toBe('Enviando...');
+    expect(submit.props.label).toBe('Enviando…');
     expect(submit.props.disabled).toBe(true);
 
     expect(

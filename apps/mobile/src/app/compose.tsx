@@ -183,7 +183,7 @@ function AuthenticatedComposeScreen({
               />
               <Button
                 disabled={!canSubmit}
-                label={isSubmitting ? 'Publicando...' : 'Publicar'}
+                label={isSubmitting ? 'Publicando…' : 'Publicar achado'}
                 onPress={handleSubmit}
                 size="sm"
                 testID="compose-submit"
@@ -209,7 +209,7 @@ function AuthenticatedComposeScreen({
         />
         {catalogState.status === 'loading' ? (
           <AppText color={semanticColors.accentPress} variant="sm">
-            Carregando categorias...
+            Carregando categorias…
           </AppText>
         ) : null}
         {catalogState.status === 'error' ? (
@@ -305,7 +305,7 @@ function AuthenticatedComposeScreen({
         ) : null}
         {submitState.status === 'success' ? (
           <AppText color={semanticColors.accentPress} variant="sm">
-            Publicado. Indo pro início...
+            Publicado. Indo pro início…
           </AppText>
         ) : null}
         {submitState.status === 'error' ? (

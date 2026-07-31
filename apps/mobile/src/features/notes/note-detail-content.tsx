@@ -30,20 +30,6 @@ export function NoteDetailContent({ note }: NoteDetailContentProps) {
     <>
       <DetailMedia note={note} />
       <View style={styles.container}>
-        <AppText
-          accessibilityRole="header"
-          color={semanticColors.textStrong}
-          variant="h2"
-        >
-          {note.title}
-        </AppText>
-        <AppText
-          accessibilityLabel={`Texto da nota: ${note.body}`}
-          color={semanticColors.textBody}
-          variant="bodyLg"
-        >
-          {note.body}
-        </AppText>
         <View style={styles.metaRow}>
           <View
             accessible
@@ -59,6 +45,20 @@ export function NoteDetailContent({ note }: NoteDetailContentProps) {
             {timeText}
           </AppText>
         </View>
+        <AppText
+          accessibilityRole="header"
+          color={semanticColors.textStrong}
+          variant="h2"
+        >
+          {note.title}
+        </AppText>
+        <AppText
+          accessibilityLabel={`Texto da nota: ${note.body}`}
+          color={semanticColors.textBody}
+          variant="bodyLg"
+        >
+          {note.body}
+        </AppText>
       </View>
     </>
   );

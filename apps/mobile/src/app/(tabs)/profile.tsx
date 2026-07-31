@@ -66,7 +66,7 @@ export default function ProfileScreen() {
           ) : null}
           <Button
             disabled={logoutState.status === 'submitting'}
-            label={logoutState.status === 'submitting' ? 'Saindo...' : 'Sair'}
+            label={logoutState.status === 'submitting' ? 'Saindo…' : 'Sair da conta'}
             onPress={handleLogout}
             size="sm"
             testID="profile-logout-button"

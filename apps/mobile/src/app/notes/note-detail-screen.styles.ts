@@ -1,26 +1,16 @@
 import { StyleSheet } from 'react-native';
 
-import { semanticColors, spacing } from '@sdds/tokens';
+import { spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
-  topRow: {
-    alignItems: 'center',
-    backgroundColor: semanticColors.appBackground,
-    borderBottomColor: semanticColors.borderSubtle,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.sp2,
-    paddingHorizontal: spacing.sp3,
-    paddingVertical: spacing.sp2,
-  },
+  // Sized to its own content, not stretched across AppHeader's flex:1
+  // center slot, so the tap target stays just the avatar and name.
   authorControl: {
     alignItems: 'center',
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     gap: spacing.sp2,
     minHeight: 44,
-  },
-  spacer: {
-    flex: 1,
   },
   scroll: {
     flex: 1,

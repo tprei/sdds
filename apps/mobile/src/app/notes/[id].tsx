@@ -13,10 +13,11 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, semanticColors } from '@sdds/tokens';
 
 import { Screen } from '@/ui/screen';
+import { AppHeader } from '@/ui/app-header';
 import { EmptyState } from '@/ui/empty-state';
 import { lightTick } from '@/ui/haptics';
 import { IconButton } from '@/ui/icon-button';
-import { IconChevronLeft, IconFlag } from '@/ui/icons';
+import { IconFlag } from '@/ui/icons';
 import { Avatar } from '@/ui/avatar';
 import { AppText } from '@/ui/text';
 import { PressableScale } from '@/ui/pressable-scale';
@@ -88,8 +89,7 @@ export default function NoteDetailScreen() {
 
   if (!trimmedNoteID) {
     return (
-      <Screen scroll={false}>
-        <DetailTopRow onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+      <Screen scroll={false} header={<AppHeader back />}>
         <View style={styles.fallback}>
           <EmptyState
             title="Nota não encontrada"
@@ -114,8 +114,7 @@ export default function NoteDetailScreen() {
   }
 
   return (
-    <Screen scroll={false}>
-      <DetailTopRow onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+    <Screen scroll={false} header={<AppHeader back />}>
       <View style={styles.fallback}>
         <ReadAuthGate
           onLogin={() =>
@@ -657,21 +656,47 @@ function AuthenticatedNoteDetailScreen({
     );
   }
 
+  const readyNote = state.status === 'ready' ? state.note : undefined;
+
   return (
-    <Screen scroll={false}>
-      <DetailTopRow
-        note={state.status === 'ready' ? state.note : undefined}
-        onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-        onPressAuthor={() => {
-          if (state.status === 'ready') {
-            router.push({
-              pathname: '/authors/[id]',
-              params: { id: state.note.author.id },
-            });
+    <Screen
+      scroll={false}
+      header={
+        <AppHeader
+          back
+          center={
+            readyNote ? (
+              <PressableScale
+                accessibilityLabel={`Abrir perfil do autor: ${readyNote.author.displayName}`}
+                accessibilityRole="button"
+                onPress={() => {
+                  router.push({
+                    pathname: '/authors/[id]',
+                    params: { id: readyNote.author.id },
+                  });
+                }}
+                style={styles.authorControl}
+              >
+                <Avatar name={readyNote.author.displayName} size={34} />
+                <AppText color={semanticColors.textStrong} variant="body" weight="bold">
+                  {readyNote.author.displayName}
+                </AppText>
+              </PressableScale>
+            ) : undefined
           }
-        }}
-        onReportNote={handleReportNote}
-      />
+          right={
+            readyNote ? (
+              <IconButton
+                accessibilityLabel="Denunciar nota"
+                icon={<IconFlag />}
+                onPress={handleReportNote}
+                testID="note-report"
+              />
+            ) : undefined
+          }
+        />
+      }
+    >
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -748,50 +773,3 @@ function AuthenticatedNoteDetailScreen({
   );
 }
 
-function DetailTopRow({
-  note,
-  onBack,
-  onPressAuthor,
-  onReportNote,
-}: {
-  note?: LabelledNote;
-  onBack: () => void;
-  onPressAuthor?: () => void;
-  onReportNote?: () => void;
-}) {
-  return (
-    <View style={styles.topRow}>
-      <IconButton
-        icon={<IconChevronLeft />}
-        accessibilityLabel="Voltar"
-        onPress={onBack}
-      />
-      {note ? (
-        <>
-          <PressableScale
-            accessibilityLabel={`Abrir perfil do autor: ${note.author.displayName}`}
-            accessibilityRole="button"
-            onPress={onPressAuthor}
-            style={styles.authorControl}
-          >
-            <Avatar name={note.author.displayName} size={34} />
-            <AppText
-              color={semanticColors.textStrong}
-              variant="body"
-              weight="bold"
-            >
-              {note.author.displayName}
-            </AppText>
-          </PressableScale>
-          <View style={styles.spacer} />
-          <IconButton
-            accessibilityLabel="Denunciar nota"
-            icon={<IconFlag />}
-            onPress={onReportNote}
-            testID="note-report"
-          />
-        </>
-      ) : null}
-    </View>
-  );
-}

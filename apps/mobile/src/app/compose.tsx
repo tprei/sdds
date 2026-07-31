@@ -20,6 +20,7 @@ import type { CreateNoteInput } from '@/lib/api/notes';
 import { useProductEvents } from '@/lib/events/product-event-provider';
 import { productEventKinds } from '@/lib/events/event-types';
 import { Screen } from '@/ui/screen';
+import { AppHeader } from '@/ui/app-header';
 import { EmptyState } from '@/ui/empty-state';
 import { Button } from '@/ui/button';
 import { IconButton } from '@/ui/icon-button';
@@ -172,21 +173,25 @@ function AuthenticatedComposeScreen({
   return (
     <Screen
       header={
-        <View style={styles.headerRow}>
-          <IconButton
-            accessibilityLabel="Fechar"
-            icon={<IconX />}
-            onPress={() => router.back()}
-          />
-          <Button
-            disabled={!canSubmit}
-            label={isSubmitting ? 'Publicando...' : 'Publicar'}
-            onPress={handleSubmit}
-            size="sm"
-            testID="compose-submit"
-            variant="primary"
-          />
-        </View>
+        <AppHeader
+          center={
+            <View style={styles.headerRow}>
+              <IconButton
+                accessibilityLabel="Fechar"
+                icon={<IconX />}
+                onPress={() => router.back()}
+              />
+              <Button
+                disabled={!canSubmit}
+                label={isSubmitting ? 'Publicando...' : 'Publicar'}
+                onPress={handleSubmit}
+                size="sm"
+                testID="compose-submit"
+                variant="primary"
+              />
+            </View>
+          }
+        />
       }
     >
       <ScrollView

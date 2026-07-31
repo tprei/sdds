@@ -1,25 +1,9 @@
 import { StyleSheet } from 'react-native';
 
-import { semanticColors, spacing } from '@sdds/tokens';
-
 export const styles = StyleSheet.create({
-  container: {
-    backgroundColor: semanticColors.appBackground,
-    borderBottomColor: semanticColors.borderSubtle,
-    borderBottomWidth: 1,
-  },
-  topRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sp2,
-    paddingHorizontal: spacing.gutter,
-    paddingVertical: spacing.sp2,
-  },
-  wordmark: {
-    flexDirection: 'row',
-  },
+  // Centers TopTabs within AppHeader's flex:1 center slot, which otherwise
+  // stretches its content to fill the available width.
   tabs: {
     alignItems: 'center',
-    flex: 1,
   },
 });

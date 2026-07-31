@@ -7,11 +7,6 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: semanticColors.appBackground,
   },
-  header: {
-    backgroundColor: semanticColors.appBackground,
-    borderBottomWidth: 1,
-    borderBottomColor: semanticColors.borderSubtle,
-  },
   scroll: {
     flex: 1,
   },

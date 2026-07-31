@@ -14,7 +14,7 @@ type ScreenProps = {
 export function Screen({ children, header, scroll = true, testID }: ScreenProps) {
   return (
     <SafeAreaView style={styles.container}>
-      {header ? <View style={styles.header}>{header}</View> : null}
+      {header}
       {scroll ? (
         <ScrollView
           style={styles.scroll}

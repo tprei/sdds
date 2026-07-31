@@ -7,8 +7,6 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.sp3,
-    paddingVertical: spacing.sp2,
   },
   scroll: {
     flex: 1,

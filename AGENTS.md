@@ -76,6 +76,7 @@ Do not create generic `manager`, `processor`, `util`, or `service` packages when
 - Prefer generated TypeScript types, or a thin generated client, from the OpenAPI contract for API boundaries.
 - Put API calls in `lib/api` or feature-specific API modules.
 - Keep screens mostly orchestration; move reusable presentation into components.
+- Verify frontend work in a running browser at the three supported viewports before review, and follow the visual-verification rules in `agent-guidance/writing/WRITING_REACT_NATIVE.md`.
 
 ## Backend Rules
 

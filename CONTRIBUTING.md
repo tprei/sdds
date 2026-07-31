@@ -48,12 +48,19 @@ Stacked diffs preserve review quality for larger work while keeping each change 
   `docker compose -f infra/compose/compose.yaml run --build --rm --no-deps api migrate`.
 - `pnpm test:api:integration` MUST run when the assembled API image, migrations, routing, SQLite persistence, generated public client, endpoint set, or public HTTP contract changes. It requires the Compose secret files and a live readiness-checked API.
 - `pnpm test:rustfs` MUST run when object-store semantics, credentials or policy, readiness/bootstrap, private access, restart persistence, or the Compose media graph changes.
-- `pnpm test:synthetics` MUST run when a critical user-visible Expo web journey changes. It requires Expo web and a readiness-checked Dockerized API.
+- `pnpm test:synthetics` MUST run when a critical user-visible Expo web journey, layout, spacing, responsive behavior, or appearance changes. It requires Expo web and a readiness-checked Dockerized API.
 - Slow gates MUST remain separate commands with explicit prerequisites. The repository MUST NOT advertise a one-command smoke lifecycle or CI reuse that does not exist.
+
+### Presentation gates
+
+- `tests/synthetics/layout.spec.ts` MUST run at 390×844, 430×932, and 820×1180. A layout invariant MUST be a named numeric assertion, not a comment.
+- Visual baselines MUST be captured and regenerated only in the pinned Playwright container image. Locally regenerated baselines MUST NOT be committed.
+- Design metrics locked in the design spec MUST be encoded in `componentMetrics` in `@sdds/tokens` and asserted by `apps/mobile/src/ui/ds-metrics.test.ts`. A metric change MUST update the token, the contract test, and the PR description together.
 
 ### Gate integrity
 
-- A required lint, typecheck, generation check, or test MUST fail the command and CI. DO NOT add `continue-on-error`, `|| true`, warning allowances, skipped or disabled tests, retries that hide deterministic failures, suppression comments, baselines, or exclusions of test/config source.
+- A required lint, typecheck, generation check, or test MUST fail the command and CI. DO NOT add `continue-on-error`, `|| true`, warning allowances, skipped or disabled tests, retries that hide deterministic failures, suppression comments, suppression baselines that allowlist known failures, or exclusions of test/config source.
+- A Playwright visual baseline is not a suppression baseline. Committed reference screenshots and named geometry invariants are executable presentation contracts and MUST be blocking. A visual baseline MUST be regenerated only from the pinned CI container image, and its diff tolerance MUST stay tight enough to fail a one-element layout shift.
 - The current `lint:ts` and mobile `tsc` commands cover the configured application and token sources; they DO NOT cover `tests/synthetics` or `playwright.config.ts`. Documentation MUST NOT present that known gap as enforced coverage.
 - Test and configuration source MUST remain subject to blocking quality checks when the owning gate exists; missing enforcement is a tooling change, not permission to ignore the source.
 - Go lint MUST remain blocking even when a change is documentation-only but updates the commands or gates described here.
@@ -74,7 +81,8 @@ Stacked diffs preserve review quality for larger work while keeping each change 
 - HTTP/OpenAPI handler semantics MUST be tested at the smallest HTTP boundary that proves status, body, headers, authentication, validation, and streaming behavior. DO NOT use Docker to exhaustively repeat a unit-sized error matrix.
 - Every new or changed public endpoint MUST have at least one black-box Docker API integration path through the assembled image, migrations, router, generated public client, and real persistence/dependencies. Detailed cases MUST remain at lower layers.
 - The RustFS integration gate MUST be used when object-store semantics, credentials/policy, readiness/bootstrap, private access, restart persistence, or the Compose media graph changes.
-- Playwright MUST be used only for a critical user-visible Expo journey across the real API. Playwright MUST NOT own parser, mapper, reducer, state-machine, JSON-shape, API-client, or domain matrices.
+- Playwright MUST own the critical user-visible Expo journey across the real API, plus layout geometry, viewport adaptation, visual baselines, and accessibility invariants. Playwright MUST NOT own parser, mapper, reducer, state-machine, JSON-shape, API-client, or domain matrices.
+- Presentation MUST be gated in a real browser. Unit tests run in a node environment with no layout engine and MUST NOT be presented as coverage for geometry, responsiveness, or appearance.
 - Every boundary test MUST name the boundary it proves, such as parser-to-wire, handler-to-OpenAPI, repository-to-SQLite, Compose-to-runtime, RustFS-to-object-store, or Expo-to-API.
 - DO NOT duplicate the same assertion at a higher layer unless that layer has a distinct failure mode. A moved test MUST delete its old equivalent.
 - An oversized legacy test file MUST NOT receive unrelated scenarios. New behavior MUST use a behavior-sized file or split its owner, and a moved behavior MUST be removed from the old owner.
@@ -182,3 +190,6 @@ Before requesting review:
 - [ ] Every over-threshold or already over-limit file/function/test was split by ownership or has an explicit human-approved cohesion explanation; unrelated oversized files did not grow.
 - [ ] Comments document durable invariants/ownership/lifecycle only; no issue/task/PR/review/agent history or syntax narration entered the code.
 - [ ] The PR remains under 1,000 human-authored changed lines and changes one coherent idea.
+- [ ] Frontend changes include browser-verified screenshots at 390×844, 430×932, and 820×1180, uploaded to a secret gist and embedded in the PR body; no screenshot artifact is committed.
+- [ ] Every changed async surface shows loading, success, empty, and error, and has a test asserting the first commit is the loading state.
+- [ ] A screen with an approved mock is shown side by side with that mock at the same viewport; `layout.spec.ts` geometry invariants, `ds-metrics.test.ts`, and any visual baseline are green, and no spacing, radius, or font-size literal was added.

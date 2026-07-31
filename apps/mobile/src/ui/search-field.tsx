@@ -32,7 +32,7 @@ export function SearchField({
   testID,
 }: SearchFieldProps) {
   const [focused, setFocused] = useState(false);
-  const height = size === 'lg' ? 54 : 46;
+  const { height } = componentMetrics.search[size];
   const font =
     size === 'lg' ? resolveTextVariant('bodyLg') : resolveTextVariant('body');
   const borderColor = focused
@@ -62,6 +62,7 @@ export function SearchField({
           accessibilityRole="button"
           accessibilityLabel="Limpar busca"
           style={styles.clear}
+          hitSlop={componentMetrics.field.clearHitSlop}
         >
           <IconX size={componentMetrics.icon.clear} color={semanticColors.textMeta} />
         </PressableScale>

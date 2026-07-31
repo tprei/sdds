@@ -135,4 +135,31 @@ describe('CategoryChip', () => {
       semanticColors.selectionBackground,
     );
   });
+  it('announces a selected CategoryChip with a suffixed label', () => {
+    const selected = render(
+      React.createElement(CategoryChip, {
+        hue: categoryColors.food,
+        label: 'Comida',
+        selected: true,
+        onPress: vi.fn(),
+        testID: 'c',
+      }),
+    );
+    expect(leaf(selected, 'c').props.accessibilityLabel).toBe(
+      'Comida, selecionado',
+    );
+  });
+
+  it('announces an unselected CategoryChip with its label alone', () => {
+    const idle = render(
+      React.createElement(CategoryChip, {
+        hue: categoryColors.food,
+        label: 'Comida',
+        onPress: vi.fn(),
+        testID: 'c',
+      }),
+    );
+    expect(leaf(idle, 'c').props.accessibilityLabel).toBe('Comida');
+  });
+
 });

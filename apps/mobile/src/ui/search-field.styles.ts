@@ -7,7 +7,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: semanticColors.cardSurface,
-    borderWidth: 1.5,
+    borderWidth: componentMetrics.field.focusBorderWidth,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.sp4,
     gap: spacing.sp2,

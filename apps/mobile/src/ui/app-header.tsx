@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { semanticColors } from '@sdds/tokens';
+import { motion, semanticColors } from '@sdds/tokens';
 
 import { AppText } from './text';
 import { IconButton } from './icon-button';
 import { IconChevronLeft } from './icons';
+import { PressableScale } from './pressable-scale';
 
 import { styles } from './app-header.styles';
 
@@ -68,7 +69,8 @@ export function AppHeader({
           />
         ) : null}
         {showWordmark ? (
-          <Pressable
+          <PressableScale
+            scaleTo={motion.pressButtonScale}
             accessibilityLabel={onWordmarkPress ? 'Voltar ao topo' : 'Ir para o início'}
             accessibilityRole="button"
             onPress={handleWordmarkPress}
@@ -80,7 +82,7 @@ export function AppHeader({
             <AppText color={semanticColors.accent} variant="h3" weight="extraBold">
               .
             </AppText>
-          </Pressable>
+          </PressableScale>
         ) : null}
         {center ? <View style={styles.center}>{center}</View> : null}
         {right}

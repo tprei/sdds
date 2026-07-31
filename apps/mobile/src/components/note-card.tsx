@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Image, Pressable, View } from 'react-native';
+import { Image, View } from 'react-native';
 
 import type { Note } from '@/lib/api/notes';
 import {
@@ -158,14 +158,15 @@ function AuthorTarget({
   }
 
   return (
-    <Pressable
+    <PressableScale
+      scaleTo={motion.pressCardScale}
       accessibilityRole="button"
       accessibilityLabel={`Abrir perfil do autor: ${note.author.displayName}`}
       onPress={onPressAuthor}
       style={styles.authorTarget}
     >
       {content}
-    </Pressable>
+    </PressableScale>
   );
 }
 

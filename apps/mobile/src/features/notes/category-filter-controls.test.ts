@@ -2,26 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { buildNoteCatalog } from './catalog';
 import type { NoteCatalog } from './catalog';
-import {
-  categoryFilterChipAccessibility,
-  resolveCategoryFilterSlug,
-} from './category-filter';
+import { resolveCategoryFilterSlug } from './category-filter';
 import type { Catalogs } from '@/lib/api/catalogs';
 
 describe('category filter controls', () => {
-  it('marks selected category chips for accessibility', () => {
-    expect(categoryFilterChipAccessibility('Tudo', true)).toEqual({
-      accessibilityLabel: 'Tudo, selecionado',
-      accessibilityState: { selected: true },
-    });
-  });
-
-  it('keeps unselected category chips unmarked', () => {
-    expect(categoryFilterChipAccessibility('Comida', false)).toEqual({
-      accessibilityLabel: 'Comida',
-      accessibilityState: { selected: false },
-    });
-  });
 
   it('keeps active selected categories after catalog refreshes', () => {
     expect(resolveCategoryFilterSlug(builtCatalog(), 'food')).toBe(

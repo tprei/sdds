@@ -3,9 +3,16 @@ import { StyleSheet } from 'react-native';
 import { radius, semanticColors, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
-  scrim: {
+  root: {
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  scrim: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: semanticColors.scrim,
   },
   sheet: {

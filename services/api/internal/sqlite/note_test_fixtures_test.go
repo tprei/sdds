@@ -13,6 +13,10 @@ import (
 	"github.com/tprei/sdds/services/api/internal/user"
 )
 
+// testNoteStore wraps NoteStore with a deterministic system author so note
+// repository behavior tests can create notes without re-seeding the owner.
+// Mirrors the production CreateNote contract against openMigratedDatabase.
+
 const (
 	systemNoteOwnerUserID   user.UserID     = "00000000-0000-7000-8000-000000000001"
 	systemNoteOwnerAuthorID author.AuthorID = "00000000-0000-7000-8000-000000000002"

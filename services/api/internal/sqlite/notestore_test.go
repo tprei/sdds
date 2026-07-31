@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
 	"time"
@@ -660,22 +659,4 @@ func noteIDs(notes []note.Note) []string {
 		ids = append(ids, found.ID)
 	}
 	return ids
-}
-
-func openMigratedDatabase(t *testing.T, ctx context.Context) *sql.DB {
-	t.Helper()
-
-	db, err := Open(":memory:")
-	if err != nil {
-		t.Fatalf("open database: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := db.Close(); err != nil {
-			t.Fatalf("close database: %v", err)
-		}
-	})
-	if err := ApplyMigrations(ctx, db); err != nil {
-		t.Fatalf("apply migrations: %v", err)
-	}
-	return db
 }

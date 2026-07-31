@@ -32,13 +32,6 @@ func insertUsefulStoreUser(t *testing.T, ctx context.Context, db execer, userID 
 	insertAuthorStoreUser(t, ctx, db, userID, authorID, displayName)
 }
 
-func insertBareUsefulStoreUser(t *testing.T, ctx context.Context, db execer, userID user.UserID) {
-	t.Helper()
-	if _, err := db.ExecContext(ctx, `INSERT INTO users (id, state, created_at, updated_at) VALUES (?, 'active', 0, 0)`, userID); err != nil {
-		t.Fatalf("insert bare user %s: %v", userID, err)
-	}
-}
-
 func countUsefulReactions(t *testing.T, ctx context.Context, db *sql.DB, noteID string, userID user.UserID) int {
 	t.Helper()
 	var count int

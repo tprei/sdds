@@ -72,6 +72,19 @@ vi.mock('react-native', () => {
   };
 });
 
+vi.mock('react-native-svg', () => {
+  function Node({
+    children,
+    ...props
+  }: {
+    children?: ReactNode;
+    [key: string]: unknown;
+  }) {
+    return createElement('svg', props, children);
+  }
+  return { Svg: Node, Path: Node, Circle: Node, Rect: Node };
+});
+
 const noteAuthorID = 'note-author-id';
 const firstComment = comment('comment-1', 'Primeiro comentário');
 const localComment = comment('comment-new', 'Comentário recém-publicado');
@@ -184,13 +197,17 @@ describe('CommentsSection', () => {
     const authorLabel = `${avatarInitials('Thiago')}Thiago`;
     expect(buttonLabels(idleRenderer)).toEqual([
       authorLabel,
-      'Excluir comentário',
-      'Denunciar comentário',
       'Ver mais comentários',
       authorLabel,
+      'Comentar',
+    ]);
+    // Excluir/Denunciar render as icon-only buttons: their accessible name
+    // lives in accessibilityLabel, not visible text.
+    expect(actionAccessibilityLabels(idleRenderer)).toEqual([
       'Excluir comentário',
       'Denunciar comentário',
-      'Comentar',
+      'Excluir comentário',
+      'Denunciar comentário',
     ]);
 
     act(() => {
@@ -420,5 +437,12 @@ function textContent(node: ReactTestInstance): string {
 function buttonLabels(renderer: ReactTestRenderer): string[] {
   return renderer.root
     .findAll((node) => node.type === 'button')
-    .map(textContent);
+    .map(textContent)
+    .filter((label) => label.length > 0);
+}
+
+function actionAccessibilityLabels(renderer: ReactTestRenderer): string[] {
+  return renderer.root
+    .findAll((node) => node.type === 'button' && textContent(node).length === 0)
+    .map((node) => node.props.accessibilityLabel as string);
 }

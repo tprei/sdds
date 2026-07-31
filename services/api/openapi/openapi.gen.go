@@ -1406,9 +1406,10 @@ type PrepareImageUploadMultipart struct {
 
 // PublicAuthor defines model for PublicAuthor.
 type PublicAuthor struct {
-	DisplayName string `json:"display_name"`
-	Id          string `json:"id"`
-	NoteCount   int64  `json:"note_count"`
+	DisplayName         string `json:"display_name"`
+	Id                  string `json:"id"`
+	NoteCount           int64  `json:"note_count"`
+	UsefulReceivedCount int64  `json:"useful_received_count"`
 }
 
 // ReportReason defines model for ReportReason.

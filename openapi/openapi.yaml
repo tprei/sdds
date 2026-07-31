@@ -1079,13 +1079,17 @@ components:
     PublicAuthor:
       type: object
       additionalProperties: false
-      required: [id, display_name, note_count]
+      required: [id, display_name, note_count, useful_received_count]
       properties:
         id:
           type: string
         display_name:
           type: string
         note_count:
+          type: integer
+          format: int64
+          minimum: 0
+        useful_received_count:
           type: integer
           format: int64
           minimum: 0

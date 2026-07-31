@@ -9,6 +9,7 @@ export type PublicAuthor = {
   id: string;
   displayName: string;
   noteCount: number;
+  usefulReceivedCount: number;
 };
 
 export type AuthorNotesPage = {
@@ -50,6 +51,7 @@ export function bindAuthorsAPI(transport: TypedTransport): AuthorsAPI {
           displayName: publicAuthorResponse.data.display_name,
           id: publicAuthorResponse.data.id,
           noteCount: publicAuthorResponse.data.note_count,
+          usefulReceivedCount: publicAuthorResponse.data.useful_received_count,
         };
       } catch (error) {
         rewrapAuthorsTransportError(error);

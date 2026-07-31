@@ -44,6 +44,7 @@ function makePublicAuthor(): PublicAuthorResponse {
     display_name: 'Ada Lovelace',
     id: 'author-1',
     note_count: 3,
+    useful_received_count: 5,
   };
 }
 

@@ -336,6 +336,8 @@ export interface components {
             display_name: string;
             /** Format: int64 */
             note_count: number;
+            /** Format: int64 */
+            useful_received_count: number;
         };
         AuthorNotesPage: {
             notes: components["schemas"]["Note"][];

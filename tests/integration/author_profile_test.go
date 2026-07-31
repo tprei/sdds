@@ -51,12 +51,38 @@ func TestPublicAuthorProfileRuntimeBoundaries(t *testing.T) {
 	if profileResponse.JSON200 == nil {
 		t.Fatal("GET /v1/authors/{author_id} returned 200 without JSON body")
 	}
-	wantProfile := openapi.PublicAuthor{Id: firstSession.User.Author.Id, DisplayName: firstDisplayName, NoteCount: int64(len(createdFirstNotes))}
+	wantProfile := openapi.PublicAuthor{Id: firstSession.User.Author.Id, DisplayName: firstDisplayName, NoteCount: int64(len(createdFirstNotes)), UsefulReceivedCount: 0}
 	if diff := cmp.Diff(wantProfile, *profileResponse.JSON200); diff != "" {
 		t.Fatalf("public author mismatch (-want +got):\n%s", diff)
 	}
 	requirePublicAuthorWireKeys(t, profileResponse.Body)
 	requireNoPrivateAuthorPayload(t, profileResponse.Body)
+
+	// Two different users mark two of the author's notes useful; the profile
+	// aggregates useful marks across every note the author owns, not per-note.
+	markResponse, err := secondClient.MarkNoteUsefulWithResponse(context.Background(), createdFirstNotes[0].Id)
+	if err != nil {
+		t.Fatalf("PUT /v1/notes/{note_id}/useful (second author): %v", err)
+	}
+	requireStatus(t, "PUT /v1/notes/{note_id}/useful", markResponse.StatusCode(), http.StatusNoContent, markResponse.Body)
+	firstOwnMarkResponse, err := firstClient.MarkNoteUsefulWithResponse(context.Background(), createdFirstNotes[1].Id)
+	if err != nil {
+		t.Fatalf("PUT /v1/notes/{note_id}/useful (self): %v", err)
+	}
+	requireStatus(t, "PUT /v1/notes/{note_id}/useful", firstOwnMarkResponse.StatusCode(), http.StatusNoContent, firstOwnMarkResponse.Body)
+
+	usefulProfileResponse, err := firstClient.GetAuthorWithResponse(context.Background(), firstSession.User.Author.Id)
+	if err != nil {
+		t.Fatalf("GET /v1/authors/{author_id} after useful marks: %v", err)
+	}
+	requireStatus(t, "GET /v1/authors/{author_id}", usefulProfileResponse.StatusCode(), http.StatusOK, usefulProfileResponse.Body)
+	if usefulProfileResponse.JSON200 == nil {
+		t.Fatal("GET /v1/authors/{author_id} returned 200 without JSON body")
+	}
+	if usefulProfileResponse.JSON200.UsefulReceivedCount != 2 {
+		t.Fatalf("useful_received_count = %d, want 2", usefulProfileResponse.JSON200.UsefulReceivedCount)
+	}
+	requirePublicAuthorWireKeys(t, usefulProfileResponse.Body)
 
 	limit := 2
 	firstPage, firstPageBody := listAuthorNotesWithBody(t, firstClient, firstSession.User.Author.Id, &openapi.ListAuthorNotesParams{Limit: &limit})
@@ -253,7 +279,7 @@ func requirePublicAuthorWireKeys(t *testing.T, body []byte) {
 	if err := json.Unmarshal(body, &object); err != nil {
 		t.Fatalf("decode public author wire body: %v", err)
 	}
-	requireWireKeys(t, object, "id", "display_name", "note_count")
+	requireWireKeys(t, object, "id", "display_name", "note_count", "useful_received_count")
 }
 
 func requireWireKeys(t *testing.T, object map[string]any, keys ...string) {

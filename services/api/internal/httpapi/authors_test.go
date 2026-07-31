@@ -32,7 +32,7 @@ func TestGetAuthorReturnsPublicProfileWithoutAuthentication(t *testing.T) {
 			if authorID != exampleAuthorID {
 				t.Fatalf("author id = %q, want %q", authorID, exampleAuthorID)
 			}
-			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 27}, nil
+			return author.PublicAuthor{ID: exampleAuthorID, DisplayName: exampleAuthorDisplay, NoteCount: 27, UsefulReceivedCount: 41}, nil
 		},
 	}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{}))
 
@@ -49,13 +49,13 @@ func TestGetAuthorReturnsPublicProfileWithoutAuthentication(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	want := openapi.PublicAuthor{Id: string(exampleAuthorID), DisplayName: exampleAuthorDisplay, NoteCount: 27}
+	want := openapi.PublicAuthor{Id: string(exampleAuthorID), DisplayName: exampleAuthorDisplay, NoteCount: 27, UsefulReceivedCount: 41}
 	if diff := cmp.Diff(want, body); diff != "" {
 		t.Fatalf("response body mismatch (-want +got):\n%s", diff)
 	}
 
 	wireBody := decodeResponseObject(t, response.Body.Bytes())
-	requireExactJSONKeys(t, wireBody, "id", "display_name", "note_count")
+	requireExactJSONKeys(t, wireBody, "id", "display_name", "note_count", "useful_received_count")
 	requireNoPrivateWireFields(t, response.Body.String())
 }
 

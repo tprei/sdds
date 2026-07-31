@@ -53,6 +53,7 @@ type PublicAuthorResponse = {
   display_name: string;
   id: string;
   note_count: number;
+  useful_received_count: number;
 };
 
 type AuthorNotesResponse = {
@@ -790,6 +791,7 @@ test('opens a public author profile and appends paginated notes', async ({
     display_name: displayName,
     id: session.user.author.id,
     note_count: 21,
+    useful_received_count: 0,
   });
 
   await loginUser(page, session.user.username, `/authors/${session.user.author.id}`);

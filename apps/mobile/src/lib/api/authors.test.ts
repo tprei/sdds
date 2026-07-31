@@ -46,6 +46,7 @@ describe('authors API client', () => {
         display_name: 'Thiago',
         id: authorID,
         note_count: 3,
+        useful_received_count: 14,
       }),
     );
 
@@ -54,6 +55,7 @@ describe('authors API client', () => {
       displayName: 'Thiago',
       id: authorID,
       noteCount: 3,
+      usefulReceivedCount: 14,
     });
   });
 
@@ -131,6 +133,7 @@ describe('authors API client', () => {
         display_name: 'Thiago',
         id: authorID,
         note_count: 3,
+        useful_received_count: 14,
         username: 'private-name',
       }),
     );
@@ -140,6 +143,7 @@ describe('authors API client', () => {
       displayName: 'Thiago',
       id: authorID,
       noteCount: 3,
+      usefulReceivedCount: 14,
     });
   });
 

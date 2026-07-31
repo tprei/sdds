@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tprei/sdds/services/api/internal/author"
@@ -33,7 +34,7 @@ func TestUserStoreFindsPublicAuthorWithNoteCount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("find public author: %v", err)
 	}
-	want := author.PublicAuthor{ID: authorStoreAuthorID, DisplayName: "Marina Alves", NoteCount: 2}
+	want := author.PublicAuthor{ID: authorStoreAuthorID, DisplayName: "Marina Alves", NoteCount: 2, UsefulReceivedCount: 0}
 	if diff := cmp.Diff(want, found); diff != "" {
 		t.Fatalf("public author mismatch (-want +got):\n%s", diff)
 	}
@@ -50,6 +51,54 @@ func TestUserStoreFindsPublicAuthorWithZeroNotes(t *testing.T) {
 	}
 	if found.NoteCount != 0 {
 		t.Fatalf("note count = %d, want 0", found.NoteCount)
+	}
+	if found.UsefulReceivedCount != 0 {
+		t.Fatalf("useful received count = %d, want 0", found.UsefulReceivedCount)
+	}
+}
+
+func TestUserStoreFindsPublicAuthorWithUsefulReceivedCount(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	insertAuthorStoreUser(t, ctx, db, authorStoreUserID, authorStoreAuthorID, "Marina Alves")
+
+	notedAt := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC).UnixMilli()
+	reactedAt := time.Date(2026, 7, 2, 13, 0, 0, 0, time.UTC).UnixMilli()
+	usefulNoteID := "018ff5b8-0000-7000-8000-000000000401"
+	quietNoteID := "018ff5b8-0000-7000-8000-000000000402"
+	insertAuthorStoreNote(t, ctx, db, usefulNoteID, authorStoreUserID, notedAt)
+	insertAuthorStoreNote(t, ctx, db, quietNoteID, authorStoreUserID, notedAt)
+
+	firstReactorID := user.UserID("018ff5b8-0000-7000-8000-000000000501")
+	secondReactorID := user.UserID("018ff5b8-0000-7000-8000-000000000502")
+	insertBareUsefulStoreUser(t, ctx, db, firstReactorID)
+	insertBareUsefulStoreUser(t, ctx, db, secondReactorID)
+	if _, err := db.ExecContext(
+		ctx,
+		`INSERT INTO note_useful_reactions (note_id, user_id, created_at) VALUES (?, ?, ?)`,
+		usefulNoteID, firstReactorID, reactedAt,
+	); err != nil {
+		t.Fatalf("insert first useful reaction: %v", err)
+	}
+	if _, err := db.ExecContext(
+		ctx,
+		`INSERT INTO note_useful_reactions (note_id, user_id, created_at) VALUES (?, ?, ?)`,
+		usefulNoteID, secondReactorID, reactedAt,
+	); err != nil {
+		t.Fatalf("insert second useful reaction: %v", err)
+	}
+
+	found, err := NewUserStore(db).FindPublicAuthor(ctx, authorStoreAuthorID)
+	if err != nil {
+		t.Fatalf("find public author: %v", err)
+	}
+	if found.NoteCount != 2 {
+		t.Fatalf("note count = %d, want 2", found.NoteCount)
+	}
+	// One note received useful marks from two different users, the other none:
+	// the aggregate is 2, not the per-note count and not double-counted by the join.
+	if found.UsefulReceivedCount != 2 {
+		t.Fatalf("useful received count = %d, want 2", found.UsefulReceivedCount)
 	}
 }
 

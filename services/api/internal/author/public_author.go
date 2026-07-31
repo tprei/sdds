@@ -12,9 +12,10 @@ type AuthorID string
 var ErrAuthorNotFound = errors.New("author not found")
 
 type PublicAuthor struct {
-	ID          AuthorID
-	DisplayName string
-	NoteCount   int64
+	ID                  AuthorID
+	DisplayName         string
+	NoteCount           int64
+	UsefulReceivedCount int64
 }
 
 type PublicAuthorStore interface {

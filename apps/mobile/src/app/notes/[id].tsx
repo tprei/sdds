@@ -6,15 +6,17 @@ import {
   useRef,
   useState,
 } from 'react';
-import { StyleSheet, Text } from 'react-native';
-import { semanticColors, typography } from '@sdds/tokens';
+import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { semanticColors, spacing, typography } from '@sdds/tokens';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   EmptyStateCard,
-  FoundationButton,
   FoundationScreen,
 } from '@/components/foundation-screen';
+import { IconButton } from '@/ui/icon-button';
+import { IconChevronLeft } from '@/ui/icons';
 import { CommentsSection } from '@/features/comments/comments-section';
 import {
   canDeleteComment,
@@ -74,11 +76,12 @@ export default function NoteDetailScreen() {
     id?: string | string[];
     origin?: string | string[];
   }>();
-  const noteID = typeof id === 'string' ? id : undefined;
+  const trimmedNoteID = typeof id === 'string' ? id.trim() : undefined;
   const originNonce = typeof origin === 'string' ? origin : undefined;
 
-  if (!noteID?.trim()) {
-    return (
+  let content: ReactNode;
+  if (!trimmedNoteID) {
+    content = (
       <FoundationScreen
         description="Leia a nota completa, com lugar, categoria e data."
         eyebrow="Nota"
@@ -88,44 +91,53 @@ export default function NoteDetailScreen() {
           title="Nota não encontrada"
           body="Essa nota não existe mais ou o link tá incompleto."
         />
-        <FoundationButton label="Voltar" onPress={() => router.back()} />
       </FoundationScreen>
     );
-  }
-
-  if (state.status === 'authenticated') {
-    return (
+  } else if (state.status === 'authenticated') {
+    content = (
       <AuthenticatedNoteDetailScreen
-        key={`${state.user.id}:${noteID}:${originNonce ?? ''}`}
+        key={`${state.user.id}:${trimmedNoteID}:${originNonce ?? ''}`}
         apiClient={apiClient}
         currentAuthorID={state.user.author.id}
-        noteID={noteID}
+        noteID={trimmedNoteID}
         onSessionExpired={logout}
         originNonce={originNonce}
       />
     );
+  } else {
+    content = (
+      <FoundationScreen
+        description="Leia a nota completa, com lugar, categoria e data."
+        eyebrow="Nota"
+        title="Nota"
+      >
+        <ReadAuthGate
+          onLogin={() =>
+            router.push({ pathname: '/login', params: { next: `/notes/${trimmedNoteID}` } })
+          }
+          onSignup={() =>
+            router.push({
+              pathname: '/signup',
+              params: { next: `/notes/${trimmedNoteID}` },
+            })
+          }
+          status={state.status}
+        />
+      </FoundationScreen>
+    );
   }
 
   return (
-    <FoundationScreen
-      description="Leia a nota completa, com lugar, categoria e data."
-      eyebrow="Nota"
-      title="Nota"
-    >
-      <ReadAuthGate
-        onLogin={() =>
-          router.push({ pathname: '/login', params: { next: `/notes/${noteID}` } })
-        }
-        onSignup={() =>
-          router.push({
-            pathname: '/signup',
-            params: { next: `/notes/${noteID}` },
-          })
-        }
-        status={state.status}
-      />
-      <FoundationButton label="Voltar" onPress={() => router.back()} />
-    </FoundationScreen>
+    <SafeAreaView style={screenStyles.root}>
+      <View style={screenStyles.backRow}>
+        <IconButton
+          icon={<IconChevronLeft />}
+          accessibilityLabel="Voltar"
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+        />
+      </View>
+      {content}
+    </SafeAreaView>
   );
 }
 
@@ -685,7 +697,6 @@ function AuthenticatedNoteDetailScreen({
         onCancel={() => dispatchReportForm({ type: 'close' })}
         onSubmit={handleSubmitReport}
       />
-      <FoundationButton label="Voltar" onPress={() => router.back()} />
     </FoundationScreen>
   );
 }
@@ -695,5 +706,15 @@ const noticeStyles = StyleSheet.create({
     color: semanticColors.textMuted,
     fontSize: typography.sizeBody,
     lineHeight: 22,
+  },
+});
+
+const screenStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  backRow: {
+    paddingHorizontal: spacing.sp3,
+    paddingVertical: spacing.sp2,
   },
 });

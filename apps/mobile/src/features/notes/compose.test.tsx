@@ -48,7 +48,7 @@ const mocks = vi.hoisted(() => {
     launchImageLibraryAsync: vi.fn(),
     logout: vi.fn(),
     record: vi.fn(),
-    router: { navigate: vi.fn(), push: vi.fn() },
+    router: { dismissTo: vi.fn(), navigate: vi.fn(), push: vi.fn() },
   };
 });
 
@@ -263,7 +263,7 @@ describe('ComposeScreen', () => {
       { eventID: request?.clientRequestId },
     );
     expect(store.get('owner-1')).toBeNull();
-    expect(mocks.router.navigate).toHaveBeenCalledWith('/');
+    expect(mocks.router.dismissTo).toHaveBeenCalledWith('/');
     renderer.unmount();
   });
 
@@ -280,7 +280,7 @@ describe('ComposeScreen', () => {
     await press(renderer, 'compose-submit');
 
     expect(store.get('owner-1')).toBeNull();
-    expect(mocks.router.navigate).toHaveBeenCalledWith('/');
+    expect(mocks.router.dismissTo).toHaveBeenCalledWith('/');
     renderer.unmount();
   });
 
@@ -399,7 +399,7 @@ describe('ComposeScreen', () => {
       imageUploadIds: [receipt.imageUploadId],
     });
     expect(store.get('owner-1')).toBeNull();
-    expect(mocks.router.navigate).toHaveBeenCalledWith('/');
+    expect(mocks.router.dismissTo).toHaveBeenCalledWith('/');
     renderer.unmount();
   });
 

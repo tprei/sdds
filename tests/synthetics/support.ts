@@ -38,11 +38,9 @@ export async function loginUser(
   next: string,
 ): Promise<void> {
   await page.goto(`/login?next=${encodeURIComponent(next)}`);
-  await expect(
-    page.getByTestId('screen-title').filter({ hasText: /^Entrar$/ }),
-  ).toBeVisible();
-  await page.getByLabel('Nome de usuário').fill(username);
-  await page.getByLabel('Senha').fill(syntheticPassword);
+  await expect(page.getByTestId('login-username-input')).toBeVisible();
+  await page.getByTestId('login-username-input').fill(username);
+  await page.getByTestId('login-password-input').fill(syntheticPassword);
   await page.getByRole('button', { name: 'Entrar' }).click();
 }
 

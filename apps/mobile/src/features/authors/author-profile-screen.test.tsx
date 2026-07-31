@@ -39,6 +39,7 @@ vi.mock('react-native', () => {
     return createElement('div', props, content);
   }
   return {
+    StyleSheet: { create: (styles: Record<string, unknown>) => styles },
     Text: NativeView,
     View: NativeView,
   };
@@ -60,6 +61,21 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('@/lib/auth/auth-provider', () => ({
   useAuth: () => ({ apiClient: mocks.apiClient, logout: mocks.logout, state: mocks.authState }),
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: ({ children }: { children: ReactNode }) => children,
+}));
+vi.mock('@/ui/icon-button', () => ({
+  IconButton: ({
+    icon,
+    accessibilityLabel,
+  }: {
+    icon: ReactNode;
+    accessibilityLabel: string;
+  }) => createElement('button', { accessibilityLabel }, icon),
+}));
+vi.mock('@/ui/icons', () => ({
+  IconChevronLeft: () => createElement('svg', null),
 }));
 
 async function settle(): Promise<void> {

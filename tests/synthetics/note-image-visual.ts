@@ -149,7 +149,10 @@ async function readImageSurface(container: Locator) {
       /^url\((?:"|')?(.*?)(?:"|')?\)$/,
     );
     const bounds = (surface ?? element).getBoundingClientRect();
-    const preload = element.querySelector("img");
+    const preload =
+      element.querySelector("img") ??
+      element.parentElement?.querySelector("img") ??
+      null;
     return {
       backgroundURL: backgroundMatch?.[1] ?? null,
       height: bounds.height,
@@ -267,6 +270,7 @@ function scoreFixturePixels(
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       if (!isInsideRoundedContent(x, y, width, height)) continue;
+      if (isInsideCategoryBadge(x, y, width, height)) continue;
       const [rgbDistance, chromaDistance] = pixelDistances(
         actualPixels,
         expectedPixels,
@@ -368,7 +372,8 @@ function scoreEdgePreservation(
     ) {
       if (
         !isInsideRoundedContent(x - radius, y - radius, width, height) ||
-        !isInsideRoundedContent(x + radius, y + radius, width, height)
+        !isInsideRoundedContent(x + radius, y + radius, width, height) ||
+        isInsideCategoryBadge(x, y, width, height)
       )
         continue;
       const expectedMagnitude = edge(expectedPixels, x, y);
@@ -399,6 +404,19 @@ function isInsideRoundedContent(
   const cornerX = x < radius ? radius : right - radius;
   const cornerY = y < radius ? radius : bottom - radius;
   return (x - cornerX) ** 2 + (y - cornerY) ** 2 <= radius ** 2;
+}
+// Note cards overlay a CategoryChip badge in the top-left corner of the
+// photo (note-card.styles.ts: chipTopLeft, top: 8, left: 8), which the
+// reference fixture has no knowledge of. Exclude a generous top-left
+// region so the pixel comparator scores the photo content itself rather
+// than this known, intentional UI overlay.
+function isInsideCategoryBadge(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): boolean {
+  return x <= width * 0.32 && y <= height * 0.16;
 }
 async function renderBoxBlurImage(input: CorruptionInput): Promise<string> {
   const { fixtureBase64, height, radius, width } = input;
@@ -525,7 +543,7 @@ async function expectDecodedFixture(
   container: Locator,
   expectedURL: string,
 ): Promise<void> {
-  const nativeImage = container.locator("img");
+  const nativeImage = container.locator("xpath=..").locator("img");
   await expect(nativeImage).toHaveCount(1);
   await expect
     .poll(

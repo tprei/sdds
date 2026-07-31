@@ -9,9 +9,11 @@ export const styles = StyleSheet.create({
   label: {
     marginBottom: 6,
   },
-  ring: {
+  ringHost: {
     padding: 3,
     borderRadius: radius.md + 3,
+  },
+  ring: {
     backgroundColor: semanticColors.accentTint,
   },
   fieldRow: {

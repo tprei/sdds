@@ -9,13 +9,12 @@ import {
   IconBookmark,
   IconComment,
   IconHeart,
-  IconLightbulb,
   type IconProps,
 } from './icons';
 import { PressableScale } from './pressable-scale';
 import { styles } from './metric-stat.styles';
 
-type MetricKind = 'useful' | 'saved' | 'comment' | 'endorse';
+type MetricKind = 'useful' | 'saved' | 'comment';
 type MetricSize = 'md' | 'sm';
 
 type MetricStatProps = {
@@ -33,14 +32,12 @@ const kindIcon: Record<MetricKind, ComponentType<IconProps>> = {
   useful: IconHeart,
   saved: IconBookmark,
   comment: IconComment,
-  endorse: IconLightbulb,
 };
 
 function activeColor(kind: MetricKind, active: boolean): string {
   if (!active) return semanticColors.textMeta;
   if (kind === 'useful') return semanticColors.useful;
   if (kind === 'saved') return semanticColors.saved;
-  if (kind === 'endorse') return semanticColors.warning;
   return semanticColors.textMeta;
 }
 

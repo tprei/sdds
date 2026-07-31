@@ -20,6 +20,7 @@ export const colors = {
   yellow600: '#C79417',
   yellow500: '#F5C51C',
   yellow400: '#F8D44E',
+  yellow300: '#FFE98F',
   yellow200: '#FBE79B',
   yellow100: '#FFF3C4',
   blue700: '#2C4478',
@@ -69,6 +70,17 @@ export const semanticColors = {
   info: colors.blue500,
   infoBg: colors.blue100,
   scrim: colors.scrim,
+  // Semantic names for the post-it surface/border/quote, the brand tagline
+  // ink, and the soft-button ink, so components read a meaning instead of a
+  // raw palette step. brandInk and accentSoftInk share a color value but not
+  // a meaning (Caveat tagline vs. soft-button label), so they stay two names.
+  placeholderSurface: colors.paper2,
+  postItSurface: colors.yellow300,
+  postItBorder: colors.yellow400,
+  postItQuote: colors.yellow500,
+  accentSoftInk: colors.green600,
+  brandInk: colors.green600,
+  brandWash: colors.yellow200,
 } as const;
 
 export const categoryColors = {
@@ -88,7 +100,6 @@ export const spacing = {
   sp6: 20,
   sp7: 24,
   sp8: 32,
-  sp9: 40,
   sp10: 48,
   sp12: 64,
   gutter: 16,
@@ -102,7 +113,6 @@ export const radius = {
   md: 14,
   lg: 18,
   xl: 24,
-  xxl: 30,
   pill: 999,
   fab: 13,
 } as const;
@@ -245,6 +255,7 @@ export const componentMetrics = {
     md: 34,
     lg: 84,
     initialsScale: 0.4,
+    ringWidth: 2,
   },
   icon: {
     clear: 13,
@@ -301,11 +312,19 @@ export const componentMetrics = {
     ringPadding: 3,
     ringRadius: 17,
     clearButtonSize: 24,
+    focusBorderWidth: 1.5,
+    clearHitSlop: 10,
     labelMarginBottom: 6,
     rowHeight: 48,
     multilineMinHeight: 160,
   },
+  search: {
+    lg: { height: 54 },
+    md: { height: 46 },
+  },
   topTabs: {
     underlineRadius: 3,
+    underlineWidth: 22,
+    underlineHeight: 3,
   },
 } as const;

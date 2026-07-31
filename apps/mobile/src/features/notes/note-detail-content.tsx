@@ -5,7 +5,7 @@ import {
   maxNoteMediaAspectRatio,
   minNoteMediaAspectRatio,
 } from '@/features/notes/note-card-estimate';
-import { semanticColors, type CategorySlug } from '@sdds/tokens';
+import { semanticColors } from '@sdds/tokens';
 
 import { AppText } from '@/ui/text';
 import { CategoryChip } from '@/ui/category-chip';
@@ -52,7 +52,7 @@ export function NoteDetailContent({ note }: NoteDetailContentProps) {
             <CategoryChip
               label={note.categoryLabel}
               size="sm"
-              slug={note.categorySlug as CategorySlug}
+              hue={note.categoryHue}
             />
           </View>
           <AppText color={semanticColors.textMeta} variant="sm">

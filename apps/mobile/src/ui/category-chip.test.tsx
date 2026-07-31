@@ -80,7 +80,7 @@ describe('CategoryChip', () => {
   it('uses the category hue when idle and selection tokens when selected', () => {
     const idle = render(
       React.createElement(CategoryChip, {
-        slug: 'food',
+        hue: categoryColors.food,
         label: 'Comida',
         onPress: vi.fn(),
         testID: 'c',
@@ -92,7 +92,7 @@ describe('CategoryChip', () => {
 
     const selected = render(
       React.createElement(CategoryChip, {
-        slug: 'food',
+        hue: categoryColors.food,
         label: 'Comida',
         selected: true,
         onPress: vi.fn(),
@@ -110,7 +110,7 @@ describe('CategoryChip', () => {
   it('renders as a static label with no button role when not pressable', () => {
     const renderer = render(
       React.createElement(CategoryChip, {
-        slug: 'travel',
+        hue: categoryColors.travel,
         label: 'Viagem',
         testID: 'c',
       }),

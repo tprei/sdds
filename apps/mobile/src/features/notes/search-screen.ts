@@ -1,9 +1,9 @@
 import { labelNote } from './catalog';
 import type {
+  CategoryOption,
   LabelledNote,
   NoteCatalog,
 } from './catalog';
-import type { CatalogCategory } from '@/lib/api/catalogs';
 import type {
   RetrievalSource,
   SearchNoteResult,
@@ -171,7 +171,7 @@ export function resolveSearchCategorySlug(
 export function selectedSearchCategory(
   catalog: NoteCatalog,
   categorySlug: string | null,
-): CatalogCategory | null {
+): CategoryOption | null {
   if (categorySlug === null) {
     return null;
   }

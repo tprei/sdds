@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildNoteCatalog } from './catalog';
+import type { NoteCatalog } from './catalog';
 import {
   appendRecentSearchQuery,
   createSearchRequest,
@@ -116,18 +117,18 @@ describe('search screen helpers', () => {
 
   it('keeps active selected categories after catalog refreshes', () => {
     expect(
-      resolveSearchCategorySlug(buildNoteCatalog(catalogs()), 'food'),
+      resolveSearchCategorySlug(builtCatalog(), 'food'),
     ).toBe('food');
   });
 
   it('clears inactive selected categories after catalog refreshes', () => {
     expect(
-      resolveSearchCategorySlug(buildNoteCatalog(catalogs()), 'travel'),
+      resolveSearchCategorySlug(builtCatalog(), 'travel'),
     ).toBeNull();
   });
 
   it('resolves the active category for result context', () => {
-    const catalog = buildNoteCatalog(catalogs());
+    const catalog = builtCatalog();
 
     expect(selectedSearchCategory(catalog, 'food')).toMatchObject({
       label: 'Comida',
@@ -139,7 +140,7 @@ describe('search screen helpers', () => {
   it('builds result context with count and category', () => {
     expect(
       searchResultContext({
-        catalog: buildNoteCatalog(catalogs()),
+        catalog: builtCatalog(),
         categorySlug: 'food',
         query: 'café brasileiro',
         resultCount: 2,
@@ -153,7 +154,7 @@ describe('search screen helpers', () => {
 
   it('labels ordered search results without losing retrieval provenance', () => {
     const labelledResults = labelSearchResults(
-      buildNoteCatalog(catalogs()),
+      builtCatalog(),
       [
         {
           note: searchNote('first'),
@@ -194,7 +195,7 @@ describe('search screen helpers', () => {
     }
 
     const labelledResults = labelSearchResults(
-      buildNoteCatalog(catalogs()),
+      builtCatalog(),
       [
         { note: searchNote('first'), retrievalSource: 'lexical' },
         { note: searchNote('second'), retrievalSource: 'semantic' },
@@ -274,4 +275,12 @@ function catalogs(): Catalogs {
     ],
     places: [],
   };
+}
+
+function builtCatalog(): NoteCatalog {
+  const catalog = buildNoteCatalog(catalogs());
+  if (catalog === null) {
+    throw new Error('test catalog fixture must resolve every active category hue');
+  }
+  return catalog;
 }

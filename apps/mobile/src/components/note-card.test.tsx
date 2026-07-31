@@ -3,6 +3,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Note } from '@/lib/api/notes';
+import { categoryColors } from '@sdds/tokens';
 
 import { NoteCard } from './note-card';
 
@@ -97,6 +98,7 @@ describe('NoteCard', () => {
     const renderer = render(
       <NoteCard
         note={currentNote}
+        categoryHue={categoryColors.food}
         categoryLabel="Comida"
         onPress={() => undefined}
         onPressUseful={() => undefined}
@@ -116,6 +118,7 @@ describe('NoteCard', () => {
     const renderer = render(
       <NoteCard
         note={currentNote}
+        categoryHue={categoryColors.food}
         categoryLabel="Comida"
         onPressUseful={() => undefined}
         usefulPending={false}
@@ -136,6 +139,7 @@ describe('NoteCard', () => {
     const renderer = render(
       <NoteCard
         note={currentNote}
+        categoryHue={categoryColors.food}
         categoryLabel="Comida"
         onPress={onPress}
         onPressAuthor={onPressAuthor}
@@ -171,6 +175,7 @@ describe('NoteCard', () => {
     const renderer = render(
       <NoteCard
         note={note()}
+        categoryHue={categoryColors.food}
         categoryLabel="Comida"
         onPressUseful={() => undefined}
         usefulPending={false}
@@ -187,6 +192,7 @@ describe('NoteCard', () => {
     const clean = render(
       <NoteCard
         note={note()}
+        categoryHue={categoryColors.food}
         categoryLabel="Comida"
         onPressUseful={() => undefined}
         usefulPending={false}
@@ -205,6 +211,7 @@ describe('NoteCard', () => {
     const renderer = render(
       <NoteCard
         note={currentNote}
+        categoryHue={categoryColors.food}
         categoryLabel="Comida"
         onPressUseful={() => undefined}
         usefulPending={false}
@@ -224,6 +231,7 @@ describe('NoteCard', () => {
     const renderer = render(
       <NoteCard
         note={note()}
+        categoryHue={categoryColors.food}
         categoryLabel="Comida"
         onPress={() => undefined}
         onPressUseful={() => undefined}

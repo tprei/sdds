@@ -186,7 +186,16 @@ export const shadows = {
   },
 } as const;
 
-export type CategorySlug = keyof typeof categoryColors;
+export type CategoryHue = (typeof categoryColors)[keyof typeof categoryColors];
+
+// Resolves a catalog category's hue by slug. Returns `null` for a slug with
+// no configured hue instead of allowing an unsafe index into
+// `categoryColors` — every caller MUST handle the explicit failure.
+const categoryHues: Record<string, CategoryHue | undefined> = categoryColors;
+
+export function categoryHueFor(slug: string): CategoryHue | null {
+  return categoryHues[slug] ?? null;
+}
 
 export const fontFamilies = {
   light: 'PlusJakartaSans_300Light',

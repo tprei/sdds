@@ -436,6 +436,11 @@ function AuthenticatedSearchScreen({
         }
 
         const catalog = buildNoteCatalog(catalogs);
+        if (catalog === null) {
+          catalogRef.current = null;
+          setCatalogState({ status: 'error' });
+          return;
+        }
         catalogRef.current = catalog;
         const resolvedCategorySlug = resolveCategoryFilterSlug(
           catalog,
@@ -797,6 +802,7 @@ function SearchStateContent({
         }
         renderItem={(result) => (
           <NoteCard
+            categoryHue={result.note.categoryHue}
             categoryLabel={result.note.categoryLabel}
             key={result.note.id}
             note={result.note}

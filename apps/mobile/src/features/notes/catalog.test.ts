@@ -1,38 +1,81 @@
 import { describe, expect, it } from 'vitest';
 
+import { categoryColors } from '@sdds/tokens';
+
 import {
   buildNoteCatalog,
+  categoryHue,
+  categoryLabel,
   labelNote,
   resolveSelectedCategorySlug,
   resolveSelectedPlaceSlug,
 } from './catalog';
+import type { NoteCatalog } from './catalog';
 import type { Catalogs } from '@/lib/api/catalogs';
 import type { Note } from '@/lib/api/notes';
 
 describe('note catalog helpers', () => {
   it('labels notes without nesting the note payload', () => {
-    const catalog = buildNoteCatalog(catalogs());
+    const catalog = builtCatalog();
     const note = apiNote();
 
     expect(labelNote(catalog, note)).toEqual({
       ...note,
+      categoryHue: categoryColors.food,
       categoryLabel: 'Comida',
       placeLabel: 'São Paulo',
     });
   });
 
   it('preserves active compose selections across catalog refreshes', () => {
-    const catalog = buildNoteCatalog(catalogs());
+    const catalog = builtCatalog();
 
     expect(resolveSelectedCategorySlug(catalog, 'travel')).toBe('travel');
     expect(resolveSelectedPlaceSlug(catalog, 'sao-paulo')).toBe('sao-paulo');
   });
 
   it('falls back when compose selections are no longer active', () => {
-    const catalog = buildNoteCatalog(catalogs());
+    const catalog = builtCatalog();
 
     expect(resolveSelectedCategorySlug(catalog, 'beauty')).toBe('food');
     expect(resolveSelectedPlaceSlug(catalog, 'rio-de-janeiro')).toBeNull();
+  });
+
+  it('fails the catalog when an active category has no configured hue', () => {
+    const catalog = buildNoteCatalog({
+      categories: [
+        {
+          active: true,
+          displayOrder: 10,
+          label: 'Bem-estar',
+          slug: 'wellness',
+        },
+      ],
+      places: [],
+    });
+
+    expect(catalog).toBeNull();
+  });
+
+  it('spares the catalog when an inactive category has no configured hue', () => {
+    const catalog = buildNoteCatalog({
+      categories: [
+        {
+          active: false,
+          displayOrder: 10,
+          label: 'Bem-estar',
+          slug: 'wellness',
+        },
+      ],
+      places: [],
+    });
+    if (catalog === null) {
+      throw new Error('inactive hueless category must not fail the catalog');
+    }
+
+    expect(catalog.activeCategories).toEqual([]);
+    expect(categoryHue(catalog, 'wellness')).toBeNull();
+    expect(categoryLabel(catalog, 'wellness')).toBe('Bem-estar');
   });
 });
 
@@ -92,4 +135,14 @@ function apiNote(): Note {
     usefulCount: 0,
     usefulByCurrentUser: false,
   };
+}
+
+// Every category in the shared fixture above resolves a hue; this only
+// throws if that fixture regresses the invariant the other tests rely on.
+function builtCatalog(): NoteCatalog {
+  const catalog = buildNoteCatalog(catalogs());
+  if (catalog === null) {
+    throw new Error('test catalog fixture must resolve every active category hue');
+  }
+  return catalog;
 }

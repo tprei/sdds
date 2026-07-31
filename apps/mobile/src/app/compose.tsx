@@ -6,7 +6,7 @@ import {
   UIImagePickerPreferredAssetRepresentationMode,
 } from 'expo-image-picker';
 
-import { colors, componentMetrics, semanticColors, type CategorySlug } from '@sdds/tokens';
+import { colors, componentMetrics, semanticColors } from '@sdds/tokens';
 
 import { createComposeController } from '@/features/notes/compose-controller';
 import {
@@ -297,7 +297,7 @@ function AuthenticatedComposeScreen({
                   label={option.label}
                   onPress={() => selectCategorySlug(option.slug)}
                   selected={option.slug === categorySlug}
-                  slug={option.slug as CategorySlug}
+                  hue={option.hue}
                 />
               ))}
             </View>

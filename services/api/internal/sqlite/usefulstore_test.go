@@ -219,6 +219,7 @@ func TestNoteStoreLoadsUsefulStateForEveryReadPath(t *testing.T) {
 		Title:           "Older useful note",
 		Body:            "oldermarker useful body",
 		CategorySlug:    note.CategorySlugFood,
+		Embedding:       testEmbedding(),
 	})
 	if err != nil {
 		t.Fatalf("create older note: %v", err)
@@ -228,6 +229,7 @@ func TestNoteStoreLoadsUsefulStateForEveryReadPath(t *testing.T) {
 		Title:           "Newer useful note",
 		Body:            "newermarker useful body",
 		CategorySlug:    note.CategorySlugFood,
+		Embedding:       testEmbedding(),
 	})
 	if err != nil {
 		t.Fatalf("create newer note: %v", err)

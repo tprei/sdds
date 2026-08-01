@@ -26,6 +26,7 @@ func NormalizeCreateInput(input CreateInput) CreateInput {
 		CategorySlug:    NormalizeCategorySlug(input.CategorySlug),
 		ClientRequestID: input.ClientRequestID,
 		ImageUploadIDs:  input.ImageUploadIDs,
+		Embedding:       input.Embedding,
 	}
 }
 

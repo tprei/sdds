@@ -443,7 +443,7 @@ func TestCreateReportMissingCommentTargetReturnsNotFound(t *testing.T) {
 
 func TestCreateReportRejectsUnauthenticatedBeforeValidation(t *testing.T) {
 	router := NewRouter(
-		NotesDependencies{Stores: reportFoundNoteStore(), Catalog: fakeCatalog{}},
+		NotesDependencies{Stores: reportFoundNoteStore(), Publisher: reportFoundNoteStore(), Catalog: fakeCatalog{}},
 		CommentDependencies{Store: fakeCommentStore{}},
 		ReportDependencies{Store: fakeReportStore{createReport: func(context.Context, report.CreateInput) (report.CreateResult, error) {
 			t.Fatal("CreateReport should not be called")
@@ -543,7 +543,7 @@ func TestCreateReportOwnerStoreFailureReturnsInternalError(t *testing.T) {
 
 func newReportRouter(reports fakeReportStore, notes fakeNoteStore, comments fakeCommentStore) http.Handler {
 	return withCurrentSessionHeader(NewRouter(
-		NotesDependencies{Stores: notes, Catalog: fakeCatalog{}},
+		NotesDependencies{Stores: notes, Publisher: notes, Catalog: fakeCatalog{}},
 		CommentDependencies{Store: comments},
 		ReportDependencies{Store: reports, CommentTargets: comments},
 		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},

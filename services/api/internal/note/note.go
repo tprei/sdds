@@ -52,6 +52,7 @@ type CreateInput struct {
 	CategorySlug    CategorySlug
 	ClientRequestID string
 	ImageUploadIDs  []string
+	Embedding       Embedding
 }
 
 type Store interface {

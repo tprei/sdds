@@ -21,6 +21,10 @@ const (
 		INSERT INTO note_search (note_id, title, body)
 		VALUES (?, ?, ?)
 	`
+	insertNoteEmbeddingSQL = `
+		INSERT INTO note_embeddings (note_id, model_id, model_revision, dimension, source_sha256, vector, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`
 	findNoteCreateRequestSQL = `
 		SELECT request_sha256, note_id
 		FROM note_create_requests
@@ -116,7 +120,7 @@ func (store *NoteStore) createNoteInTransaction(ctx context.Context, tx *sql.Tx,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
-	if err := insertNoteAndSearch(ctx, tx, created); err != nil {
+	if err := insertNoteSearchAndEmbedding(ctx, tx, created, input.Embedding, now); err != nil {
 		return note.Note{}, err
 	}
 	if err := associateImageUploads(ctx, tx, input, created.ID, now); err != nil {
@@ -147,7 +151,7 @@ func validateNoteCreateCatalog(ctx context.Context, tx *sql.Tx, input note.Creat
 	return nil
 }
 
-func insertNoteAndSearch(ctx context.Context, tx *sql.Tx, created note.Note) error {
+func insertNoteSearchAndEmbedding(ctx context.Context, tx *sql.Tx, created note.Note, embedding note.Embedding, now time.Time) error {
 	if _, err := tx.ExecContext(
 		ctx,
 		insertNoteSQL,
@@ -163,6 +167,25 @@ func insertNoteAndSearch(ctx context.Context, tx *sql.Tx, created note.Note) err
 	}
 	if _, err := tx.ExecContext(ctx, insertNoteSearchSQL, created.ID, created.Title, created.Body); err != nil {
 		return fmt.Errorf("insert note search: %w", err)
+	}
+	// A publisher that skipped embedding must fail loudly here rather than
+	// commit a note with no vector or a corrupt one.
+	if len(embedding.Vector) != note.EmbeddingDimension {
+		return fmt.Errorf("insert note embedding: vector length %d, want %d", len(embedding.Vector), note.EmbeddingDimension)
+	}
+	if _, err := tx.ExecContext(
+		ctx,
+		insertNoteEmbeddingSQL,
+		created.ID,
+		embedding.ModelID,
+		embedding.ModelRevision,
+		note.EmbeddingDimension,
+		embedding.SourceSHA256,
+		encodeVector(embedding.Vector),
+		unixMillis(now),
+		unixMillis(now),
+	); err != nil {
+		return fmt.Errorf("insert note embedding: %w", err)
 	}
 	return nil
 }

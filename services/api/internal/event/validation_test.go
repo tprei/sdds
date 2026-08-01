@@ -139,6 +139,18 @@ func TestNormalizeAndValidateRejectsEnvelopeBoundaries(t *testing.T) {
 	}
 }
 
+func TestNormalizeAndValidateAcceptsHybridSearchVersion(t *testing.T) {
+	input := validInput(KindSearchSubmitted, SearchSubmittedPayload{
+		SearchID:      testSearchID,
+		SearchVersion: SearchVersionHybridSerafim100mFTS5V1,
+		Query:         "lugar bom pra trabalhar",
+	})
+	_, problems := NormalizeAndValidate(input)
+	if hasProblem(problems, "payload.search_version", "unsupported") {
+		t.Fatalf("hybrid search version rejected: %+v", problems)
+	}
+}
+
 func TestNormalizeAndValidateRejectsPartialSearchUsefulContext(t *testing.T) {
 	_, problems := NormalizeAndValidate(validInput(KindNoteMarkedUseful, NoteMarkedUsefulPayload{
 		NoteID:  testNoteID,

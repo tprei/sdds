@@ -383,6 +383,18 @@ describe('notes API client', () => {
       searchVersion: 'fts5-v1',
     });
   });
+  it('parses the hybrid search version from the API response', async () => {
+    stubFetch(async () =>
+      jsonResponse({
+        ...apiSearchNotesResponse(),
+        search_version: 'hybrid-serafim100m-fts5-v1',
+      }),
+    );
+
+    const client = createAPIClient(exampleToken);
+    const notes = await client.searchNotes({ query: 'cafe' });
+    expect(notes.searchVersion).toBe('hybrid-serafim100m-fts5-v1');
+  });
   it('rejects missing search response wrapper fields', async () => {
     const { search_version: _searchVersion, ...response } =
       apiSearchNotesResponse();

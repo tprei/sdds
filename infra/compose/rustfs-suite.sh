@@ -1,42 +1,33 @@
 #!/bin/sh
+# rustfs-suite.sh — the RustFS object-store assertions, run against a
+# smoke-provided Compose stack. This is the suite body behind `pnpm smoke rustfs`;
+# it does NOT own the lifecycle (project, credentials, readiness, cleanup).
 set -eu
 umask 077
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
-COMPOSE_FILE=$ROOT/infra/compose/compose.yaml
-PREFLIGHT_COMPOSE_FILE=$ROOT/infra/compose/compose-preflight.yaml
-PROJECT=sdds-rustfs-$(date +%s)-$$
-TMP=
-API_URL=
-cleanup() {
-  status=$?
-  trap - EXIT INT TERM
-  if [ "$status" -ne 0 ] && [ -n "$PROJECT" ]; then
-    compose ps >&2 || :
-    compose logs --no-color --tail=80 api rustfs rustfs-init rustfs-permissions >&2 || :
-  fi
-  [ -z "$PROJECT" ] || docker compose -f "$COMPOSE_FILE" -p "$PROJECT" down --rmi local --volumes --remove-orphans >/dev/null 2>&1 || :
-  [ -z "$TMP" ] || rm -rf "$TMP"
-  exit "$status"
-}
-trap cleanup EXIT INT TERM
-die() { printf '%s\n' "$1" >&2; exit 1; }
-compose() { docker compose -f "$COMPOSE_FILE" -p "$PROJECT" "$@"; }
+. "$ROOT/infra/compose/smoke-lib.sh"
+
+for required in SDDS_SMOKE_PROJECT SDDS_SMOKE_COMPOSE_FILE SDDS_SMOKE_PREFLIGHT_COMPOSE_FILE SDDS_SMOKE_TMP \
+  SDDS_API_BASE_URL SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE SDDS_COMPOSE_RUSTFS_ROOT_SECRET_KEY_FILE \
+  SDDS_COMPOSE_SDDS_MEDIA_ACCESS_KEY_FILE SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE; do
+  eval "required_value=\${$required:-}"
+  [ -n "$required_value" ] || { printf 'rustfs-suite: %s is not set; run this suite through `pnpm smoke rustfs`\n' "$required" >&2; exit 1; }
+done
+
+COMPOSE_FILE=$SDDS_SMOKE_COMPOSE_FILE
+PREFLIGHT_COMPOSE_FILE=$SDDS_SMOKE_PREFLIGHT_COMPOSE_FILE
+PROJECT=$SDDS_SMOKE_PROJECT
+TMP=$SDDS_SMOKE_TMP
+API_URL=$SDDS_API_BASE_URL
+root_access=$(tr -d '\r\n' <"$SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE")
+root_secret=$(tr -d '\r\n' <"$SDDS_COMPOSE_RUSTFS_ROOT_SECRET_KEY_FILE")
+media_access=$(tr -d '\r\n' <"$SDDS_COMPOSE_SDDS_MEDIA_ACCESS_KEY_FILE")
+media_secret=$(tr -d '\r\n' <"$SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE")
+die() { smoke_die "$1"; }
+compose() { smoke_compose "$@"; }
+wait_for_api_readiness() { smoke_wait_for_api_readiness; }
 sha256_file() { shasum -a 256 "$1" | awk '{print $1}'; }
-create_test_credentials() {
-  create_credentials_work_dir=$1
-  create_credentials_project=$2
-  printf 'rustfs-root-access-%s\n' "$create_credentials_project" >"$create_credentials_work_dir/root-access"
-  printf 'rustfs-root-secret-%s\n' "$create_credentials_project" >"$create_credentials_work_dir/root-secret"
-  printf 'sdds-media-access-%s\n' "$create_credentials_project" >"$create_credentials_work_dir/media-access"
-  printf 'sdds-media-secret-%s\n' "$create_credentials_project" >"$create_credentials_work_dir/media-secret"
-  chmod 0444 "$create_credentials_work_dir"/root-access "$create_credentials_work_dir"/root-secret "$create_credentials_work_dir"/media-access "$create_credentials_work_dir"/media-secret
-  root_access=$(tr -d '\r\n' <"$create_credentials_work_dir/root-access")
-  root_secret=$(tr -d '\r\n' <"$create_credentials_work_dir/root-secret")
-  media_access=$(tr -d '\r\n' <"$create_credentials_work_dir/media-access")
-  media_secret=$(tr -d '\r\n' <"$create_credentials_work_dir/media-secret")
-  export SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE=$create_credentials_work_dir/root-access SDDS_COMPOSE_RUSTFS_ROOT_SECRET_KEY_FILE=$create_credentials_work_dir/root-secret
-  export SDDS_COMPOSE_SDDS_MEDIA_ACCESS_KEY_FILE=$create_credentials_work_dir/media-access SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE=$create_credentials_work_dir/media-secret SDDS_HTTP_PORT=0
-}
+
 verify_preflight_runs_as_service_user() {
   output=$(docker compose --env-file /dev/null -f "$PREFLIGHT_COMPOSE_FILE" -p "$PROJECT" run --build --rm --no-deps --entrypoint id rustfs-init 2>&1) || { printf '%s\n' "$output" >&2; die 'preflight identity check failed'; }
   case "$output" in *'uid=10001 gid=10001'*) ;; *) printf '%s\n' "$output" >&2; die 'preflight did not run as the service user';; esac
@@ -132,32 +123,6 @@ root_mc() {
   shift
   run_root_mc_script 'mc "$@"' "$root_mc_command" "$@"
 }
-wait_for_api_readiness() {
-  API_URL=
-  readiness_attempt=0
-  while [ "$readiness_attempt" -lt 120 ]; do
-    readiness_init_id=$(compose ps -aq rustfs-init 2>/dev/null || :)
-    if [ -n "$readiness_init_id" ]; then
-      readiness_init_state=$(docker inspect --format '{{.State.Status}} {{.State.ExitCode}}' "$readiness_init_id" 2>/dev/null || :)
-      case "$readiness_init_state" in
-        'exited 0') ;;
-        'exited '*) die 'rustfs-init failed';;
-      esac
-    fi
-    readiness_published=$(compose port api 8080 2>/dev/null || :)
-    readiness_port=${readiness_published##*:}
-    case "$readiness_port" in
-      ''|*[!0-9]*) ;;
-      *)
-        API_URL=http://127.0.0.1:$readiness_port
-        curl --silent --show-error --fail --max-time 2 "$API_URL/readyz" >/dev/null 2>&1 && return
-        ;;
-    esac
-    readiness_attempt=$((readiness_attempt + 1))
-    sleep 1
-  done
-  die 'api did not become ready'
-}
 recreate_clean_stack() {
   compose down --volumes --remove-orphans >/dev/null 2>&1 || :
   compose up -d >/dev/null
@@ -207,10 +172,6 @@ verify_bootstrap_drift_recovery() {
   assert_bootstrap_rejects_drift anonymous-v1 'anonymous bucket policy is configured' enable_anonymous_download
   assert_bootstrap_rejects_drift attachment-v1 'API user attachment drift' detach_api_policy
 }
-start_compose_runtime() {
-  compose up --build -d >/dev/null
-  wait_for_api_readiness
-}
 verify_bootstrap_idempotency() {
   compose run --rm --no-deps rustfs-init >/dev/null
 }
@@ -254,15 +215,12 @@ verify_migrate_without_media_dependencies() {
   )
 }
 run_rustfs_integration() {
-  TMP=$(mktemp -d "${TMPDIR:-/tmp}/sdds-rustfs.XXXXXX")
-  create_test_credentials "$TMP" "$PROJECT"
   verify_preflight_runs_as_service_user
   verify_preflight_rejects_whitespace_secret
   verify_preflight_rejects_embedded_newline_secret
   verify_preflight_rejects_nul_secret
   verify_secret_reader_cleans_snapshot_on_signal
   verify_compose_start_requires_secret_paths
-  start_compose_runtime
   verify_preflight_ignores_orphans
   verify_bootstrap_idempotency
   verify_bootstrap_drift_recovery

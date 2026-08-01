@@ -1,8 +1,19 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const apiBaseURL =
-  process.env.SDDS_SYNTHETICS_API_BASE_URL ?? 'http://127.0.0.1:18080';
-const webPort = process.env.SDDS_SYNTHETICS_WEB_PORT ?? '19006';
+function requiredEnv(name: string, value: string | undefined): string {
+  if (!value) {
+    throw new Error(
+      `${name} is required; run synthetics through \`pnpm smoke synthetics\``,
+    );
+  }
+  return value;
+}
+
+const apiBaseURL = requiredEnv(
+  'SDDS_SYNTHETICS_API_BASE_URL',
+  process.env.SDDS_SYNTHETICS_API_BASE_URL,
+);
+const webPort = requiredEnv('SDDS_SYNTHETICS_WEB_PORT', process.env.SDDS_SYNTHETICS_WEB_PORT);
 const webBaseURL =
   process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${webPort}`;
 

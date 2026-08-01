@@ -12,8 +12,20 @@ import {
   parseSearchNotesResponse,
 } from '../contract/api-wire';
 const execFileAsync = promisify(execFile);
-export const apiBaseURL =
-  process.env.SDDS_SYNTHETICS_API_BASE_URL ?? 'http://127.0.0.1:18080';
+
+function requiredEnv(name: string, value: string | undefined): string {
+  if (!value) {
+    throw new Error(
+      `${name} is required; run synthetics through \`pnpm smoke synthetics\``,
+    );
+  }
+  return value;
+}
+
+export const apiBaseURL = requiredEnv(
+  'SDDS_SYNTHETICS_API_BASE_URL',
+  process.env.SDDS_SYNTHETICS_API_BASE_URL,
+);
 export const syntheticPassword = 'secret-password';
 export type { AuthorSummary };
 export { isRecord } from '../contract/api-wire';
@@ -50,14 +62,16 @@ export async function loginUser(
 }
 
 export async function runComposeAPICommand(command: string): Promise<string> {
+  const composeProject = requiredEnv('SDDS_SMOKE_PROJECT', process.env.SDDS_SMOKE_PROJECT);
+  const composeFile = requiredEnv('SDDS_SMOKE_COMPOSE_FILE', process.env.SDDS_SMOKE_COMPOSE_FILE);
   const result = await execFileAsync(
     'docker',
     [
       'compose',
       '-p',
-      'sdds-synthetics',
+      composeProject,
       '-f',
-      'infra/compose/compose.yaml',
+      composeFile,
       'run',
       '--rm',
       '--no-deps',

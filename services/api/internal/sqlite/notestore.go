@@ -87,6 +87,13 @@ const (
 	` + searchNotesOrderSQL + `
 		LIMIT ?
 	`
+	findNotesByIDSQL = `
+		SELECT
+		` + noteProjectionSQL + `
+		FROM notes
+		JOIN authors ON authors.user_id = notes.user_id
+		WHERE notes.id IN (%s)
+	`
 )
 
 var _ note.Store = (*NoteStore)(nil)
@@ -206,6 +213,58 @@ func (store *NoteStore) SearchNotes(ctx context.Context, input note.SearchInput)
 	}
 
 	return notes, nil
+}
+
+// FindNotesByID loads a batch of notes by id, returned in the requested
+// order. An id that no longer exists is silently omitted -- a note deleted
+// between candidate retrieval and hydration is not an error.
+func (store *NoteStore) FindNotesByID(ctx context.Context, ids []string, viewerUserID user.UserID) ([]note.Note, error) {
+	if len(ids) == 0 {
+		return []note.Note{}, nil
+	}
+
+	placeholders := make([]string, len(ids))
+	args := make([]any, 0, len(ids)+1)
+	args = append(args, string(viewerUserID))
+	for index, id := range ids {
+		placeholders[index] = "?"
+		args = append(args, id)
+	}
+	query := fmt.Sprintf(findNotesByIDSQL, strings.Join(placeholders, ", "))
+
+	rows, err := store.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query notes by id: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	byID := make(map[string]note.Note, len(ids))
+	for rows.Next() {
+		found, err := scanNote(rows)
+		if err != nil {
+			return nil, err
+		}
+		byID[found.ID] = found
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read notes by id: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close notes by id rows: %w", err)
+	}
+
+	ordered := make([]note.Note, 0, len(ids))
+	for _, id := range ids {
+		if found, ok := byID[id]; ok {
+			ordered = append(ordered, found)
+		}
+	}
+	if err := store.loadNotesWithOrderedImages(ctx, ordered); err != nil {
+		return nil, fmt.Errorf("hydrate notes by id images: %w", err)
+	}
+	return ordered, nil
 }
 
 func noteSearchMatchExpression(query string) string {

@@ -60,4 +60,6 @@ type Store interface {
 	FindNote(ctx context.Context, id string, viewerUserID user.UserID) (Note, error)
 	ListRecentNotes(ctx context.Context, input ListInput) ([]Note, error)
 	SearchNotes(ctx context.Context, input SearchInput) ([]Note, error)
+	SearchSemantic(ctx context.Context, input SemanticSearchInput) ([]ScoredNote, error)
+	FindNotesByID(ctx context.Context, ids []string, viewerUserID user.UserID) ([]Note, error)
 }

@@ -249,7 +249,7 @@ func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 				CreatedAt:    now.UnixMilli(),
 				UpdatedAt:    now.UnixMilli(),
 			},
-			RetrievalSource: openapi.RetrievalSource(note.CurrentRetrievalSource),
+			RetrievalSource: openapi.Lexical,
 		}},
 	}
 	if diff := cmp.Diff(want, body); diff != "" {
@@ -551,6 +551,81 @@ func TestSearchNotesReturnsInternalError(t *testing.T) {
 	}
 	if body.Code != openapi.ErrorCodeInternal {
 		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeInternal)
+	}
+}
+
+func TestSearchNotesReturnsEmbeddingUnavailable(t *testing.T) {
+	router := newTestRouter(fakeNoteStore{
+		search: func(context.Context, note.SearchInput) ([]note.SearchResult, error) {
+			return nil, note.ErrSearchUnavailable
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=caf%C3%A9", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeEmbeddingUnavailable {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeEmbeddingUnavailable)
+	}
+}
+
+func TestSearchNotesCarriesHybridVersionAndPerResultRetrievalSource(t *testing.T) {
+	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
+	router := newTestRouter(fakeNoteStore{
+		search: func(context.Context, note.SearchInput) ([]note.SearchResult, error) {
+			return []note.SearchResult{
+				{
+					Note:            note.Note{ID: exampleNoteID, Title: "Achado", Body: "Em ambas as listas.", CategorySlug: "food", CreatedAt: now, UpdatedAt: now},
+					RetrievalSource: note.RetrievalSourceHybrid,
+				},
+				{
+					Note:            note.Note{ID: "018ff5b8-0000-7000-8000-000000000001", Title: "Só léxico", Body: "Só no FTS5.", CategorySlug: "food", CreatedAt: now, UpdatedAt: now},
+					RetrievalSource: note.RetrievalSourceLexical,
+				},
+				{
+					Note:            note.Note{ID: "018ff5b8-0000-7000-8000-000000000002", Title: "Só semântico", Body: "Só no KNN.", CategorySlug: "food", CreatedAt: now, UpdatedAt: now},
+					RetrievalSource: note.RetrievalSourceSemantic,
+				},
+			}, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=caf%C3%A9", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	var body openapi.SearchNotesResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if string(body.SearchVersion) != "hybrid-serafim100m-fts5-v1" {
+		t.Fatalf("search version = %q, want hybrid-serafim100m-fts5-v1", body.SearchVersion)
+	}
+	if len(body.Results) != 3 {
+		t.Fatalf("result count = %d, want 3", len(body.Results))
+	}
+	wantSources := []openapi.RetrievalSource{openapi.Hybrid, openapi.Lexical, openapi.Semantic}
+	for i, result := range body.Results {
+		if result.RetrievalSource != wantSources[i] {
+			t.Fatalf("result[%d].RetrievalSource = %q, want %q", i, result.RetrievalSource, wantSources[i])
+		}
 	}
 }
 

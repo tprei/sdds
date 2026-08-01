@@ -72,7 +72,7 @@ type SearchNoteResult = {
 
 type SearchNotesResponse = {
   results: SearchNoteResult[];
-  search_version: 'fts5-v1';
+  search_version: 'hybrid-serafim100m-fts5-v1';
 };
 
 type ErrorResponse = {
@@ -525,9 +525,11 @@ test('narrows the mobile search results by category and clears stale cards', asy
   await expect(
     page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
   ).toBeVisible();
-  await expect(page.getByText(`2 achados para "${marker}"`)).toBeVisible();
   await expect(
-    page.getByLabel(`2 achados para ${marker}.`),
+    page.getByText(new RegExp(`^\\d+ achados? para "${marker}"$`)),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel(new RegExp(`^\\d+ achados? para ${marker}\\.$`)),
   ).toBeVisible();
 
   await page.getByRole('button', { exact: true, name: 'Comida' }).click();
@@ -536,10 +538,12 @@ test('narrows the mobile search results by category and clears stale cards', asy
   ).toBeVisible();
 
   await expect(
-    page.getByText(`1 achado para "${marker}" · Comida`),
+    page.getByText(new RegExp(`^\\d+ achados? para "${marker}" · Comida$`)),
   ).toBeVisible();
   await expect(
-    page.getByLabel(`1 achado para ${marker}, categoria Comida.`),
+    page.getByLabel(
+      new RegExp(`^\\d+ achados? para ${marker}, categoria Comida\\.$`),
+    ),
   ).toBeVisible();
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toHaveCount(0);
@@ -548,7 +552,9 @@ test('narrows the mobile search results by category and clears stale cards', asy
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
-  await expect(page.getByText(`2 achados para "${marker}"`)).toBeVisible();
+  await expect(
+    page.getByText(new RegExp(`^\\d+ achados? para "${marker}"$`)),
+  ).toBeVisible();
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toBeVisible();
 
@@ -564,7 +570,7 @@ test('narrows the mobile search results by category and clears stale cards', asy
   await expect(travelNote).toBeVisible();
 });
 
-test('orders search results by weighted title matches and handles punctuation-only queries', async ({
+test('surfaces both title and body matches and handles punctuation-only queries', async ({
   page,
   request,
 }) => {
@@ -600,10 +606,14 @@ test('orders search results by weighted title matches and handles punctuation-on
   await page.getByTestId('search-field-input').fill(marker);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
-  const searchResults = page.getByRole('button', { name: /Abrir nota:/ });
-  await expect(searchResults).toHaveCount(2);
-  await expect(searchResults.nth(0)).toContainText(titleMatchTitle);
-  await expect(searchResults.nth(1)).toContainText(bodyMatchTitle);
+  const titleMatchResult = page.getByRole('button', {
+    name: `Abrir nota: ${titleMatchTitle}`,
+  });
+  const bodyMatchResult = page.getByRole('button', {
+    name: `Abrir nota: ${bodyMatchTitle}`,
+  });
+  await expect(titleMatchResult).toBeVisible();
+  await expect(bodyMatchResult).toBeVisible();
   await expect(
     page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
   ).toBeVisible();
@@ -613,6 +623,45 @@ test('orders search results by weighted title matches and handles punctuation-on
 
   await expect(page.getByText('Nada por aqui ainda')).toBeVisible();
   await expect(page.getByText('Não deu pra buscar')).toHaveCount(0);
+});
+
+test('finds a note through semantic vocabulary-mismatch search', async ({
+  page,
+  request,
+}) => {
+  const timestamp = Date.now();
+  const displayName = `Autor Semântica ${timestamp}`;
+  const session = await createAuthUser(request, {
+    display_name: displayName,
+    password: syntheticPassword,
+    username: `semantica-${timestamp}`,
+  });
+  const title = `Café da esquina ${timestamp}`;
+
+  await createNote(request, session.token, {
+    body: 'Wi-Fi estável, várias tomadas e ninguém reclamou que fiquei duas horas',
+    client_request_id: `synthetic-vocab-mismatch-${timestamp}`,
+    category_slug: 'food',
+    title,
+  });
+
+  const results = await searchNotes(request, session.token, 'lugar bom pra trabalhar de notebook', {
+    categorySlug: 'food',
+  });
+  const match = results.results.find((result) => result.note.title === title);
+  expect(match).toBeDefined();
+  expect(match!.retrieval_source).toBe('semantic');
+  expect(results.search_version).toBe('hybrid-serafim100m-fts5-v1');
+
+  await loginUser(page, session.user.username, '/search');
+  await expect(page.getByPlaceholder('Buscar notas…')).toBeVisible();
+
+  await page.getByTestId('search-field-input').fill('lugar bom pra trabalhar de notebook');
+  await page.getByRole('button', { name: 'Buscar' }).click();
+
+  const noteCard = page.getByRole('button', { name: `Abrir nota: ${title}` });
+  await expect(noteCard).toBeVisible();
+  await expect(noteCard).toContainText('Wi-Fi estável');
 });
 
 test('filters note discovery by category through the public API', async ({
@@ -1104,7 +1153,7 @@ function isSearchNotesResponse(value: unknown): value is SearchNotesResponse {
   return (
     isRecord(value) &&
     hasOnlyKeys(value, searchNotesResponseKeys) &&
-    value.search_version === 'fts5-v1' &&
+    value.search_version === 'hybrid-serafim100m-fts5-v1' &&
     Array.isArray(value.results) &&
     value.results.every(isSearchNoteResult)
   );

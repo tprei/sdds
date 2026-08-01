@@ -108,3 +108,26 @@ func TestValidateSearchInputRejectsNegativeLimit(t *testing.T) {
 		t.Fatalf("validation problems mismatch (-want +got):\n%s", diff)
 	}
 }
+
+func TestHasSearchableTokens(t *testing.T) {
+	cases := []struct {
+		name  string
+		query string
+		want  bool
+	}{
+		{name: "letters", query: "cafe", want: true},
+		{name: "digits", query: "1234", want: true},
+		{name: "accented letters", query: "café", want: true},
+		{name: "mixed with punctuation", query: "!!! cafe ***", want: true},
+		{name: "punctuation only", query: "!!! *** ()", want: false},
+		{name: "whitespace only", query: "   ", want: false},
+		{name: "empty", query: "", want: false},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := HasSearchableTokens(testCase.query); got != testCase.want {
+				t.Fatalf("HasSearchableTokens(%q) = %v, want %v", testCase.query, got, testCase.want)
+			}
+		})
+	}
+}

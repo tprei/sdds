@@ -1,0 +1,13 @@
+{
+  "model_id": "PORTULAN/serafim-100m-portuguese-pt-sentence-encoder-ir",
+  "model_revision": "f27c45d197ea6541dd071b1d992ec91776ee76bd",
+  "dimension": 768,
+  "onnx_sha256": "ffa4bef14f978cf251ea9c62daeca07f34e3cc1628ff57e3fc4bc1b82bec9f4a",
+  "exporter": {
+    "optimum": "1.27.0",
+    "transformers": "4.53.0",
+    "torch": "2.8.0",
+    "opset": 17
+  },
+  "weights": "float32"
+}

@@ -127,23 +127,16 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		t.Fatalf("fetched travel note id = %q, want %q", fetchedTravelNote.Id, travelNote.Id)
 	}
 
+	// Hybrid search ranks via fusion, not exclusion, so a small shared corpus
+	// may surface weakly related notes as semantic background. Assertions
+	// check membership and provenance, not an exact result count.
 	searchResults := searchNotes(t, client, "balcao")
-	if len(searchResults.Results) != 1 {
-		t.Fatalf("search note count = %d, want 1", len(searchResults.Results))
-	}
-	requireCreatedNote(t, searchResults.Results[0].Note, request)
-	if searchResults.Results[0].Note.Id != created.Id {
-		t.Fatalf("search note id = %q, want %q", searchResults.Results[0].Note.Id, created.Id)
-	}
+	balcaoMatch := requireSearchResultByID(t, searchResults, created.Id)
+	requireCreatedNote(t, balcaoMatch.Note, request)
 
 	travelSearchResults := searchNotes(t, client, "mundial")
-	if len(travelSearchResults.Results) != 1 {
-		t.Fatalf("travel search note count = %d, want 1", len(travelSearchResults.Results))
-	}
-	requireCreatedNote(t, travelSearchResults.Results[0].Note, travelRequest)
-	if travelSearchResults.Results[0].Note.Id != travelNote.Id {
-		t.Fatalf("travel search note id = %q, want %q", travelSearchResults.Results[0].Note.Id, travelNote.Id)
-	}
+	mundialMatch := requireSearchResultByID(t, travelSearchResults, travelNote.Id)
+	requireCreatedNote(t, mundialMatch.Note, travelRequest)
 
 	filteredSearchResults := searchNotesByCategory(t, client, "mundial", "travel")
 	if len(filteredSearchResults.Results) != 1 {
@@ -152,14 +145,14 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	requireCreatedNote(t, filteredSearchResults.Results[0].Note, travelRequest)
 
 	emptyFilteredSearchResults := searchNotesByCategory(t, client, "mundial", "food")
-	if len(emptyFilteredSearchResults.Results) != 0 {
-		t.Fatalf("empty filtered search note count = %d, want 0", len(emptyFilteredSearchResults.Results))
+	for _, result := range emptyFilteredSearchResults.Results {
+		if result.Note.CategorySlug != "food" {
+			t.Fatalf("category filter leaked note outside food: %+v", result.Note)
+		}
 	}
 
 	emptySearchResults := searchNotes(t, client, "necessaire")
-	if len(emptySearchResults.Results) != 0 {
-		t.Fatalf("empty search note count = %d, want 0", len(emptySearchResults.Results))
-	}
+	requireOnlySemanticMatches(t, emptySearchResults, "necessaire")
 
 	accentRequest := openapi.CreateNoteJSONRequestBody{
 		Title:           "Pão ftsaccent48",
@@ -169,7 +162,7 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	}
 	accentNote := createNote(t, client, accentRequest)
 	accentResults := searchNotes(t, client, "pao ftsaccent48")
-	requireOnlySearchNoteIDs(t, accentResults, []string{accentNote.Id})
+	requireLexicalMatch(t, accentResults, accentNote.Id)
 
 	strictBothRequest := openapi.CreateNoteJSONRequestBody{
 		Title:           "strictcafe48 strictpao48",
@@ -178,20 +171,22 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		ClientRequestId: "integration-strict-both",
 	}
 	strictBothNote := createNote(t, client, strictBothRequest)
-	createNote(t, client, openapi.CreateNoteJSONRequestBody{
+	strictCafeOnlyNote := createNote(t, client, openapi.CreateNoteJSONRequestBody{
 		Title:           "strictcafe48",
 		Body:            "Falta o segundo termo.",
 		CategorySlug:    "food",
 		ClientRequestId: "integration-strict-cafe",
 	})
-	createNote(t, client, openapi.CreateNoteJSONRequestBody{
+	strictPaoOnlyNote := createNote(t, client, openapi.CreateNoteJSONRequestBody{
 		Title:           "strictpao48",
 		Body:            "Falta o primeiro termo.",
 		CategorySlug:    "food",
 		ClientRequestId: "integration-strict-pao",
 	})
 	strictResults := searchNotes(t, client, "strictcafe48 strictpao48")
-	requireOnlySearchNoteIDs(t, strictResults, []string{strictBothNote.Id})
+	requireLexicalMatch(t, strictResults, strictBothNote.Id)
+	requireNeverLexicallyMatched(t, strictResults, strictCafeOnlyNote.Id)
+	requireNeverLexicallyMatched(t, strictResults, strictPaoOnlyNote.Id)
 
 	titleRankRequest := openapi.CreateNoteJSONRequestBody{
 		Title:           "rankbolo48 roteiro enorme com muitas palavras extras para alongar o titulo e reduzir relevancia sem peso",
@@ -208,7 +203,8 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	}
 	bodyRankNote := createNote(t, client, bodyRankRequest)
 	rankedResults := searchNotes(t, client, "rankbolo48")
-	requireOnlySearchNoteIDs(t, rankedResults, []string{titleRankNote.Id, bodyRankNote.Id})
+	requireLexicalMatch(t, rankedResults, titleRankNote.Id)
+	requireLexicalMatch(t, rankedResults, bodyRankNote.Id)
 
 	categoryFoodRequest := openapi.CreateNoteJSONRequestBody{
 		Title:           "catbusca48 comida",
@@ -224,7 +220,12 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		ClientRequestId: "integration-category-travel",
 	})
 	categoryResults := searchNotesByCategory(t, client, "catbusca48", "food")
-	requireOnlySearchNoteIDs(t, categoryResults, []string{categoryFoodNote.Id})
+	requireLexicalMatch(t, categoryResults, categoryFoodNote.Id)
+	for _, result := range categoryResults.Results {
+		if result.Note.CategorySlug != "food" {
+			t.Fatalf("category filter leaked note outside food: %+v", result.Note)
+		}
+	}
 
 	globalFirstRequest := openapi.CreateNoteJSONRequestBody{
 		Title:           "globalbusca48 primeira",
@@ -241,7 +242,8 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	}
 	globalSecondNote := createNote(t, client, globalSecondRequest)
 	globalResults := searchNotes(t, client, "globalbusca48")
-	requireSearchNoteIDs(t, globalResults, []string{globalFirstNote.Id, globalSecondNote.Id})
+	requireLexicalMatch(t, globalResults, globalFirstNote.Id)
+	requireLexicalMatch(t, globalResults, globalSecondNote.Id)
 
 	punctuationRequest := openapi.CreateNoteJSONRequestBody{
 		Title:           "pontoseguro48",
@@ -251,12 +253,10 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	}
 	punctuationNote := createNote(t, client, punctuationRequest)
 	punctuationResults := searchNotes(t, client, "pontoseguro48 ***")
-	requireOnlySearchNoteIDs(t, punctuationResults, []string{punctuationNote.Id})
+	requireLexicalMatch(t, punctuationResults, punctuationNote.Id)
 
 	punctuationOnlyResults := searchNotes(t, client, "!!! *** ()")
-	if len(punctuationOnlyResults.Results) != 0 {
-		t.Fatalf("punctuation-only search note count = %d, want 0", len(punctuationOnlyResults.Results))
-	}
+	requireOnlySemanticMatches(t, punctuationOnlyResults, "!!! *** ()")
 
 	requireListNotesCategoryFilterError(t, client, "comida")
 	requireSearchNotesCategoryFilterError(t, client, "comida")
@@ -550,12 +550,14 @@ func searchNotesByCategory(t *testing.T, client *openapi.ClientWithResponses, qu
 }
 func requireSearchResponseProvenance(t *testing.T, response openapi.SearchNotesResponse) {
 	t.Helper()
-	if response.SearchVersion != openapi.SearchVersion("fts5-v1") {
-		t.Fatalf("search version = %q, want fts5-v1", response.SearchVersion)
+	if response.SearchVersion != openapi.SearchVersion("hybrid-serafim100m-fts5-v1") {
+		t.Fatalf("search version = %q, want hybrid-serafim100m-fts5-v1", response.SearchVersion)
 	}
 	for index, result := range response.Results {
-		if result.RetrievalSource != openapi.RetrievalSource("lexical") {
-			t.Fatalf("search result %d source = %q, want lexical", index, result.RetrievalSource)
+		switch result.RetrievalSource {
+		case openapi.Lexical, openapi.Semantic, openapi.Hybrid:
+		default:
+			t.Fatalf("search result %d source = %q, want lexical, semantic, or hybrid", index, result.RetrievalSource)
 		}
 	}
 }
@@ -690,32 +692,65 @@ func requireListedNote(t *testing.T, notes openapi.ListNotesResponse, id string,
 	t.Fatalf("listed note id %q missing", id)
 }
 
-func requireOnlySearchNoteIDs(t *testing.T, response openapi.SearchNotesResponse, wantIDs []string) {
+// requireSearchResultByID asserts a specific note id appears somewhere in
+// the search response and returns its result for further field assertions.
+// Hybrid search has no similarity threshold, so a small shared corpus may
+// surface additional, weakly-related notes alongside the intended match;
+// this checks presence, not exclusivity.
+func requireSearchResultByID(t *testing.T, response openapi.SearchNotesResponse, wantID string) openapi.SearchNoteResult {
 	t.Helper()
 
-	gotIDs := make([]string, 0, len(response.Results))
 	for _, result := range response.Results {
-		gotIDs = append(gotIDs, result.Note.Id)
+		if result.Note.Id == wantID {
+			return result
+		}
 	}
-	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
-		t.Fatalf("search note ids mismatch (-want +got):\n%s", diff)
+	t.Fatalf("search note id %q missing from results", wantID)
+	return openapi.SearchNoteResult{}
+}
+
+// requireLexicalMatch asserts a note is present and was actually found by
+// the lexical (FTS5) engine -- retrieval_source lexical or hybrid, never a
+// semantic-only coincidence.
+func requireLexicalMatch(t *testing.T, response openapi.SearchNotesResponse, wantID string) openapi.SearchNoteResult {
+	t.Helper()
+
+	result := requireSearchResultByID(t, response, wantID)
+	if result.RetrievalSource != openapi.Lexical && result.RetrievalSource != openapi.Hybrid {
+		t.Fatalf("note %q retrieval source = %q, want lexical or hybrid", wantID, result.RetrievalSource)
+	}
+	return result
+}
+
+// requireNeverLexicallyMatched asserts that if a note appears in the search
+// response at all, it is never labeled lexical or hybrid -- proving the
+// lexical engine's token/operator precision (e.g. AND-token exclusion)
+// still holds, even though unrestricted semantic recall may still surface
+// the note as weak background noise.
+func requireNeverLexicallyMatched(t *testing.T, response openapi.SearchNotesResponse, excludedID string) {
+	t.Helper()
+
+	for _, result := range response.Results {
+		if result.Note.Id != excludedID {
+			continue
+		}
+		if result.RetrievalSource != openapi.Semantic {
+			t.Fatalf("note %q retrieval source = %q, want semantic-only (lexical engine must not match it)", excludedID, result.RetrievalSource)
+		}
 	}
 }
 
-func requireSearchNoteIDs(t *testing.T, response openapi.SearchNotesResponse, wantIDs []string) {
+// requireOnlySemanticMatches asserts that every result for a query with no
+// real lexical match is labeled semantic -- never lexical or hybrid. It
+// replaces a stronger "returns nothing" claim that no longer holds once any
+// notes exist: hybrid search has no similarity threshold, so an unrelated
+// query still returns the corpus as weakly-scored semantic background.
+func requireOnlySemanticMatches(t *testing.T, response openapi.SearchNotesResponse, query string) {
 	t.Helper()
 
-	if len(response.Results) != len(wantIDs) {
-		t.Fatalf("search note count = %d, want %d", len(response.Results), len(wantIDs))
-	}
-
-	gotIDs := make(map[string]bool, len(response.Results))
 	for _, result := range response.Results {
-		gotIDs[result.Note.Id] = true
-	}
-	for _, wantID := range wantIDs {
-		if !gotIDs[wantID] {
-			t.Fatalf("search note id %q missing", wantID)
+		if result.RetrievalSource != openapi.Semantic {
+			t.Fatalf("query %q matched note %q with source %q, want semantic-only", query, result.Note.Id, result.RetrievalSource)
 		}
 	}
 }

@@ -39,7 +39,7 @@ func (handler server) GetAuthor(w http.ResponseWriter, r *http.Request, authorID
 }
 
 func (handler server) ListAuthorNotes(w http.ResponseWriter, r *http.Request, authorID string, params openapi.ListAuthorNotesParams) {
-	if handler.auth.publicAuthors == nil || handler.notes.authorNotes == nil {
+	if handler.auth.publicAuthors == nil || handler.notes.authorNoteStore == nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}
@@ -65,7 +65,7 @@ func (handler server) ListAuthorNotes(w http.ResponseWriter, r *http.Request, au
 		return
 	}
 
-	page, err := handler.notes.authorNotes.ListAuthorNotes(r.Context(), input)
+	page, err := handler.notes.authorNoteStore.ListAuthorNotes(r.Context(), input)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return

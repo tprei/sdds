@@ -1,0 +1,6 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.8.0
+transformers==4.53.0
+optimum[exporters]==1.27.0
+onnx==1.18.0
+sentence-transformers==5.1.1

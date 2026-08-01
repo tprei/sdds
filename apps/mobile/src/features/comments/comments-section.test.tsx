@@ -196,8 +196,10 @@ describe('CommentsSection', () => {
     const authorLabel = 'TThiago';
     expect(buttonLabels(idleRenderer)).toEqual([
       authorLabel,
+      'Responder',
       'Ver mais comentários',
       authorLabel,
+      'Responder',
       'Comentar',
     ]);
     // Excluir/Denunciar render as icon-only buttons: their accessible name
@@ -329,6 +331,12 @@ describe('CommentsSection', () => {
     expect(
       renderer.root.findByProps({ testID: `comment-report-${secondReply.id}` }),
     ).toBeDefined();
+    expect(
+      renderer.root.findAllByProps({ testID: `comment-reply-${firstReply.id}` }),
+    ).toHaveLength(0);
+    expect(
+      renderer.root.findByProps({ testID: `comment-reply-${firstComment.id}` }),
+    ).toBeDefined();
 
     act(() => {
       renderer.root
@@ -370,11 +378,50 @@ describe('CommentsSection', () => {
         ]),
       }),
     });
-
     expect(textNodes(renderer, firstComment.body)).toHaveLength(1);
     expect(textNodes(renderer, firstReply.body)).toHaveLength(0);
     expect(textNodes(renderer, secondReply.body)).toHaveLength(1);
   });
+
+  it('opens a reply composer for a parent, trims submission, and cancels it', () => {
+    const onSubmitReply = vi.fn();
+    const renderer = render(<ReplyHarness onSubmitReply={onSubmitReply} />);
+
+    act(() => {
+      renderer.root
+        .findByProps({ testID: `comment-reply-${firstComment.id}` })
+        .props.onPress();
+    });
+    expect(textNodes(renderer, 'Respondendo Thiago')).toHaveLength(1);
+    const input = renderer.root.findByProps({ testID: 'comment-reply-draft' });
+    act(() => {
+      input.props.onChangeText('  Resposta nova  ');
+    });
+    expect(
+      renderer.root.findByProps({ testID: 'comment-reply-submit' }).props.disabled,
+    ).toBe(false);
+    act(() => {
+      renderer.root.findByProps({ testID: 'comment-reply-submit' }).props.onPress();
+    });
+    expect(onSubmitReply).toHaveBeenCalledWith('Resposta nova');
+
+    const secondRenderer = render(<ReplyHarness onSubmitReply={vi.fn()} />);
+    act(() => {
+      secondRenderer.root
+        .findByProps({ testID: `comment-reply-${firstComment.id}` })
+        .props.onPress();
+    });
+    act(() => {
+      secondRenderer.root
+        .findByProps({ testID: 'comment-reply-cancel' })
+        .props.onPress();
+    });
+    expect(textNodes(secondRenderer, 'Respondendo Thiago')).toHaveLength(0);
+    expect(
+      secondRenderer.root.findAllByProps({ testID: 'comment-reply-draft' }),
+    ).toHaveLength(0);
+  });
+
 
   it('trims a valid draft before submitting and disables duplicate presses while pending', () => {
     const onSubmit = vi.fn();
@@ -422,6 +469,47 @@ describe('CommentsSection', () => {
     ).toHaveLength(1);
   });
 });
+
+function ReplyHarness({
+  onSubmitReply,
+}: {
+  onSubmitReply: (body: string) => void;
+}) {
+  const [state, dispatch] = useReducer(
+    commentThreadReducer,
+    undefined,
+    createCommentThreadState,
+  );
+
+  return (
+    <CommentsSection
+      currentAuthorID="author-id"
+      noteAuthorID={noteAuthorID}
+      onDraftChange={() => undefined}
+      onLoadMore={() => undefined}
+      onPressAuthor={() => undefined}
+      onDeleteComment={() => undefined}
+      onRetryInitial={() => undefined}
+      onSubmit={() => undefined}
+      onStartReply={(commentID, authorDisplayName) =>
+        dispatch({ type: 'reply_started', commentID, authorDisplayName })
+      }
+      onCancelReply={() => dispatch({ type: 'reply_cancelled' })}
+      onReplyDraftChange={(draft) =>
+        dispatch({ type: 'reply_draft_changed', draft })
+      }
+      onSubmitReply={(body) => {
+        dispatch({ type: 'reply_submit_started' });
+        onSubmitReply(body);
+      }}
+      thread={{
+        ...state,
+        initialLoadStatus: 'ready',
+        threads: [thread(firstComment)],
+      }}
+    />
+  );
+}
 
 function ComposerHarness({ onSubmit }: { onSubmit: (body: string) => void }) {
   const [thread, dispatch] = useReducer(

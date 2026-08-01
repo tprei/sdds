@@ -18,6 +18,7 @@ import { TextField } from '@/ui/text-field';
 import {
   commentBodyMaxCodePoints,
   canSubmitComment,
+  canSubmitReply,
   displayedCommentCount,
   replyMaxPerParent,
   visibleComments,
@@ -40,6 +41,10 @@ export type CommentsSectionProps = {
   onReportComment?: (commentID: string) => void;
   onRetryInitial: () => void;
   onSubmit: (body: string) => void;
+  onStartReply?: (commentID: string, authorDisplayName: string) => void;
+  onCancelReply?: () => void;
+  onReplyDraftChange?: (draft: string) => void;
+  onSubmitReply?: (body: string) => void;
   composerRef?: Ref<TextInput>;
   thread: CommentThreadState;
 };
@@ -55,11 +60,20 @@ export function CommentsSection({
   onReportComment = () => undefined,
   onRetryInitial,
   onSubmit,
+  onStartReply = () => undefined,
+  onCancelReply = () => undefined,
+  onReplyDraftChange = () => undefined,
+  onSubmitReply = () => undefined,
   thread,
 }: CommentsSectionProps) {
   const validation = validateCommentDraft(thread.draft);
   const submitDisabled = !canSubmitComment(thread);
   const draftError = thread.draftTouched ? validation.error : null;
+  const replyValidation = validateCommentDraft(thread.replyDraft);
+  const replySubmitDisabled = !canSubmitReply(thread);
+  const replyDraftError = thread.replyDraftTouched
+    ? replyValidation.error
+    : null;
 
   return (
     <View style={styles.section}>
@@ -74,6 +88,16 @@ export function CommentsSection({
         onPressAuthor={onPressAuthor}
         onReportComment={onReportComment}
         onRetryInitial={onRetryInitial}
+        onStartReply={onStartReply}
+        onCancelReply={onCancelReply}
+        onReplyDraftChange={onReplyDraftChange}
+        onSubmitReply={onSubmitReply}
+        replyDraft={thread.replyDraft}
+        replyDraftTouched={thread.replyDraftTouched}
+        replyDraftError={replyDraftError}
+        replyDraftCodePointCount={replyValidation.codePointCount}
+        replySubmitDisabled={replySubmitDisabled}
+        replySubmitStatus={thread.replySubmitStatus}
         thread={thread}
       />
       <View style={styles.composer}>
@@ -120,6 +144,16 @@ function CommentThreadView({
   onLoadMore,
   onPressAuthor,
   onRetryInitial,
+  onStartReply = () => undefined,
+  onCancelReply = () => undefined,
+  onReplyDraftChange = () => undefined,
+  onSubmitReply = () => undefined,
+  replyDraft,
+  replyDraftTouched,
+  replyDraftError,
+  replyDraftCodePointCount,
+  replySubmitDisabled,
+  replySubmitStatus,
   thread,
 }: Pick<
   CommentsSectionProps,
@@ -130,8 +164,19 @@ function CommentThreadView({
   | 'onLoadMore'
   | 'onPressAuthor'
   | 'onRetryInitial'
+  | 'onStartReply'
+  | 'onCancelReply'
+  | 'onReplyDraftChange'
+  | 'onSubmitReply'
   | 'thread'
->) {
+> & {
+  replyDraft: string;
+  replyDraftTouched: boolean;
+  replyDraftError: 'required' | 'too_long' | null;
+  replyDraftCodePointCount: number;
+  replySubmitDisabled: boolean;
+  replySubmitStatus: 'idle' | 'pending' | 'error';
+}) {
   const count = displayedCommentCount(thread);
 
   if (thread.initialLoadStatus === 'loading' && count === 0) {
@@ -172,6 +217,17 @@ function CommentThreadView({
         onDeleteComment={onDeleteComment}
         onReportComment={onReportComment}
         onPressAuthor={onPressAuthor}
+        onStartReply={onStartReply}
+        onCancelReply={onCancelReply}
+        onReplyDraftChange={onReplyDraftChange}
+        onSubmitReply={onSubmitReply}
+        replyTarget={thread.replyTarget}
+        replyDraft={replyDraft}
+        replyDraftTouched={replyDraftTouched}
+        replyDraftError={replyDraftError}
+        replyDraftCodePointCount={replyDraftCodePointCount}
+        replySubmitDisabled={replySubmitDisabled}
+        replySubmitStatus={replySubmitStatus}
       />
       <LoadMoreControl onLoadMore={onLoadMore} thread={thread} />
       <CommentList
@@ -185,6 +241,17 @@ function CommentThreadView({
         onDeleteComment={onDeleteComment}
         onReportComment={onReportComment}
         onPressAuthor={onPressAuthor}
+        onStartReply={onStartReply}
+        onCancelReply={onCancelReply}
+        onReplyDraftChange={onReplyDraftChange}
+        onSubmitReply={onSubmitReply}
+        replyTarget={thread.replyTarget}
+        replyDraft={replyDraft}
+        replyDraftTouched={replyDraftTouched}
+        replyDraftError={replyDraftError}
+        replyDraftCodePointCount={replyDraftCodePointCount}
+        replySubmitDisabled={replySubmitDisabled}
+        replySubmitStatus={replySubmitStatus}
       />
     </View>
   );
@@ -260,6 +327,17 @@ function CommentList({
   onDeleteComment,
   onPressAuthor,
   onReportComment,
+  onStartReply,
+  onCancelReply,
+  onReplyDraftChange,
+  onSubmitReply,
+  replyTarget,
+  replyDraft,
+  replyDraftTouched,
+  replyDraftError,
+  replyDraftCodePointCount,
+  replySubmitDisabled,
+  replySubmitStatus,
 }: {
   threads: CommentThread[];
   currentAuthorID: string;
@@ -268,6 +346,17 @@ function CommentList({
   onDeleteComment: (commentID: string) => void;
   onReportComment: (commentID: string) => void;
   onPressAuthor: (authorID: string) => void;
+  onStartReply: (commentID: string, authorDisplayName: string) => void;
+  onCancelReply: () => void;
+  onReplyDraftChange: (draft: string) => void;
+  onSubmitReply: (body: string) => void;
+  replyTarget: CommentThreadState['replyTarget'];
+  replyDraft: string;
+  replyDraftTouched: boolean;
+  replyDraftError: 'required' | 'too_long' | null;
+  replyDraftCodePointCount: number;
+  replySubmitDisabled: boolean;
+  replySubmitStatus: 'idle' | 'pending' | 'error';
 }) {
   return threads.map((thread) => {
     const replies = visibleComments(
@@ -284,6 +373,18 @@ function CommentList({
           onDeleteComment={onDeleteComment}
           onPressAuthor={onPressAuthor}
           onReportComment={onReportComment}
+        />
+        <Button
+          label="Responder"
+          onPress={() =>
+            onStartReply(
+              thread.comment.id,
+              thread.comment.author.displayName,
+            )
+          }
+          size="sm"
+          testID={`comment-reply-${thread.comment.id}`}
+          variant="ghost"
         />
         {replies.length > 0 ? (
           <View style={styles.replyList}>
@@ -304,6 +405,20 @@ function CommentList({
         ) : null}
         {thread.hasMoreReplies ? (
           <StatusMessage>{`Mostrando as primeiras ${replyMaxPerParent} respostas.`}</StatusMessage>
+        ) : null}
+        {replyTarget?.commentID === thread.comment.id ? (
+          <ReplyComposer
+            authorDisplayName={replyTarget.authorDisplayName}
+            draft={replyDraft}
+            draftCodePointCount={replyDraftCodePointCount}
+            draftError={replyDraftError}
+            draftTouched={replyDraftTouched}
+            onCancel={onCancelReply}
+            onChange={onReplyDraftChange}
+            onSubmit={onSubmitReply}
+            submitDisabled={replySubmitDisabled}
+            submitStatus={replySubmitStatus}
+          />
         ) : null}
       </View>
     );
@@ -376,9 +491,80 @@ function CommentRow({
   );
 }
 
+function ReplyComposer({
+  authorDisplayName,
+  draft,
+  draftCodePointCount,
+  draftError,
+  draftTouched,
+  onCancel,
+  onChange,
+  onSubmit,
+  submitDisabled,
+  submitStatus,
+}: {
+  authorDisplayName: string;
+  draft: string;
+  draftCodePointCount: number;
+  draftError: 'required' | 'too_long' | null;
+  draftTouched: boolean;
+  onCancel: () => void;
+  onChange: (draft: string) => void;
+  onSubmit: (body: string) => void;
+  submitDisabled: boolean;
+  submitStatus: 'idle' | 'pending' | 'error';
+}) {
+  return (
+    <View style={styles.replyComposer}>
+      <AppText color={semanticColors.textMuted} variant="sm" weight="semibold">
+        Respondendo {authorDisplayName}
+      </AppText>
+      <TextField
+        counter={{ count: draftCodePointCount, max: commentBodyMaxCodePoints }}
+        label="Escreva uma resposta"
+        multiline
+        onChangeText={onChange}
+        placeholder="Escreva uma resposta"
+        testID="comment-reply-draft"
+        value={draft}
+      />
+      {draftTouched && draftError !== null ? (
+        <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm" weight="semibold">
+          {replyDraftErrorMessage(draftError)}
+        </AppText>
+      ) : null}
+      {submitStatus === 'error' ? (
+        <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm" weight="semibold">
+          Não deu pra publicar a resposta. Tenta de novo.
+        </AppText>
+      ) : null}
+      <Button
+        disabled={submitDisabled}
+        label={submitStatus === 'pending' ? 'Publicando…' : 'Responder'}
+        onPress={() => onSubmit(validateCommentDraft(draft).body)}
+        testID="comment-reply-submit"
+        variant="primary"
+      />
+      <Button
+        label="Cancelar"
+        onPress={onCancel}
+        testID="comment-reply-cancel"
+        variant="secondary"
+      />
+    </View>
+  );
+}
+
 function draftErrorMessage(error: 'required' | 'too_long'): string {
   if (error === 'required') {
     return 'Escreva alguma coisa antes de comentar.';
   }
   return 'Seu comentário pode ter até 1.000 caracteres.';
+}
+
+function replyDraftErrorMessage(error: 'required' | 'too_long'): string {
+  if (error === 'required') {
+    return 'Escreva alguma coisa antes de responder.';
+  }
+  return 'Sua resposta pode ter até 1.000 caracteres.';
 }

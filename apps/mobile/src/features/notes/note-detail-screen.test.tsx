@@ -43,6 +43,7 @@ type LocalParams = {
 const mocks = vi.hoisted(() => ({
   apiClient: {
     createNoteComment: vi.fn(),
+    createCommentReply: vi.fn(),
     deleteNoteComment: vi.fn(),
     getNote: vi.fn(),
     listCatalogs: vi.fn(),
@@ -273,6 +274,7 @@ describe('NoteDetailScreen route', () => {
       nextCursor: null,
     });
     mocks.apiClient.createNoteComment.mockReset();
+    mocks.apiClient.createCommentReply.mockReset();
     mocks.apiClient.deleteNoteComment.mockReset();
     mocks.apiClient.markNoteUseful.mockReset();
     mocks.apiClient.unmarkNoteUseful.mockReset();
@@ -530,6 +532,65 @@ describe('NoteDetailScreen route', () => {
     expect(
       renderer.root.findByProps({ testID: 'comment-count' }).children,
     ).toEqual(['2']);
+  });
+
+  it('submits a trimmed reply under the selected parent', async () => {
+    const reply = replyComment('reply-new', 'Resposta nova');
+    mocks.apiClient.listNoteComments.mockResolvedValueOnce(
+      commentPage([firstComment]),
+    );
+    mocks.apiClient.createCommentReply.mockResolvedValueOnce(reply);
+
+    const renderer = await renderScreen();
+    await act(async () => {
+      commentsSection(renderer).props.onStartReply(
+        firstComment.id,
+        firstComment.author.displayName,
+      );
+      await settle();
+    });
+    await act(async () => {
+      commentsSection(renderer).props.onReplyDraftChange('  Resposta nova  ');
+      await settle();
+    });
+    await act(async () => {
+      commentsSection(renderer).props.onSubmitReply();
+      await settle();
+    });
+
+    expect(mocks.apiClient.createCommentReply).toHaveBeenCalledWith({
+      body: 'Resposta nova',
+      parentCommentID: firstComment.id,
+    });
+    expect(renderedCommentThread(renderer).threads).toEqual([
+      { comment: firstComment, replies: [reply], hasMoreReplies: false },
+    ]);
+  });
+
+  it('logs out when a reply submission returns 401', async () => {
+    mocks.apiClient.listNoteComments.mockResolvedValueOnce(
+      commentPage([firstComment]),
+    );
+    mocks.apiClient.createCommentReply.mockRejectedValueOnce({ status: 401 });
+
+    const renderer = await renderScreen();
+    await act(async () => {
+      commentsSection(renderer).props.onStartReply(
+        firstComment.id,
+        firstComment.author.displayName,
+      );
+      await settle();
+    });
+    await act(async () => {
+      commentsSection(renderer).props.onReplyDraftChange('Resposta');
+      await settle();
+    });
+    await act(async () => {
+      commentsSection(renderer).props.onSubmitReply();
+      await settle();
+    });
+
+    expect(mocks.logout).toHaveBeenCalledOnce();
   });
 
   it('fences invalid drafts and keeps a created comment in the local tail', async () => {

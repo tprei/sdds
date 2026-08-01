@@ -25,6 +25,7 @@ import { CommentsSection } from '@/features/comments/comments-section';
 import {
   canDeleteComment,
   canSubmitComment,
+  canSubmitReply,
   commentThreadReducer,
   createCommentThreadState,
   displayedCommentCount,
@@ -159,6 +160,7 @@ function AuthenticatedNoteDetailScreen({
   const commentRequestIDRef = useRef(0);
   const commentListRequestRef = useRef<number | null>(null);
   const commentCreateRequestRef = useRef<number | null>(null);
+  const commentReplyRequestRef = useRef<number | null>(null);
   const commentDeleteRequestRefs = useRef(new Map<string, number>());
   const [state, setState] = useState<NoteDetailState>({ status: 'loading' });
   const [commentThread, dispatchCommentThread] = useReducer(
@@ -327,6 +329,85 @@ function AuthenticatedNoteDetailScreen({
     handleCommentSessionExpired,
     noteID,
     productEvents,
+  ]);
+
+  const handleStartReply = useCallback(
+    (commentID: string, authorDisplayName: string) => {
+      dispatchCommentThread({
+        type: 'reply_started',
+        commentID,
+        authorDisplayName,
+      });
+    },
+    [],
+  );
+
+  const handleCancelReply = useCallback(() => {
+    dispatchCommentThread({ type: 'reply_cancelled' });
+  }, []);
+
+  const handleSubmitReply = useCallback(() => {
+    const replyTarget = commentThread.replyTarget;
+    if (
+      commentReplyRequestRef.current !== null ||
+      replyTarget === null ||
+      !canSubmitReply(commentThread)
+    ) {
+      return;
+    }
+
+    const generation = detailGenerationRef.current;
+    const requestID = ++commentRequestIDRef.current;
+    const body = validateCommentDraft(commentThread.replyDraft).body;
+    commentReplyRequestRef.current = requestID;
+    dispatchCommentThread({ type: 'reply_submit_started' });
+
+    void apiClient
+      .createCommentReply({
+        body,
+        parentCommentID: replyTarget.commentID,
+      })
+      .then((comment) => {
+        if (
+          detailGenerationRef.current !== generation ||
+          commentReplyRequestRef.current !== requestID
+        ) {
+          return;
+        }
+        dispatchCommentThread({
+          type: 'reply_submit_succeeded',
+          parentCommentID: replyTarget.commentID,
+          comment,
+        });
+      })
+      .catch((error: unknown) => {
+        if (
+          detailGenerationRef.current !== generation ||
+          commentReplyRequestRef.current !== requestID
+        ) {
+          return;
+        }
+
+        const status = requestStatus(error);
+        if (status === unauthorizedStatus) {
+          void handleCommentSessionExpired();
+          return;
+        }
+        if (status === notFoundStatus) {
+          loadCommentPage();
+        }
+        dispatchCommentThread({ type: 'reply_submit_failed' });
+      })
+      .finally(() => {
+        if (commentReplyRequestRef.current === requestID) {
+          commentReplyRequestRef.current = null;
+        }
+      });
+  }, [
+    apiClient,
+    commentThread,
+    handleCommentSessionExpired,
+    loadCommentPage,
   ]);
 
   const handleDeleteComment = useCallback(
@@ -503,6 +584,7 @@ function AuthenticatedNoteDetailScreen({
       const generation = ++detailGenerationRef.current;
       commentListRequestRef.current = null;
       commentCreateRequestRef.current = null;
+      commentReplyRequestRef.current = null;
       commentDeleteRequestRefs.current.clear();
       dispatchCommentThread({ type: 'reset' });
       void Promise.all([apiClient.listCatalogs(), apiClient.getNote(noteID)])
@@ -554,6 +636,7 @@ function AuthenticatedNoteDetailScreen({
       let isActive = true;
       commentListRequestRef.current = null;
       commentCreateRequestRef.current = null;
+      commentReplyRequestRef.current = null;
       commentDeleteRequestRefs.current.clear();
       dispatchCommentThread({ type: 'reset' });
       dispatchReportForm({ type: 'reset' });
@@ -600,6 +683,7 @@ function AuthenticatedNoteDetailScreen({
         reportPendingTargetRef.current = null;
         commentListRequestRef.current = null;
         commentCreateRequestRef.current = null;
+        commentReplyRequestRef.current = null;
         commentDeleteRequestRefs.current.clear();
       };
     }, [
@@ -657,6 +741,12 @@ function AuthenticatedNoteDetailScreen({
               router.push({ pathname: '/authors/[id]', params: { id: authorID } })
             }
             onRetryInitial={() => loadCommentPage()}
+            onStartReply={handleStartReply}
+            onCancelReply={handleCancelReply}
+            onReplyDraftChange={(draft) =>
+              dispatchCommentThread({ type: 'reply_draft_changed', draft })
+            }
+            onSubmitReply={handleSubmitReply}
             onSubmit={handleSubmitComment}
             thread={commentThread}
           />

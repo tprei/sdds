@@ -41,15 +41,16 @@ Stacked diffs preserve review quality for larger work while keeping each change 
 - `pnpm check` currently covers Go formatting/lint, OpenAPI lint, generated TypeScript/Go contract checks, mobile/tokens typechecks, API schema tests, mobile tests, and Go API tests.
 - Go lint MUST remain zero-warning and blocking. It runs `gofmt` checks plus `golangci-lint` with `errcheck`, `govet`, `ineffassign`, `staticcheck`, and `unused`.
 - A required formatting check, linter, typecheck, generation check, or test MUST fail the command and CI when it fails.
+- Complexity linters are not enabled. A linter MAY be enabled only when it reports zero findings at its default threshold; the measurement MUST be re-run and recorded here before any future enablement.
 
 ### Slow boundary gates
-
-- Standalone Compose migration validation MUST run when Compose startup or migration behavior changes:
-  `docker compose -f infra/compose/compose.yaml run --build --rm --no-deps api migrate`.
-- `pnpm test:api:integration` MUST run when the assembled API image, migrations, routing, SQLite persistence, generated public client, endpoint set, or public HTTP contract changes. It requires the Compose secret files and a live readiness-checked API.
-- `pnpm test:rustfs` MUST run when object-store semantics, credentials or policy, readiness/bootstrap, private access, restart persistence, or the Compose media graph changes.
-- `pnpm test:synthetics` MUST run when a critical user-visible Expo web journey, layout, spacing, responsive behavior, or appearance changes. It requires Expo web and a readiness-checked Dockerized API.
-- Slow gates MUST remain separate commands with explicit prerequisites. The repository MUST NOT advertise a one-command smoke lifecycle or CI reuse that does not exist.
+- Docker and browser gates run only through the smoke runner: `pnpm smoke api`, `pnpm smoke rustfs`, `pnpm smoke synthetics`, and `pnpm smoke all`. The runner owns prerequisites, per-run isolation, temporary credentials, OS-assigned ports, the Compose lifecycle, readiness, failure diagnostics, and cleanup.
+- `pnpm test:api:integration`, `pnpm test:rustfs`, and `pnpm test:synthetics` are suite bodies that require a smoke-provided stack. They MUST NOT be run directly; the harness aborts without smoke environment variables.
+- `pnpm smoke api` MUST run when the assembled API image, migrations, routing, SQLite persistence, generated public client, endpoint set, public HTTP contract, or `services/embedding/**` changes.
+- The `embedding` CI job MUST remain blocking for changes to the sidecar image and its model/export parity; `pnpm smoke api` separately proves the sidecar's Compose HTTP contract, health, startup, and API integration.
+- `pnpm smoke rustfs` MUST run when object-store semantics, credentials or policy, readiness/bootstrap, private access, restart persistence, migration-without-media, or the Compose media graph changes.
+- `pnpm smoke synthetics` MUST run when a critical user-visible Expo web journey, layout, spacing, responsive behavior, or appearance changes.
+- `pnpm check` MUST remain Docker-free and browser-free; the smoke runner MUST NOT be invoked from `pnpm check`.
 
 ### Presentation gates
 
@@ -61,9 +62,14 @@ Stacked diffs preserve review quality for larger work while keeping each change 
 
 - A required lint, typecheck, generation check, or test MUST fail the command and CI. DO NOT add `continue-on-error`, `|| true`, warning allowances, skipped or disabled tests, retries that hide deterministic failures, suppression comments, suppression baselines that allowlist known failures, or exclusions of test/config source.
 - A Playwright visual baseline is not a suppression baseline. Committed reference screenshots and named geometry invariants are executable presentation contracts and MUST be blocking. A visual baseline MUST be regenerated only from the pinned CI container image, and its diff tolerance MUST stay tight enough to fail a one-element layout shift.
-- The current `lint:ts` and mobile `tsc` commands cover the configured application and token sources; they DO NOT cover `tests/synthetics` or `playwright.config.ts`. Documentation MUST NOT present that known gap as enforced coverage.
+- `pnpm lint:ts` runs `eslint --max-warnings 0` over `apps/mobile`, `packages/tokens`, `tests/synthetics`, `tests/contract`, `playwright.config.ts`, and `vitest.config.ts`; `pnpm typecheck:synthetics` runs a strict `tsc --noEmit` over `tests/synthetics`, `tests/contract`, and `playwright.config.ts`. Both are blocking and MUST NOT gain an exclusion, warning allowance, or suppression comment.
 - Test and configuration source MUST remain subject to blocking quality checks when the owning gate exists; missing enforcement is a tooling change, not permission to ignore the source.
 - Go lint MUST remain blocking even when a change is documentation-only but updates the commands or gates described here.
+- The smoke runner MUST be extended by adding a named phase or a focused helper, not by appending unrelated inline shell to `infra/compose/smoke.sh`. A new smoke mode adds one dispatch entry plus existing tests and MUST NOT clone the lifecycle or create a second runner.
+- CI workflows MUST call `pnpm smoke <selector>` and MUST NOT copy readiness, secret generation, port selection, log collection, or cleanup into workflow YAML.
+- Readiness polling and web-port allocation MUST retain bounded timeouts. Build, Compose start, and test-suite commands rely on CI job-level timeouts rather than per-phase deadlines.
+- A change to the smoke runner MUST include a focused failure, cleanup, or isolation check.
+- CI parallelism MUST NOT be enabled until per-run uniqueness of project, port, volumes, images, secrets, and artifact paths is demonstrated and documented.
 
 ## Test Quality
 

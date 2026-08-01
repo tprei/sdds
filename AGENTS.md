@@ -97,6 +97,8 @@ Write tests when they reduce real risk.
 
 Tests should verify behavior, not implementation details. Prefer a few clear tests over many fragile ones. Tests must not depend on order or shared mutable state.
 
+Docker and browser gates run only through `pnpm smoke <api|rustfs|synthetics|all>`; `pnpm check` stays Docker-free and browser-free. Pure domain, parser, and state logic MUST be tested at the lowest faithful deterministic layer (Go package tests or Vitest), never in Playwright. A new test MUST NOT be added to an oversized legacy file; split it into a behavior-sized file or create the focused file and delete the duplicate coverage.
+
 ## Pull Requests
 
 - Never push directly to `main`.

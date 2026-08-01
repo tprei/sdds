@@ -7,7 +7,9 @@ const lintedFiles = [
   'apps/mobile/**/*.{ts,tsx}',
   'packages/tokens/src/**/*.ts',
   'tests/synthetics/**/*.ts',
+  'tests/contract/**/*.ts',
   'playwright.config.ts',
+  'vitest.config.ts',
 ];
 
 // Properties whose value is a spec-locked metric. A raw number here is the

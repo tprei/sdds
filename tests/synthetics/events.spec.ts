@@ -9,15 +9,15 @@ import {
   runComposeAPICommand,
   syntheticPassword,
 } from './support';
+import {
+  arrayField,
+  hasCapturedEvent,
+  parseExportRows,
+  stringField,
+} from '../contract/event-export';
 
 type CapturedEvent = Record<string, unknown>;
 type CapturedBatch = { events: CapturedEvent[] };
-
-type ExportRow = {
-  kind: string;
-  payload: Record<string, unknown>;
-  userID: string;
-};
 
 test('exports the authenticated search event lineage', async ({
   page,
@@ -202,62 +202,3 @@ function waitForEventsResponse(page: Page): Promise<Response> {
   });
 }
 
-function hasCapturedEvent(
-  batches: CapturedBatch[],
-  kind: string,
-  matches: (payload: Record<string, unknown>) => boolean,
-): boolean {
-  return batches.some((batch) =>
-    batch.events.some((event) => {
-      if (event.kind !== kind || !isRecord(event.payload)) {
-        return false;
-      }
-      return matches(event.payload);
-    }),
-  );
-}
-
-function parseExportRows(output: string): ExportRow[] {
-  return output
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '')
-    .map((line) => {
-      const parsed: unknown = JSON.parse(line);
-      if (
-        !isRecord(parsed) ||
-        typeof parsed.kind !== 'string' ||
-        typeof parsed.user_id !== 'string' ||
-        !isRecord(parsed.payload)
-      ) {
-        throw new Error('invalid event export row');
-      }
-      return {
-        kind: parsed.kind,
-        payload: parsed.payload,
-        userID: parsed.user_id,
-      };
-    });
-}
-
-function stringField(
-  payload: Record<string, unknown> | undefined,
-  field: string,
-): string {
-  const value = payload?.[field];
-  if (typeof value !== 'string') {
-    throw new Error(`missing string event field ${field}`);
-  }
-  return value;
-}
-
-function arrayField(
-  payload: Record<string, unknown> | undefined,
-  field: string,
-): Record<string, unknown>[] {
-  const value = payload?.[field];
-  if (!Array.isArray(value) || !value.every(isRecord)) {
-    throw new Error(`missing event array field ${field}`);
-  }
-  return value;
-}

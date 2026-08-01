@@ -30,9 +30,14 @@ type ImageUploadPreparer interface {
 	PrepareImageUpload(context.Context, string, media.UploadReceiver) (media.UploadReceipt, error)
 }
 
+type NotePublisher interface {
+	Publish(ctx context.Context, input note.CreateInput) (note.Note, error)
+}
+
 type NotesDependencies struct {
-	Stores  NoteStores
-	Catalog note.Catalog
+	Stores    NoteStores
+	Publisher NotePublisher
+	Catalog   note.Catalog
 }
 
 type CommentDependencies struct {
@@ -60,6 +65,7 @@ type SystemDependencies struct {
 
 type noteHandlers struct {
 	store       note.Store
+	publisher   NotePublisher
 	authorNotes note.AuthorNoteStore
 	useful      note.UsefulStore
 	catalog     note.Catalog
@@ -143,7 +149,7 @@ func NewRouter(notes NotesDependencies, comments CommentDependencies, reports Re
 		eventLimits = DefaultEventLimits()
 	}
 	return newRouter(
-		noteHandlers{store: notes.Stores, authorNotes: notes.Stores, useful: notes.Stores, catalog: notes.Catalog},
+		noteHandlers{store: notes.Stores, publisher: notes.Publisher, authorNotes: notes.Stores, useful: notes.Stores, catalog: notes.Catalog},
 		commentHandlers{store: comments.Store, notes: notes.Stores},
 		reportHandlers{store: reports.Store, notes: notes.Stores, comments: reports.CommentTargets},
 		eventHandlers{store: events.Store, limits: newEventRateLimiters(eventLimits, time.Now), clock: time.Now},

@@ -30,7 +30,7 @@ func TestNoteStoreAssociatesReadyImageAtomically(t *testing.T) {
 	command := note.CreateInput{
 		ClientRequestID: "note-request-atomic", Title: "Atomic image note",
 		Body: "The image is attached in the same transaction.", CategorySlug: note.CategorySlugFood,
-		ImageUploadIDs: []string{"upload-atomic"},
+		ImageUploadIDs: []string{"upload-atomic"}, Embedding: testEmbedding(),
 	}
 	created, err := store.CreateNote(ctx, command)
 	if err != nil {
@@ -88,6 +88,7 @@ func TestNoteStoreReplaysBeforeCatalogChecksAndConflictsChangedCommand(t *testin
 		Title:           "Replayable note",
 		Body:            "The receipt wins over catalog state.",
 		CategorySlug:    note.CategorySlugFood,
+		Embedding:       testEmbedding(),
 	}
 	first, err := store.CreateNote(ctx, input)
 	if err != nil {
@@ -157,7 +158,7 @@ func TestNoteStoreUploadAvailabilityErrors(t *testing.T) {
 			_, err := store.CreateNote(ctx, note.CreateInput{
 				ClientRequestID: "request-" + test.name, Title: "Upload state note",
 				Body: "Association must reject unavailable media.", CategorySlug: note.CategorySlugFood,
-				ImageUploadIDs: []string{test.imageID},
+				ImageUploadIDs: []string{test.imageID}, Embedding: testEmbedding(),
 			})
 			if !errors.Is(err, test.want) {
 				t.Fatalf("create error = %v, want %v", err, test.want)
@@ -182,6 +183,7 @@ func TestNoteStoreAssociationRollbackRestoresAllRows(t *testing.T) {
 		Body:            "The existing image ID forces association failure.",
 		CategorySlug:    note.CategorySlugFood,
 		ImageUploadIDs:  []string{"upload-rollback"},
+		Embedding:       testEmbedding(),
 	})
 	if err == nil {
 		t.Fatal("create note error = nil, want association failure")
@@ -227,7 +229,7 @@ func TestNoteStoreConcurrentIdenticalCreatesConvergeOnOneReceipt(t *testing.T) {
 			}
 			input := note.CreateInput{
 				ClientRequestID: "note-request-concurrent-" + test.name, Title: "Concurrent note",
-				Body: "One transaction wins and the other replays.", CategorySlug: note.CategorySlugFood,
+				Body: "One transaction wins and the other replays.", CategorySlug: note.CategorySlugFood, Embedding: testEmbedding(),
 			}
 			if test.imageID != "" {
 				input.ImageUploadIDs = []string{test.imageID}
@@ -271,7 +273,7 @@ func TestNoteStoreReconcilesCommittedReceiptPrimaryKeyRace(t *testing.T) {
 	store := newTestNoteStore(db, func() time.Time { return now })
 	input := note.CreateInput{
 		UserID: systemNoteOwnerUserID, ClientRequestID: "note-request-receipt-primary-key", Title: "Receipt primary key",
-		Body: "A committed receipt wins after an explicit rollback.", CategorySlug: note.CategorySlugFood,
+		Body: "A committed receipt wins after an explicit rollback.", CategorySlug: note.CategorySlugFood, Embedding: testEmbedding(),
 	}
 	winner, err := store.CreateNote(ctx, input)
 	if err != nil {
@@ -318,7 +320,7 @@ func TestNoteStoreConcurrentRequestsCompeteForReadyImage(t *testing.T) {
 	input := note.CreateInput{
 		ClientRequestID: "note-request-competing-a", Title: "Competing image note",
 		Body: "Only one request may consume the image.", CategorySlug: note.CategorySlugFood,
-		ImageUploadIDs: []string{imageID},
+		ImageUploadIDs: []string{imageID}, Embedding: testEmbedding(),
 	}
 	other := input
 	other.ClientRequestID = "note-request-competing-b"
@@ -376,6 +378,7 @@ func TestNoteStoreReceiptFailureRollsBackCompletedAssociation(t *testing.T) {
 		Body:            "The receipt failure must roll back every earlier write.",
 		CategorySlug:    note.CategorySlugFood,
 		ImageUploadIDs:  []string{imageID},
+		Embedding:       testEmbedding(),
 	})
 	if err == nil || !strings.Contains(err.Error(), "receipt insert aborted") {
 		t.Fatalf("create error = %v, want receipt trigger error", err)
@@ -400,6 +403,116 @@ func TestNoteStoreReceiptFailureRollsBackCompletedAssociation(t *testing.T) {
 	}
 	if state != "ready" || consumedNoteID != "" {
 		t.Fatalf("receipt rollback upload = %q/%q, want ready/empty", state, consumedNoteID)
+	}
+}
+
+func TestNoteStoreCreateNoteInsertsExactlyOneEmbeddingRow(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	now := time.Date(2026, 7, 15, 12, 0, 0, 0, time.UTC)
+	store := newTestNoteStore(db, func() time.Time { return now })
+
+	embedding := testEmbedding()
+	created, err := store.CreateNote(ctx, testCreateInput(note.CreateInput{
+		Title:        "Café da esquina",
+		Body:         "Wi-Fi estável, várias tomadas",
+		CategorySlug: note.CategorySlugFood,
+		Embedding:    embedding,
+	}))
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	var count int
+	var modelID, modelRevision, sourceSHA256 string
+	var dimension int
+	var vectorLength int
+	if err := db.QueryRowContext(ctx, `
+		SELECT COUNT(*), model_id, model_revision, dimension, source_sha256, length(vector)
+		FROM note_embeddings WHERE note_id = ?
+		GROUP BY model_id, model_revision, dimension, source_sha256, length(vector)
+	`, created.ID).Scan(&count, &modelID, &modelRevision, &dimension, &sourceSHA256, &vectorLength); err != nil {
+		t.Fatalf("query note embedding: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("embedding row count = %d, want 1", count)
+	}
+	if modelID != note.EmbeddingModelID {
+		t.Fatalf("embedding model id = %q, want %q", modelID, note.EmbeddingModelID)
+	}
+	if modelRevision != note.EmbeddingModelRevision {
+		t.Fatalf("embedding model revision = %q, want %q", modelRevision, note.EmbeddingModelRevision)
+	}
+	if dimension != note.EmbeddingDimension {
+		t.Fatalf("embedding dimension = %d, want %d", dimension, note.EmbeddingDimension)
+	}
+	if sourceSHA256 != embedding.SourceSHA256 {
+		t.Fatalf("embedding fingerprint = %q, want %q", sourceSHA256, embedding.SourceSHA256)
+	}
+	if vectorLength != note.EmbeddingDimension*4 {
+		t.Fatalf("embedding vector byte length = %d, want %d", vectorLength, note.EmbeddingDimension*4)
+	}
+}
+
+func TestNoteStoreCreateNoteRollsBackOnEmptyEmbedding(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	now := time.Date(2026, 7, 15, 12, 0, 0, 0, time.UTC)
+	store := newTestNoteStore(db, func() time.Time { return now })
+
+	// A caller that skips the publisher (leaving Embedding zero-valued) must
+	// fail loudly rather than commit a note with no vector.
+	_, err := store.CreateNote(ctx, note.CreateInput{
+		ClientRequestID: "note-request-empty-embedding",
+		Title:           "Sem vetor",
+		Body:            "Nunca deveria ser publicada assim.",
+		CategorySlug:    note.CategorySlugFood,
+		Embedding:       note.Embedding{},
+	})
+	if err == nil {
+		t.Fatal("create note with empty embedding error = nil, want an error")
+	}
+
+	var notes, search, embeddings int
+	if err := db.QueryRowContext(ctx, `
+		SELECT (SELECT COUNT(*) FROM notes), (SELECT COUNT(*) FROM note_search), (SELECT COUNT(*) FROM note_embeddings)
+	`).Scan(&notes, &search, &embeddings); err != nil {
+		t.Fatalf("count rows after empty-embedding create: %v", err)
+	}
+	if notes != 0 || search != 0 || embeddings != 0 {
+		t.Fatalf("rows after rollback notes/search/embeddings = %d/%d/%d, want 0/0/0", notes, search, embeddings)
+	}
+}
+
+func TestNoteStoreIdempotentReplayLeavesOneEmbeddingRow(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	now := time.Date(2026, 7, 15, 12, 0, 0, 0, time.UTC)
+	store := newTestNoteStore(db, func() time.Time { return now })
+
+	input := testCreateInput(note.CreateInput{
+		Title:        "Nota idempotente",
+		Body:         "Deve gerar apenas um vetor.",
+		CategorySlug: note.CategorySlugFood,
+	})
+	first, err := store.CreateNote(ctx, input)
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+	replay, err := store.CreateNote(ctx, input)
+	if err != nil {
+		t.Fatalf("replay create note: %v", err)
+	}
+	if replay.ID != first.ID {
+		t.Fatalf("replay note id = %q, want %q", replay.ID, first.ID)
+	}
+
+	var count int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM note_embeddings WHERE note_id = ?`, first.ID).Scan(&count); err != nil {
+		t.Fatalf("count embedding rows after replay: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("embedding row count after replay = %d, want 1", count)
 	}
 }
 

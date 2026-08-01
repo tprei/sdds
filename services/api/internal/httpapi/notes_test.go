@@ -656,7 +656,7 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	imageCreatedAt := now.Add(-time.Hour)
 	router := newTestRouter(fakeNoteStore{
-		createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
+		publish: func(_ context.Context, input note.CreateInput) (note.Note, error) {
 			if input.UserID != user.UserID("user-id-thiago") {
 				t.Fatalf("user id = %q, want user-id-thiago", input.UserID)
 			}
@@ -751,10 +751,10 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 }
 
 func TestCreateNoteRejectsMissingSessionBeforeValidation(t *testing.T) {
-	createCalled := false
+	publishCalled := false
 	router := newRouterForTest(fakeNoteStore{
-		createNote: func(_ context.Context, _ note.CreateInput) (note.Note, error) {
-			createCalled = true
+		publish: func(_ context.Context, _ note.CreateInput) (note.Note, error) {
+			publishCalled = true
 			return note.Note{}, nil
 		},
 	}, fakeCatalog{}, authenticatedFakeUserStore(fakeUserStore{}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
@@ -768,8 +768,8 @@ func TestCreateNoteRejectsMissingSessionBeforeValidation(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
 	}
 	requireErrorCode(t, response, openapi.ErrorCodeUnauthenticated)
-	if createCalled {
-		t.Fatal("note store was called")
+	if publishCalled {
+		t.Fatal("publish was called")
 	}
 }
 
@@ -836,8 +836,8 @@ func TestCreateNoteRejectsOpenAPIRequestSchemaProblems(t *testing.T) {
 	}
 
 	router := newTestRouter(fakeNoteStore{
-		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
-			t.Fatal("CreateNote should not be called")
+		publish: func(context.Context, note.CreateInput) (note.Note, error) {
+			t.Fatal("Publish should not be called")
 			return note.Note{}, nil
 		},
 	})
@@ -874,7 +874,7 @@ func TestCreateNoteMapsCreateErrors(t *testing.T) {
 	tests := []struct {
 		name       string
 		body       string
-		createErr  error
+		publishErr error
 		wantStatus int
 		wantCode   openapi.ErrorCode
 		wantFields []openapi.ValidationProblem
@@ -882,21 +882,21 @@ func TestCreateNoteMapsCreateErrors(t *testing.T) {
 		{
 			name:       "idempotency conflict",
 			body:       validBody,
-			createErr:  note.ErrIdempotencyConflict,
+			publishErr: note.ErrIdempotencyConflict,
 			wantStatus: http.StatusConflict,
 			wantCode:   openapi.ErrorCodeIdempotencyConflict,
 		},
 		{
 			name:       "expired upload",
 			body:       validBody,
-			createErr:  note.ErrImageUploadExpired,
+			publishErr: note.ErrImageUploadExpired,
 			wantStatus: http.StatusConflict,
 			wantCode:   openapi.ErrorCodeUploadExpired,
 		},
 		{
 			name:       "unavailable upload",
 			body:       validBody,
-			createErr:  note.ErrImageUploadUnavailable,
+			publishErr: note.ErrImageUploadUnavailable,
 			wantStatus: http.StatusConflict,
 			wantCode:   openapi.ErrorCodeInvalidNote,
 			wantFields: []openapi.ValidationProblem{{Field: openapi.ValidationFieldImageUploadIDs, Code: openapi.ValidationProblemCodeInvalid}},
@@ -908,9 +908,16 @@ func TestCreateNoteMapsCreateErrors(t *testing.T) {
 			wantCode:   openapi.ErrorCodeTooManyImages,
 		},
 		{
+			name:       "embedding unavailable",
+			body:       validBody,
+			publishErr: note.ErrEmbeddingUnavailable,
+			wantStatus: http.StatusServiceUnavailable,
+			wantCode:   openapi.ErrorCodeEmbeddingUnavailable,
+		},
+		{
 			name:       "internal storage error",
 			body:       validBody,
-			createErr:  errors.New("storage unavailable"),
+			publishErr: errors.New("storage unavailable"),
 			wantStatus: http.StatusInternalServerError,
 			wantCode:   openapi.ErrorCodeInternal,
 		},
@@ -918,14 +925,14 @@ func TestCreateNoteMapsCreateErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			createCalled := false
+			publishCalled := false
 			router := newTestRouter(fakeNoteStore{
-				createNote: func(context.Context, note.CreateInput) (note.Note, error) {
-					createCalled = true
-					if tt.createErr == nil {
-						t.Fatal("CreateNote should not be called")
+				publish: func(context.Context, note.CreateInput) (note.Note, error) {
+					publishCalled = true
+					if tt.publishErr == nil {
+						t.Fatal("Publish should not be called")
 					}
-					return note.Note{}, tt.createErr
+					return note.Note{}, tt.publishErr
 				},
 			})
 			response := httptest.NewRecorder()
@@ -949,8 +956,8 @@ func TestCreateNoteMapsCreateErrors(t *testing.T) {
 			} else {
 				requireValidationProblems(t, body.Fields, tt.wantFields)
 			}
-			if tt.createErr == nil && createCalled {
-				t.Fatal("CreateNote should not be called for validation errors")
+			if tt.publishErr == nil && publishCalled {
+				t.Fatal("Publish should not be called for validation errors")
 			}
 		})
 	}
@@ -958,7 +965,7 @@ func TestCreateNoteMapsCreateErrors(t *testing.T) {
 
 func TestCreateNotePassesCatalogValidationToStore(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
-		createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
+		publish: func(_ context.Context, input note.CreateInput) (note.Note, error) {
 			if input.CategorySlug != "qualquer" {
 				t.Fatalf("category slug = %q, want qualquer", input.CategorySlug)
 			}
@@ -1010,7 +1017,7 @@ func TestCreateNoteMapsUnknownAndInactiveCatalogErrorsToValidation(t *testing.T)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := newTestRouter(fakeNoteStore{
-				createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
+				publish: func(_ context.Context, input note.CreateInput) (note.Note, error) {
 					if input.CategorySlug != note.CategorySlug(tt.categorySlug) {
 						t.Fatalf("category slug = %q, want %q", input.CategorySlug, tt.categorySlug)
 					}
@@ -1063,7 +1070,7 @@ func TestCreateNoteMapsAggregateCatalogErrorsInStableOrder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := newTestRouter(fakeNoteStore{
-				createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
+				publish: func(_ context.Context, input note.CreateInput) (note.Note, error) {
 					if input.CategorySlug != note.CategorySlug(tt.categorySlug) {
 						t.Fatalf("category slug = %q, want %q", input.CategorySlug, tt.categorySlug)
 					}
@@ -1099,7 +1106,7 @@ func TestCreateNoteMapsAggregateCatalogErrorsInStableOrder(t *testing.T) {
 
 func TestCreateNotePreservesGenuineStoreFailure(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
-		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
+		publish: func(context.Context, note.CreateInput) (note.Note, error) {
 			return note.Note{}, errors.New("database unavailable")
 		},
 	})
@@ -1156,8 +1163,8 @@ func TestCreateNoteRejectsMissingOrUnsupportedContentType(t *testing.T) {
 	}
 
 	router := newTestRouter(fakeNoteStore{
-		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
-			t.Fatal("CreateNote should not be called")
+		publish: func(context.Context, note.CreateInput) (note.Note, error) {
+			t.Fatal("Publish should not be called")
 			return note.Note{}, nil
 		},
 	})
@@ -1191,8 +1198,8 @@ func TestCreateNoteRejectsMissingOrUnsupportedContentType(t *testing.T) {
 
 func TestCreateNoteRejectsOldCitySlugJSON(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
-		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
-			t.Fatal("CreateNote should not be called")
+		publish: func(context.Context, note.CreateInput) (note.Note, error) {
+			t.Fatal("Publish should not be called")
 			return note.Note{}, nil
 		},
 	})
@@ -1219,8 +1226,8 @@ func TestCreateNoteRejectsOldCitySlugJSON(t *testing.T) {
 
 func TestCreateNoteRejectsUnknownJSONFields(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
-		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
-			t.Fatal("CreateNote should not be called")
+		publish: func(context.Context, note.CreateInput) (note.Note, error) {
+			t.Fatal("Publish should not be called")
 			return note.Note{}, nil
 		},
 	})

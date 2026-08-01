@@ -106,7 +106,7 @@ func TestRunLoadsS3ConfigForServer(t *testing.T) {
 	restoreEmbeddingConfigLoader(t)
 	loadEmbeddingConfig = func() (embedding.Config, error) { return embedding.Config{}, nil }
 	restoreEmbeddingClientFactory(t)
-	newEmbeddingClient = func(embedding.Config) (embeddingReadiness, error) {
+	newEmbeddingClient = func(embedding.Config) (embeddingStore, error) {
 		return fakeEmbeddingReadiness{verify: func(context.Context) error { return nil }}, nil
 	}
 	restoreListen := listenAndServe
@@ -148,7 +148,7 @@ func TestRunServerRequiresMediaReadiness(t *testing.T) {
 				return fakeMediaReadiness{verify: func(context.Context) error { return test.err }}, nil
 			}
 			restoreEmbeddingClientFactory(t)
-			newEmbeddingClient = func(embedding.Config) (embeddingReadiness, error) {
+			newEmbeddingClient = func(embedding.Config) (embeddingStore, error) {
 				return fakeEmbeddingReadiness{verify: func(context.Context) error { return nil }}, nil
 			}
 			listened := false
@@ -183,7 +183,7 @@ func TestRunServerListensAfterMediaReadiness(t *testing.T) {
 		}}, nil
 	}
 	restoreEmbeddingClientFactory(t)
-	newEmbeddingClient = func(embedding.Config) (embeddingReadiness, error) {
+	newEmbeddingClient = func(embedding.Config) (embeddingStore, error) {
 		return fakeEmbeddingReadiness{verify: func(context.Context) error { return nil }}, nil
 	}
 
@@ -235,7 +235,7 @@ func TestRunServerCleansExpiredUploadsBeforeListen(t *testing.T) {
 		}, nil
 	}
 	restoreEmbeddingClientFactory(t)
-	newEmbeddingClient = func(embedding.Config) (embeddingReadiness, error) {
+	newEmbeddingClient = func(embedding.Config) (embeddingStore, error) {
 		return fakeEmbeddingReadiness{verify: func(context.Context) error { return nil }}, nil
 	}
 
@@ -267,7 +267,7 @@ func TestRunServerCleanupFailurePreventsListenAndClosesDatabase(t *testing.T) {
 		}, nil
 	}
 	restoreEmbeddingClientFactory(t)
-	newEmbeddingClient = func(embedding.Config) (embeddingReadiness, error) {
+	newEmbeddingClient = func(embedding.Config) (embeddingStore, error) {
 		return fakeEmbeddingReadiness{verify: func(context.Context) error { return nil }}, nil
 	}
 
@@ -352,6 +352,17 @@ func (fake fakeEmbeddingReadiness) VerifyReadiness(ctx context.Context) error {
 	return fake.verify(ctx)
 }
 
+// EmbedQuery and EmbedPassages are unused by the startup-readiness tests in
+// this file; they exist only so fakeEmbeddingReadiness satisfies
+// embeddingStore (readiness + note.Embedder).
+func (fakeEmbeddingReadiness) EmbedQuery(context.Context, string) ([]float32, error) {
+	return nil, errors.New("unexpected embed query")
+}
+
+func (fakeEmbeddingReadiness) EmbedPassages(context.Context, []string) ([][]float32, error) {
+	return nil, errors.New("unexpected embed passages")
+}
+
 func restoreEmbeddingClientFactory(t *testing.T) {
 	t.Helper()
 	original := newEmbeddingClient
@@ -393,7 +404,7 @@ func TestRunServerAbortsOnEmbeddingReadinessFailure(t *testing.T) {
 	}
 	embeddingErr := errors.New("embedding sidecar unreachable")
 	restoreEmbeddingClientFactory(t)
-	newEmbeddingClient = func(embedding.Config) (embeddingReadiness, error) {
+	newEmbeddingClient = func(embedding.Config) (embeddingStore, error) {
 		return fakeEmbeddingReadiness{verify: func(context.Context) error { return embeddingErr }}, nil
 	}
 	listened := false

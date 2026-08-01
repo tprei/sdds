@@ -17,6 +17,7 @@ import (
 	"github.com/tprei/sdds/services/api/internal/eventexport"
 	"github.com/tprei/sdds/services/api/internal/httpapi"
 	"github.com/tprei/sdds/services/api/internal/media"
+	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/s3store"
 	"github.com/tprei/sdds/services/api/internal/sqlite"
 )
@@ -45,6 +46,14 @@ type embeddingReadiness interface {
 type readyObjectStore interface {
 	media.ObjectStore
 	mediaReadiness
+}
+
+// embeddingStore is what runServer needs from the embedding sidecar: startup
+// readiness plus the embed operations note.Publisher uses to embed a note's
+// passage before it is ever persisted.
+type embeddingStore interface {
+	note.Embedder
+	embeddingReadiness
 }
 
 type runtimeReadiness struct {
@@ -82,7 +91,7 @@ var newMediaStore = func(ctx context.Context, config s3store.Config) (readyObjec
 
 var loadS3Config = s3store.LoadConfigFromEnv
 
-var newEmbeddingClient = func(config embedding.Config) (embeddingReadiness, error) {
+var newEmbeddingClient = func(config embedding.Config) (embeddingStore, error) {
 	return embedding.New(config)
 }
 
@@ -191,6 +200,7 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config, embe
 		return fmt.Errorf("verify embedding readiness: %w", err)
 	}
 	noteStore := sqlite.NewNoteStore(db)
+	publisher := note.NewPublisher(noteStore, embeddingClient)
 	commentStore := sqlite.NewCommentStore(db)
 	catalogStore := sqlite.NewCatalogStore(db)
 	userStore := sqlite.NewUserStore(db)
@@ -208,7 +218,7 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config, embe
 	cleanupCancel()
 	readiness := runtimeReadiness{database: db, media: store, embedding: embeddingClient}
 	server := newServer(config, httpapi.NewRouter(
-		httpapi.NotesDependencies{Stores: noteStore, Catalog: catalogStore},
+		httpapi.NotesDependencies{Stores: noteStore, Publisher: publisher, Catalog: catalogStore},
 		httpapi.CommentDependencies{Store: commentStore},
 		httpapi.ReportDependencies{Store: sqlite.NewReportStore(db), CommentTargets: commentStore},
 		httpapi.EventDependencies{Store: sqlite.NewEventStore(db), Limits: httpapi.DefaultEventLimits()},

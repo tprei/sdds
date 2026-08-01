@@ -681,6 +681,9 @@ func TestNoteEmbeddingsMigrationCascadesOnNoteDelete(t *testing.T) {
 	db := openMigratedDatabase(t, ctx)
 	store := newTestNoteStore(db, time.Now)
 
+	// testCreateInput attaches a deterministic embedding, so CreateNote
+	// already inserts the note_embeddings row atomically; this test only
+	// needs to confirm the cascade removes it on delete.
 	created, err := store.CreateNote(ctx, testCreateInput(note.CreateInput{
 		Title:        "Wi-Fi estável",
 		Body:         "várias tomadas e ninguém reclamou",
@@ -690,14 +693,12 @@ func TestNoteEmbeddingsMigrationCascadesOnNoteDelete(t *testing.T) {
 		t.Fatalf("create note: %v", err)
 	}
 
-	vector := make([]float32, note.EmbeddingDimension)
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO note_embeddings (note_id, model_id, model_revision, dimension, source_sha256, vector, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, created.ID, note.EmbeddingModelID, note.EmbeddingModelRevision, note.EmbeddingDimension,
-		note.EmbeddingFingerprint(note.EmbeddingPassage(created.Title, created.Body)),
-		encodeVector(vector), 0, 0); err != nil {
-		t.Fatalf("insert embedding: %v", err)
+	var before int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM note_embeddings WHERE note_id = ?`, created.ID).Scan(&before); err != nil {
+		t.Fatalf("count embeddings before delete: %v", err)
+	}
+	if before != 1 {
+		t.Fatalf("embedding rows after create = %d, want 1", before)
 	}
 
 	if _, err := db.ExecContext(ctx, `DELETE FROM notes WHERE id = ?`, created.ID); err != nil {
@@ -716,24 +717,20 @@ func TestNoteEmbeddingsMigrationCascadesOnNoteDelete(t *testing.T) {
 func TestNoteEmbeddingsMigrationRejectsMismatchedVectorLength(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
-	store := newTestNoteStore(db, time.Now)
-
-	created, err := store.CreateNote(ctx, testCreateInput(note.CreateInput{
-		Title:        "Café da esquina",
-		Body:         "bom demais",
-		CategorySlug: note.CategorySlug("food"),
-	}))
-	if err != nil {
-		t.Fatalf("create note: %v", err)
-	}
+	// Seed the system user directly (bypassing CreateNote/the publisher path)
+	// so this note has no embedding row yet, keeping the CHECK-constraint
+	// assertion isolated from the atomic-publish insert.
+	newTestNoteStore(db, time.Now)
+	const noteID = "mismatched-vector-note"
+	insertAuthorStoreNote(t, ctx, db, noteID, systemNoteOwnerUserID, 0)
 
 	// A vector whose byte length is half of dimension*4 must be rejected by the
 	// length(vector) = dimension * 4 CHECK constraint.
 	shortBlob := encodeVector(make([]float32, note.EmbeddingDimension/2))
-	_, err = db.ExecContext(ctx, `
+	_, err := db.ExecContext(ctx, `
 		INSERT INTO note_embeddings (note_id, model_id, model_revision, dimension, source_sha256, vector, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, created.ID, note.EmbeddingModelID, note.EmbeddingModelRevision, note.EmbeddingDimension,
+	`, noteID, note.EmbeddingModelID, note.EmbeddingModelRevision, note.EmbeddingDimension,
 		note.EmbeddingFingerprint("stale"), shortBlob, 0, 0)
 	if err == nil {
 		t.Fatal("expected CHECK constraint violation for mismatched vector length, got nil")

@@ -137,7 +137,7 @@ func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	created, err := handler.notes.store.CreateNote(r.Context(), input)
+	created, err := handler.notes.publisher.Publish(r.Context(), input)
 	if err != nil {
 		var catalogValidationErr *note.CatalogValidationError
 		if errors.As(err, &catalogValidationErr) {
@@ -153,6 +153,8 @@ func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, validationErrorResponse(openapi.ErrorCodeInvalidNote, []note.ValidationProblem{{Field: "image_upload_ids", Message: "invalid"}}))
 		case errors.Is(err, note.ErrCategoryNotFound):
 			writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, []note.ValidationProblem{{Field: "category_slug", Message: "unknown"}}))
+		case errors.Is(err, note.ErrEmbeddingUnavailable):
+			writeError(w, http.StatusServiceUnavailable, openapi.ErrorResponse{Code: openapi.ErrorCodeEmbeddingUnavailable})
 		default:
 			writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		}

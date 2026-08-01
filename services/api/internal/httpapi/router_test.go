@@ -107,7 +107,7 @@ func (fake fakeEventStore) AppendBatch(ctx context.Context, records []event.Reco
 }
 
 func newRouterForTest(
-	notes NoteStores,
+	notes fakeNoteStore,
 	catalog note.Catalog,
 	users UserStores,
 	authLimits AuthLimits,
@@ -116,7 +116,7 @@ func newRouterForTest(
 	imageReader media.AttachedImageReader,
 ) http.Handler {
 	return NewRouter(
-		NotesDependencies{Stores: notes, Catalog: catalog},
+		NotesDependencies{Stores: notes, Publisher: notes, Catalog: catalog},
 		CommentDependencies{Store: fakeCommentStore{}},
 		ReportDependencies{Store: fakeReportStore{}, CommentTargets: fakeCommentStore{}},
 		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
@@ -127,7 +127,7 @@ func newRouterForTest(
 }
 
 func newRouterWithAuthSeamsForTest(
-	notes NoteStores,
+	notes fakeNoteStore,
 	catalog note.Catalog,
 	users UserStores,
 	passwordHasher passwordHasher,
@@ -140,7 +140,7 @@ func newRouterWithAuthSeamsForTest(
 	imageReader media.AttachedImageReader,
 ) http.Handler {
 	return newRouter(
-		noteHandlers{store: notes, authorNotes: notes, useful: notes, catalog: catalog},
+		noteHandlers{store: notes, publisher: notes, authorNotes: notes, useful: notes, catalog: catalog},
 		commentHandlers{store: fakeCommentStore{}, notes: notes},
 		reportHandlers{store: fakeReportStore{}, notes: notes, comments: fakeCommentStore{}},
 		eventHandlers{store: fakeEventStore{}, limits: newEventRateLimiters(DefaultEventLimits(), clock), clock: clock},
@@ -174,7 +174,7 @@ func TestNewRouterRequiresMediaDependencies(t *testing.T) {
 				}
 			}()
 			NewRouter(
-				NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
+				NotesDependencies{Stores: fakeNoteStore{}, Publisher: fakeNoteStore{}, Catalog: fakeCatalog{}},
 				CommentDependencies{Store: fakeCommentStore{}},
 				ReportDependencies{Store: fakeReportStore{}},
 				EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
@@ -193,7 +193,7 @@ func TestNewRouterRequiresCommentStore(t *testing.T) {
 		}
 	}()
 	NewRouter(
-		NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
+		NotesDependencies{Stores: fakeNoteStore{}, Publisher: fakeNoteStore{}, Catalog: fakeCatalog{}},
 		CommentDependencies{},
 		ReportDependencies{Store: fakeReportStore{}},
 		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
@@ -210,7 +210,7 @@ func TestNewRouterRequiresReportStore(t *testing.T) {
 		}
 	}()
 	NewRouter(
-		NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
+		NotesDependencies{Stores: fakeNoteStore{}, Publisher: fakeNoteStore{}, Catalog: fakeCatalog{}},
 		CommentDependencies{Store: fakeCommentStore{}},
 		ReportDependencies{},
 		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
@@ -422,6 +422,7 @@ func TestRouterRejectsPlainOptionsRequest(t *testing.T) {
 
 type fakeNoteStore struct {
 	createNote      func(ctx context.Context, input note.CreateInput) (note.Note, error)
+	publish         func(ctx context.Context, input note.CreateInput) (note.Note, error)
 	findNote        func(ctx context.Context, id string, viewerUserID user.UserID) (note.Note, error)
 	listNotes       func(ctx context.Context, input note.ListInput) ([]note.Note, error)
 	searchNotes     func(ctx context.Context, input note.SearchInput) ([]note.Note, error)
@@ -435,6 +436,13 @@ func (store fakeNoteStore) CreateNote(ctx context.Context, input note.CreateInpu
 		return note.Note{}, fmt.Errorf("create note not implemented")
 	}
 	return store.createNote(ctx, input)
+}
+
+func (store fakeNoteStore) Publish(ctx context.Context, input note.CreateInput) (note.Note, error) {
+	if store.publish == nil {
+		return note.Note{}, fmt.Errorf("publish not implemented")
+	}
+	return store.publish(ctx, input)
 }
 
 func (store fakeNoteStore) FindNote(ctx context.Context, id string, viewerUserID user.UserID) (note.Note, error) {

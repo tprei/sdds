@@ -23,12 +23,13 @@ import (
 )
 
 const (
-	commandMigrate          = "migrate"
-	commandInspectReports   = "inspect-reports"
-	commandExportEvents     = "export-events"
-	serverReadHeaderTimeout = 5 * time.Second
-	serverReadTimeout       = 15 * time.Second
-	startupReadinessTimeout = 5 * time.Second
+	commandMigrate           = "migrate"
+	commandInspectReports    = "inspect-reports"
+	commandExportEvents      = "export-events"
+	commandReindexEmbeddings = "reindex-embeddings"
+	serverReadHeaderTimeout  = 5 * time.Second
+	serverReadTimeout        = 15 * time.Second
+	startupReadinessTimeout  = 5 * time.Second
 )
 
 type databaseReadiness interface {
@@ -107,6 +108,7 @@ var closeDatabase = func(database *sql.DB) error {
 
 var reportOutputStream io.Writer = os.Stdout
 var eventOutputStream io.Writer = os.Stdout
+var reindexOutputStream io.Writer = os.Stdout
 
 func main() {
 	if err := run(); err != nil {
@@ -115,16 +117,22 @@ func main() {
 	}
 }
 
+// run dispatches by argument count and command name. Commands that never
+// touch S3 or the embedding sidecar (migrate, inspect-reports, export-events)
+// load only the app config. Server mode and reindex-embeddings both need the
+// embedding client, so both load the full config set.
 func run() error {
 	args := os.Args[1:]
-	if len(args) > 0 && (len(args) != 1 || (args[0] != commandMigrate && args[0] != commandInspectReports && args[0] != commandExportEvents)) {
+	bareConfigCommand := len(args) == 1 && (args[0] == commandMigrate || args[0] == commandInspectReports || args[0] == commandExportEvents)
+	fullConfigCommand := len(args) == 0 || (len(args) == 1 && args[0] == commandReindexEmbeddings)
+	if !bareConfigCommand && !fullConfigCommand {
 		return runWithArgs(context.Background(), config{}, s3store.Config{}, embedding.Config{}, args)
 	}
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
-	if len(args) == 1 {
+	if bareConfigCommand {
 		return runWithArgs(context.Background(), cfg, s3store.Config{}, embedding.Config{}, args)
 	}
 	s3Config, err := loadS3Config()
@@ -148,6 +156,8 @@ func runWithArgs(ctx context.Context, config config, s3Config s3store.Config, em
 		return runInspectReports(ctx, config)
 	case len(args) == 1 && args[0] == commandExportEvents:
 		return eventexport.Run(ctx, config.databasePath, eventOutputStream)
+	case len(args) == 1 && args[0] == commandReindexEmbeddings:
+		return runReindexEmbeddings(ctx, config, embeddingConfig)
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
@@ -164,6 +174,57 @@ func runMigrations(ctx context.Context, config config) (err error) {
 		}
 	}()
 
+	return nil
+}
+
+// reindexOutputRow is the compact JSON summary printed after a reindex run.
+// Field declaration order is the emitted JSON key order.
+type reindexOutputRow struct {
+	Scanned  int `json:"scanned"`
+	Embedded int `json:"embedded"`
+	Skipped  int `json:"skipped"`
+}
+
+// runReindexEmbeddings backfills or repairs note embeddings idempotently: a
+// note whose stored model id, revision, and source fingerprint already match
+// the current values is skipped, so running this twice in a row embeds
+// nothing the second time. It writes nothing to stdout on failure.
+func runReindexEmbeddings(ctx context.Context, config config, embeddingConfig embedding.Config) (err error) {
+	db, err := openMigratedDatabase(ctx, config)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close database: %w", closeErr)
+		}
+	}()
+
+	embeddingClient, err := newEmbeddingClient(embeddingConfig)
+	if err != nil {
+		return fmt.Errorf("create embedding client: %w", err)
+	}
+	readinessCtx, cancel := context.WithTimeout(ctx, startupReadinessTimeout)
+	defer cancel()
+	if err := embeddingClient.VerifyReadiness(readinessCtx); err != nil {
+		return fmt.Errorf("verify embedding readiness: %w", err)
+	}
+
+	noteStore := sqlite.NewNoteStore(db)
+	result, err := note.ReindexEmbeddings(ctx, noteStore, embeddingClient, time.Now)
+	if err != nil {
+		return fmt.Errorf("reindex embeddings: %w", err)
+	}
+
+	var output bytes.Buffer
+	encoder := json.NewEncoder(&output)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(reindexOutputRow{Scanned: result.Scanned, Embedded: result.Embedded, Skipped: result.Skipped}); err != nil {
+		return fmt.Errorf("encode reindex summary: %w", err)
+	}
+	if _, err := output.WriteTo(reindexOutputStream); err != nil {
+		return fmt.Errorf("write reindex summary: %w", err)
+	}
 	return nil
 }
 

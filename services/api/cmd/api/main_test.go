@@ -342,7 +342,8 @@ func restoreS3ConfigLoader(t *testing.T) {
 }
 
 type fakeEmbeddingReadiness struct {
-	verify func(context.Context) error
+	verify        func(context.Context) error
+	embedPassages func(context.Context, []string) ([][]float32, error)
 }
 
 func (fake fakeEmbeddingReadiness) VerifyReadiness(ctx context.Context) error {
@@ -352,15 +353,17 @@ func (fake fakeEmbeddingReadiness) VerifyReadiness(ctx context.Context) error {
 	return fake.verify(ctx)
 }
 
-// EmbedQuery and EmbedPassages are unused by the startup-readiness tests in
-// this file; they exist only so fakeEmbeddingReadiness satisfies
-// embeddingStore (readiness + note.Embedder).
+// EmbedQuery is unused by every test in this file; it exists only so
+// fakeEmbeddingReadiness satisfies embeddingStore (readiness + note.Embedder).
 func (fakeEmbeddingReadiness) EmbedQuery(context.Context, string) ([]float32, error) {
 	return nil, errors.New("unexpected embed query")
 }
 
-func (fakeEmbeddingReadiness) EmbedPassages(context.Context, []string) ([][]float32, error) {
-	return nil, errors.New("unexpected embed passages")
+func (fake fakeEmbeddingReadiness) EmbedPassages(ctx context.Context, texts []string) ([][]float32, error) {
+	if fake.embedPassages == nil {
+		return nil, errors.New("unexpected embed passages")
+	}
+	return fake.embedPassages(ctx, texts)
 }
 
 func restoreEmbeddingClientFactory(t *testing.T) {

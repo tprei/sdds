@@ -505,6 +505,33 @@ describe('NoteDetailScreen route', () => {
     ]);
   });
 
+  it('hydrates replies beneath a parent and includes them in the comment count', async () => {
+    const reply = replyComment('reply-1', 'Uma resposta');
+    mocks.apiClient.listNoteComments.mockResolvedValueOnce({
+      threads: [
+        {
+          comment: firstComment,
+          replies: [reply],
+          hasMoreReplies: false,
+        },
+      ],
+      nextCursor: null,
+    });
+
+    const renderer = await renderScreen();
+
+    expect(renderedCommentThread(renderer).threads).toEqual([
+      {
+        comment: firstComment,
+        replies: [reply],
+        hasMoreReplies: false,
+      },
+    ]);
+    expect(
+      renderer.root.findByProps({ testID: 'comment-count' }).children,
+    ).toEqual(['2']);
+  });
+
   it('fences invalid drafts and keeps a created comment in the local tail', async () => {
     mocks.apiClient.listNoteComments.mockResolvedValueOnce(
       commentPage([firstComment], 'cursor-1'),
@@ -972,6 +999,14 @@ function comment(id: string, body: string): Comment {
     createdAt: testTimestamp(),
     id,
     parentCommentID: null,
+  };
+}
+
+function replyComment(id: string, body: string): Comment {
+  return {
+    ...comment(id, body),
+    author: { displayName: 'Lia', id: 'reply-author-id' },
+    parentCommentID: firstComment.id,
   };
 }
 

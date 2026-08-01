@@ -296,6 +296,81 @@ describe('CommentsSection', () => {
     expect(onReportComment).toHaveBeenCalledWith(firstComment.id);
   });
 
+  it('renders replies beneath their parent and reports each reply', () => {
+    const onReportComment = vi.fn();
+    const firstReply = replyComment('reply-1', 'Primeira resposta');
+    const secondReply = replyComment('reply-2', 'Segunda resposta');
+    const renderer = renderSection({
+      onReportComment,
+      thread: readyThread({
+        threads: [
+          {
+            comment: firstComment,
+            replies: [firstReply, secondReply],
+            hasMoreReplies: true,
+          },
+        ],
+      }),
+    });
+
+    expect(textNodes(renderer, firstReply.body)).toHaveLength(1);
+    expect(textNodes(renderer, secondReply.body)).toHaveLength(1);
+    expect(
+      textNodes(renderer, 'Mostrando as primeiras 20 respostas.'),
+    ).toHaveLength(1);
+    expect(
+      renderer.root.findByProps({ testID: `comment-report-${firstReply.id}` }),
+    ).toBeDefined();
+    expect(
+      renderer.root.findByProps({ testID: `comment-report-${secondReply.id}` }),
+    ).toBeDefined();
+
+    act(() => {
+      renderer.root
+        .findByProps({ testID: `comment-report-${secondReply.id}` })
+        .props.onPress();
+    });
+    expect(onReportComment).toHaveBeenCalledWith(secondReply.id);
+
+    const bounded = renderSection({
+      thread: readyThread({
+        threads: [
+          {
+            comment: firstComment,
+            replies: [firstReply],
+            hasMoreReplies: false,
+          },
+        ],
+      }),
+    });
+    expect(
+      textNodes(bounded, 'Mostrando as primeiras 20 respostas.'),
+    ).toHaveLength(0);
+  });
+
+  it('deletes only the targeted reply', () => {
+    const firstReply = replyComment('reply-1', 'Primeira resposta');
+    const secondReply = replyComment('reply-2', 'Segunda resposta');
+    const renderer = renderSection({
+      thread: readyThread({
+        threads: [
+          {
+            comment: firstComment,
+            replies: [firstReply, secondReply],
+            hasMoreReplies: false,
+          },
+        ],
+        deleteStatusByCommentID: new Map([
+          [firstReply.id, 'deleted' as const],
+        ]),
+      }),
+    });
+
+    expect(textNodes(renderer, firstComment.body)).toHaveLength(1);
+    expect(textNodes(renderer, firstReply.body)).toHaveLength(0);
+    expect(textNodes(renderer, secondReply.body)).toHaveLength(1);
+  });
+
   it('trims a valid draft before submitting and disables duplicate presses while pending', () => {
     const onSubmit = vi.fn();
     const renderer = render(<ComposerHarness onSubmit={onSubmit} />);
@@ -404,6 +479,14 @@ function comment(id: string, body: string): Comment {
     createdAt: 1782993600000,
     id,
     parentCommentID: null,
+  };
+}
+
+function replyComment(id: string, body: string): Comment {
+  return {
+    ...comment(id, body),
+    author: { displayName: 'Lia', id: 'reply-author-id' },
+    parentCommentID: firstComment.id,
   };
 }
 

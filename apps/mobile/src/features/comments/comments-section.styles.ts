@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { componentMetrics, spacing } from '@sdds/tokens';
+import { componentMetrics, semanticColors, spacing } from '@sdds/tokens';
 
 export const styles = StyleSheet.create({
   authorControl: {
@@ -25,6 +25,14 @@ export const styles = StyleSheet.create({
   },
   commentList: {
     gap: spacing.sp3,
+  },
+  replyList: {
+    gap: spacing.sp3,
+  },
+  reply: {
+    borderLeftColor: semanticColors.borderSubtle,
+    borderLeftWidth: 1,
+    paddingLeft: spacing.sp5,
   },
   composer: {
     gap: spacing.sp3,

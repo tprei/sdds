@@ -562,6 +562,11 @@ describe('NoteDetailScreen route', () => {
       body: 'Resposta nova',
       parentCommentID: firstComment.id,
     });
+    expect(mocks.record).toHaveBeenCalledWith('comment_created', {
+      commentID: reply.id,
+      noteID: 'note-id',
+      parentCommentID: firstComment.id,
+    });
     expect(renderedCommentThread(renderer).threads).toEqual([
       { comment: firstComment, replies: [reply], hasMoreReplies: false },
     ]);
@@ -631,6 +636,7 @@ describe('NoteDetailScreen route', () => {
     expect(mocks.record).toHaveBeenCalledWith('comment_created', {
       commentID: submittedComment.id,
       noteID: 'note-id',
+      parentCommentID: null,
     });
   });
 
@@ -818,6 +824,7 @@ describe('NoteDetailScreen route', () => {
     expect(mocks.record).toHaveBeenCalledWith('comment_created', {
       commentID: submittedComment.id,
       noteID: 'note-id',
+      parentCommentID: null,
     });
     expect(renderedCommentThread(renderer).localTailThreads).toEqual([]);
     expect(renderedCommentThread(renderer).deleteStatusByCommentID).toEqual(

@@ -196,6 +196,9 @@ func normalizePayload(kind Kind, payload Payload) (Payload, []ValidationProblem)
 		problems := make([]ValidationProblem, 0)
 		problems = appendUUIDProblem(problems, "payload.note_id", value.NoteID)
 		problems = appendUUIDProblem(problems, "payload.comment_id", string(value.CommentID))
+		if value.ParentCommentID != "" && !isCanonicalUUID(string(value.ParentCommentID)) {
+			problems = append(problems, ValidationProblem{Field: "payload.parent_comment_id", Code: "invalid"})
+		}
 		return value, problems
 	case KindReportCreated:
 		value, ok := payload.(ReportCreatedPayload)

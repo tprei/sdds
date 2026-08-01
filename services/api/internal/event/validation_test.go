@@ -161,6 +161,49 @@ func TestNormalizeAndValidateRejectsPartialSearchUsefulContext(t *testing.T) {
 	}
 }
 
+func TestNormalizeAndValidateCommentCreatedParent(t *testing.T) {
+	t.Parallel()
+	const (
+		parentID  = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d08"
+		commentID = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d06"
+	)
+
+	t.Run("empty_parent_is_top_level", func(t *testing.T) {
+		t.Parallel()
+		_, problems := NormalizeAndValidate(validInput(KindCommentCreated, CommentCreatedPayload{
+			NoteID:    testNoteID,
+			CommentID: commentID,
+		}))
+		if hasProblem(problems, "payload.parent_comment_id", "") {
+			t.Fatalf("expected no parent_comment_id problem, got %+v", problems)
+		}
+	})
+
+	t.Run("valid_reply_parent", func(t *testing.T) {
+		t.Parallel()
+		_, problems := NormalizeAndValidate(validInput(KindCommentCreated, CommentCreatedPayload{
+			NoteID:          testNoteID,
+			CommentID:       commentID,
+			ParentCommentID: parentID,
+		}))
+		if hasProblem(problems, "payload.parent_comment_id", "") {
+			t.Fatalf("expected no parent_comment_id problem, got %+v", problems)
+		}
+	})
+
+	t.Run("malformed_parent_uuid", func(t *testing.T) {
+		t.Parallel()
+		_, problems := NormalizeAndValidate(validInput(KindCommentCreated, CommentCreatedPayload{
+			NoteID:          testNoteID,
+			CommentID:       commentID,
+			ParentCommentID: "not-a-uuid",
+		}))
+		if !hasProblem(problems, "payload.parent_comment_id", "invalid") {
+			t.Fatalf("expected parent_comment_id/invalid, got %+v", problems)
+		}
+	})
+}
+
 func validInput(kind Kind, payload Payload) Input {
 	return Input{
 		ID:            testEventID,

@@ -106,7 +106,7 @@ func payloadFields(kind event.Kind) map[string]struct{} {
 	case event.KindNoteMarkedUseful, event.KindNoteUnmarkedUseful:
 		fields = []string{"note_id", "context"}
 	case event.KindCommentCreated:
-		fields = []string{"note_id", "comment_id"}
+		fields = []string{"note_id", "comment_id", "parent_comment_id"}
 	case event.KindReportCreated:
 		fields = []string{"report_id", "target_type", "target_id"}
 	case event.KindNotePublished:
@@ -205,9 +205,16 @@ func requiredInt64(fields map[string]json.RawMessage, name string, index int, pr
 }
 
 func nullableString(fields map[string]json.RawMessage, name string, index int, problems *[]openapi.InvalidEventProblem) (*string, bool) {
+	return nullableStringAt(fields, name, index, "", problems)
+}
+
+// nullableStringAt decodes a required object field that may carry JSON null.
+// A missing key reports "required", JSON null yields a nil pointer (valid),
+// and a malformed value reports "invalid".
+func nullableStringAt(fields map[string]json.RawMessage, name string, index int, prefix string, problems *[]openapi.InvalidEventProblem) (*string, bool) {
 	value, ok := fields[name]
 	if !ok {
-		*problems = append(*problems, invalidEventProblem(index, name, "required"))
+		*problems = append(*problems, invalidEventProblem(index, prefix+name, "required"))
 		return nil, false
 	}
 	if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
@@ -215,10 +222,14 @@ func nullableString(fields map[string]json.RawMessage, name string, index int, p
 	}
 	var result string
 	if err := json.Unmarshal(value, &result); err != nil {
-		*problems = append(*problems, invalidEventProblem(index, name, "invalid"))
+		*problems = append(*problems, invalidEventProblem(index, prefix+name, "invalid"))
 		return nil, false
 	}
 	return &result, true
+}
+
+func nullablePayloadString(fields map[string]json.RawMessage, name string, index int, problems *[]openapi.InvalidEventProblem) (*string, bool) {
+	return nullableStringAt(fields, name, index, "payload.", problems)
 }
 
 func nullableCategory(fields map[string]json.RawMessage, name string, index int) (*note.CategorySlug, []openapi.InvalidEventProblem) {

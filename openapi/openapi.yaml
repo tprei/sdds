@@ -1764,12 +1764,17 @@ components:
     EventCommentCreatedPayload:
       type: object
       additionalProperties: false
-      required: [note_id, comment_id]
+      required: [note_id, comment_id, parent_comment_id]
       properties:
         note_id:
           $ref: "#/components/schemas/EventID"
         comment_id:
           $ref: "#/components/schemas/EventID"
+        parent_comment_id:
+          type: string
+          allOf:
+            - $ref: "#/components/schemas/EventID"
+          nullable: true
     EventReportCreatedPayload:
       type: object
       additionalProperties: false

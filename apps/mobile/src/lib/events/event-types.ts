@@ -36,7 +36,7 @@ export type PayloadByKind = {
   search_no_results: { searchID: string; searchVersion: SearchVersion; query: string; categorySlug: string | null; resultCount: 0 };
   note_marked_useful: { noteID: string; context: UsefulContext };
   note_unmarked_useful: { noteID: string; context: UsefulContext };
-  comment_created: { noteID: string; commentID: string };
+  comment_created: { noteID: string; commentID: string; parentCommentID: string | null };
   report_created: { reportID: string; targetType: ReportTargetType; targetID: string };
   note_published: { noteID: string; categorySlug: string };
 };

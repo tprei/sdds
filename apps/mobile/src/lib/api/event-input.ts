@@ -127,6 +127,7 @@ export function mapProductEvent(event: ProductEvent): EventInput {
       payload: {
         note_id: event.payload.noteID,
         comment_id: event.payload.commentID,
+        parent_comment_id: event.payload.parentCommentID,
       },
     };
   }

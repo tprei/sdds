@@ -5,9 +5,12 @@ import { expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
 import {
   type AuthorSummary,
+  type CommentResponse,
   type SearchNotesResponse,
+  parseCommentResponse,
   parseNoteResponse,
   parseSearchNotesResponse,
+} from '../contract/api-wire';
 } from '../contract/api-wire';
 const execFileAsync = promisify(execFile);
 export const apiBaseURL =
@@ -116,3 +119,27 @@ export async function searchNotes(
   return parseSearchNotesResponse(await response.json());
 }
 
+export async function createComment(
+  request: APIRequestContext,
+  token: string,
+  noteID: string,
+  body: string,
+): Promise<CommentResponse> {
+  const response = await request.post(apiURL(`/v1/notes/${noteID}/comments`), {
+    data: { body },
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(response.status()).toBe(201);
+  return parseCommentResponse(await response.json());
+}
+
+export async function openCompose(page: Page): Promise<void> {
+  await page
+    .getByRole('button', { name: 'Escrever um achado' })
+    .or(page.getByLabel('Escrever um achado'))
+    .click();
+}
+
+export async function clickTab(page: Page, name: string): Promise<void> {
+  await page.getByRole('tab', { name: new RegExp(name + '$') }).click();
+}

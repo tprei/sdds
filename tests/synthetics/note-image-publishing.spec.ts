@@ -9,7 +9,7 @@ import {
   expectNoteMediaSource,
   fixturePath,
 } from './note-image-visual';
-import { syntheticPassword } from './support';
+import { clickTab, openCompose, syntheticPassword } from './support';
 
 test.use({ viewport: { height: 1400, width: 1280 } });
 
@@ -225,18 +225,6 @@ async function signUp(page: Page, user: SyntheticUser): Promise<void> {
   await page.getByTestId('signup-username-input').fill(user.username);
   await page.getByTestId('signup-password-input').fill(syntheticPassword);
   await page.getByRole('button', { exact: true, name: 'Criar conta' }).click();
-}
-async function clickTab(page: Page, name: string): Promise<void> {
-  const tab = page.getByRole('tab', { name: new RegExp(`${name}$`) });
-  await expectVisible(tab);
-  await tab.click();
-}
-async function openCompose(page: Page): Promise<void> {
-  const fab = page
-    .getByRole('button', { name: 'Escrever um achado' })
-    .or(page.getByLabel('Escrever um achado'));
-  await expectVisible(fab);
-  await fab.click();
 }
 
 async function expectVisible(

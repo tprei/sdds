@@ -426,6 +426,8 @@ type fakeNoteStore struct {
 	findNote        func(ctx context.Context, id string, viewerUserID user.UserID) (note.Note, error)
 	listNotes       func(ctx context.Context, input note.ListInput) ([]note.Note, error)
 	searchNotes     func(ctx context.Context, input note.SearchInput) ([]note.Note, error)
+	searchSemantic  func(ctx context.Context, input note.SemanticSearchInput) ([]note.ScoredNote, error)
+	findNotesByID   func(ctx context.Context, ids []string, viewerUserID user.UserID) ([]note.Note, error)
 	listAuthorNotes func(ctx context.Context, input note.AuthorNotesInput) (note.AuthorNotesPage, error)
 	markUseful      func(ctx context.Context, input note.MarkUsefulInput) error
 	unmarkUseful    func(ctx context.Context, input note.UnmarkUsefulInput) error
@@ -464,6 +466,20 @@ func (store fakeNoteStore) SearchNotes(ctx context.Context, input note.SearchInp
 		return nil, fmt.Errorf("search notes not implemented")
 	}
 	return store.searchNotes(ctx, input)
+}
+
+func (store fakeNoteStore) SearchSemantic(ctx context.Context, input note.SemanticSearchInput) ([]note.ScoredNote, error) {
+	if store.searchSemantic == nil {
+		return nil, fmt.Errorf("search semantic not implemented")
+	}
+	return store.searchSemantic(ctx, input)
+}
+
+func (store fakeNoteStore) FindNotesByID(ctx context.Context, ids []string, viewerUserID user.UserID) ([]note.Note, error) {
+	if store.findNotesByID == nil {
+		return nil, fmt.Errorf("find notes by id not implemented")
+	}
+	return store.findNotesByID(ctx, ids, viewerUserID)
 }
 
 func (store fakeNoteStore) ListAuthorNotes(ctx context.Context, input note.AuthorNotesInput) (note.AuthorNotesPage, error) {

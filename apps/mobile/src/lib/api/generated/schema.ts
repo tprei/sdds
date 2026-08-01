@@ -245,6 +245,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/comments/{comment_id}/replies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reply to a top-level note comment */
+        post: operations["createCommentReply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/notes/{note_id}/useful": {
         parameters: {
             query?: never;
@@ -360,6 +377,12 @@ export interface components {
              * @description Unix timestamp in milliseconds.
              */
             created_at: number;
+            parent_comment_id: string | null;
+        };
+        CommentThread: {
+            comment: components["schemas"]["Comment"];
+            replies: components["schemas"]["Comment"][];
+            has_more_replies: boolean;
         };
         ImageUploadReceipt: {
             /** Format: uuid */
@@ -436,7 +459,7 @@ export interface components {
             author: components["schemas"]["AuthorSummary"];
         };
         /** @enum {string} */
-        ErrorCode: "internal_error" | "forbidden" | "invalid_auth" | "invalid_comment" | "invalid_json" | "invalid_note" | "invalid_report" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken" | "invalid_media" | "unsupported_media_type" | "idempotency_conflict" | "upload_in_progress" | "upload_expired" | "media_staging_quota_exceeded" | "media_storage_unavailable" | "media_integrity_error" | "too_many_images" | "invalid_event" | "invalid_event_batch" | "embedding_unavailable";
+        ErrorCode: "internal_error" | "forbidden" | "invalid_auth" | "invalid_comment" | "invalid_json" | "invalid_note" | "invalid_report" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken" | "invalid_media" | "unsupported_media_type" | "idempotency_conflict" | "upload_in_progress" | "upload_expired" | "media_staging_quota_exceeded" | "media_storage_unavailable" | "media_integrity_error" | "too_many_images" | "invalid_event" | "invalid_event_batch" | "embedding_unavailable" | "invalid_reply_target";
         ErrorResponse: {
             code: components["schemas"]["ErrorCode"];
             fields?: components["schemas"]["ValidationProblem"][];
@@ -776,7 +799,7 @@ export interface components {
             retrieval_source: components["schemas"]["RetrievalSource"];
         };
         ListNoteCommentsResponse: {
-            comments: components["schemas"]["Comment"][];
+            threads: components["schemas"]["CommentThread"][];
             next_cursor: string | null;
         };
         ListCategoriesResponse: {
@@ -827,7 +850,7 @@ export interface components {
             useful_by_current_user: boolean;
         };
         /** @enum {string} */
-        ValidationField: "title" | "body" | "category_slug" | "q" | "username" | "password" | "display_name" | "limit" | "cursor" | "client_request_id" | "upload_request_id" | "image_upload_ids" | "file" | "target_type" | "target_id" | "reason" | "details";
+        ValidationField: "title" | "body" | "category_slug" | "q" | "username" | "password" | "display_name" | "limit" | "cursor" | "client_request_id" | "upload_request_id" | "image_upload_ids" | "file" | "target_type" | "target_id" | "reason" | "details" | "parent_comment_id";
         ValidationProblem: {
             field: components["schemas"]["ValidationField"];
             /** @enum {string} */
@@ -1830,6 +1853,86 @@ export interface operations {
                 };
             };
             /** @description The API could not delete the comment. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createCommentReply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCommentRequest"];
+            };
+        };
+        responses: {
+            /** @description The created reply. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Comment"];
+                };
+            };
+            /** @description Invalid JSON or reply body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is missing a valid authenticated session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The parent comment or its note was not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The parent comment is itself a reply. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request body exceeds 8 KiB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not create the reply. */
             500: {
                 headers: {
                     [name: string]: unknown;

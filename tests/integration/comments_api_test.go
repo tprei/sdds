@@ -47,19 +47,20 @@ func TestCommentAPIRuntimeBoundaries(t *testing.T) {
 
 	limit := 2
 	firstPage := listRuntimeComments(t, firstClient, note.Id, &openapi.ListNoteCommentsParams{Limit: &limit})
-	if len(firstPage.Comments) != 2 {
-		t.Fatalf("first page comments = %d, want 2", len(firstPage.Comments))
+	firstPageComments := threadComments(firstPage.Threads)
+	if len(firstPageComments) != 2 {
+		t.Fatalf("first page comments = %d, want 2", len(firstPageComments))
 	}
-	if firstPage.Comments[0].Id != first.Id || firstPage.Comments[1].Id != second.Id {
-		t.Fatalf("first page IDs = [%q, %q], want [%q, %q]", firstPage.Comments[0].Id, firstPage.Comments[1].Id, first.Id, second.Id)
+	if firstPageComments[0].Id != first.Id || firstPageComments[1].Id != second.Id {
+		t.Fatalf("first page IDs = [%q, %q], want [%q, %q]", firstPageComments[0].Id, firstPageComments[1].Id, first.Id, second.Id)
 	}
 	if firstPage.NextCursor == nil || *firstPage.NextCursor == "" {
 		t.Fatal("first page next_cursor is nil or empty")
 	}
-
 	secondPage := listRuntimeComments(t, firstClient, note.Id, &openapi.ListNoteCommentsParams{Limit: &limit, Cursor: firstPage.NextCursor})
-	if len(secondPage.Comments) != 1 || secondPage.Comments[0].Id != third.Id {
-		t.Fatalf("second page comments = %#v, want only %q", secondPage.Comments, third.Id)
+	secondPageComments := threadComments(secondPage.Threads)
+	if len(secondPageComments) != 1 || secondPageComments[0].Id != third.Id {
+		t.Fatalf("second page comments = %#v, want only %q", secondPageComments, third.Id)
 	}
 	if secondPage.NextCursor != nil {
 		t.Fatalf("second page next_cursor = %q, want nil", *secondPage.NextCursor)
@@ -95,8 +96,8 @@ func TestCommentAPIRuntimeBoundaries(t *testing.T) {
 		t.Fatalf("oversized comment response = %#v, want request_too_large", oversized.JSON413)
 	}
 	afterOversized := listRuntimeComments(t, firstClient, note.Id, &openapi.ListNoteCommentsParams{Limit: &pageLimit})
-	if len(afterOversized.Comments) != len(beforeOversized.Comments) {
-		t.Fatalf("oversized comment changed row count: got %d, want %d", len(afterOversized.Comments), len(beforeOversized.Comments))
+	if len(afterOversized.Threads) != len(beforeOversized.Threads) {
+		t.Fatalf("oversized comment changed row count: got %d, want %d", len(afterOversized.Threads), len(beforeOversized.Threads))
 	}
 
 	injectionBody := `'); DROP TABLE note_comments; --`
@@ -113,9 +114,58 @@ func TestCommentAPIRuntimeBoundaries(t *testing.T) {
 	}
 
 	injectionPage := listRuntimeComments(t, firstClient, note.Id, &openapi.ListNoteCommentsParams{Limit: &pageLimit})
-	if !containsRuntimeComment(injectionPage.Comments, injection.Id, injectionBody) {
-		t.Fatalf("SQL-injection comment did not round-trip: %#v", injectionPage.Comments)
+	if !containsRuntimeComment(threadComments(injectionPage.Threads), injection.Id, injectionBody) {
+		t.Fatalf("SQL-injection comment did not round-trip: %#v", injectionPage.Threads)
 	}
+
+	// Replies nest one level under their parent and never appear as top-level threads.
+	firstReply := createRuntimeReply(t, firstClient, first.Id, "Resposta de Thiago")
+	secondReply := createRuntimeReply(t, secondClient, first.Id, "Resposta da Dois")
+	requireRuntimeReply(t, firstReply, "Resposta de Thiago", first.Id, firstSession.User.Author)
+	requireRuntimeReply(t, secondReply, "Resposta da Dois", first.Id, secondSession.User.Author)
+
+	replyPage := listRuntimeComments(t, firstClient, note.Id, &openapi.ListNoteCommentsParams{Limit: &pageLimit})
+	replyThread, ok := findRuntimeThread(replyPage.Threads, first.Id)
+	if !ok {
+		t.Fatalf("reply page missing parent thread %q: %#v", first.Id, replyPage.Threads)
+	}
+	if len(replyThread.Replies) != 2 {
+		t.Fatalf("parent thread replies = %d, want 2", len(replyThread.Replies))
+	}
+	if replyThread.Replies[0].Id != firstReply.Id || replyThread.Replies[1].Id != secondReply.Id {
+		t.Fatalf("reply order = [%q, %q], want chronological [%q, %q]", replyThread.Replies[0].Id, replyThread.Replies[1].Id, firstReply.Id, secondReply.Id)
+	}
+	replyTopLevel := threadComments(replyPage.Threads)
+	if containsRuntimeComment(replyTopLevel, firstReply.Id, "") || containsRuntimeComment(replyTopLevel, secondReply.Id, "") {
+		t.Fatalf("reply appeared as a top-level thread: %#v", replyTopLevel)
+	}
+
+	missingReply, err := firstClient.CreateCommentReplyWithResponse(context.Background(), "missing-parent", openapi.CreateCommentReplyJSONRequestBody{Body: "ok"})
+	if err != nil {
+		t.Fatalf("POST /v1/comments/{comment_id}/replies missing parent: %v", err)
+	}
+	requireStatus(t, "POST /v1/comments/{comment_id}/replies missing parent", missingReply.StatusCode(), http.StatusNotFound, missingReply.Body)
+	if missingReply.JSON404 == nil || missingReply.JSON404.Code != openapi.ErrorCodeNotFound {
+		t.Fatalf("missing parent reply response = %#v, want not_found", missingReply.JSON404)
+	}
+
+	replyAsParent, err := firstClient.CreateCommentReplyWithResponse(context.Background(), firstReply.Id, openapi.CreateCommentReplyJSONRequestBody{Body: "nested"})
+	if err != nil {
+		t.Fatalf("POST /v1/comments/{comment_id}/replies reply as parent: %v", err)
+	}
+	requireStatus(t, "POST /v1/comments/{comment_id}/replies reply as parent", replyAsParent.StatusCode(), http.StatusConflict, replyAsParent.Body)
+	if replyAsParent.JSON409 == nil || replyAsParent.JSON409.Code != openapi.ErrorCodeInvalidReplyTarget {
+		t.Fatalf("reply-as-parent response = %#v, want invalid_reply_target", replyAsParent.JSON409)
+	}
+
+	// Replies are note_comments rows, so the report intake accepts a reply id unchanged.
+	replyReceipt, replyReportStatus, replyReportBody := createRuntimeReport(t, firstClient, openapi.CreateReportJSONRequestBody{
+		TargetType: openapi.ReportTargetTypeComment,
+		TargetId:   firstReply.Id,
+		Reason:     openapi.Spam,
+	})
+	requireStatus(t, "POST /v1/reports reply", replyReportStatus, http.StatusCreated, replyReportBody)
+	requireRuntimeReportReceipt(t, replyReceipt, replyReportBody, openapi.ReportTargetTypeComment, firstReply.Id, openapi.Spam, nil)
 
 	missingDelete, err := firstClient.DeleteNoteCommentWithResponse(context.Background(), note.Id, "missing-comment")
 	if err != nil {
@@ -157,6 +207,53 @@ func createRuntimeComment(t *testing.T, client *openapi.ClientWithResponses, not
 		t.Fatalf("comment response exposes private identifiers: %s", response.Body)
 	}
 	return *response.JSON201
+}
+
+func createRuntimeReply(t *testing.T, client *openapi.ClientWithResponses, parentCommentID string, body string) openapi.Comment {
+	t.Helper()
+
+	response, err := client.CreateCommentReplyWithResponse(context.Background(), parentCommentID, openapi.CreateCommentReplyJSONRequestBody{Body: body})
+	if err != nil {
+		t.Fatalf("POST /v1/comments/{comment_id}/replies: %v", err)
+	}
+	requireStatus(t, "POST /v1/comments/{comment_id}/replies", response.StatusCode(), http.StatusCreated, response.Body)
+	if response.JSON201 == nil {
+		t.Fatal("POST /v1/comments/{comment_id}/replies returned 201 without JSON body")
+	}
+	if bytes.Contains(response.Body, []byte(`"user_id"`)) || bytes.Contains(response.Body, []byte(`"note_id"`)) {
+		t.Fatalf("reply response exposes private identifiers: %s", response.Body)
+	}
+	return *response.JSON201
+}
+
+func requireRuntimeReply(t *testing.T, reply openapi.Comment, body string, parentCommentID string, author openapi.AuthorSummary) {
+	t.Helper()
+
+	requireRuntimeComment(t, reply, body, author)
+	if reply.ParentCommentId == nil || *reply.ParentCommentId != parentCommentID {
+		var got any
+		if reply.ParentCommentId != nil {
+			got = *reply.ParentCommentId
+		}
+		t.Fatalf("reply parent_comment_id = %#v, want %q", got, parentCommentID)
+	}
+}
+
+func threadComments(threads []openapi.CommentThread) []openapi.Comment {
+	comments := make([]openapi.Comment, len(threads))
+	for i, thread := range threads {
+		comments[i] = thread.Comment
+	}
+	return comments
+}
+
+func findRuntimeThread(threads []openapi.CommentThread, commentID string) (openapi.CommentThread, bool) {
+	for _, thread := range threads {
+		if thread.Comment.Id == commentID {
+			return thread, true
+		}
+	}
+	return openapi.CommentThread{}, false
 }
 
 func listRuntimeComments(t *testing.T, client *openapi.ClientWithResponses, noteID string, params *openapi.ListNoteCommentsParams) openapi.ListNoteCommentsResponse {

@@ -22,12 +22,12 @@ const noteID = 'note-id';
 const authorID = 'author-id';
 
 const malformedCommentCases: [string, unknown][] = [
-  ['missing comments', { next_cursor: null }],
-  ['missing cursor', { comments: [] }],
-  ['empty cursor', { comments: [], next_cursor: '' }],
-  ['oversized cursor', { comments: [], next_cursor: 'x'.repeat(513) }],
-  ['missing comment author', { comments: [{ body: 'Oi', created_at: 1, id: 'comment-id' }], next_cursor: null }],
-  ['invalid timestamp', { comments: [{ ...apiComment(), created_at: -1 }], next_cursor: null }],
+  ['missing threads', { next_cursor: null }],
+  ['missing cursor', { threads: [] }],
+  ['empty cursor', { threads: [], next_cursor: '' }],
+  ['oversized cursor', { threads: [], next_cursor: 'x'.repeat(513) }],
+  ['missing comment author', { threads: [apiThread({ body: 'Oi', created_at: 1, id: 'comment-id' })], next_cursor: null }],
+  ['invalid timestamp', { threads: [apiThread({ ...apiComment(), created_at: -1 })], next_cursor: null }],
 ];
 
 type FetchHandler = (request: Request) => Promise<Response>;
@@ -46,9 +46,9 @@ describe('comments API client', () => {
     stubFetch(async (request) => {
       requests.push(request);
       return jsonResponse({
-        comments: [
-          apiComment({ body: 'Primeiro comentário', id: 'comment-1' }),
-          apiComment({ body: 'Segundo comentário', id: 'comment-2' }),
+        threads: [
+          apiThread(apiComment({ body: 'Primeiro comentário', id: 'comment-1' })),
+          apiThread(apiComment({ body: 'Segundo comentário', id: 'comment-2' })),
         ],
         next_cursor: 'next-cursor',
       });
@@ -58,9 +58,9 @@ describe('comments API client', () => {
     await expect(
       client.listNoteComments({ noteID, cursor: 'after-cursor', limit: 2 }),
     ).resolves.toEqual({
-      comments: [
-        expectedComment({ body: 'Primeiro comentário', id: 'comment-1' }),
-        expectedComment({ body: 'Segundo comentário', id: 'comment-2' }),
+      threads: [
+        expectedThread(expectedComment({ body: 'Primeiro comentário', id: 'comment-1' })),
+        expectedThread(expectedComment({ body: 'Segundo comentário', id: 'comment-2' })),
       ],
       nextCursor: 'next-cursor',
     });
@@ -93,6 +93,31 @@ describe('comments API client', () => {
     await expect(request.json()).resolves.toEqual({ body: 'Comentário novo' });
   });
 
+  it('creates a reply under a parent comment and maps the response', async () => {
+    const requests: Request[] = [];
+    stubFetch(async (request) => {
+      requests.push(request);
+      return jsonResponse(
+        apiComment({ body: 'Resposta', id: 'reply-1', parent_comment_id: 'comment-1' }),
+        201,
+      );
+    });
+
+    const client = createAPIClient(exampleToken);
+    await expect(
+      client.createCommentReply({ parentCommentID: 'comment-1', body: 'Resposta' }),
+    ).resolves.toEqual(
+      expectedComment({ body: 'Resposta', id: 'reply-1', parentCommentID: 'comment-1' }),
+    );
+
+    const request = onlyRequest(requests);
+    const url = new URL(request.url);
+    expect(request.method).toBe('POST');
+    expect(url.pathname).toBe('/v1/comments/comment-1/replies');
+    expect(request.headers.get('Authorization')).toBe(`Bearer ${exampleToken}`);
+    await expect(request.json()).resolves.toEqual({ body: 'Resposta' });
+  });
+
   it('deletes a comment through the authenticated client', async () => {
     const requests: Request[] = [];
     stubFetch(async (request) => {
@@ -114,11 +139,11 @@ describe('comments API client', () => {
   });
 
   it('preserves a terminal null cursor', async () => {
-    stubFetch(async () => jsonResponse({ comments: [], next_cursor: null }));
+    stubFetch(async () => jsonResponse({ threads: [], next_cursor: null }));
 
     const client = createAPIClient(exampleToken);
     await expect(client.listNoteComments({ noteID })).resolves.toEqual({
-      comments: [],
+      threads: [],
       nextCursor: null,
     });
   });
@@ -126,12 +151,12 @@ describe('comments API client', () => {
   it('accepts a response body with 1000 Unicode code points', async () => {
     const body = '😀'.repeat(1000);
     stubFetch(async () =>
-      jsonResponse({ comments: [apiComment({ body })], next_cursor: null }),
+      jsonResponse({ threads: [apiThread(apiComment({ body }))], next_cursor: null }),
     );
 
     const client = createAPIClient(exampleToken);
     await expect(client.listNoteComments({ noteID })).resolves.toEqual({
-      comments: [expectedComment({ body })],
+      threads: [expectedThread(expectedComment({ body }))],
       nextCursor: null,
     });
   });
@@ -191,6 +216,22 @@ describe('comments API client', () => {
     });
   });
 
+  it('retains an invalid-reply-target conflict from a reply request', async () => {
+    stubFetch(async () => jsonResponse({ code: 'invalid_reply_target' }, 409));
+
+    const client = createAPIClient(exampleToken);
+    await expect(
+      client.createCommentReply({ parentCommentID: 'comment-1', body: 'Resposta' }),
+    ).rejects.toMatchObject({
+      body: { code: 'invalid_reply_target' },
+      code: 'invalid_reply_target',
+      status: 409,
+    });
+    await expect(
+      client.createCommentReply({ parentCommentID: 'comment-1', body: 'Resposta' }),
+    ).rejects.toBeInstanceOf(APIRequestError);
+  });
+
   it.each([
     ['forbidden', 403, 'forbidden'],
     ['not found', 404, 'not_found'],
@@ -214,8 +255,13 @@ function apiComment(overrides: Partial<Record<string, unknown>> = {}) {
     body: 'Comentário útil',
     created_at: 1782993600000,
     id: 'comment-id',
+    parent_comment_id: null,
     ...overrides,
   };
+}
+
+function apiThread(comment: Record<string, unknown>) {
+  return { comment, replies: [], has_more_replies: false };
 }
 
 function expectedComment(overrides: Partial<Record<string, unknown>> = {}) {
@@ -224,8 +270,13 @@ function expectedComment(overrides: Partial<Record<string, unknown>> = {}) {
     body: 'Comentário útil',
     createdAt: 1782993600000,
     id: 'comment-id',
+    parentCommentID: null,
     ...overrides,
   };
+}
+
+function expectedThread(comment: Record<string, unknown>) {
+  return { comment, replies: [], hasMoreReplies: false };
 }
 
 function jsonResponse(value: unknown, status = 200): Response {

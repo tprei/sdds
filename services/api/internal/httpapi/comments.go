@@ -115,6 +115,61 @@ func (handler server) DeleteNoteComment(w http.ResponseWriter, r *http.Request, 
 	noContent(w, r)
 }
 
+func (handler server) CreateCommentReply(w http.ResponseWriter, r *http.Request, commentID string) {
+	current, ok := currentSessionFromContext(r.Context())
+	if !ok {
+		writeUnauthenticated(w)
+		return
+	}
+	if handler.comments.store == nil || handler.comments.notes == nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+	parent, err := handler.comments.store.FindCommentByID(r.Context(), commentID)
+	if errors.Is(err, comment.ErrCommentNotFound) {
+		writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+	if parent.ParentCommentID != "" {
+		writeError(w, http.StatusConflict, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidReplyTarget})
+		return
+	}
+	if !handler.findCommentNote(w, r, parent.NoteID, current.User.ID) {
+		return
+	}
+	var request openapi.CreateCommentRequest
+	if !decodeJSONRequest(w, r, maxCreateCommentRequestBytes, &request) {
+		return
+	}
+	input := comment.NormalizeCreateReplyInput(comment.CreateReplyInput{
+		ParentCommentID: comment.CommentID(commentID),
+		UserID:          current.User.ID,
+		Body:            request.Body,
+	})
+	if problems := comment.ValidateCreateReplyInput(input); len(problems) > 0 {
+		writeError(w, http.StatusBadRequest, commentValidationErrorResponse(problems))
+		return
+	}
+	created, err := handler.comments.store.CreateReply(r.Context(), input)
+	if errors.Is(err, comment.ErrCommentNotFound) {
+		writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
+		return
+	}
+	if errors.Is(err, comment.ErrParentCommentNotTopLevel) {
+		writeError(w, http.StatusConflict, openapi.ErrorResponse{Code: openapi.ErrorCodeInvalidReplyTarget})
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+	writeJSON(w, http.StatusCreated, newCommentResponse(created))
+}
+
 func (handler server) findCommentNote(w http.ResponseWriter, r *http.Request, noteID string, viewerUserID user.UserID) bool {
 	if handler.comments.store == nil || handler.comments.notes == nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
@@ -152,7 +207,7 @@ func decodeCommentCursor(encoded *string) (*comment.Position, []comment.Validati
 }
 
 func newCommentResponse(found comment.Comment) openapi.Comment {
-	return openapi.Comment{
+	response := openapi.Comment{
 		Id:   string(found.ID),
 		Body: found.Body,
 		Author: openapi.AuthorSummary{
@@ -161,15 +216,28 @@ func newCommentResponse(found comment.Comment) openapi.Comment {
 		},
 		CreatedAt: found.CreatedAt.UTC().UnixMilli(),
 	}
+	if found.ParentCommentID != "" {
+		parentCommentID := string(found.ParentCommentID)
+		response.ParentCommentId = &parentCommentID
+	}
+	return response
 }
 
 func newCommentPageResponse(page comment.Page) (openapi.ListNoteCommentsResponse, error) {
 	response := openapi.ListNoteCommentsResponse{
-		Comments:   make([]openapi.Comment, 0, len(page.Comments)),
+		Threads:    make([]openapi.CommentThread, 0, len(page.Comments)),
 		NextCursor: nil,
 	}
 	for _, listed := range page.Comments {
-		response.Comments = append(response.Comments, newCommentResponse(listed.Comment))
+		replies := make([]openapi.Comment, 0, len(listed.Replies))
+		for _, reply := range listed.Replies {
+			replies = append(replies, newCommentResponse(reply))
+		}
+		response.Threads = append(response.Threads, openapi.CommentThread{
+			Comment:        newCommentResponse(listed.Comment),
+			Replies:        replies,
+			HasMoreReplies: listed.HasMoreReplies,
+		})
 	}
 	if page.HasMore && len(page.Comments) > 0 {
 		encoded, err := encodeCommentCursor(page.Comments[len(page.Comments)-1].Position)

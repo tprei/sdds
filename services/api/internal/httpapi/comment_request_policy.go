@@ -10,19 +10,21 @@ import (
 )
 
 const createNoteCommentGeneratedOperationID = "CreateNoteComment"
+const createCommentReplyGeneratedOperationID = "CreateCommentReply"
 
 func commentRequestValidationPolicy(operationID string) (requestValidationPolicy, bool) {
-	if operationID != createNoteCommentGeneratedOperationID {
+	if operationID != createNoteCommentGeneratedOperationID && operationID != createCommentReplyGeneratedOperationID {
 		return requestValidationPolicy{}, false
 	}
 	return requestValidationPolicy{maxBodyBytes: maxCreateCommentRequestBytes}, true
 }
 
-func invalidCreateNoteCommentBody(err error) (openapi.ErrorResponse, bool) {
+func invalidCreateCommentBody(err error) (openapi.ErrorResponse, bool) {
 	var requestError *openapi3filter.RequestError
 	if !errors.As(err, &requestError) || requestError.Input == nil ||
 		requestError.Input.Route == nil || requestError.Input.Route.Operation == nil ||
-		requestError.Input.Route.Operation.OperationID != createNoteCommentGeneratedOperationID {
+		(requestError.Input.Route.Operation.OperationID != createNoteCommentGeneratedOperationID &&
+			requestError.Input.Route.Operation.OperationID != createCommentReplyGeneratedOperationID) {
 		return openapi.ErrorResponse{}, false
 	}
 	var schemaError *openapi3.SchemaError

@@ -1,6 +1,11 @@
-import type { Comment, CommentPage } from '@/lib/api/comments';
+import type {
+  Comment,
+  CommentPage,
+  CommentThread,
+} from '@/lib/api/comments';
 
 export const commentBodyMaxCodePoints = 1000;
+export const replyMaxPerParent = 20;
 
 type InitialLoadStatus = 'loading' | 'ready' | 'error';
 type LoadMoreStatus = 'idle' | 'pending' | 'error';
@@ -17,13 +22,13 @@ export type CommentDraftValidation = {
 };
 
 export type CommentThreadState = {
-  comments: Comment[];
+  threads: CommentThread[];
   deleteStatusByCommentID: ReadonlyMap<string, CommentDeleteStatus>;
   draft: string;
   draftTouched: boolean;
   initialLoadStatus: InitialLoadStatus;
   loadMoreStatus: LoadMoreStatus;
-  localTailComments: Comment[];
+  localTailThreads: CommentThread[];
   nextCursor: string | null;
   submitStatus: SubmitStatus;
 };
@@ -47,13 +52,13 @@ export type CommentThreadAction =
 
 export function createCommentThreadState(): CommentThreadState {
   return {
-    comments: [],
+    threads: [],
     deleteStatusByCommentID: new Map(),
     draft: '',
     draftTouched: false,
     initialLoadStatus: 'loading',
     loadMoreStatus: 'idle',
-    localTailComments: [],
+    localTailThreads: [],
     nextCursor: null,
     submitStatus: 'idle',
   };
@@ -81,18 +86,18 @@ export function commentThreadReducer(
       if (state.initialLoadStatus !== 'loading') {
         return state;
       }
-      const comments = uniqueComments(action.page.comments);
+      const threads = uniqueThreads(action.page.threads);
       const settledTail = settleLocalTail(
-        comments,
-        withoutCommentIDs(state.localTailComments, comments),
+        threads,
+        withoutThreadIDs(state.localTailThreads, threads),
         action.page.nextCursor,
       );
       return {
         ...state,
-        comments: settledTail.comments,
+        threads: settledTail.threads,
         initialLoadStatus: 'ready',
         loadMoreStatus: 'idle',
-        localTailComments: settledTail.localTailComments,
+        localTailThreads: settledTail.localTailThreads,
         nextCursor: action.page.nextCursor,
       };
     }
@@ -119,17 +124,17 @@ export function commentThreadReducer(
       ) {
         return state;
       }
-      const comments = appendUniqueComments(state.comments, action.page.comments);
+      const threads = appendUniqueThreads(state.threads, action.page.threads);
       const settledTail = settleLocalTail(
-        comments,
-        withoutCommentIDs(state.localTailComments, comments),
+        threads,
+        withoutThreadIDs(state.localTailThreads, threads),
         action.page.nextCursor,
       );
       return {
         ...state,
-        comments: settledTail.comments,
+        threads: settledTail.threads,
         loadMoreStatus: 'idle',
-        localTailComments: settledTail.localTailComments,
+        localTailThreads: settledTail.localTailThreads,
         nextCursor: action.page.nextCursor,
       };
     }
@@ -158,21 +163,26 @@ export function commentThreadReducer(
       if (state.submitStatus !== 'pending') {
         return state;
       }
-      const appendToLoadedComments =
+      const appendToLoaded =
         state.initialLoadStatus === 'ready' && state.nextCursor === null;
+      const thread: CommentThread = {
+        comment: action.comment,
+        replies: [],
+        hasMoreReplies: false,
+      };
       return {
         ...state,
-        comments: appendToLoadedComments
-          ? appendUniqueComments(state.comments, [action.comment])
-          : state.comments,
+        threads: appendToLoaded
+          ? appendUniqueThreads(state.threads, [thread])
+          : state.threads,
         draft: '',
         draftTouched: false,
-        localTailComments: appendToLoadedComments
-          ? state.localTailComments
-          : appendUniqueTailComment(
-              state.comments,
-              state.localTailComments,
-              action.comment,
+        localTailThreads: appendToLoaded
+          ? state.localTailThreads
+          : appendUniqueTailThread(
+              state.threads,
+              state.localTailThreads,
+              thread,
             ),
         submitStatus: 'idle',
       };
@@ -247,8 +257,8 @@ export function canSubmitComment(state: CommentThreadState): boolean {
 
 export function displayedCommentCount(state: CommentThreadState): number {
   return (
-    visibleCommentCount(state.comments, state.deleteStatusByCommentID) +
-    visibleCommentCount(state.localTailComments, state.deleteStatusByCommentID)
+    visibleThreadCount(state.threads, state.deleteStatusByCommentID) +
+    visibleThreadCount(state.localTailThreads, state.deleteStatusByCommentID)
   );
 }
 
@@ -260,8 +270,8 @@ export function canDeleteComment(
   return (
     status !== 'pending' &&
     status !== 'deleted' &&
-    (state.comments.some((comment) => comment.id === commentID) ||
-      state.localTailComments.some((comment) => comment.id === commentID))
+    (hasCommentID(state.threads, commentID) ||
+      hasCommentID(state.localTailThreads, commentID))
   );
 }
 
@@ -275,6 +285,34 @@ export function visibleComments(
   return comments.filter((comment) =>
     isCommentVisible(deleteStatusByCommentID.get(comment.id)),
   );
+}
+
+export function visibleThreads(
+  threads: CommentThread[],
+  deleteStatusByCommentID: ReadonlyMap<string, CommentDeleteStatus>,
+): CommentThread[] {
+  if (deleteStatusByCommentID.size === 0) {
+    return threads;
+  }
+  return threads.filter((thread) =>
+    isCommentVisible(deleteStatusByCommentID.get(thread.comment.id)),
+  );
+}
+
+function visibleThreadCount(
+  threads: CommentThread[],
+  deleteStatusByCommentID: ReadonlyMap<string, CommentDeleteStatus>,
+): number {
+  return threads.reduce((total, thread) => {
+    if (!isCommentVisible(deleteStatusByCommentID.get(thread.comment.id))) {
+      return total;
+    }
+    return (
+      total +
+      1 +
+      visibleCommentCount(thread.replies, deleteStatusByCommentID)
+    );
+  }, 0);
 }
 
 function visibleCommentCount(
@@ -297,6 +335,14 @@ function isCommentVisible(status: CommentDeleteStatus | undefined): boolean {
   return status !== 'pending' && status !== 'deleted';
 }
 
+function hasCommentID(threads: CommentThread[], commentID: string): boolean {
+  return threads.some(
+    (thread) =>
+      thread.comment.id === commentID ||
+      thread.replies.some((reply) => reply.id === commentID),
+  );
+}
+
 function setDeleteStatus(
   deleteStatusByCommentID: ReadonlyMap<string, CommentDeleteStatus>,
   commentID: string,
@@ -310,57 +356,60 @@ function setDeleteStatus(
   return nextDeleteStatusByCommentID;
 }
 
-function uniqueComments(comments: Comment[]): Comment[] {
-  return appendUniqueComments([], comments);
+function uniqueThreads(threads: CommentThread[]): CommentThread[] {
+  return appendUniqueThreads([], threads);
 }
 
-function appendUniqueTailComment(
-  comments: Comment[],
-  localTailComments: Comment[],
-  comment: Comment,
-): Comment[] {
-  if (comments.some((existing) => existing.id === comment.id)) {
-    return localTailComments;
+function appendUniqueTailThread(
+  threads: CommentThread[],
+  localTailThreads: CommentThread[],
+  thread: CommentThread,
+): CommentThread[] {
+  if (threads.some((existing) => existing.comment.id === thread.comment.id)) {
+    return localTailThreads;
   }
-  return appendUniqueComments(localTailComments, [comment]);
+  return appendUniqueThreads(localTailThreads, [thread]);
 }
 
 function settleLocalTail(
-  comments: Comment[],
-  localTailComments: Comment[],
+  threads: CommentThread[],
+  localTailThreads: CommentThread[],
   nextCursor: string | null,
-): { comments: Comment[]; localTailComments: Comment[] } {
-  if (nextCursor !== null || localTailComments.length === 0) {
-    return { comments, localTailComments };
+): { threads: CommentThread[]; localTailThreads: CommentThread[] } {
+  if (nextCursor !== null || localTailThreads.length === 0) {
+    return { threads, localTailThreads };
   }
   return {
-    comments: appendUniqueComments(comments, localTailComments),
-    localTailComments: [],
+    threads: appendUniqueThreads(threads, localTailThreads),
+    localTailThreads: [],
   };
 }
 
-function appendUniqueComments(
-  comments: Comment[],
-  additions: Comment[],
-): Comment[] {
-  const knownIDs = new Set(comments.map((comment) => comment.id));
-  const uniqueAdditions = additions.filter((comment) => {
-    if (knownIDs.has(comment.id)) {
+function appendUniqueThreads(
+  threads: CommentThread[],
+  additions: CommentThread[],
+): CommentThread[] {
+  const knownIDs = new Set(threads.map((thread) => thread.comment.id));
+  const uniqueAdditions = additions.filter((thread) => {
+    if (knownIDs.has(thread.comment.id)) {
       return false;
     }
-    knownIDs.add(comment.id);
+    knownIDs.add(thread.comment.id);
     return true;
   });
-  return uniqueAdditions.length === 0 ? comments : [...comments, ...uniqueAdditions];
+  return uniqueAdditions.length === 0 ? threads : [...threads, ...uniqueAdditions];
 }
 
-function withoutCommentIDs(comments: Comment[], knownComments: Comment[]): Comment[] {
-  if (comments.length === 0 || knownComments.length === 0) {
-    return comments;
+function withoutThreadIDs(
+  threads: CommentThread[],
+  knownThreads: CommentThread[],
+): CommentThread[] {
+  if (threads.length === 0 || knownThreads.length === 0) {
+    return threads;
   }
-  const knownIDs = new Set(knownComments.map((comment) => comment.id));
-  const remainingComments = comments.filter(
-    (comment) => !knownIDs.has(comment.id),
+  const knownIDs = new Set(knownThreads.map((thread) => thread.comment.id));
+  const remainingThreads = threads.filter(
+    (thread) => !knownIDs.has(thread.comment.id),
   );
-  return remainingComments.length === comments.length ? comments : remainingComments;
+  return remainingThreads.length === threads.length ? threads : remainingThreads;
 }

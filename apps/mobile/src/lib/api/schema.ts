@@ -48,10 +48,17 @@ export const commentSchema = z.object({
   body: commentBodySchema,
   author: authorSummarySchema,
   created_at: z.number().int().nonnegative(),
+  parent_comment_id: z.string().nullable(),
 }) satisfies z.ZodType<CommentResponse>;
 
+export const commentThreadSchema = z.object({
+  comment: commentSchema,
+  replies: z.array(commentSchema).max(20),
+  has_more_replies: z.boolean(),
+}) satisfies z.ZodType<GeneratedSchemas['CommentThread']>;
+
 export const listNoteCommentsResponseSchema = z.object({
-  comments: z.array(commentSchema),
+  threads: z.array(commentThreadSchema),
   next_cursor: z.string().min(1).max(512).nullable(),
 }) satisfies z.ZodType<ListNoteCommentsResponse>;
 const reportReasonSchema = z.enum([
@@ -213,6 +220,7 @@ export const errorCodeSchema = z.enum([
   'invalid_event',
   'invalid_event_batch',
   'embedding_unavailable',
+  'invalid_reply_target',
 ]) satisfies z.ZodType<ErrorCode>;
 
 export const validationFieldSchema = z.enum([
@@ -233,6 +241,7 @@ export const validationFieldSchema = z.enum([
   'target_id',
   'reason',
   'details',
+  'parent_comment_id',
 ]) satisfies z.ZodType<ValidationField>;
 
 const validationProblemCodeSchema = z.enum([

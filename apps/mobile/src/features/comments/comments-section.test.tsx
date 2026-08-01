@@ -7,7 +7,7 @@ import {
 } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { Comment } from '@/lib/api/comments';
+import type { Comment, CommentThread } from '@/lib/api/comments';
 
 import {
   commentThreadReducer,
@@ -137,7 +137,7 @@ describe('CommentsSection', () => {
 
     const populated = renderSection({
       onPressAuthor,
-      thread: readyThread({ comments: [firstComment] }),
+      thread: readyThread({ threads: [thread(firstComment)] }),
     });
     expect(textNodes(populated, firstComment.body)).toHaveLength(1);
     expect(textNodes(populated, '1 comentários')).toHaveLength(1);
@@ -155,12 +155,12 @@ describe('CommentsSection', () => {
   it('shows an Autor badge only for the comment matching the note author', () => {
     const matching = renderSection({
       noteAuthorID: firstComment.author.id,
-      thread: readyThread({ comments: [firstComment] }),
+      thread: readyThread({ threads: [thread(firstComment)] }),
     });
     expect(textNodes(matching, 'Autor')).toHaveLength(1);
 
     const nonMatching = renderSection({
-      thread: readyThread({ comments: [firstComment] }),
+      thread: readyThread({ threads: [thread(firstComment)] }),
     });
     expect(textNodes(nonMatching, 'Autor')).toHaveLength(0);
   });
@@ -170,9 +170,9 @@ describe('CommentsSection', () => {
     const renderer = renderSection({
       onLoadMore,
       thread: readyThread({
-        comments: [firstComment],
+        threads: [thread(firstComment)],
         loadMoreStatus: 'error',
-        localTailComments: [localComment],
+        localTailThreads: [thread(localComment)],
         nextCursor: 'cursor-2',
       }),
     });
@@ -188,8 +188,8 @@ describe('CommentsSection', () => {
 
     const idleRenderer = renderSection({
       thread: readyThread({
-        comments: [firstComment],
-        localTailComments: [localComment],
+        threads: [thread(firstComment)],
+        localTailThreads: [thread(localComment)],
         nextCursor: 'cursor-2',
       }),
     });
@@ -226,7 +226,7 @@ describe('CommentsSection', () => {
     const renderer = renderSection({
       onDeleteComment,
       thread: readyThread({
-        comments: [firstComment, otherComment],
+        threads: [thread(firstComment), thread(otherComment)],
         deleteStatusByCommentID: new Map([[firstComment.id, 'error' as const]]),
       }),
     });
@@ -251,7 +251,7 @@ describe('CommentsSection', () => {
 
     const pending = renderSection({
       thread: readyThread({
-        comments: [firstComment],
+        threads: [thread(firstComment)],
         deleteStatusByCommentID: new Map([
           [firstComment.id, 'pending' as const],
         ]),
@@ -268,7 +268,7 @@ describe('CommentsSection', () => {
     };
     const renderer = renderSection({
       onReportComment,
-      thread: readyThread({ comments: [firstComment, otherComment] }),
+      thread: readyThread({ threads: [thread(firstComment), thread(otherComment)] }),
     });
 
     expect(
@@ -403,7 +403,12 @@ function comment(id: string, body: string): Comment {
     body,
     createdAt: 1782993600000,
     id,
+    parentCommentID: null,
   };
+}
+
+function thread(comment: Comment): CommentThread {
+  return { comment, replies: [], hasMoreReplies: false };
 }
 
 function render(element: React.ReactElement): ReactTestRenderer {

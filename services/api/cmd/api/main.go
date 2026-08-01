@@ -13,6 +13,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/tprei/sdds/services/api/internal/embedding"
 	"github.com/tprei/sdds/services/api/internal/eventexport"
 	"github.com/tprei/sdds/services/api/internal/httpapi"
 	"github.com/tprei/sdds/services/api/internal/media"
@@ -37,14 +38,19 @@ type mediaReadiness interface {
 	VerifyReadiness(context.Context) error
 }
 
+type embeddingReadiness interface {
+	VerifyReadiness(context.Context) error
+}
+
 type readyObjectStore interface {
 	media.ObjectStore
 	mediaReadiness
 }
 
 type runtimeReadiness struct {
-	database databaseReadiness
-	media    mediaReadiness
+	database  databaseReadiness
+	media     mediaReadiness
+	embedding embeddingReadiness
 }
 
 func (readiness runtimeReadiness) Check(ctx context.Context) error {
@@ -60,6 +66,12 @@ func (readiness runtimeReadiness) Check(ctx context.Context) error {
 	if err := readiness.media.VerifyReadiness(ctx); err != nil {
 		return fmt.Errorf("media readiness: %w", err)
 	}
+	if readiness.embedding == nil {
+		return errors.New("embedding readiness is unavailable")
+	}
+	if err := readiness.embedding.VerifyReadiness(ctx); err != nil {
+		return fmt.Errorf("embedding readiness: %w", err)
+	}
 	return nil
 }
 
@@ -69,6 +81,12 @@ var newMediaStore = func(ctx context.Context, config s3store.Config) (readyObjec
 }
 
 var loadS3Config = s3store.LoadConfigFromEnv
+
+var newEmbeddingClient = func(config embedding.Config) (embeddingReadiness, error) {
+	return embedding.New(config)
+}
+
+var loadEmbeddingConfig = embedding.LoadConfigFromEnv
 
 var listenAndServe = func(server *http.Server) error {
 	return server.ListenAndServe()
@@ -91,26 +109,30 @@ func main() {
 func run() error {
 	args := os.Args[1:]
 	if len(args) > 0 && (len(args) != 1 || (args[0] != commandMigrate && args[0] != commandInspectReports && args[0] != commandExportEvents)) {
-		return runWithArgs(context.Background(), config{}, s3store.Config{}, args)
+		return runWithArgs(context.Background(), config{}, s3store.Config{}, embedding.Config{}, args)
 	}
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
 	if len(args) == 1 {
-		return runWithArgs(context.Background(), cfg, s3store.Config{}, args)
+		return runWithArgs(context.Background(), cfg, s3store.Config{}, embedding.Config{}, args)
 	}
 	s3Config, err := loadS3Config()
 	if err != nil {
 		return err
 	}
-	return runWithArgs(context.Background(), cfg, s3Config, args)
+	embeddingConfig, err := loadEmbeddingConfig()
+	if err != nil {
+		return err
+	}
+	return runWithArgs(context.Background(), cfg, s3Config, embeddingConfig, args)
 }
 
-func runWithArgs(ctx context.Context, config config, s3Config s3store.Config, args []string) error {
+func runWithArgs(ctx context.Context, config config, s3Config s3store.Config, embeddingConfig embedding.Config, args []string) error {
 	switch {
 	case len(args) == 0:
-		return runServer(ctx, config, s3Config)
+		return runServer(ctx, config, s3Config, embeddingConfig)
 	case len(args) == 1 && args[0] == commandMigrate:
 		return runMigrations(ctx, config)
 	case len(args) == 1 && args[0] == commandInspectReports:
@@ -136,7 +158,7 @@ func runMigrations(ctx context.Context, config config) (err error) {
 	return nil
 }
 
-func runServer(ctx context.Context, config config, s3Config s3store.Config) (err error) {
+func runServer(ctx context.Context, config config, s3Config s3store.Config, embeddingConfig embedding.Config) (err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -159,6 +181,15 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config) (err
 	if err := store.VerifyReadiness(readinessCtx); err != nil {
 		return fmt.Errorf("verify media readiness: %w", err)
 	}
+	embeddingClient, err := newEmbeddingClient(embeddingConfig)
+	if err != nil {
+		return fmt.Errorf("create embedding client: %w", err)
+	}
+	embeddingReadinessCtx, embeddingCancel := context.WithTimeout(ctx, startupReadinessTimeout)
+	defer embeddingCancel()
+	if err := embeddingClient.VerifyReadiness(embeddingReadinessCtx); err != nil {
+		return fmt.Errorf("verify embedding readiness: %w", err)
+	}
 	noteStore := sqlite.NewNoteStore(db)
 	commentStore := sqlite.NewCommentStore(db)
 	catalogStore := sqlite.NewCatalogStore(db)
@@ -175,7 +206,7 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config) (err
 		return fmt.Errorf("cleanup expired uploads: %w", err)
 	}
 	cleanupCancel()
-	readiness := runtimeReadiness{database: db, media: store}
+	readiness := runtimeReadiness{database: db, media: store, embedding: embeddingClient}
 	server := newServer(config, httpapi.NewRouter(
 		httpapi.NotesDependencies{Stores: noteStore, Catalog: catalogStore},
 		httpapi.CommentDependencies{Store: commentStore},

@@ -209,10 +209,15 @@ verify_api_restart_outage_recovery() {
   pnpm test:api:runtime-boundaries
 }
 verify_migrate_without_media_dependencies() {
+  migrate_project="${PROJECT}-migrate-fresh"
+  docker compose --env-file /dev/null -f "$COMPOSE_FILE" -p "$migrate_project" down --volumes --remove-orphans >/dev/null 2>&1 || :
   (
     unset SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE SDDS_COMPOSE_RUSTFS_ROOT_SECRET_KEY_FILE SDDS_COMPOSE_SDDS_MEDIA_ACCESS_KEY_FILE SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE
-    docker compose --env-file /dev/null -f "$COMPOSE_FILE" -p "$PROJECT" run --build --rm --no-deps api migrate >/dev/null
+    docker compose --env-file /dev/null -f "$COMPOSE_FILE" -p "$migrate_project" run --build --rm --no-deps api migrate >/dev/null
   )
+  if ! docker compose --env-file /dev/null -f "$COMPOSE_FILE" -p "$migrate_project" down --volumes --remove-orphans >/dev/null 2>&1; then
+    die "migrate-fresh project cleanup failed; volumes may remain"
+  fi
 }
 run_rustfs_integration() {
   verify_preflight_runs_as_service_user

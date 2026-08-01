@@ -139,3 +139,64 @@ func TestValidateListInput(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeCreateReplyInput(t *testing.T) {
+	input := CreateReplyInput{
+		ParentCommentID: "parent-id",
+		UserID:          user.UserID("user-id"),
+		Body:            " \n resposta com acento á \t",
+	}
+
+	got := NormalizeCreateReplyInput(input)
+	want := CreateReplyInput{
+		ParentCommentID: "parent-id",
+		UserID:          user.UserID("user-id"),
+		Body:            "resposta com acento á",
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("normalized create reply input mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestValidateCreateReplyInput(t *testing.T) {
+	tests := []struct {
+		name            string
+		parentCommentID CommentID
+		body            string
+		want            []ValidationProblem
+	}{
+		{
+			name:            "rejects missing parent comment id",
+			parentCommentID: "",
+			body:            "resposta",
+			want:            []ValidationProblem{{Field: "parent_comment_id", Code: "required"}},
+		},
+		{
+			name:            "rejects empty body with valid parent",
+			parentCommentID: "0196-parent-comment",
+			body:            " \t\n ",
+			want:            []ValidationProblem{{Field: "body", Code: "required"}},
+		},
+		{
+			name:            "rejects body over max length",
+			parentCommentID: "0196-parent-comment",
+			body:            strings.Repeat("á", BodyMaxLength+1),
+			want:            []ValidationProblem{{Field: "body", Code: "too_long"}},
+		},
+		{
+			name:            "accepts valid parent and body",
+			parentCommentID: "0196-parent-comment",
+			body:            "resposta válida",
+			want:            []ValidationProblem{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := ValidateCreateReplyInput(CreateReplyInput{ParentCommentID: test.parentCommentID, Body: test.body})
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Fatalf("validation problems mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}

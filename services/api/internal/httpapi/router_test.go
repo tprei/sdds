@@ -47,6 +47,7 @@ type fakeCommentStore struct {
 	listNoteComments func(context.Context, comment.ListInput) (comment.Page, error)
 	deleteComment    func(context.Context, string) error
 	findCommentByID  func(context.Context, string) (comment.Comment, error)
+	createReply      func(context.Context, comment.CreateReplyInput) (comment.Comment, error)
 }
 
 func (fake fakeCommentStore) CreateComment(ctx context.Context, input comment.CreateInput) (comment.Comment, error) {
@@ -82,6 +83,13 @@ func (fake fakeCommentStore) FindCommentByID(ctx context.Context, id string) (co
 		return comment.Comment{}, errors.New("comment store not implemented")
 	}
 	return fake.findCommentByID(ctx, id)
+}
+
+func (fake fakeCommentStore) CreateReply(ctx context.Context, input comment.CreateReplyInput) (comment.Comment, error) {
+	if fake.createReply == nil {
+		return comment.Comment{}, errors.New("comment store not implemented")
+	}
+	return fake.createReply(ctx, input)
 }
 
 type fakeReportStore struct {

@@ -6,9 +6,10 @@ import (
 )
 
 const (
-	BodyMaxLength    = 1000
-	ListDefaultLimit = 20
-	ListMaxLimit     = 50
+	BodyMaxLength     = 1000
+	ListDefaultLimit  = 20
+	ListMaxLimit      = 50
+	ReplyMaxPerParent = 20
 )
 
 type ValidationProblem struct {
@@ -26,15 +27,34 @@ func NormalizeCreateInput(input CreateInput) CreateInput {
 
 func ValidateCreateInput(input CreateInput) []ValidationProblem {
 	normalized := NormalizeCreateInput(input)
-	problems := make([]ValidationProblem, 0, 1)
-	bodyLength := utf8.RuneCountInString(normalized.Body)
+	return validateBody(normalized.Body)
+}
+
+func validateBody(body string) []ValidationProblem {
+	bodyLength := utf8.RuneCountInString(body)
 	if bodyLength == 0 {
-		return append(problems, ValidationProblem{Field: "body", Code: "required"})
+		return []ValidationProblem{{Field: "body", Code: "required"}}
 	}
 	if bodyLength > BodyMaxLength {
-		return append(problems, ValidationProblem{Field: "body", Code: "too_long"})
+		return []ValidationProblem{{Field: "body", Code: "too_long"}}
 	}
-	return problems
+	return []ValidationProblem{}
+}
+
+func NormalizeCreateReplyInput(input CreateReplyInput) CreateReplyInput {
+	return CreateReplyInput{
+		ParentCommentID: input.ParentCommentID,
+		UserID:          input.UserID,
+		Body:            strings.TrimSpace(input.Body),
+	}
+}
+
+func ValidateCreateReplyInput(input CreateReplyInput) []ValidationProblem {
+	normalized := NormalizeCreateReplyInput(input)
+	if normalized.ParentCommentID == "" {
+		return []ValidationProblem{{Field: "parent_comment_id", Code: "required"}}
+	}
+	return validateBody(normalized.Body)
 }
 
 func NormalizeListInput(input ListInput) ListInput {

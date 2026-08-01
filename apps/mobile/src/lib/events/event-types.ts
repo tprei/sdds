@@ -15,7 +15,7 @@ export const productEventKinds = {
 export type ProductEventKind =
   (typeof productEventKinds)[keyof typeof productEventKinds];
 export type EventPlatform = 'ios' | 'android' | 'web';
-export type SearchVersion = 'fts5-v1';
+export type SearchVersion = 'fts5-v1' | 'hybrid-serafim100m-fts5-v1';
 export type RetrievalSource = 'lexical' | 'semantic' | 'hybrid';
 export type ReportTargetType = 'note' | 'comment';
 export type ExploreResult = { noteID: string; rank: number };

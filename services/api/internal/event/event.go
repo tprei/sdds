@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	SchemaVersion1                    = 1
-	SearchVersionFTS5V1 SearchVersion = "fts5-v1"
+	SchemaVersion1                                     = 1
+	SearchVersionFTS5V1                  SearchVersion = "fts5-v1"
+	SearchVersionHybridSerafim100mFTS5V1 SearchVersion = "hybrid-serafim100m-fts5-v1"
 )
 
 // Kind identifies the user interaction or product surface that produced an event.

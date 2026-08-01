@@ -376,7 +376,7 @@ func appendSearchVersionProblem(problems []ValidationProblem, field string, valu
 	if value == "" {
 		return append(problems, ValidationProblem{Field: field, Code: "required"})
 	}
-	if value != SearchVersionFTS5V1 {
+	if value != SearchVersionFTS5V1 && value != SearchVersionHybridSerafim100mFTS5V1 {
 		return append(problems, ValidationProblem{Field: field, Code: "unsupported"})
 	}
 	return problems

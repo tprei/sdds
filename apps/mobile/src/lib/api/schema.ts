@@ -133,9 +133,10 @@ export const catalogCategorySchema = z.object({
 export const listNotesResponseSchema = z.object({
   notes: z.array(noteSchema),
 }) satisfies z.ZodType<ListNotesResponse>;
-const searchVersionSchema = z.literal(
+const searchVersionSchema = z.enum([
   'fts5-v1',
-) satisfies z.ZodType<SearchVersion>;
+  'hybrid-serafim100m-fts5-v1',
+]) satisfies z.ZodType<SearchVersion>;
 const retrievalSourceSchema = z.enum([
   'lexical',
   'semantic',
@@ -211,6 +212,7 @@ export const errorCodeSchema = z.enum([
   'too_many_images',
   'invalid_event',
   'invalid_event_batch',
+  'embedding_unavailable',
 ]) satisfies z.ZodType<ErrorCode>;
 
 export const validationFieldSchema = z.enum([

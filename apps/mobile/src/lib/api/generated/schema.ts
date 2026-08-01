@@ -436,7 +436,7 @@ export interface components {
             author: components["schemas"]["AuthorSummary"];
         };
         /** @enum {string} */
-        ErrorCode: "internal_error" | "forbidden" | "invalid_auth" | "invalid_comment" | "invalid_json" | "invalid_note" | "invalid_report" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken" | "invalid_media" | "unsupported_media_type" | "idempotency_conflict" | "upload_in_progress" | "upload_expired" | "media_staging_quota_exceeded" | "media_storage_unavailable" | "media_integrity_error" | "too_many_images" | "invalid_event" | "invalid_event_batch";
+        ErrorCode: "internal_error" | "forbidden" | "invalid_auth" | "invalid_comment" | "invalid_json" | "invalid_note" | "invalid_report" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken" | "invalid_media" | "unsupported_media_type" | "idempotency_conflict" | "upload_in_progress" | "upload_expired" | "media_staging_quota_exceeded" | "media_storage_unavailable" | "media_integrity_error" | "too_many_images" | "invalid_event" | "invalid_event_batch" | "embedding_unavailable";
         ErrorResponse: {
             code: components["schemas"]["ErrorCode"];
             fields?: components["schemas"]["ValidationProblem"][];
@@ -446,7 +446,7 @@ export interface components {
         /** @enum {string} */
         EventPlatform: "ios" | "android" | "web";
         /** @enum {string} */
-        SearchVersion: "fts5-v1";
+        SearchVersion: "fts5-v1" | "hybrid-serafim100m-fts5-v1";
         /** @enum {string} */
         RetrievalSource: "lexical" | "semantic" | "hybrid";
         EventAppVersion: string;
@@ -1582,7 +1582,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description The image association is temporarily unavailable. */
+            /** @description The image association or the embedding runtime is temporarily unavailable. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -1977,6 +1977,15 @@ export interface operations {
             };
             /** @description The API could not search notes. */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The embedding runtime is unavailable. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

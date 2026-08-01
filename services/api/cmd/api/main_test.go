@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tprei/sdds/services/api/internal/embedding"
 	"github.com/tprei/sdds/services/api/internal/httpapi"
 	"github.com/tprei/sdds/services/api/internal/media"
 	"github.com/tprei/sdds/services/api/internal/s3store"
@@ -43,7 +44,7 @@ func TestRunWithArgsAppliesMigrations(t *testing.T) {
 	ctx := context.Background()
 	databasePath := filepath.Join(t.TempDir(), "sdds.db")
 
-	if err := runWithArgs(ctx, config{databasePath: databasePath}, s3store.Config{}, []string{"migrate"}); err != nil {
+	if err := runWithArgs(ctx, config{databasePath: databasePath}, s3store.Config{}, embedding.Config{}, []string{"migrate"}); err != nil {
 		t.Fatalf("run migrate command: %v", err)
 	}
 
@@ -102,6 +103,12 @@ func TestRunLoadsS3ConfigForServer(t *testing.T) {
 	newMediaStore = func(context.Context, s3store.Config) (readyObjectStore, error) {
 		return fakeMediaReadiness{verify: func(context.Context) error { return nil }}, nil
 	}
+	restoreEmbeddingConfigLoader(t)
+	loadEmbeddingConfig = func() (embedding.Config, error) { return embedding.Config{}, nil }
+	restoreEmbeddingClientFactory(t)
+	newEmbeddingClient = func(embedding.Config) (embeddingReadiness, error) {
+		return fakeEmbeddingReadiness{verify: func(context.Context) error { return nil }}, nil
+	}
 	restoreListen := listenAndServe
 	listenAndServe = func(*http.Server) error { return http.ErrServerClosed }
 	t.Cleanup(func() { listenAndServe = restoreListen })
@@ -115,7 +122,7 @@ func TestRunLoadsS3ConfigForServer(t *testing.T) {
 }
 
 func TestRunWithArgsRejectsUnknownCommand(t *testing.T) {
-	err := runWithArgs(context.Background(), config{}, s3store.Config{}, []string{"unknown"})
+	err := runWithArgs(context.Background(), config{}, s3store.Config{}, embedding.Config{}, []string{"unknown"})
 	if err == nil {
 		t.Fatal("unknown command error is nil")
 	}
@@ -140,6 +147,10 @@ func TestRunServerRequiresMediaReadiness(t *testing.T) {
 			newMediaStore = func(context.Context, s3store.Config) (readyObjectStore, error) {
 				return fakeMediaReadiness{verify: func(context.Context) error { return test.err }}, nil
 			}
+			restoreEmbeddingClientFactory(t)
+			newEmbeddingClient = func(embedding.Config) (embeddingReadiness, error) {
+				return fakeEmbeddingReadiness{verify: func(context.Context) error { return nil }}, nil
+			}
 			listened := false
 			restoreListen := listenAndServe
 			listenAndServe = func(*http.Server) error {
@@ -148,7 +159,7 @@ func TestRunServerRequiresMediaReadiness(t *testing.T) {
 			}
 			t.Cleanup(func() { listenAndServe = restoreListen })
 
-			err := runServer(context.Background(), testServerConfig(t), s3store.Config{})
+			err := runServer(context.Background(), testServerConfig(t), s3store.Config{}, embedding.Config{})
 			if !errors.Is(err, test.err) {
 				t.Fatalf("run server error = %v, want %v", err, test.err)
 			}
@@ -171,6 +182,10 @@ func TestRunServerListensAfterMediaReadiness(t *testing.T) {
 			return nil
 		}}, nil
 	}
+	restoreEmbeddingClientFactory(t)
+	newEmbeddingClient = func(embedding.Config) (embeddingReadiness, error) {
+		return fakeEmbeddingReadiness{verify: func(context.Context) error { return nil }}, nil
+	}
 
 	listened := false
 	restoreListen := listenAndServe
@@ -183,7 +198,7 @@ func TestRunServerListensAfterMediaReadiness(t *testing.T) {
 	}
 	t.Cleanup(func() { listenAndServe = restoreListen })
 
-	if err := runServer(context.Background(), testServerConfig(t), s3store.Config{}); err != nil {
+	if err := runServer(context.Background(), testServerConfig(t), s3store.Config{}, embedding.Config{}); err != nil {
 		t.Fatalf("run server: %v", err)
 	}
 	if !listened {
@@ -219,6 +234,10 @@ func TestRunServerCleansExpiredUploadsBeforeListen(t *testing.T) {
 			},
 		}, nil
 	}
+	restoreEmbeddingClientFactory(t)
+	newEmbeddingClient = func(embedding.Config) (embeddingReadiness, error) {
+		return fakeEmbeddingReadiness{verify: func(context.Context) error { return nil }}, nil
+	}
 
 	restoreListen := listenAndServe
 	listenAndServe = func(*http.Server) error {
@@ -227,7 +246,7 @@ func TestRunServerCleansExpiredUploadsBeforeListen(t *testing.T) {
 	}
 	t.Cleanup(func() { listenAndServe = restoreListen })
 
-	if err := runServer(context.Background(), cfg, s3store.Config{}); err != nil {
+	if err := runServer(context.Background(), cfg, s3store.Config{}, embedding.Config{}); err != nil {
 		t.Fatalf("run server: %v", err)
 	}
 	if diff := cmp.Diff([]string{"readiness", "cleanup", "listen"}, events); diff != "" {
@@ -247,6 +266,10 @@ func TestRunServerCleanupFailurePreventsListenAndClosesDatabase(t *testing.T) {
 			delete: func(context.Context, media.ObjectKey) error { return cleanupErr },
 		}, nil
 	}
+	restoreEmbeddingClientFactory(t)
+	newEmbeddingClient = func(embedding.Config) (embeddingReadiness, error) {
+		return fakeEmbeddingReadiness{verify: func(context.Context) error { return nil }}, nil
+	}
 
 	listened := false
 	restoreListen := listenAndServe
@@ -264,7 +287,7 @@ func TestRunServerCleanupFailurePreventsListenAndClosesDatabase(t *testing.T) {
 	}
 	t.Cleanup(func() { closeDatabase = restoreClose })
 
-	err := runServer(context.Background(), cfg, s3store.Config{})
+	err := runServer(context.Background(), cfg, s3store.Config{}, embedding.Config{})
 	if !errors.Is(err, cleanupErr) {
 		t.Fatalf("run server error = %v, want cleanup error", err)
 	}
@@ -316,6 +339,78 @@ func restoreS3ConfigLoader(t *testing.T) {
 	t.Helper()
 	original := loadS3Config
 	t.Cleanup(func() { loadS3Config = original })
+}
+
+type fakeEmbeddingReadiness struct {
+	verify func(context.Context) error
+}
+
+func (fake fakeEmbeddingReadiness) VerifyReadiness(ctx context.Context) error {
+	if fake.verify == nil {
+		return errors.New("unexpected embedding readiness")
+	}
+	return fake.verify(ctx)
+}
+
+func restoreEmbeddingClientFactory(t *testing.T) {
+	t.Helper()
+	original := newEmbeddingClient
+	t.Cleanup(func() { newEmbeddingClient = original })
+}
+
+func restoreEmbeddingConfigLoader(t *testing.T) {
+	t.Helper()
+	original := loadEmbeddingConfig
+	t.Cleanup(func() { loadEmbeddingConfig = original })
+}
+
+func TestRuntimeReadinessCheckRequiresEmbeddingReadiness(t *testing.T) {
+	db, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close database: %v", err)
+		}
+	})
+	embeddingErr := errors.New("embedding sidecar unreachable")
+	readiness := runtimeReadiness{
+		database:  db,
+		media:     fakeMediaReadiness{verify: func(context.Context) error { return nil }},
+		embedding: fakeEmbeddingReadiness{verify: func(context.Context) error { return embeddingErr }},
+	}
+	err = readiness.Check(context.Background())
+	if !errors.Is(err, embeddingErr) {
+		t.Fatalf("check error = %v, want %v", err, embeddingErr)
+	}
+}
+
+func TestRunServerAbortsOnEmbeddingReadinessFailure(t *testing.T) {
+	restoreMediaStoreFactory(t)
+	newMediaStore = func(context.Context, s3store.Config) (readyObjectStore, error) {
+		return fakeMediaReadiness{verify: func(context.Context) error { return nil }}, nil
+	}
+	embeddingErr := errors.New("embedding sidecar unreachable")
+	restoreEmbeddingClientFactory(t)
+	newEmbeddingClient = func(embedding.Config) (embeddingReadiness, error) {
+		return fakeEmbeddingReadiness{verify: func(context.Context) error { return embeddingErr }}, nil
+	}
+	listened := false
+	restoreListen := listenAndServe
+	listenAndServe = func(*http.Server) error {
+		listened = true
+		return http.ErrServerClosed
+	}
+	t.Cleanup(func() { listenAndServe = restoreListen })
+
+	err := runServer(context.Background(), testServerConfig(t), s3store.Config{}, embedding.Config{})
+	if !errors.Is(err, embeddingErr) {
+		t.Fatalf("run server error = %v, want %v", err, embeddingErr)
+	}
+	if listened {
+		t.Fatal("server listened despite failed embedding readiness")
+	}
 }
 
 func seedExpiredUpload(t *testing.T, databasePath string) {

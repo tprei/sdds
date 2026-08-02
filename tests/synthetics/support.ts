@@ -11,7 +11,6 @@ import {
   parseNoteResponse,
   parseSearchNotesResponse,
 } from '../contract/api-wire';
-} from '../contract/api-wire';
 const execFileAsync = promisify(execFile);
 export const apiBaseURL =
   process.env.SDDS_SYNTHETICS_API_BASE_URL ?? 'http://127.0.0.1:18080';

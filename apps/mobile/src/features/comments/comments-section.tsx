@@ -375,6 +375,7 @@ function CommentList({
           onReportComment={onReportComment}
         />
         <Button
+          disabled={replySubmitStatus === 'pending'}
           label="Responder"
           onPress={() =>
             onStartReply(
@@ -546,6 +547,7 @@ function ReplyComposer({
         variant="primary"
       />
       <Button
+        disabled={submitStatus === 'pending'}
         label="Cancelar"
         onPress={onCancel}
         testID="comment-reply-cancel"

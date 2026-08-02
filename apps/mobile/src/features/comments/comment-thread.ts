@@ -518,6 +518,9 @@ function appendReplyToThreads(
       return thread;
     }
     changed = true;
+    if (thread.replies.length >= replyMaxPerParent) {
+      return { ...thread, hasMoreReplies: true };
+    }
     return { ...thread, replies: [...thread.replies, reply] };
   });
   return { threads: changed ? nextThreads : threads, found };

@@ -42,7 +42,7 @@ func newEventHTTPRouterWithSessionError(t *testing.T, store EventStore, limits E
 	}}
 	hasher := user.NewPasswordHasher()
 	handler := newRouter(
-		noteHandlers{store: fakeNoteStore{}, authorNotes: fakeNoteStore{}, useful: fakeNoteStore{}, catalog: fakeCatalog{}},
+		noteHandlers{noteStore: fakeNoteStore{}, notePublisher: fakeNoteStore{}, noteSearcher: fakeNoteStore{}, authorNoteStore: fakeNoteStore{}, usefulStore: fakeNoteStore{}, categoryCatalog: fakeCatalog{}},
 		commentHandlers{store: fakeCommentStore{}, notes: fakeNoteStore{}},
 		reportHandlers{store: fakeReportStore{}, notes: fakeNoteStore{}, comments: fakeCommentStore{}},
 		eventHandlers{store: store, limits: newEventRateLimiters(limits, clock), clock: clock},

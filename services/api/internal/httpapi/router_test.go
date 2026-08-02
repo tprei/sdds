@@ -107,7 +107,7 @@ func (fake fakeEventStore) AppendBatch(ctx context.Context, records []event.Reco
 }
 
 func newRouterForTest(
-	notes NoteStores,
+	notes fakeNoteStore,
 	catalog note.Catalog,
 	users UserStores,
 	authLimits AuthLimits,
@@ -116,7 +116,7 @@ func newRouterForTest(
 	imageReader media.AttachedImageReader,
 ) http.Handler {
 	return NewRouter(
-		NotesDependencies{Stores: notes, Catalog: catalog},
+		NotesDependencies{Stores: notes, Publisher: notes, Searcher: notes, Catalog: catalog},
 		CommentDependencies{Store: fakeCommentStore{}},
 		ReportDependencies{Store: fakeReportStore{}, CommentTargets: fakeCommentStore{}},
 		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
@@ -127,7 +127,7 @@ func newRouterForTest(
 }
 
 func newRouterWithAuthSeamsForTest(
-	notes NoteStores,
+	notes fakeNoteStore,
 	catalog note.Catalog,
 	users UserStores,
 	passwordHasher passwordHasher,
@@ -140,7 +140,7 @@ func newRouterWithAuthSeamsForTest(
 	imageReader media.AttachedImageReader,
 ) http.Handler {
 	return newRouter(
-		noteHandlers{store: notes, authorNotes: notes, useful: notes, catalog: catalog},
+		noteHandlers{noteStore: notes, notePublisher: notes, noteSearcher: notes, authorNoteStore: notes, usefulStore: notes, categoryCatalog: catalog},
 		commentHandlers{store: fakeCommentStore{}, notes: notes},
 		reportHandlers{store: fakeReportStore{}, notes: notes, comments: fakeCommentStore{}},
 		eventHandlers{store: fakeEventStore{}, limits: newEventRateLimiters(DefaultEventLimits(), clock), clock: clock},
@@ -174,7 +174,7 @@ func TestNewRouterRequiresMediaDependencies(t *testing.T) {
 				}
 			}()
 			NewRouter(
-				NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
+				NotesDependencies{Stores: fakeNoteStore{}, Publisher: fakeNoteStore{}, Searcher: fakeNoteStore{}, Catalog: fakeCatalog{}},
 				CommentDependencies{Store: fakeCommentStore{}},
 				ReportDependencies{Store: fakeReportStore{}},
 				EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
@@ -193,7 +193,7 @@ func TestNewRouterRequiresCommentStore(t *testing.T) {
 		}
 	}()
 	NewRouter(
-		NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
+		NotesDependencies{Stores: fakeNoteStore{}, Publisher: fakeNoteStore{}, Searcher: fakeNoteStore{}, Catalog: fakeCatalog{}},
 		CommentDependencies{},
 		ReportDependencies{Store: fakeReportStore{}},
 		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
@@ -210,7 +210,7 @@ func TestNewRouterRequiresReportStore(t *testing.T) {
 		}
 	}()
 	NewRouter(
-		NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
+		NotesDependencies{Stores: fakeNoteStore{}, Publisher: fakeNoteStore{}, Searcher: fakeNoteStore{}, Catalog: fakeCatalog{}},
 		CommentDependencies{Store: fakeCommentStore{}},
 		ReportDependencies{},
 		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
@@ -422,9 +422,13 @@ func TestRouterRejectsPlainOptionsRequest(t *testing.T) {
 
 type fakeNoteStore struct {
 	createNote      func(ctx context.Context, input note.CreateInput) (note.Note, error)
+	publish         func(ctx context.Context, input note.CreateInput) (note.Note, error)
 	findNote        func(ctx context.Context, id string, viewerUserID user.UserID) (note.Note, error)
 	listNotes       func(ctx context.Context, input note.ListInput) ([]note.Note, error)
 	searchNotes     func(ctx context.Context, input note.SearchInput) ([]note.Note, error)
+	search          func(ctx context.Context, input note.SearchInput) ([]note.SearchResult, error)
+	searchSemantic  func(ctx context.Context, input note.SemanticSearchInput) ([]note.ScoredNote, error)
+	findNotesByID   func(ctx context.Context, ids []string, viewerUserID user.UserID) ([]note.Note, error)
 	listAuthorNotes func(ctx context.Context, input note.AuthorNotesInput) (note.AuthorNotesPage, error)
 	markUseful      func(ctx context.Context, input note.MarkUsefulInput) error
 	unmarkUseful    func(ctx context.Context, input note.UnmarkUsefulInput) error
@@ -435,6 +439,13 @@ func (store fakeNoteStore) CreateNote(ctx context.Context, input note.CreateInpu
 		return note.Note{}, fmt.Errorf("create note not implemented")
 	}
 	return store.createNote(ctx, input)
+}
+
+func (store fakeNoteStore) Publish(ctx context.Context, input note.CreateInput) (note.Note, error) {
+	if store.publish == nil {
+		return note.Note{}, fmt.Errorf("publish not implemented")
+	}
+	return store.publish(ctx, input)
 }
 
 func (store fakeNoteStore) FindNote(ctx context.Context, id string, viewerUserID user.UserID) (note.Note, error) {
@@ -456,6 +467,39 @@ func (store fakeNoteStore) SearchNotes(ctx context.Context, input note.SearchInp
 		return nil, fmt.Errorf("search notes not implemented")
 	}
 	return store.searchNotes(ctx, input)
+}
+
+// Search is the NoteSearcher seam. It defaults to wrapping SearchNotes
+// results as lexical so every existing test that only sets searchNotes
+// keeps working unchanged; tests exercising hybrid-specific behavior (e.g.
+// per-result retrieval sources, embedder failure) set search directly.
+func (store fakeNoteStore) Search(ctx context.Context, input note.SearchInput) ([]note.SearchResult, error) {
+	if store.search != nil {
+		return store.search(ctx, input)
+	}
+	notes, err := store.SearchNotes(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]note.SearchResult, len(notes))
+	for i, found := range notes {
+		results[i] = note.SearchResult{Note: found, RetrievalSource: note.RetrievalSourceLexical}
+	}
+	return results, nil
+}
+
+func (store fakeNoteStore) SearchSemantic(ctx context.Context, input note.SemanticSearchInput) ([]note.ScoredNote, error) {
+	if store.searchSemantic == nil {
+		return nil, fmt.Errorf("search semantic not implemented")
+	}
+	return store.searchSemantic(ctx, input)
+}
+
+func (store fakeNoteStore) FindNotesByID(ctx context.Context, ids []string, viewerUserID user.UserID) ([]note.Note, error) {
+	if store.findNotesByID == nil {
+		return nil, fmt.Errorf("find notes by id not implemented")
+	}
+	return store.findNotesByID(ctx, ids, viewerUserID)
 }
 
 func (store fakeNoteStore) ListAuthorNotes(ctx context.Context, input note.AuthorNotesInput) (note.AuthorNotesPage, error) {

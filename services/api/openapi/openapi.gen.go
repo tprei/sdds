@@ -24,6 +24,7 @@ const (
 
 // Defines values for ErrorCode.
 const (
+	ErrorCodeEmbeddingUnavailable      ErrorCode = "embedding_unavailable"
 	ErrorCodeForbidden                 ErrorCode = "forbidden"
 	ErrorCodeIdempotencyConflict       ErrorCode = "idempotency_conflict"
 	ErrorCodeInternal                  ErrorCode = "internal_error"
@@ -53,6 +54,8 @@ const (
 // Valid indicates whether the value is a known member of the ErrorCode enum.
 func (e ErrorCode) Valid() bool {
 	switch e {
+	case ErrorCodeEmbeddingUnavailable:
+		return true
 	case ErrorCodeForbidden:
 		return true
 	case ErrorCodeIdempotencyConflict:
@@ -708,13 +711,16 @@ func (e RetrievalSource) Valid() bool {
 
 // Defines values for SearchVersion.
 const (
-	Fts5V1 SearchVersion = "fts5-v1"
+	Fts5V1                  SearchVersion = "fts5-v1"
+	HybridSerafim100mFts5V1 SearchVersion = "hybrid-serafim100m-fts5-v1"
 )
 
 // Valid indicates whether the value is a known member of the SearchVersion enum.
 func (e SearchVersion) Valid() bool {
 	switch e {
 	case Fts5V1:
+		return true
+	case HybridSerafim100mFts5V1:
 		return true
 	default:
 		return false
@@ -4330,6 +4336,7 @@ type SearchNotesHTTPResponse struct {
 	JSON400      *ErrorResponse
 	JSON401      *ErrorResponse
 	JSON500      *ErrorResponse
+	JSON503      *ErrorResponse
 }
 
 // Status returns HTTPResponse.Status
@@ -5728,6 +5735,13 @@ func ParseSearchNotesHTTPResponse(rsp *http.Response) (*SearchNotesHTTPResponse,
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

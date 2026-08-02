@@ -636,7 +636,7 @@ func TestCommentRoutesRejectUnauthenticatedSessions(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			router := NewRouter(
-				NotesDependencies{Stores: fakeNoteStore{}, Catalog: fakeCatalog{}},
+				NotesDependencies{Stores: fakeNoteStore{}, Publisher: fakeNoteStore{}, Catalog: fakeCatalog{}},
 				CommentDependencies{Store: fakeCommentStore{}},
 				ReportDependencies{Store: fakeReportStore{}},
 				EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
@@ -670,7 +670,7 @@ func TestCommentRoutesRejectUnauthenticatedSessions(t *testing.T) {
 
 func newCommentRouter(notes fakeNoteStore, comments fakeCommentStore) http.Handler {
 	return withCurrentSessionHeader(NewRouter(
-		NotesDependencies{Stores: notes, Catalog: fakeCatalog{}},
+		NotesDependencies{Stores: notes, Publisher: notes, Catalog: fakeCatalog{}},
 		CommentDependencies{Store: comments},
 		ReportDependencies{Store: fakeReportStore{}, CommentTargets: comments},
 		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},

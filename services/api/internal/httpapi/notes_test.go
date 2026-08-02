@@ -249,7 +249,7 @@ func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 				CreatedAt:    now.UnixMilli(),
 				UpdatedAt:    now.UnixMilli(),
 			},
-			RetrievalSource: openapi.RetrievalSource(note.CurrentRetrievalSource),
+			RetrievalSource: openapi.Lexical,
 		}},
 	}
 	if diff := cmp.Diff(want, body); diff != "" {
@@ -554,6 +554,81 @@ func TestSearchNotesReturnsInternalError(t *testing.T) {
 	}
 }
 
+func TestSearchNotesReturnsEmbeddingUnavailable(t *testing.T) {
+	router := newTestRouter(fakeNoteStore{
+		search: func(context.Context, note.SearchInput) ([]note.SearchResult, error) {
+			return nil, note.ErrSearchUnavailable
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=caf%C3%A9", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	}
+
+	var body openapi.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != openapi.ErrorCodeEmbeddingUnavailable {
+		t.Fatalf("code = %s, want %s", body.Code, openapi.ErrorCodeEmbeddingUnavailable)
+	}
+}
+
+func TestSearchNotesCarriesHybridVersionAndPerResultRetrievalSource(t *testing.T) {
+	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
+	router := newTestRouter(fakeNoteStore{
+		search: func(context.Context, note.SearchInput) ([]note.SearchResult, error) {
+			return []note.SearchResult{
+				{
+					Note:            note.Note{ID: exampleNoteID, Title: "Achado", Body: "Em ambas as listas.", CategorySlug: "food", CreatedAt: now, UpdatedAt: now},
+					RetrievalSource: note.RetrievalSourceHybrid,
+				},
+				{
+					Note:            note.Note{ID: "018ff5b8-0000-7000-8000-000000000001", Title: "Só léxico", Body: "Só no FTS5.", CategorySlug: "food", CreatedAt: now, UpdatedAt: now},
+					RetrievalSource: note.RetrievalSourceLexical,
+				},
+				{
+					Note:            note.Note{ID: "018ff5b8-0000-7000-8000-000000000002", Title: "Só semântico", Body: "Só no KNN.", CategorySlug: "food", CreatedAt: now, UpdatedAt: now},
+					RetrievalSource: note.RetrievalSourceSemantic,
+				},
+			}, nil
+		},
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/search/notes?q=caf%C3%A9", nil)
+
+	router.ServeHTTP(response, request)
+	requireOpenAPIResponse(t, request, response)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	var body openapi.SearchNotesResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if string(body.SearchVersion) != "hybrid-serafim100m-fts5-v1" {
+		t.Fatalf("search version = %q, want hybrid-serafim100m-fts5-v1", body.SearchVersion)
+	}
+	if len(body.Results) != 3 {
+		t.Fatalf("result count = %d, want 3", len(body.Results))
+	}
+	wantSources := []openapi.RetrievalSource{openapi.Hybrid, openapi.Lexical, openapi.Semantic}
+	for i, result := range body.Results {
+		if result.RetrievalSource != wantSources[i] {
+			t.Fatalf("result[%d].RetrievalSource = %q, want %q", i, result.RetrievalSource, wantSources[i])
+		}
+	}
+}
+
 func TestGetNoteReturnsNote(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	router := newTestRouter(fakeNoteStore{
@@ -656,7 +731,7 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	imageCreatedAt := now.Add(-time.Hour)
 	router := newTestRouter(fakeNoteStore{
-		createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
+		publish: func(_ context.Context, input note.CreateInput) (note.Note, error) {
 			if input.UserID != user.UserID("user-id-thiago") {
 				t.Fatalf("user id = %q, want user-id-thiago", input.UserID)
 			}
@@ -751,10 +826,10 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 }
 
 func TestCreateNoteRejectsMissingSessionBeforeValidation(t *testing.T) {
-	createCalled := false
+	publishCalled := false
 	router := newRouterForTest(fakeNoteStore{
-		createNote: func(_ context.Context, _ note.CreateInput) (note.Note, error) {
-			createCalled = true
+		publish: func(_ context.Context, _ note.CreateInput) (note.Note, error) {
+			publishCalled = true
 			return note.Note{}, nil
 		},
 	}, fakeCatalog{}, authenticatedFakeUserStore(fakeUserStore{}), DefaultAuthLimits(), fakeReadiness{}, fakeUploadPreparer{}, fakeAttachedImageReader{})
@@ -768,8 +843,8 @@ func TestCreateNoteRejectsMissingSessionBeforeValidation(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
 	}
 	requireErrorCode(t, response, openapi.ErrorCodeUnauthenticated)
-	if createCalled {
-		t.Fatal("note store was called")
+	if publishCalled {
+		t.Fatal("publish was called")
 	}
 }
 
@@ -836,8 +911,8 @@ func TestCreateNoteRejectsOpenAPIRequestSchemaProblems(t *testing.T) {
 	}
 
 	router := newTestRouter(fakeNoteStore{
-		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
-			t.Fatal("CreateNote should not be called")
+		publish: func(context.Context, note.CreateInput) (note.Note, error) {
+			t.Fatal("Publish should not be called")
 			return note.Note{}, nil
 		},
 	})
@@ -874,7 +949,7 @@ func TestCreateNoteMapsCreateErrors(t *testing.T) {
 	tests := []struct {
 		name       string
 		body       string
-		createErr  error
+		publishErr error
 		wantStatus int
 		wantCode   openapi.ErrorCode
 		wantFields []openapi.ValidationProblem
@@ -882,21 +957,21 @@ func TestCreateNoteMapsCreateErrors(t *testing.T) {
 		{
 			name:       "idempotency conflict",
 			body:       validBody,
-			createErr:  note.ErrIdempotencyConflict,
+			publishErr: note.ErrIdempotencyConflict,
 			wantStatus: http.StatusConflict,
 			wantCode:   openapi.ErrorCodeIdempotencyConflict,
 		},
 		{
 			name:       "expired upload",
 			body:       validBody,
-			createErr:  note.ErrImageUploadExpired,
+			publishErr: note.ErrImageUploadExpired,
 			wantStatus: http.StatusConflict,
 			wantCode:   openapi.ErrorCodeUploadExpired,
 		},
 		{
 			name:       "unavailable upload",
 			body:       validBody,
-			createErr:  note.ErrImageUploadUnavailable,
+			publishErr: note.ErrImageUploadUnavailable,
 			wantStatus: http.StatusConflict,
 			wantCode:   openapi.ErrorCodeInvalidNote,
 			wantFields: []openapi.ValidationProblem{{Field: openapi.ValidationFieldImageUploadIDs, Code: openapi.ValidationProblemCodeInvalid}},
@@ -908,9 +983,16 @@ func TestCreateNoteMapsCreateErrors(t *testing.T) {
 			wantCode:   openapi.ErrorCodeTooManyImages,
 		},
 		{
+			name:       "embedding unavailable",
+			body:       validBody,
+			publishErr: note.ErrEmbeddingUnavailable,
+			wantStatus: http.StatusServiceUnavailable,
+			wantCode:   openapi.ErrorCodeEmbeddingUnavailable,
+		},
+		{
 			name:       "internal storage error",
 			body:       validBody,
-			createErr:  errors.New("storage unavailable"),
+			publishErr: errors.New("storage unavailable"),
 			wantStatus: http.StatusInternalServerError,
 			wantCode:   openapi.ErrorCodeInternal,
 		},
@@ -918,14 +1000,14 @@ func TestCreateNoteMapsCreateErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			createCalled := false
+			publishCalled := false
 			router := newTestRouter(fakeNoteStore{
-				createNote: func(context.Context, note.CreateInput) (note.Note, error) {
-					createCalled = true
-					if tt.createErr == nil {
-						t.Fatal("CreateNote should not be called")
+				publish: func(context.Context, note.CreateInput) (note.Note, error) {
+					publishCalled = true
+					if tt.publishErr == nil {
+						t.Fatal("Publish should not be called")
 					}
-					return note.Note{}, tt.createErr
+					return note.Note{}, tt.publishErr
 				},
 			})
 			response := httptest.NewRecorder()
@@ -949,8 +1031,8 @@ func TestCreateNoteMapsCreateErrors(t *testing.T) {
 			} else {
 				requireValidationProblems(t, body.Fields, tt.wantFields)
 			}
-			if tt.createErr == nil && createCalled {
-				t.Fatal("CreateNote should not be called for validation errors")
+			if tt.publishErr == nil && publishCalled {
+				t.Fatal("Publish should not be called for validation errors")
 			}
 		})
 	}
@@ -958,7 +1040,7 @@ func TestCreateNoteMapsCreateErrors(t *testing.T) {
 
 func TestCreateNotePassesCatalogValidationToStore(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
-		createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
+		publish: func(_ context.Context, input note.CreateInput) (note.Note, error) {
 			if input.CategorySlug != "qualquer" {
 				t.Fatalf("category slug = %q, want qualquer", input.CategorySlug)
 			}
@@ -1010,7 +1092,7 @@ func TestCreateNoteMapsUnknownAndInactiveCatalogErrorsToValidation(t *testing.T)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := newTestRouter(fakeNoteStore{
-				createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
+				publish: func(_ context.Context, input note.CreateInput) (note.Note, error) {
 					if input.CategorySlug != note.CategorySlug(tt.categorySlug) {
 						t.Fatalf("category slug = %q, want %q", input.CategorySlug, tt.categorySlug)
 					}
@@ -1063,7 +1145,7 @@ func TestCreateNoteMapsAggregateCatalogErrorsInStableOrder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			router := newTestRouter(fakeNoteStore{
-				createNote: func(_ context.Context, input note.CreateInput) (note.Note, error) {
+				publish: func(_ context.Context, input note.CreateInput) (note.Note, error) {
 					if input.CategorySlug != note.CategorySlug(tt.categorySlug) {
 						t.Fatalf("category slug = %q, want %q", input.CategorySlug, tt.categorySlug)
 					}
@@ -1099,7 +1181,7 @@ func TestCreateNoteMapsAggregateCatalogErrorsInStableOrder(t *testing.T) {
 
 func TestCreateNotePreservesGenuineStoreFailure(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
-		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
+		publish: func(context.Context, note.CreateInput) (note.Note, error) {
 			return note.Note{}, errors.New("database unavailable")
 		},
 	})
@@ -1156,8 +1238,8 @@ func TestCreateNoteRejectsMissingOrUnsupportedContentType(t *testing.T) {
 	}
 
 	router := newTestRouter(fakeNoteStore{
-		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
-			t.Fatal("CreateNote should not be called")
+		publish: func(context.Context, note.CreateInput) (note.Note, error) {
+			t.Fatal("Publish should not be called")
 			return note.Note{}, nil
 		},
 	})
@@ -1191,8 +1273,8 @@ func TestCreateNoteRejectsMissingOrUnsupportedContentType(t *testing.T) {
 
 func TestCreateNoteRejectsOldCitySlugJSON(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
-		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
-			t.Fatal("CreateNote should not be called")
+		publish: func(context.Context, note.CreateInput) (note.Note, error) {
+			t.Fatal("Publish should not be called")
 			return note.Note{}, nil
 		},
 	})
@@ -1219,8 +1301,8 @@ func TestCreateNoteRejectsOldCitySlugJSON(t *testing.T) {
 
 func TestCreateNoteRejectsUnknownJSONFields(t *testing.T) {
 	router := newTestRouter(fakeNoteStore{
-		createNote: func(context.Context, note.CreateInput) (note.Note, error) {
-			t.Fatal("CreateNote should not be called")
+		publish: func(context.Context, note.CreateInput) (note.Note, error) {
+			t.Fatal("Publish should not be called")
 			return note.Note{}, nil
 		},
 	})

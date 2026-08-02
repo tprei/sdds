@@ -18,7 +18,7 @@ The first version should prove the loop:
 
 1. Write an authenticated text-first note with an optional single JPEG or PNG.
 2. Browse recent and categorized notes.
-3. Search notes.
+3. Search notes, combining exact lexical matching with Portuguese semantic retrieval.
 4. Perform basic user actions around notes.
 
 Out of scope for the first version:
@@ -29,8 +29,8 @@ Out of scope for the first version:
 - Complex recommendation systems.
 - Saved collections.
 - Moderation workflows beyond minimal operational controls.
-- Separate search infrastructure.
-- Multiple backend services.
+
+Search runs as the Go API plus one private CPU-only embedding sidecar (see Architecture → Search); no other backend service exists.
 
 ## Architecture
 
@@ -65,22 +65,23 @@ The backend is a single Go service:
 
 - `net/http` for the HTTP foundation.
 - `chi` for routing and middleware.
-- SQLite for relational metadata and FTS5 search.
+- SQLite for relational metadata, FTS5 lexical search, and note embedding vectors.
 - A private RustFS bucket for image bytes through the server-side S3 adapter.
+- A private CPU-only ONNX embedding sidecar for Portuguese semantic search (see Architecture → Search).
 - SQL migrations checked into the repo.
 
 Mobile never receives RustFS credentials, bucket/object keys, or direct RustFS URLs. The API contract standard is OpenAPI-first over JSON/HTTP. Product endpoints describe the external contract in `openapi/openapi.yaml` and keep JSON on the wire. Mobile can consume generated TypeScript types, while Go keeps hand-owned domain and persistence code behind the HTTP boundary.
 
 Protobuf is not the default for this phase of the product. Do not introduce protobuf or gRPC until the product needs stricter multi-client or multi-service contracts enough to justify the extra workflow and review overhead.
 
-No background worker is required by the current product loop. Image processing, notifications, search reindexing, and moderation queues remain future work rather than available behavior.
+No background worker is required by the current product loop. Image processing, notifications, and moderation queues remain future work rather than available behavior. Note embedding backfill/repair runs through the standalone `api reindex-embeddings` command (see Local Development → Reindexing embeddings), not a worker.
 
 The API exposes these operational endpoints:
 
 - `GET /healthz` reports process liveness and returns `204 No Content`.
-- `GET /readyz` reports SQLite and media readiness. It returns `204 No Content` only when SQLite and the signed media readiness object are available, and returns `503` otherwise.
+- `GET /readyz` reports SQLite, media, and embedding-sidecar readiness. It returns `204 No Content` only when SQLite, the signed media readiness object, and the embedding sidecar (matching the pinned model id, revision, and dimension) are all available, and returns `503` otherwise.
 
-Server startup requires the configured S3-compatible media endpoint and successful media readiness. There is no local-filesystem or media-unavailable fallback. The standalone `api migrate` command is deliberately independent from media configuration.
+Server startup requires the configured S3-compatible media endpoint, the embedding sidecar URL, and successful readiness for both. There is no local-filesystem, media-unavailable, or embedding-unavailable fallback: search and note publishing return an explicit `503 embedding_unavailable` rather than silently degrading. The standalone `api migrate` command is deliberately independent from media and embedding configuration.
 
 Auth has process-local operational limits to protect the small VM from expensive password work. The signup and login request limits apply independently per remote source and per normalized username; the global limits are higher shared ceilings:
 
@@ -93,11 +94,11 @@ Auth has process-local operational limits to protect the small VM from expensive
 The current product endpoints are:
 
 - `GET /healthz` reports process liveness.
-- `GET /readyz` reports SQLite and media readiness.
+- `GET /readyz` reports SQLite, media, and embedding-sidecar readiness.
 - `GET /v1/categories` and `GET /v1/places` require authentication and return catalogs.
 - `POST /v1/auth/users`, `POST /v1/auth/sessions`, and `GET`/`DELETE /v1/auth/session` own account/session operations.
 - `GET /v1/authors/{author_id}` and `GET /v1/authors/{author_id}/notes` require authentication and return an author plus that author’s paginated notes.
-- `GET /v1/notes` requires authentication and returns a bounded list of up to 50 recent/category-filtered notes; `GET /v1/notes/{note_id}` requires authentication and returns one note; `GET /v1/search/notes` requires authentication and searches notes.
+- `GET /v1/notes` requires authentication and returns a bounded list of up to 50 recent/category-filtered notes; `GET /v1/notes/{note_id}` requires authentication and returns one note; `GET /v1/search/notes` requires authentication and runs hybrid (lexical + semantic) search, returning `503 embedding_unavailable` if the embedding sidecar cannot be reached.
 - `PUT /v1/notes/{note_id}/useful` and `DELETE /v1/notes/{note_id}/useful` require authentication and idempotently mark or unmark a note as useful.
 - `POST /v1/events` requires authentication and accepts one bounded batch of 1 to 50 product events; it returns only accepted and duplicate counts and never stored rows or user identity.
 - `POST /v1/media/image-uploads` requires authentication and stages exactly one private JPEG or PNG with a stable `upload_request_id`; its receipt is not public media.
@@ -105,7 +106,7 @@ The current product endpoints are:
 
 ### Data
 
-SQLite remains the metadata and search database and requires no database server. Image bytes live outside SQLite in a separate private RustFS volume. Metadata and bytes form one application lifecycle and must be backed up and restored together.
+SQLite remains the metadata and search database and requires no database server. Image bytes live outside SQLite in a separate private RustFS volume. Metadata and bytes form one application lifecycle and must be backed up and restored together. Note embedding vectors (`note_embeddings`, one row per note, `ON DELETE CASCADE` from `notes`) live in the same SQLite file as ordinary derived data; they are covered by the same backup and can always be regenerated from note text with `api reindex-embeddings`.
 
 The schema stays portable enough that we can later migrate to Postgres if product needs justify it. Do not add SQLite-specific cleverness to core domain logic unless it buys a real product advantage.
 
@@ -113,9 +114,17 @@ The `events` table is append-only SQLite in the same database. It is operator-on
 
 ### Search
 
-Search starts with SQLite FTS5. This is enough to build and tune the first product loop.
+Search is one hybrid retrieval path: SQLite FTS5 lexical matching fused with Portuguese semantic retrieval, so a search finds a note even when the searcher and the author used different words (for example, a query like "lugar bom pra trabalhar de notebook" finding a note that only says "Wi-Fi estável, várias tomadas"). There is no lexical-only fallback mode; hybrid search is the product search, and every executed search carries the explicit version `hybrid-serafim100m-fts5-v1`.
 
-Long-term social search will depend less on the engine and more on ranking signals: note text, saves, usefulness, freshness, category, author trust, place context, and Brazilian vocabulary. When those signals become clearer, we can evaluate a dedicated search engine such as Meilisearch, Typesense, OpenSearch, or Postgres full-text search.
+For every search: FTS5 supplies a bounded lexical candidate list, the query is embedded and an exact cosine k-nearest-neighbors scan over stored note vectors supplies a bounded semantic candidate list, the two candidate id lists are merged and deduplicated with deterministic reciprocal-rank fusion, the active category filter is applied consistently to both sources, and one bounded ranked list is returned using the existing public note shape. Each result carries `retrieval_source`: `lexical` (FTS5 only), `semantic` (vector only), or `hybrid` (both agreed).
+
+**Embedding model.** `PORTULAN/serafim-100m-portuguese-pt-sentence-encoder-ir`, MIT-licensed, pinned to immutable revision `f27c45d197ea6541dd071b1d992ec91776ee76bd`, 768-dimensional mean-pooled sentence embeddings, L2-normalized so cosine similarity is a plain dot product. The model runs as a pinned ONNX export (not PyTorch/Sentence-Transformers) inside one private, CPU-only sidecar container (`services/embedding/`) reachable only on the internal Compose network; the export's fidelity against the original model's reference embeddings is a committed, tested fixture (`services/embedding/testdata/`).
+
+**Vector storage and retrieval.** Vectors are stored as little-endian `float32` `BLOB` columns in an ordinary SQLite table (`note_embeddings`), not a vector extension or virtual table; the API remains `CGO_ENABLED=0` on `modernc.org/sqlite` with no CGO driver and no vector extension loaded anywhere. Retrieval is an exact brute-force cosine scan in Go, correct at the launch corpus size: `BenchmarkSearchSemantic*` (`services/api/internal/sqlite/note_semantic_search_bench_test.go`) measures roughly 5 ms at 1,000 notes, 58 ms at 10,000, and 580 ms at 100,000 on a single CPU core. There is no approximate/ANN index. Past roughly 10k–100k notes (depending on the deployment's acceptable search latency) the scan needs a real index, most likely Postgres with pgvector; because vectors are derived data, `api reindex-embeddings` can always regenerate the whole set into any future store.
+
+**Publish and repair.** A note's embedding is generated from its title and body before the create transaction and written in the same SQLite transaction as the note itself, so a publicly visible note is never missing its vector; if the embedding sidecar is unreachable, publishing fails explicitly with `503 embedding_unavailable` rather than publishing unindexed. `api reindex-embeddings` (see Local Development → Reindexing embeddings) pages through every note, skips any whose stored model id/revision/text fingerprint already match the current values, and re-embeds the rest — safe to run repeatedly and the mechanism that repairs a restore that lost the derived vectors.
+
+Long-term social search will depend less on the retrieval engine and more on ranking signals: saves, usefulness, freshness, category, author trust, and place context. A parallel relevance dataset and evaluation harness (tracked separately) will grow confidence in ranking changes over time without blocking this baseline.
 
 ### Events
 
@@ -153,7 +162,7 @@ Delivery is best-effort from the product's perspective. Mobile keeps an in-memor
 | `note_detail` | none |
 | `author_profile` | none |
 
-Search provenance is server-owned: `search_version` is the current literal `fts5-v1`; `retrieval_source` is the constrained enum `lexical`, `semantic`, or `hybrid`, and every current FTS5 result is `lexical`; `rank` is one-based rendered order; and `search_id` is a client-generated UUID stable for one execution. Search-origin useful context repeats the immutable ID/version/rank/source attached to the rendered result and is never recomputed later.
+Search provenance is server-owned: `search_version` is the current literal `hybrid-serafim100m-fts5-v1`; `retrieval_source` is the constrained enum `lexical`, `semantic`, or `hybrid`, set per result by hybrid fusion; `rank` is one-based rendered order; and `search_id` is a client-generated UUID stable for one execution. Search-origin useful context repeats the immutable ID/version/rank/source attached to the rendered result and is never recomputed later.
 
 **Impression semantics.** An "impression" is the complete current result set committed and rendered by the eager `ScrollView`, not an HTTP response and not pixel-level viewport exposure. Both impression kinds require `result_count === results.length`, cap the list at 50 items, keep note IDs and ranks unique, and use contiguous one-based ranks in array order. `search_no_results.result_count` is exactly `0` and records a committed empty result set. A stale successful response can record submission evidence but can never set render state or emit an impression, so it cannot produce a false impression.
 
@@ -165,13 +174,24 @@ Search provenance is server-owned: `search_version` is the current literal `fts5
 
 The deployment target is a small VM managed with Docker Compose and Portainer. The current production shape is:
 
+```mermaid
+flowchart LR
+    mobile[Mobile/web] --> api[Go API]
+    api --> sqlite[(SQLite)]
+    api --> embedding[Private embedding sidecar<br/>ONNX, CPU-only]
+    api --> rustfs[Private RustFS]
+```
+
 - Go API container.
 - Mounted SQLite volume.
+- Private CPU-only embedding sidecar (`services/embedding/`), reachable only on the internal Compose network with no published port.
 - Private single-node/single-disk RustFS with separate data and log volumes.
 - Caddy or another simple reverse proxy when public TLS is needed.
 - Paired encrypted backups of SQLite and RustFS state.
 
 RustFS is a pinned beta SNSD dependency, not high availability, replication, erasure coding, or a backup system. Scalability is not the first concern; reviewability, operational simplicity, and product learning are.
+
+**Embedding sidecar resource envelope**, measured on the reference CI CPU-only environment and set as the Compose `deploy.resources.limits`: image size 490 MB, cold start (container start to healthy) ~7.0 s, single-query embedding latency p50 20.9 ms / p95 72.8 ms, batch throughput ~52 texts/sec at a 32-text batch, peak RSS under sustained batch load ~584 MiB. The Compose memory limit (`896M`) and healthcheck `start_period` (`15s`) are derived from these numbers (peak RSS × 1.5, cold start × 2); re-measure and adjust if the deployment CPU differs meaningfully from CI.
 
 ## Development Values
 
@@ -246,9 +266,23 @@ DELETE FROM events WHERE installation_id = :installation_id;
 
 Account deletion is automatic: `user_id` is declared `REFERENCES users(id) ON DELETE CASCADE` and the API opens every connection with `PRAGMA foreign_keys = ON`, so deleting the user row removes every event that user produced and no separate event purge is needed for account deletion.
 
+### Reindexing embeddings
+
+`api reindex-embeddings` pages through every note, embeds each one whose stored embedding is missing or whose model id/revision/text fingerprint no longer match the current values, and writes each vector in the same SQLite transaction as its bookkeeping update. It requires a reachable embedding sidecar (`SDDS_EMBEDDING_URL`) in addition to database configuration, and it is safe to run repeatedly: a note already current is skipped, so a second run against unchanged data does no embedding work.
+
+```sh
+# Compose deployment (repository default); reads /data/sdds.db in the api-data volume
+make reindex-embeddings
+
+# Direct process (host DB path, mirroring the migrate example)
+SDDS_DATABASE_PATH=/tmp/sdds.db SDDS_EMBEDDING_URL=http://127.0.0.1:8081 go run ./services/api/cmd/api reindex-embeddings
+```
+
+Run it after restoring a backup that lost `note_embeddings`, after a deliberate model upgrade (once the new model's id/revision is pinned in the embedding sidecar), or any time the embedding sidecar was unavailable during publishing and left notes without a vector. The command prints one JSON summary line — `scanned`, `embedded`, `skipped` — after each page.
+
 ### Full local runtime through Compose
 
-Compose is the repository-default full API runtime. It provisions RustFS, the private bucket and API identity, the readiness sentinel, secrets, volumes, and startup ordering. Set these four secret-file paths before starting it:
+Compose is the repository-default full API runtime. It provisions RustFS, the private bucket and API identity, the embedding sidecar, the readiness sentinel, secrets, volumes, and startup ordering. Set these four secret-file paths before starting it:
 
 ```sh
 export SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE="$HOME/.config/sdds/rustfs-root-access"
@@ -264,7 +298,7 @@ Each file must contain one printable ASCII, whitespace-free credential and be re
 make compose-start
 ```
 
-Compose publishes only the API port (`8080`, or `SDDS_HTTP_PORT`). RustFS stays private on the Compose network with its console disabled. Data uses separate `api-data`, `rustfs-data`, and `rustfs-logs` volumes. Back up `api-data` and `rustfs-data` together; restoring one without the other can leave metadata and bytes out of sync. RustFS is beta, and Compose is not a backup system.
+Compose publishes only the API port (`8080`, or `SDDS_HTTP_PORT`). RustFS and the embedding sidecar stay private on the Compose network with no published ports; the sidecar has no secrets and needs no backup file of its own. Data uses separate `api-data`, `rustfs-data`, and `rustfs-logs` volumes. Back up `api-data` and `rustfs-data` together; restoring one without the other can leave metadata and bytes out of sync. Note embedding vectors live inside `api-data` (the same SQLite file as notes), so restoring `api-data` restores them too; `api reindex-embeddings` repairs them if a restore ever loses them. RustFS is beta, and Compose is not a backup system.
 
 Stop the stack only when discarding its state is intentional. This command is destructive and removes `api-data`, `rustfs-data`, and `rustfs-logs`:
 
@@ -274,7 +308,7 @@ make compose-down
 
 ### Advanced direct API process
 
-Use `pnpm dev:api` only against an already provisioned S3-compatible endpoint. The process requires all six media settings; it fails startup when configuration or media readiness is absent and MUST NOT fall back to local files:
+Use `pnpm dev:api` only against an already provisioned S3-compatible endpoint and a reachable embedding sidecar. The process requires all six media settings plus `SDDS_EMBEDDING_URL`; it fails startup when configuration, media readiness, or embedding readiness is absent and MUST NOT fall back to local files or lexical-only search:
 
 - `SDDS_MEDIA_S3_ENDPOINT`.
 - `SDDS_MEDIA_S3_REGION`.
@@ -282,8 +316,9 @@ Use `pnpm dev:api` only against an already provisioned S3-compatible endpoint. T
 - `SDDS_MEDIA_S3_PATH_STYLE`.
 - `SDDS_MEDIA_S3_ACCESS_KEY_FILE`.
 - `SDDS_MEDIA_S3_SECRET_KEY_FILE`.
+- `SDDS_EMBEDDING_URL`, the embedding sidecar's base URL (for example `http://embedding:8081` inside Compose, or `http://127.0.0.1:8081` against a sidecar run directly). Optional `SDDS_EMBEDDING_QUERY_TIMEOUT_MS` (default `2000`) and `SDDS_EMBEDDING_BATCH_TIMEOUT_MS` (default `30000`) bound per-call latency.
 
-For example, with secret files already provisioned outside Git:
+For example, with secret files already provisioned outside Git and the embedding sidecar already running (`docker compose -f infra/compose/compose.yaml up -d embedding`):
 
 ```sh
 SDDS_DATABASE_PATH=/tmp/sdds.db \
@@ -293,6 +328,7 @@ SDDS_MEDIA_S3_BUCKET=sdds-media \
 SDDS_MEDIA_S3_PATH_STYLE=true \
 SDDS_MEDIA_S3_ACCESS_KEY_FILE="$HOME/.config/sdds/sdds-media-access" \
 SDDS_MEDIA_S3_SECRET_KEY_FILE="$HOME/.config/sdds/sdds-media-secret" \
+SDDS_EMBEDDING_URL=http://127.0.0.1:8081 \
 pnpm dev:api
 ```
 
@@ -375,3 +411,5 @@ docker compose -p sdds-synthetics -f infra/compose/compose.yaml down --volumes
 - chi: https://github.com/go-chi/chi
 - SQLite appropriate uses: https://sqlite.org/whentouse.html
 - SQLite FTS5: https://sqlite.org/fts5.html
+- SERAFIM Portuguese sentence encoder: https://huggingface.co/PORTULAN/serafim-100m-portuguese-pt-sentence-encoder-ir
+- Reciprocal rank fusion: https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf

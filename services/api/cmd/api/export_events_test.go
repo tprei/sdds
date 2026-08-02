@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tprei/sdds/services/api/internal/embedding"
 	"github.com/tprei/sdds/services/api/internal/event"
 	"github.com/tprei/sdds/services/api/internal/eventexport"
 	"github.com/tprei/sdds/services/api/internal/s3store"
@@ -90,7 +91,7 @@ func TestRunWithArgsExportEvents(t *testing.T) {
 	seedExportEventsDatabase(t, databasePath)
 	output := captureEventOutput(t)
 
-	if err := runWithArgs(context.Background(), config{databasePath: databasePath}, s3store.Config{}, []string{commandExportEvents}); err != nil {
+	if err := runWithArgs(context.Background(), config{databasePath: databasePath}, s3store.Config{}, embedding.Config{}, []string{commandExportEvents}); err != nil {
 		t.Fatalf("run export-events command: %v", err)
 	}
 	if output.Len() == 0 {

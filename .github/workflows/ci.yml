@@ -187,3 +187,24 @@ jobs:
 
       - name: Test mobile
         run: pnpm test:mobile
+
+  embedding:
+    name: Embedding Sidecar
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and test embedding image
+        uses: docker/build-push-action@v6
+        with:
+          context: "{{defaultContext}}:services/embedding"
+          target: test
+          push: false
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

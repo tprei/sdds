@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"math"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -19,9 +20,34 @@ const (
 
 var testCreateInputSequence atomic.Uint64
 
+// testEmbeddingVector returns a deterministic unit-length 768-float vector so
+// tests that don't care about embedding content still satisfy the
+// note_embeddings dimension and CHECK constraints.
+func testEmbeddingVector() []float32 {
+	component := float32(1 / math.Sqrt(float64(note.EmbeddingDimension)))
+	vector := make([]float32, note.EmbeddingDimension)
+	for i := range vector {
+		vector[i] = component
+	}
+	return vector
+}
+
+func testEmbedding() note.Embedding {
+	return note.Embedding{
+		ModelID:       note.EmbeddingModelID,
+		ModelRevision: note.EmbeddingModelRevision,
+		Dimension:     note.EmbeddingDimension,
+		SourceSHA256:  note.EmbeddingFingerprint("test-fixture"),
+		Vector:        testEmbeddingVector(),
+	}
+}
+
 func testCreateInput(input note.CreateInput) note.CreateInput {
 	sequence := testCreateInputSequence.Add(1)
 	input.ClientRequestID = "sqlite-test-" + strconv.FormatUint(sequence, 10)
+	if len(input.Embedding.Vector) == 0 {
+		input.Embedding = testEmbedding()
+	}
 	return input
 }
 

@@ -30,9 +30,19 @@ type ImageUploadPreparer interface {
 	PrepareImageUpload(context.Context, string, media.UploadReceiver) (media.UploadReceipt, error)
 }
 
+type NotePublisher interface {
+	Publish(ctx context.Context, input note.CreateInput) (note.Note, error)
+}
+
+type NoteSearcher interface {
+	Search(ctx context.Context, input note.SearchInput) ([]note.SearchResult, error)
+}
+
 type NotesDependencies struct {
-	Stores  NoteStores
-	Catalog note.Catalog
+	Stores    NoteStores
+	Publisher NotePublisher
+	Searcher  NoteSearcher
+	Catalog   note.Catalog
 }
 
 type CommentDependencies struct {
@@ -59,10 +69,12 @@ type SystemDependencies struct {
 }
 
 type noteHandlers struct {
-	store       note.Store
-	authorNotes note.AuthorNoteStore
-	useful      note.UsefulStore
-	catalog     note.Catalog
+	noteStore       note.Store
+	notePublisher   NotePublisher
+	noteSearcher    NoteSearcher
+	authorNoteStore note.AuthorNoteStore
+	usefulStore     note.UsefulStore
+	categoryCatalog note.Catalog
 }
 
 type commentHandlers struct {
@@ -143,7 +155,7 @@ func NewRouter(notes NotesDependencies, comments CommentDependencies, reports Re
 		eventLimits = DefaultEventLimits()
 	}
 	return newRouter(
-		noteHandlers{store: notes.Stores, authorNotes: notes.Stores, useful: notes.Stores, catalog: notes.Catalog},
+		noteHandlers{noteStore: notes.Stores, notePublisher: notes.Publisher, noteSearcher: notes.Searcher, authorNoteStore: notes.Stores, usefulStore: notes.Stores, categoryCatalog: notes.Catalog},
 		commentHandlers{store: comments.Store, notes: notes.Stores},
 		reportHandlers{store: reports.Store, notes: notes.Stores, comments: reports.CommentTargets},
 		eventHandlers{store: events.Store, limits: newEventRateLimiters(eventLimits, time.Now), clock: time.Now},

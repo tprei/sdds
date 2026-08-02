@@ -34,7 +34,7 @@ func (handler server) ListNotes(w http.ResponseWriter, r *http.Request, params o
 		return
 	}
 
-	notes, err := handler.notes.store.ListRecentNotes(r.Context(), input)
+	notes, err := handler.notes.noteStore.ListRecentNotes(r.Context(), input)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
@@ -49,7 +49,7 @@ func (handler server) GetNote(w http.ResponseWriter, r *http.Request, noteID str
 		writeUnauthenticated(w)
 		return
 	}
-	found, err := handler.notes.store.FindNote(r.Context(), noteID, current.User.ID)
+	found, err := handler.notes.noteStore.FindNote(r.Context(), noteID, current.User.ID)
 	if errors.Is(err, note.ErrNoteNotFound) {
 		writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
 		return
@@ -69,7 +69,7 @@ func (handler server) MarkNoteUseful(w http.ResponseWriter, r *http.Request, not
 		return
 	}
 
-	if _, err := handler.notes.store.FindNote(r.Context(), noteID, current.User.ID); err != nil {
+	if _, err := handler.notes.noteStore.FindNote(r.Context(), noteID, current.User.ID); err != nil {
 		if errors.Is(err, note.ErrNoteNotFound) {
 			writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
 			return
@@ -78,7 +78,7 @@ func (handler server) MarkNoteUseful(w http.ResponseWriter, r *http.Request, not
 		return
 	}
 
-	if err := handler.notes.useful.MarkUseful(r.Context(), note.MarkUsefulInput{NoteID: noteID, UserID: current.User.ID}); err != nil {
+	if err := handler.notes.usefulStore.MarkUseful(r.Context(), note.MarkUsefulInput{NoteID: noteID, UserID: current.User.ID}); err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}
@@ -93,7 +93,7 @@ func (handler server) UnmarkNoteUseful(w http.ResponseWriter, r *http.Request, n
 		return
 	}
 
-	if _, err := handler.notes.store.FindNote(r.Context(), noteID, current.User.ID); err != nil {
+	if _, err := handler.notes.noteStore.FindNote(r.Context(), noteID, current.User.ID); err != nil {
 		if errors.Is(err, note.ErrNoteNotFound) {
 			writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
 			return
@@ -102,7 +102,7 @@ func (handler server) UnmarkNoteUseful(w http.ResponseWriter, r *http.Request, n
 		return
 	}
 
-	if err := handler.notes.useful.UnmarkUseful(r.Context(), note.UnmarkUsefulInput{NoteID: noteID, UserID: current.User.ID}); err != nil {
+	if err := handler.notes.usefulStore.UnmarkUseful(r.Context(), note.UnmarkUsefulInput{NoteID: noteID, UserID: current.User.ID}); err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}
@@ -137,7 +137,7 @@ func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	created, err := handler.notes.store.CreateNote(r.Context(), input)
+	created, err := handler.notes.notePublisher.Publish(r.Context(), input)
 	if err != nil {
 		var catalogValidationErr *note.CatalogValidationError
 		if errors.As(err, &catalogValidationErr) {
@@ -153,6 +153,8 @@ func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, validationErrorResponse(openapi.ErrorCodeInvalidNote, []note.ValidationProblem{{Field: "image_upload_ids", Message: "invalid"}}))
 		case errors.Is(err, note.ErrCategoryNotFound):
 			writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, []note.ValidationProblem{{Field: "category_slug", Message: "unknown"}}))
+		case errors.Is(err, note.ErrEmbeddingUnavailable):
+			writeError(w, http.StatusServiceUnavailable, openapi.ErrorResponse{Code: openapi.ErrorCodeEmbeddingUnavailable})
 		default:
 			writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		}
@@ -182,13 +184,17 @@ func (handler server) SearchNotes(w http.ResponseWriter, r *http.Request, params
 		return
 	}
 
-	notes, err := handler.notes.store.SearchNotes(r.Context(), input)
+	results, err := handler.notes.noteSearcher.Search(r.Context(), input)
 	if err != nil {
+		if errors.Is(err, note.ErrSearchUnavailable) {
+			writeError(w, http.StatusServiceUnavailable, openapi.ErrorResponse{Code: openapi.ErrorCodeEmbeddingUnavailable})
+			return
+		}
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, newSearchNotesResponse(notes))
+	writeJSON(w, http.StatusOK, newSearchNotesResponse(results))
 }
 
 func validationErrorResponse(code openapi.ErrorCode, problems []note.ValidationProblem) openapi.ErrorResponse {
@@ -233,7 +239,7 @@ func (handler server) validateCategoryFilter(ctx context.Context, slug note.Cate
 		return nil, nil
 	}
 
-	if _, err := handler.notes.catalog.FindActiveCategory(ctx, slug); errors.Is(err, note.ErrCategoryNotFound) {
+	if _, err := handler.notes.categoryCatalog.FindActiveCategory(ctx, slug); errors.Is(err, note.ErrCategoryNotFound) {
 		return []note.ValidationProblem{{Field: "category_slug", Message: "unknown"}}, nil
 	} else if err != nil {
 		return nil, err
@@ -265,15 +271,15 @@ func newListNotesResponse(notes []note.Note) openapi.ListNotesResponse {
 	}
 	return response
 }
-func newSearchNotesResponse(notes []note.Note) openapi.SearchNotesResponse {
+func newSearchNotesResponse(results []note.SearchResult) openapi.SearchNotesResponse {
 	response := openapi.SearchNotesResponse{
 		SearchVersion: openapi.SearchVersion(note.CurrentSearchVersion),
-		Results:       make([]openapi.SearchNoteResult, 0, len(notes)),
+		Results:       make([]openapi.SearchNoteResult, 0, len(results)),
 	}
-	for _, found := range notes {
+	for _, result := range results {
 		response.Results = append(response.Results, openapi.SearchNoteResult{
-			Note:            newNoteResponse(found),
-			RetrievalSource: openapi.RetrievalSource(note.CurrentRetrievalSource),
+			Note:            newNoteResponse(result.Note),
+			RetrievalSource: openapi.RetrievalSource(result.RetrievalSource),
 		})
 	}
 	return response

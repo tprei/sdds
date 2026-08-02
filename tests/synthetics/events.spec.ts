@@ -92,7 +92,10 @@ test('exports the authenticated search event lineage', async ({
     .toBe(true);
 
   const usefulResponse = waitForEventsResponse(page);
-  await page.getByRole('button', { name: /^Marcar como útil$/ }).click();
+  const noteCard = page.getByTestId('note-card').filter({ hasText: title });
+  await noteCard
+    .getByRole('button', { name: /^Marcar como útil$/ })
+    .click();
   await usefulResponse;
   await expect
     .poll(() =>
@@ -142,7 +145,7 @@ test('exports the authenticated search event lineage', async ({
   expect(firstResult).toMatchObject({
     note_id: note.id,
     rank: 1,
-    retrieval_source: 'lexical',
+    retrieval_source: 'hybrid',
   });
 
   const opened = rows.find(
@@ -154,7 +157,7 @@ test('exports the authenticated search event lineage', async ({
   expect(opened).toBeDefined();
   expect(opened?.payload.search_version).toBe(searchVersion);
   expect(opened?.payload.rank).toBe(1);
-  expect(opened?.payload.retrieval_source).toBe('lexical');
+  expect(opened?.payload.retrieval_source).toBe('hybrid');
 
   const useful = rows.find((row) => {
     if (row.kind !== 'note_marked_useful' || row.payload.note_id !== note.id) {
@@ -169,7 +172,7 @@ test('exports the authenticated search event lineage', async ({
     : null;
   expect(usefulContext).toMatchObject({
     rank: 1,
-    retrieval_source: 'lexical',
+    retrieval_source: 'hybrid',
     search_version: searchVersion,
   });
 

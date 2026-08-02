@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tprei/sdds/services/api/internal/note"
@@ -672,6 +673,70 @@ func TestApplyMigrationsCreatesEmptySearchIndex(t *testing.T) {
 	}
 	if len(found) != 0 {
 		t.Fatalf("search note count = %d, want 0", len(found))
+	}
+}
+
+func TestNoteEmbeddingsMigrationCascadesOnNoteDelete(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	store := newTestNoteStore(db, time.Now)
+
+	created, err := store.CreateNote(ctx, testCreateInput(note.CreateInput{
+		Title:        "Wi-Fi estável",
+		Body:         "várias tomadas e ninguém reclamou",
+		CategorySlug: note.CategorySlug("food"),
+	}))
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	vector := make([]float32, note.EmbeddingDimension)
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO note_embeddings (note_id, model_id, model_revision, dimension, source_sha256, vector, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, created.ID, note.EmbeddingModelID, note.EmbeddingModelRevision, note.EmbeddingDimension,
+		note.EmbeddingFingerprint(note.EmbeddingPassage(created.Title, created.Body)),
+		encodeVector(vector), 0, 0); err != nil {
+		t.Fatalf("insert embedding: %v", err)
+	}
+
+	if _, err := db.ExecContext(ctx, `DELETE FROM notes WHERE id = ?`, created.ID); err != nil {
+		t.Fatalf("delete note: %v", err)
+	}
+
+	var remaining int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM note_embeddings WHERE note_id = ?`, created.ID).Scan(&remaining); err != nil {
+		t.Fatalf("count remaining embeddings: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("embedding rows after note delete = %d, want 0 (cascade)", remaining)
+	}
+}
+
+func TestNoteEmbeddingsMigrationRejectsMismatchedVectorLength(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	store := newTestNoteStore(db, time.Now)
+
+	created, err := store.CreateNote(ctx, testCreateInput(note.CreateInput{
+		Title:        "Café da esquina",
+		Body:         "bom demais",
+		CategorySlug: note.CategorySlug("food"),
+	}))
+	if err != nil {
+		t.Fatalf("create note: %v", err)
+	}
+
+	// A vector whose byte length is half of dimension*4 must be rejected by the
+	// length(vector) = dimension * 4 CHECK constraint.
+	shortBlob := encodeVector(make([]float32, note.EmbeddingDimension/2))
+	_, err = db.ExecContext(ctx, `
+		INSERT INTO note_embeddings (note_id, model_id, model_revision, dimension, source_sha256, vector, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, created.ID, note.EmbeddingModelID, note.EmbeddingModelRevision, note.EmbeddingDimension,
+		note.EmbeddingFingerprint("stale"), shortBlob, 0, 0)
+	if err == nil {
+		t.Fatal("expected CHECK constraint violation for mismatched vector length, got nil")
 	}
 }
 

@@ -328,7 +328,7 @@ function CommentRow({
   onReportComment: (commentID: string) => void;
 }) {
   return (
-    <View>
+    <View style={styles.commentRow}>
       <View style={styles.commentHeader}>
         <PressableScale
           accessibilityLabel={`Abrir perfil do autor: ${comment.author.displayName}`}
@@ -355,6 +355,7 @@ function CommentRow({
             accessibilityLabel="Excluir comentário"
             icon={<IconTrash color={semanticColors.textMeta} size={componentMetrics.icon.sm} />}
             onPress={() => onDeleteComment(comment.id)}
+            size={componentMetrics.minTarget}
             testID={`comment-delete-${comment.id}`}
           />
         ) : null}
@@ -362,6 +363,7 @@ function CommentRow({
           accessibilityLabel="Denunciar comentário"
           icon={<IconFlag color={semanticColors.textMeta} size={componentMetrics.icon.sm} />}
           onPress={() => onReportComment(comment.id)}
+          size={componentMetrics.minTarget}
           testID={`comment-report-${comment.id}`}
         />
       </View>

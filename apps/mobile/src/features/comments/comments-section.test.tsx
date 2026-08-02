@@ -315,6 +315,11 @@ describe('CommentsSection', () => {
 
     expect(textNodes(renderer, firstReply.body)).toHaveLength(1);
     expect(textNodes(renderer, secondReply.body)).toHaveLength(1);
+    const replyBodies = renderer.root
+      .findAll((node) => node.type === 'span')
+      .map(textContent)
+      .filter((text) => text === firstReply.body || text === secondReply.body);
+    expect(replyBodies).toEqual([firstReply.body, secondReply.body]);
     expect(
       textNodes(renderer, 'Mostrando as primeiras 20 respostas.'),
     ).toHaveLength(1);

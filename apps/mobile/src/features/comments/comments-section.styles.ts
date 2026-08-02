@@ -12,6 +12,9 @@ export const styles = StyleSheet.create({
   comment: {
     gap: spacing.sp3,
   },
+  commentRow: {
+    gap: spacing.sp3,
+  },
   commentActions: {
     alignItems: 'center',
     flexDirection: 'row',

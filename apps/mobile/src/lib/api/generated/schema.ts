@@ -578,7 +578,7 @@ export interface components {
         EventCommentCreatedPayload: {
             note_id: components["schemas"]["EventID"];
             comment_id: components["schemas"]["EventID"];
-            parent_comment_id: (string & components["schemas"]["EventID"]) | null;
+            parent_comment_id?: (string & components["schemas"]["EventID"]) | null;
         };
         EventReportCreatedPayload: {
             report_id: components["schemas"]["EventID"];

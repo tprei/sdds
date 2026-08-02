@@ -977,7 +977,7 @@ type EventCommentCreatedSchemaVersion int
 type EventCommentCreatedPayload struct {
 	CommentId       EventID  `json:"comment_id"`
 	NoteId          EventID  `json:"note_id"`
-	ParentCommentId *EventID `json:"parent_comment_id"`
+	ParentCommentId *EventID `json:"parent_comment_id,omitempty"`
 }
 
 // EventErrorResponse defines model for EventErrorResponse.

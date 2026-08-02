@@ -97,10 +97,11 @@ func decodeEventPayload(kind event.Kind, rawPayload json.RawMessage, index int) 
 	case event.KindCommentCreated:
 		noteID, _ := requiredPayloadString(fields, "note_id", index, &problems)
 		commentID, _ := requiredPayloadString(fields, "comment_id", index, &problems)
-		parentCommentID, _ := nullablePayloadString(fields, "parent_comment_id", index, &problems)
+		parentCommentID, _ := optionalNullablePayloadString(fields, "parent_comment_id", index, &problems)
 		payload := event.CommentCreatedPayload{NoteID: noteID, CommentID: comment.CommentID(commentID)}
 		if parentCommentID != nil {
-			payload.ParentCommentID = comment.CommentID(*parentCommentID)
+			parsedParentCommentID := comment.CommentID(*parentCommentID)
+			payload.ParentCommentID = &parsedParentCommentID
 		}
 		return payload, problems
 	case event.KindReportCreated:

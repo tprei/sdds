@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tprei/sdds/services/api/internal/comment"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
@@ -184,7 +185,7 @@ func TestNormalizeAndValidateCommentCreatedParent(t *testing.T) {
 		_, problems := NormalizeAndValidate(validInput(KindCommentCreated, CommentCreatedPayload{
 			NoteID:          testNoteID,
 			CommentID:       commentID,
-			ParentCommentID: parentID,
+			ParentCommentID: new(comment.CommentID(parentID)),
 		}))
 		if hasProblem(problems, "payload.parent_comment_id", "") {
 			t.Fatalf("expected no parent_comment_id problem, got %+v", problems)
@@ -196,10 +197,22 @@ func TestNormalizeAndValidateCommentCreatedParent(t *testing.T) {
 		_, problems := NormalizeAndValidate(validInput(KindCommentCreated, CommentCreatedPayload{
 			NoteID:          testNoteID,
 			CommentID:       commentID,
-			ParentCommentID: "not-a-uuid",
+			ParentCommentID: new(comment.CommentID("not-a-uuid")),
 		}))
 		if !hasProblem(problems, "payload.parent_comment_id", "invalid") {
 			t.Fatalf("expected parent_comment_id/invalid, got %+v", problems)
+		}
+	})
+
+	t.Run("empty_parent_is_rejected", func(t *testing.T) {
+		t.Parallel()
+		_, problems := NormalizeAndValidate(validInput(KindCommentCreated, CommentCreatedPayload{
+			NoteID:          testNoteID,
+			CommentID:       commentID,
+			ParentCommentID: new(comment.CommentID("")),
+		}))
+		if !hasProblem(problems, "payload.parent_comment_id", "invalid") {
+			t.Fatalf("expected parent_comment_id/invalid for empty string, got %+v", problems)
 		}
 	})
 }

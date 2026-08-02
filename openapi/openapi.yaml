@@ -1764,7 +1764,7 @@ components:
     EventCommentCreatedPayload:
       type: object
       additionalProperties: false
-      required: [note_id, comment_id, parent_comment_id]
+      required: [note_id, comment_id]
       properties:
         note_id:
           $ref: "#/components/schemas/EventID"

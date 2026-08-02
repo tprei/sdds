@@ -77,12 +77,21 @@ func TestDecodeEventPayloadDecodesValidEvents(t *testing.T) {
 			},
 		},
 		{
+			name:    "comment_created_top_level_absent_parent",
+			kind:    event.KindCommentCreated,
+			payload: `{"note_id":"note-1","comment_id":"comment-1"}`,
+			check: func(payload event.Payload) bool {
+				created, ok := payload.(event.CommentCreatedPayload)
+				return ok && created.NoteID == "note-1" && created.CommentID == "comment-1" && created.ParentCommentID == nil
+			},
+		},
+		{
 			name:    "comment_created_top_level_null_parent",
 			kind:    event.KindCommentCreated,
 			payload: `{"note_id":"note-1","comment_id":"comment-1","parent_comment_id":null}`,
 			check: func(payload event.Payload) bool {
 				created, ok := payload.(event.CommentCreatedPayload)
-				return ok && created.NoteID == "note-1" && created.CommentID == "comment-1" && created.ParentCommentID == ""
+				return ok && created.NoteID == "note-1" && created.CommentID == "comment-1" && created.ParentCommentID == nil
 			},
 		},
 		{
@@ -91,7 +100,7 @@ func TestDecodeEventPayloadDecodesValidEvents(t *testing.T) {
 			payload: `{"note_id":"note-1","comment_id":"reply-1","parent_comment_id":"parent-1"}`,
 			check: func(payload event.Payload) bool {
 				created, ok := payload.(event.CommentCreatedPayload)
-				return ok && created.NoteID == "note-1" && created.CommentID == "reply-1" && created.ParentCommentID == "parent-1"
+				return ok && created.NoteID == "note-1" && created.CommentID == "reply-1" && created.ParentCommentID != nil && *created.ParentCommentID == "parent-1"
 			},
 		},
 	}
@@ -133,13 +142,6 @@ func TestDecodeEventPayloadReportsProblems(t *testing.T) {
 		_, problems := decodeEventPayload(event.KindNotePublished, json.RawMessage(`"not-an-object"`), 2)
 		if !hasProblem(t, problems, "payload", string(openapi.Invalid)) {
 			t.Fatalf("expected invalid payload problem, got %+v", problems)
-		}
-	})
-	t.Run("missing_comment_parent_comment_id", func(t *testing.T) {
-		t.Parallel()
-		_, problems := decodeEventPayload(event.KindCommentCreated, rawJSON(t, `{"note_id":"note-1","comment_id":"comment-1"}`), 0)
-		if !hasProblem(t, problems, "payload.parent_comment_id", string(openapi.Required)) {
-			t.Fatalf("expected payload.parent_comment_id/required, got %+v", problems)
 		}
 	})
 	t.Run("malformed_comment_parent_comment_id", func(t *testing.T) {

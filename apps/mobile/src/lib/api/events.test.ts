@@ -11,6 +11,7 @@ const searchID = '018ff5b8-0000-7000-8000-000000000003';
 const noteID = '018ff5b8-0000-7000-8000-000000000004';
 const commentID = '018ff5b8-0000-7000-8000-000000000005';
 const parentCommentID = '018ff5b8-0000-7000-8000-000000000006';
+const replyEventID = '018ff5b8-0000-7000-8000-000000000007';
 
 describe('events API client', () => {
   beforeEach(() => delete process.env.EXPO_PUBLIC_SDDS_API_BASE_URL);
@@ -58,8 +59,8 @@ describe('events API client', () => {
 
     await expect(
       createAPIClient('session-token').createEvents([
-        commentCreatedEvent(null),
-        commentCreatedEvent(parentCommentID),
+        commentCreatedEvent(eventID, null),
+        commentCreatedEvent(replyEventID, parentCommentID),
       ]),
     ).resolves.toEqual({ accepted_count: 2, duplicate_count: 0 });
 
@@ -81,7 +82,7 @@ describe('events API client', () => {
           },
         }),
         expect.objectContaining({
-          id: eventID,
+          id: replyEventID,
           kind: 'comment_created',
           occurred_at: eventOccurredAt(),
           installation_id: installationID,
@@ -145,9 +146,12 @@ function event(): ProductEvent {
     payload: { searchID, searchVersion: 'fts5-v1', query: 'cafe bom', categorySlug: 'food' },
   };
 }
-function commentCreatedEvent(parentCommentID: string | null): ProductEvent {
+function commentCreatedEvent(
+  id: string,
+  parentCommentID: string | null,
+): ProductEvent {
   return {
-    id: eventID,
+    id,
     kind: 'comment_created',
     occurredAt: eventOccurredAt(),
     installationID,

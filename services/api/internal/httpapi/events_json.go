@@ -228,8 +228,29 @@ func nullableStringAt(fields map[string]json.RawMessage, name string, index int,
 	return &result, true
 }
 
-func nullablePayloadString(fields map[string]json.RawMessage, name string, index int, problems *[]openapi.InvalidEventProblem) (*string, bool) {
-	return nullableStringAt(fields, name, index, "payload.", problems)
+// optionalNullableStringAt decodes an object field that may be absent or
+// carry JSON null. A missing key or JSON null both yield a nil pointer
+// (valid), and a malformed value reports "invalid". It exists for fields
+// that were added after schema version 1 shipped, so older clients that
+// never send the key remain accepted.
+func optionalNullableStringAt(fields map[string]json.RawMessage, name string, index int, prefix string, problems *[]openapi.InvalidEventProblem) (*string, bool) {
+	value, ok := fields[name]
+	if !ok {
+		return nil, true
+	}
+	if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+		return nil, true
+	}
+	var result string
+	if err := json.Unmarshal(value, &result); err != nil {
+		*problems = append(*problems, invalidEventProblem(index, prefix+name, "invalid"))
+		return nil, false
+	}
+	return &result, true
+}
+
+func optionalNullablePayloadString(fields map[string]json.RawMessage, name string, index int, problems *[]openapi.InvalidEventProblem) (*string, bool) {
+	return optionalNullableStringAt(fields, name, index, "payload.", problems)
 }
 
 func nullableCategory(fields map[string]json.RawMessage, name string, index int) (*note.CategorySlug, []openapi.InvalidEventProblem) {

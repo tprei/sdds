@@ -149,9 +149,11 @@ Delivery is best-effort from the product's perspective. Mobile keeps an in-memor
 | `search_no_results` | `search_id`, `search_version`, `query`, `category_slug` (string\|null), `result_count: 0` |
 | `note_marked_useful` | `note_id`, `context: UsefulContext` |
 | `note_unmarked_useful` | `note_id`, `context: UsefulContext` |
-| `comment_created` | `note_id`, `comment_id` |
+| `comment_created` | `note_id`, `comment_id`, `parent_comment_id` (string\|null, optional) |
 | `report_created` | `report_id`, `target_type`, `target_id` |
 | `note_published` | `note_id`, `category_slug` |
+
+`comment_created.parent_comment_id` is `null` for a top-level comment and the parent's UUID for a one-level reply. The field is optional on the wire: a client that omits it entirely is treated the same as sending `null`, so schema version 1 stays backward-compatible with the app release that shipped before replies existed. A present but empty string is rejected as invalid.
 
 **`UsefulContext` variants.** `context` is a closed union keyed by `source`; only the whole tuple is valid, and partial provenance is rejected:
 

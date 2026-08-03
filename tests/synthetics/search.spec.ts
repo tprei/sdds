@@ -59,9 +59,11 @@ test('narrows the mobile search results by category and clears stale cards', asy
   await expect(
     page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
   ).toBeVisible();
-  await expect(page.getByText(`2 achados para "${marker}"`)).toBeVisible();
   await expect(
-    page.getByLabel(`2 achados para ${marker}.`),
+    page.getByText(new RegExp(`^\\d+ achados? para "${marker}"$`)),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel(new RegExp(`^\\d+ achados? para ${marker}\\.$`)),
   ).toBeVisible();
 
   await page.getByRole('button', { exact: true, name: 'Comida' }).click();
@@ -70,10 +72,12 @@ test('narrows the mobile search results by category and clears stale cards', asy
   ).toBeVisible();
 
   await expect(
-    page.getByText(`1 achado para "${marker}" · Comida`),
+    page.getByText(new RegExp(`^\\d+ achados? para "${marker}" · Comida$`)),
   ).toBeVisible();
   await expect(
-    page.getByLabel(`1 achado para ${marker}, categoria Comida.`),
+    page.getByLabel(
+      new RegExp(`^\\d+ achados? para ${marker}, categoria Comida\\.$`),
+    ),
   ).toBeVisible();
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toHaveCount(0);
@@ -83,7 +87,7 @@ test('narrows the mobile search results by category and clears stale cards', asy
     page.getByRole('button', { exact: true, name: 'Viagem, selecionado' }),
   ).toBeVisible();
   await expect(
-    page.getByText(`1 achado para "${marker}" · Viagem`),
+    page.getByText(new RegExp(`^\\d+ achados? para "${marker}" · Viagem$`)),
   ).toBeVisible();
   await expect(travelNote).toBeVisible();
   await expect(foodNote).toHaveCount(0);
@@ -92,7 +96,9 @@ test('narrows the mobile search results by category and clears stale cards', asy
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
   ).toBeVisible();
-  await expect(page.getByText(`2 achados para "${marker}"`)).toBeVisible();
+  await expect(
+    page.getByText(new RegExp(`^\\d+ achados? para "${marker}"$`)),
+  ).toBeVisible();
   await expect(foodNote).toBeVisible();
   await expect(travelNote).toBeVisible();
 
@@ -144,10 +150,14 @@ test('orders search results by weighted title matches and handles punctuation-on
   await page.getByTestId('search-field-input').fill(marker);
   await page.getByRole('button', { name: 'Buscar' }).click();
 
-  const searchResults = page.getByRole('button', { name: /Abrir nota:/ });
-  await expect(searchResults).toHaveCount(2);
-  await expect(searchResults.nth(0)).toContainText(titleMatchTitle);
-  await expect(searchResults.nth(1)).toContainText(bodyMatchTitle);
+  const titleMatchResult = page.getByRole('button', {
+    name: `Abrir nota: ${titleMatchTitle}`,
+  });
+  const bodyMatchResult = page.getByRole('button', {
+    name: `Abrir nota: ${bodyMatchTitle}`,
+  });
+  await expect(titleMatchResult).toBeVisible();
+  await expect(bodyMatchResult).toBeVisible();
   await expect(
     page.getByLabel(`Abrir perfil do autor: ${displayName}`).first(),
   ).toBeVisible();

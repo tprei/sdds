@@ -3,7 +3,14 @@ import { promisify } from 'node:util';
 
 import { expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
-import { type AuthorSummary, parseNoteResponse } from '../contract/api-wire';
+import {
+  type AuthorSummary,
+  type CommentResponse,
+  type SearchNotesResponse,
+  parseCommentResponse,
+  parseNoteResponse,
+  parseSearchNotesResponse,
+} from '../contract/api-wire';
 const execFileAsync = promisify(execFile);
 export const apiBaseURL =
   process.env.SDDS_SYNTHETICS_API_BASE_URL ?? 'http://127.0.0.1:18080';
@@ -93,3 +100,45 @@ export async function createNote(
   return { author: note.author, id: note.id, title: note.title };
 }
 
+export async function searchNotes(
+  request: APIRequestContext,
+  token: string,
+  query: string,
+  options: { categorySlug?: string } = {},
+): Promise<SearchNotesResponse> {
+  const url = new URL('/v1/search/notes', apiBaseURL);
+  url.searchParams.set('q', query);
+  if (options.categorySlug !== undefined) {
+    url.searchParams.set('category_slug', options.categorySlug);
+  }
+  const response = await request.get(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(response.status()).toBe(200);
+  return parseSearchNotesResponse(await response.json());
+}
+
+export async function createComment(
+  request: APIRequestContext,
+  token: string,
+  noteID: string,
+  body: string,
+): Promise<CommentResponse> {
+  const response = await request.post(apiURL(`/v1/notes/${noteID}/comments`), {
+    data: { body },
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(response.status()).toBe(201);
+  return parseCommentResponse(await response.json());
+}
+
+export async function openCompose(page: Page): Promise<void> {
+  await page
+    .getByRole('button', { name: 'Escrever um achado' })
+    .or(page.getByLabel('Escrever um achado'))
+    .click();
+}
+
+export async function clickTab(page: Page, name: string): Promise<void> {
+  await page.getByRole('tab', { name: new RegExp(name + '$') }).click();
+}

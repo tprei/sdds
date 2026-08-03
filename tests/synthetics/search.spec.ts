@@ -5,6 +5,7 @@ import {
   createAuthUser,
   createNote,
   loginUser,
+  searchNotes,
   syntheticPassword,
 } from './support';
 
@@ -91,7 +92,6 @@ test('narrows the mobile search results by category and clears stale cards', asy
   ).toBeVisible();
   await expect(travelNote).toBeVisible();
   await expect(foodNote).toHaveCount(0);
-
   await page.getByRole('button', { exact: true, name: 'Tudo' }).click();
   await expect(
     page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
@@ -167,4 +167,41 @@ test('orders search results by weighted title matches and handles punctuation-on
 
   await expect(page.getByText('Nada por aqui ainda')).toBeVisible();
   await expect(page.getByText('Não deu pra buscar')).toHaveCount(0);
+});
+
+test('finds a note through semantic vocabulary-mismatch search', async ({
+  page,
+  request,
+}) => {
+  const timestamp = Date.now();
+  const displayName = `Autor Semântica ${timestamp}`;
+  const session = await createAuthUser(request, {
+    display_name: displayName,
+    password: syntheticPassword,
+    username: `semantica-${timestamp}`,
+  });
+  const title = `Café da esquina ${timestamp}`;
+
+  await createNote(request, session.token, {
+    body: 'Wi-Fi estável, várias tomadas e ninguém reclamou que fiquei duas horas',
+    client_request_id: `synthetic-vocab-mismatch-${timestamp}`,
+    category_slug: 'food',
+    title,
+  });
+
+  const results = await searchNotes(request, session.token, 'lugar bom pra trabalhar de notebook', {
+    categorySlug: 'food',
+  });
+  const match = results.results.find((result) => result.note.title === title);
+  expect(match).toBeDefined();
+  expect(match!.retrieval_source).toBe('semantic');
+  expect(results.search_version).toBe('hybrid-serafim100m-fts5-v1');
+
+  await loginUser(page, session.user.username, '/search');
+  await expect(page.getByPlaceholder('Buscar notas…')).toBeVisible();
+  await page.getByTestId('search-field-input').fill('lugar bom pra trabalhar de notebook');
+  await page.getByRole('button', { name: 'Buscar' }).click();
+  const noteCard = page.getByRole('button', { name: `Abrir nota: ${title}` });
+  await expect(noteCard).toBeVisible();
+  await expect(noteCard).toContainText('Wi-Fi estável');
 });

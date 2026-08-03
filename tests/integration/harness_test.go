@@ -499,6 +499,15 @@ func requireListedNote(t *testing.T, notes openapi.ListNotesResponse, id string,
 
 	t.Fatalf("listed note id %q missing", id)
 }
+func requireNoteNotListed(t *testing.T, notes openapi.ListNotesResponse, id string) {
+	t.Helper()
+
+	for _, listedNote := range notes.Notes {
+		if listedNote.Id == id {
+			t.Fatalf("note id %q found in category results, want absent", id)
+		}
+	}
+}
 
 func noteFieldsFromResponse(note openapi.Note) noteFields {
 	return noteFields{

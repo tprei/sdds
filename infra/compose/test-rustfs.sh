@@ -245,7 +245,7 @@ verify_sentinel_payload() {
 }
 verify_api_restart_outage_recovery() {
   export SDDS_API_BASE_URL="$API_URL" SDDS_RUSTFS_COMPOSE_FILE="$COMPOSE_FILE" SDDS_RUSTFS_COMPOSE_PROJECT="$PROJECT"
-  pnpm test:rustfs:api-runtime-boundaries
+  pnpm test:api:runtime-boundaries
 }
 verify_migrate_without_media_dependencies() {
   (

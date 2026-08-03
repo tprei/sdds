@@ -34,6 +34,21 @@ const (
 	mediaFixtureSHA256      = "57e8aeda4753fca6b9077b271ccee6d6558923a72767b9c1bf3773e43254afbb"
 )
 
+// TestMediaAPIRuntimeBoundaries proves the Compose-to-runtime media boundary:
+// image upload, association, private access, and object-store availability
+// across an API restart.
+func TestMediaAPIRuntimeBoundaries(t *testing.T) {
+	publicClient := newAPIClient(t)
+	waitForReadiness(t, publicClient)
+
+	session := createAuthUser(t, publicClient, openapi.CreateAuthUserJSONRequestBody{
+		Username:    fmt.Sprintf("media-%d", time.Now().UnixNano()),
+		Password:    "secret-password",
+		DisplayName: "Mídia Runtime",
+	})
+	requireMediaAPIRuntimeBoundaries(t, publicClient, newAuthenticatedAPIClient(t, session.Token), session.User.Author)
+}
+
 func requireMediaAPIRuntimeBoundaries(t *testing.T, publicClient *openapi.ClientWithResponses, productClient *openapi.ClientWithResponses, author openapi.AuthorSummary) {
 	t.Helper()
 

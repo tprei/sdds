@@ -144,8 +144,8 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Test RustFS integration
-        run: pnpm test:rustfs
+      - name: Run RustFS integration smoke
+        run: pnpm smoke rustfs
 
   mobile:
     name: Mobile And Tokens

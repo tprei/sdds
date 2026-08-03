@@ -21,6 +21,8 @@ jobs:
       SDDS_HTTP_PORT: 18080
       SDDS_SYNTHETICS_API_BASE_URL: http://127.0.0.1:18080
       SDDS_SYNTHETICS_WEB_PORT: 19006
+      SDDS_SMOKE_PROJECT: sdds-synthetics
+      SDDS_SMOKE_COMPOSE_FILE: infra/compose/compose.yaml
     steps:
       - name: Check out code
         uses: actions/checkout@v4

@@ -143,6 +143,9 @@ jobs:
       - name: Test mobile
         run: pnpm test:mobile
 
+      - name: Test wire contracts
+        run: pnpm test:contract
+
   embedding:
     name: Embedding Sidecar
     runs-on: ubuntu-latest
@@ -162,5 +165,3 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Test wire contracts
-        run: pnpm test:contract

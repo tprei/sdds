@@ -14,15 +14,7 @@ jobs:
     name: Playwright Synthetics
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      PLAYWRIGHT_BASE_URL: http://localhost:19006
-      SDDS_AUTH_LOGIN_REQUESTS_PER_MINUTE: 60
-      SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE: 60
-      SDDS_HTTP_PORT: 18080
-      SDDS_SYNTHETICS_API_BASE_URL: http://127.0.0.1:18080
-      SDDS_SYNTHETICS_WEB_PORT: 19006
-      SDDS_SMOKE_PROJECT: sdds-synthetics
-      SDDS_SMOKE_COMPOSE_FILE: infra/compose/compose.yaml
+
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -41,52 +33,13 @@ jobs:
       - name: Install packages
         run: pnpm install --frozen-lockfile
 
-      - name: Provision Compose secrets
-        run: |
-          umask 077
-          dir="$RUNNER_TEMP/sdds-compose-synthetics"; install -d -m 700 "$dir"
-          openssl rand -hex 10 >"$dir/rustfs-root-access"
-          openssl rand -hex 20 >"$dir/rustfs-root-secret"
-          openssl rand -hex 10 >"$dir/sdds-media-access"
-          openssl rand -hex 20 >"$dir/sdds-media-secret"
-          chmod 444 "$dir"/rustfs-root-access "$dir"/rustfs-root-secret "$dir"/sdds-media-access "$dir"/sdds-media-secret
-          {
-            printf 'SDDS_COMPOSE_RUSTFS_ROOT_ACCESS_KEY_FILE=%s\n' "$dir/rustfs-root-access"
-            printf 'SDDS_COMPOSE_RUSTFS_ROOT_SECRET_KEY_FILE=%s\n' "$dir/rustfs-root-secret"
-            printf 'SDDS_COMPOSE_SDDS_MEDIA_ACCESS_KEY_FILE=%s\n' "$dir/sdds-media-access"
-            printf 'SDDS_COMPOSE_SDDS_MEDIA_SECRET_KEY_FILE=%s\n' "$dir/sdds-media-secret"
-          } >>"$GITHUB_ENV"
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
 
-      - name: Reset API state
-        run: docker compose -p sdds-synthetics -f infra/compose/compose.yaml down -v
-
-      - name: Start API
-        run: docker compose -p sdds-synthetics -f infra/compose/compose.yaml up --build -d api
-
-      - name: Wait for API readiness
-        run: |
-          for attempt in $(seq 1 60); do
-            if curl --fail --silent --show-error http://127.0.0.1:18080/readyz; then
-              exit 0
-            fi
-            sleep 2
-          done
-          curl --include http://127.0.0.1:18080/readyz
-          exit 1
-
-      - name: Run synthetics
-        run: pnpm test:synthetics
-      - name: Capture RustFS logs
-        if: failure()
-        run: docker compose -p sdds-synthetics -f infra/compose/compose.yaml logs --no-color rustfs
-
-      - name: Capture RustFS init logs
-        if: failure()
-        run: docker compose -p sdds-synthetics -f infra/compose/compose.yaml logs --no-color rustfs-init
-
-      - name: Capture API logs
-        if: failure()
-        run: docker compose -p sdds-synthetics -f infra/compose/compose.yaml logs --no-color api
+      - name: Run synthetics smoke
+        env:
+          SDDS_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/smoke-logs
+        run: pnpm smoke synthetics
 
       - name: Upload Playwright report
         if: ${{ failure() || cancelled() }}
@@ -95,6 +48,7 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
+          if-no-files-found: ignore
 
       - name: Upload Playwright test results
         if: ${{ failure() || cancelled() }}
@@ -103,11 +57,13 @@ jobs:
           name: playwright-test-results
           path: test-results/
           retention-days: 14
+          if-no-files-found: ignore
 
-      - name: Stop API
-        if: always()
-        run: docker compose -p sdds-synthetics -f infra/compose/compose.yaml down -v
-
-      - name: Remove Compose secrets
-        if: always()
-        run: rm -rf "$RUNNER_TEMP/sdds-compose-synthetics"
+      - name: Upload smoke logs
+        if: ${{ failure() || cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetics-smoke-logs
+          path: ${{ runner.temp }}/smoke-logs
+          retention-days: 14
+          if-no-files-found: ignore

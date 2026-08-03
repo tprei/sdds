@@ -16,7 +16,7 @@ export default defineConfig({
     {
       name: 'chromium',
       testIgnore: 'layout.spec.ts',
-      use: { ...devices['Desktop Chrome'], ...(process.env.CI ? { channel: 'chrome' } : {}) },
+      use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'layout-390x844',
@@ -25,7 +25,6 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 390, height: 844 },
         deviceScaleFactor: 1,
-        ...(process.env.CI ? { channel: 'chrome' } : {}),
       },
     },
     {
@@ -35,7 +34,6 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 430, height: 932 },
         deviceScaleFactor: 1,
-        ...(process.env.CI ? { channel: 'chrome' } : {}),
       },
     },
     {
@@ -45,7 +43,6 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 820, height: 1180 },
         deviceScaleFactor: 1,
-        ...(process.env.CI ? { channel: 'chrome' } : {}),
       },
     },
   ],

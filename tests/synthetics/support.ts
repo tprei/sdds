@@ -3,8 +3,7 @@ import { promisify } from 'node:util';
 
 import { expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
-import type { AuthorSummary } from '../contract/api-wire';
-
+import { type AuthorSummary, parseNoteResponse } from '../contract/api-wire';
 const execFileAsync = promisify(execFile);
 export const apiBaseURL =
   process.env.SDDS_SYNTHETICS_API_BASE_URL ?? 'http://127.0.0.1:18080';
@@ -90,6 +89,7 @@ export async function createNote(
     headers: { Authorization: `Bearer ${token}` },
   });
   expect(response.status()).toBe(201);
-  return (await response.json()) as SyntheticNote;
+  const note = parseNoteResponse(await response.json());
+  return { author: note.author, id: note.id, title: note.title };
 }
 

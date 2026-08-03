@@ -226,7 +226,7 @@ func TestCatalogMigrationRequiresPlacesToReferenceCities(t *testing.T) {
 			t.Fatalf("close database: %v", err)
 		}
 	})
-	applyMigrationFiles(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs")
+	applyMigrationHistorySchema(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs")
 
 	_, err = db.ExecContext(
 		ctx,
@@ -255,7 +255,7 @@ func TestCatalogMigrationPreservesModifiedCategoryAttributes(t *testing.T) {
 			t.Fatalf("close database: %v", err)
 		}
 	})
-	applyMigrationFiles(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs")
+	applyMigrationHistorySchema(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs")
 
 	if _, err := db.ExecContext(ctx, `UPDATE categories SET label = ?, active = 0, display_order = 99 WHERE slug = ?`, "Comida guardada", "comida"); err != nil {
 		t.Fatalf("update legacy category: %v", err)
@@ -293,7 +293,7 @@ func TestDropPlacesMigrationRemovesPlaceDomainAndPreservesNotes(t *testing.T) {
 			t.Fatalf("close database: %v", err)
 		}
 	})
-	applyMigrationFiles(t, ctx, db,
+	applyMigrationHistorySchema(t, ctx, db,
 		"000001_initial_notes", "000002_note_search", "000003_catalogs",
 		"000004_note_places", "000005_users_authors_sessions", "000006_note_ownership",
 		"000007_author_notes_index", "000008_note_cursor_invariants", "000009_note_images",
@@ -378,7 +378,7 @@ func TestNoteOwnershipMigrationPreservesExistingNotes(t *testing.T) {
 			t.Fatalf("close database: %v", err)
 		}
 	})
-	applyMigrationFiles(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs", "000004_note_places", "000005_users_authors_sessions")
+	applyMigrationHistorySchema(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs", "000004_note_places", "000005_users_authors_sessions")
 
 	if _, err := db.ExecContext(
 		ctx,
@@ -500,7 +500,7 @@ func TestNoteCursorMigrationPreservesLegacyNoteIDsAndTimestamps(t *testing.T) {
 			t.Fatalf("close database: %v", err)
 		}
 	})
-	applyMigrationFiles(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs", "000004_note_places", "000005_users_authors_sessions", "000006_note_ownership", "000007_author_notes_index")
+	applyMigrationHistorySchema(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs", "000004_note_places", "000005_users_authors_sessions", "000006_note_ownership", "000007_author_notes_index")
 	if _, err := db.ExecContext(
 		ctx,
 		`INSERT INTO users (id, state, created_at, updated_at) VALUES (?, 'active', ?, ?)`,
@@ -748,7 +748,7 @@ func TestNoteImagesMigrationPreservesExistingTextOnlyNotes(t *testing.T) {
 			t.Fatalf("close database: %v", err)
 		}
 	})
-	applyMigrationFiles(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs", "000004_note_places", "000005_users_authors_sessions")
+	applyMigrationHistorySchema(t, ctx, db, "000001_initial_notes", "000002_note_search", "000003_catalogs", "000004_note_places", "000005_users_authors_sessions")
 
 	if _, err := db.ExecContext(
 		ctx,
@@ -767,7 +767,7 @@ func TestNoteImagesMigrationPreservesExistingTextOnlyNotes(t *testing.T) {
 		t.Fatalf("insert existing text-only note: %v", err)
 	}
 
-	applyMigrationFiles(t, ctx, db, "000006_note_ownership", "000007_author_notes_index", "000008_note_cursor_invariants")
+	applyMigrationHistorySchema(t, ctx, db, "000006_note_ownership", "000007_author_notes_index", "000008_note_cursor_invariants")
 
 	if err := ApplyMigrations(ctx, db); err != nil {
 		t.Fatalf("apply remaining migrations: %v", err)
@@ -840,7 +840,11 @@ func TestNoteImagesMigrationPreservesExistingTextOnlyNotes(t *testing.T) {
 	assertEmptyImages("author", authorPage.Notes[0].Note)
 }
 
-func applyMigrationFiles(t *testing.T, ctx context.Context, db *sql.DB, versions ...string) {
+// applyMigrationHistorySchema builds a deliberately partial schema by applying
+// only the named migration files. It is for migration-history assertions only
+// and MUST NOT be used by repository behavior tests, which use
+// openMigratedDatabase to apply the full history.
+func applyMigrationHistorySchema(t *testing.T, ctx context.Context, db *sql.DB, versions ...string) {
 	t.Helper()
 
 	if _, err := db.ExecContext(ctx, createSchemaMigrationsSQL); err != nil {

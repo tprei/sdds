@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 	"testing"
@@ -224,35 +223,4 @@ func authorNoteIDs(notes []note.AuthorNote) []string {
 		ids = append(ids, found.Note.ID)
 	}
 	return ids
-}
-
-func insertAuthorStoreUser(t *testing.T, ctx context.Context, db execer, userID user.UserID, authorID author.AuthorID, displayName string) {
-	t.Helper()
-	if _, err := db.ExecContext(ctx, `INSERT INTO users (id, state, created_at, updated_at) VALUES (?, 'active', 0, 0)`, userID); err != nil {
-		t.Fatalf("insert user %s: %v", userID, err)
-	}
-	if _, err := db.ExecContext(ctx, `INSERT INTO authors (id, user_id, display_name, created_at, updated_at) VALUES (?, ?, ?, 0, 0)`, authorID, userID, displayName); err != nil {
-		t.Fatalf("insert author %s: %v", authorID, err)
-	}
-}
-
-func insertAuthorStoreNote(t *testing.T, ctx context.Context, db execer, id string, userID user.UserID, createdAt int64) {
-	t.Helper()
-	if _, err := db.ExecContext(
-		ctx,
-		`INSERT INTO notes (id, user_id, title, body, category_slug, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		id,
-		userID,
-		"Café bom",
-		"Tem pão de queijo decente.",
-		note.CategorySlugFood,
-		createdAt,
-		createdAt,
-	); err != nil {
-		t.Fatalf("insert note %s: %v", id, err)
-	}
-}
-
-type execer interface {
-	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }

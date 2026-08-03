@@ -10,6 +10,10 @@ import (
 	"github.com/tprei/sdds/services/api/internal/media"
 )
 
+// imageUploadStoreFixture seeds an openMigratedDatabase with users, notes, and
+// upload rows so image-upload repository behavior tests exercise the
+// production lease/quota/cleanup contract against migrated SQLite.
+
 type imageUploadStoreFixture struct {
 	ctx   context.Context
 	db    *sql.DB

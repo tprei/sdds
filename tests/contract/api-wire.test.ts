@@ -140,14 +140,23 @@ describe('isNoteImageResponse', () => {
 });
 
 describe('isCommentResponse', () => {
-  it('accepts a valid comment', () => {
-    expect(isCommentResponse({ author, body: 'corpo', created_at: 1, id: 'comment-1' })).toBe(true);
+  it('accepts a top-level comment with parent_comment_id null', () => {
+    expect(isCommentResponse({ author, body: 'corpo', created_at: 1, id: 'comment-1', parent_comment_id: null })).toBe(true);
+  });
+  it('accepts a reply with a parent UUID', () => {
+    expect(isCommentResponse({ author, body: 'corpo', created_at: 1, id: 'comment-1', parent_comment_id: '11111111-1111-1111-1111-111111111111' })).toBe(true);
   });
   it('rejects an empty id', () => {
-    expect(isCommentResponse({ author, body: 'corpo', created_at: 1, id: '' })).toBe(false);
+    expect(isCommentResponse({ author, body: 'corpo', created_at: 1, id: '', parent_comment_id: null })).toBe(false);
   });
   it('rejects a non-integer created_at', () => {
-    expect(isCommentResponse({ author, body: 'corpo', created_at: 1.5, id: 'comment-1' })).toBe(false);
+    expect(isCommentResponse({ author, body: 'corpo', created_at: 1.5, id: 'comment-1', parent_comment_id: null })).toBe(false);
+  });
+  it('rejects a non-string, non-null parent_comment_id', () => {
+    expect(isCommentResponse({ author, body: 'corpo', created_at: 1, id: 'comment-1', parent_comment_id: 1234 })).toBe(false);
+  });
+  it('rejects a comment missing parent_comment_id', () => {
+    expect(isCommentResponse({ author, body: 'corpo', created_at: 1, id: 'comment-1' })).toBe(false);
   });
 });
 
@@ -234,7 +243,7 @@ describe('parsers throw on invalid input and narrow on valid input', () => {
     expect(() => parseNoteResponse({})).toThrowError('invalid note response');
   });
   it('parseCommentResponse', () => {
-    expect(parseCommentResponse({ author, body: 'b', created_at: 1, id: 'c1' })).toMatchObject({ id: 'c1' });
+    expect(parseCommentResponse({ author, body: 'b', created_at: 1, id: 'c1', parent_comment_id: null })).toMatchObject({ id: 'c1' });
     expect(() => parseCommentResponse({})).toThrowError('invalid comment response');
   });
   it('parseListNotesResponse', () => {

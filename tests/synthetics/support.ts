@@ -3,15 +3,14 @@ import { promisify } from 'node:util';
 
 import { expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
+import type { AuthorSummary } from '../contract/api-wire';
 
 const execFileAsync = promisify(execFile);
 export const apiBaseURL =
   process.env.SDDS_SYNTHETICS_API_BASE_URL ?? 'http://127.0.0.1:18080';
 export const syntheticPassword = 'secret-password';
-export type AuthorSummary = {
-  display_name: string;
-  id: string;
-};
+export type { AuthorSummary };
+export { isRecord } from '../contract/api-wire';
 
 export type AuthSessionResponse = {
   expires_at: number;
@@ -94,6 +93,3 @@ export async function createNote(
   return (await response.json()) as SyntheticNote;
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}

@@ -8,5 +8,5 @@
     "target": "ES2022",
     "types": ["node"]
   },
-  "include": ["tests/synthetics/**/*.ts", "playwright.config.ts"]
+  "include": ["tests/synthetics/**/*.ts", "tests/contract/**/*.ts", "playwright.config.ts", "vitest.config.ts"]
 }

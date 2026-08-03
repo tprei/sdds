@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 
 import { expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
+import { requiredEnv } from './env';
 import {
   type AuthorSummary,
   type CommentResponse,
@@ -13,14 +14,6 @@ import {
 } from '../contract/api-wire';
 const execFileAsync = promisify(execFile);
 
-function requiredEnv(name: string, value: string | undefined): string {
-  if (!value) {
-    throw new Error(
-      `${name} is required; run synthetics through \`pnpm smoke synthetics\``,
-    );
-  }
-  return value;
-}
 
 export const apiBaseURL = requiredEnv(
   'SDDS_SYNTHETICS_API_BASE_URL',

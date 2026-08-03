@@ -1,13 +1,6 @@
+import { requiredEnv } from './tests/synthetics/env';
 import { defineConfig, devices } from '@playwright/test';
 
-function requiredEnv(name: string, value: string | undefined): string {
-  if (!value) {
-    throw new Error(
-      `${name} is required; run synthetics through \`pnpm smoke synthetics\``,
-    );
-  }
-  return value;
-}
 
 const apiBaseURL = requiredEnv(
   'SDDS_SYNTHETICS_API_BASE_URL',

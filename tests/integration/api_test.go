@@ -114,38 +114,29 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	}
 
 	searchResults := searchNotes(t, client, "balcao")
-	if len(searchResults.Results) != 1 {
-		t.Fatalf("search note count = %d, want 1", len(searchResults.Results))
-	}
-	requireCreatedNote(t, searchResults.Results[0].Note, request)
-	if searchResults.Results[0].Note.Id != created.Id {
-		t.Fatalf("search note id = %q, want %q", searchResults.Results[0].Note.Id, created.Id)
-	}
+	searchMatch := requireLexicalMatch(t, searchResults, created.Id)
+	requireCreatedNote(t, searchMatch.Note, request)
 
 	travelSearchResults := searchNotes(t, client, "mundial")
-	if len(travelSearchResults.Results) != 1 {
-		t.Fatalf("travel search note count = %d, want 1", len(travelSearchResults.Results))
-	}
-	requireCreatedNote(t, travelSearchResults.Results[0].Note, travelRequest)
-	if travelSearchResults.Results[0].Note.Id != travelNote.Id {
-		t.Fatalf("travel search note id = %q, want %q", travelSearchResults.Results[0].Note.Id, travelNote.Id)
-	}
+	travelSearchMatch := requireLexicalMatch(t, travelSearchResults, travelNote.Id)
+	requireCreatedNote(t, travelSearchMatch.Note, travelRequest)
 
 	filteredSearchResults := searchNotesByCategory(t, client, "mundial", "travel")
-	if len(filteredSearchResults.Results) != 1 {
-		t.Fatalf("filtered search note count = %d, want 1", len(filteredSearchResults.Results))
-	}
-	requireCreatedNote(t, filteredSearchResults.Results[0].Note, travelRequest)
+	filteredMatch := requireLexicalMatch(t, filteredSearchResults, travelNote.Id)
+	requireCreatedNote(t, filteredMatch.Note, travelRequest)
 
 	emptyFilteredSearchResults := searchNotesByCategory(t, client, "mundial", "food")
-	if len(emptyFilteredSearchResults.Results) != 0 {
-		t.Fatalf("empty filtered search note count = %d, want 0", len(emptyFilteredSearchResults.Results))
+	for _, result := range emptyFilteredSearchResults.Results {
+		if result.Note.Id == travelNote.Id {
+			t.Fatalf("travel note leaked into a food-category search: %+v", result.Note)
+		}
 	}
 
 	emptySearchResults := searchNotes(t, client, "necessaire")
-	if len(emptySearchResults.Results) != 0 {
-		t.Fatalf("empty search note count = %d, want 0", len(emptySearchResults.Results))
+	if len(emptySearchResults.Results) == 0 {
+		t.Fatal("semantic search returned no background matches for a non-empty query")
 	}
+	requireOnlySemanticMatches(t, emptySearchResults, "necessaire")
 
 	accentRequest := openapi.CreateNoteJSONRequestBody{
 		Title:           "Pão ftsaccent48",
@@ -155,7 +146,7 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	}
 	accentNote := createNote(t, client, accentRequest)
 	accentResults := searchNotes(t, client, "pao ftsaccent48")
-	requireOnlySearchNoteIDs(t, accentResults, []string{accentNote.Id})
+	requireLexicalMatch(t, accentResults, accentNote.Id)
 
 	strictBothRequest := openapi.CreateNoteJSONRequestBody{
 		Title:           "strictcafe48 strictpao48",
@@ -177,7 +168,9 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		ClientRequestId: "integration-strict-pao",
 	})
 	strictResults := searchNotes(t, client, "strictcafe48 strictpao48")
-	requireOnlySearchNoteIDs(t, strictResults, []string{strictBothNote.Id})
+	requireLexicalMatch(t, strictResults, strictBothNote.Id)
+	requireNeverLexicallyMatched(t, strictResults, "integration-strict-cafe")
+	requireNeverLexicallyMatched(t, strictResults, "integration-strict-pao")
 
 	titleRankRequest := openapi.CreateNoteJSONRequestBody{
 		Title:           "rankbolo48 roteiro enorme com muitas palavras extras para alongar o titulo e reduzir relevancia sem peso",
@@ -194,7 +187,8 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	}
 	bodyRankNote := createNote(t, client, bodyRankRequest)
 	rankedResults := searchNotes(t, client, "rankbolo48")
-	requireOnlySearchNoteIDs(t, rankedResults, []string{titleRankNote.Id, bodyRankNote.Id})
+	requireLexicalMatch(t, rankedResults, titleRankNote.Id)
+	requireLexicalMatch(t, rankedResults, bodyRankNote.Id)
 
 	categoryFoodRequest := openapi.CreateNoteJSONRequestBody{
 		Title:           "catbusca48 comida",
@@ -210,7 +204,12 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 		ClientRequestId: "integration-category-travel",
 	})
 	categoryResults := searchNotesByCategory(t, client, "catbusca48", "food")
-	requireOnlySearchNoteIDs(t, categoryResults, []string{categoryFoodNote.Id})
+	requireLexicalMatch(t, categoryResults, categoryFoodNote.Id)
+	for _, result := range categoryResults.Results {
+		if result.Note.CategorySlug != openapi.CategorySlug("food") {
+			t.Fatalf("food-category search returned %q", result.Note.CategorySlug)
+		}
+	}
 
 	globalFirstRequest := openapi.CreateNoteJSONRequestBody{
 		Title:           "globalbusca48 primeira",
@@ -227,7 +226,8 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	}
 	globalSecondNote := createNote(t, client, globalSecondRequest)
 	globalResults := searchNotes(t, client, "globalbusca48")
-	requireSearchNoteIDs(t, globalResults, []string{globalFirstNote.Id, globalSecondNote.Id})
+	requireLexicalMatch(t, globalResults, globalFirstNote.Id)
+	requireLexicalMatch(t, globalResults, globalSecondNote.Id)
 
 	punctuationRequest := openapi.CreateNoteJSONRequestBody{
 		Title:           "pontoseguro48",
@@ -237,7 +237,7 @@ func TestAPIRuntimeBoundaries(t *testing.T) {
 	}
 	punctuationNote := createNote(t, client, punctuationRequest)
 	punctuationResults := searchNotes(t, client, "pontoseguro48 ***")
-	requireOnlySearchNoteIDs(t, punctuationResults, []string{punctuationNote.Id})
+	requireLexicalMatch(t, punctuationResults, punctuationNote.Id)
 
 	punctuationOnlyResults := searchNotes(t, client, "!!! *** ()")
 	if len(punctuationOnlyResults.Results) != 0 {

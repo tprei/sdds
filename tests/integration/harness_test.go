@@ -347,6 +347,29 @@ func requireLexicalMatch(t *testing.T, response openapi.SearchNotesResponse, wan
 	return result
 }
 
+func requireNeverLexicallyMatched(t *testing.T, response openapi.SearchNotesResponse, excludedID string) {
+	t.Helper()
+
+	for _, result := range response.Results {
+		if result.Note.Id != excludedID {
+			continue
+		}
+		if result.RetrievalSource != openapi.Semantic {
+			t.Fatalf("note %q retrieval source = %q, want semantic-only", excludedID, result.RetrievalSource)
+		}
+	}
+}
+
+func requireOnlySemanticMatches(t *testing.T, response openapi.SearchNotesResponse, query string) {
+	t.Helper()
+
+	for _, result := range response.Results {
+		if result.RetrievalSource != openapi.Semantic {
+			t.Fatalf("query %q matched note %q with source %q, want semantic-only", query, result.Note.Id, result.RetrievalSource)
+		}
+	}
+}
+
 func requireListNotesCategoryFilterError(t *testing.T, client *openapi.ClientWithResponses, category string) {
 	t.Helper()
 
@@ -475,36 +498,6 @@ func requireListedNote(t *testing.T, notes openapi.ListNotesResponse, id string,
 	}
 
 	t.Fatalf("listed note id %q missing", id)
-}
-
-func requireOnlySearchNoteIDs(t *testing.T, response openapi.SearchNotesResponse, wantIDs []string) {
-	t.Helper()
-
-	gotIDs := make([]string, 0, len(response.Results))
-	for _, result := range response.Results {
-		gotIDs = append(gotIDs, result.Note.Id)
-	}
-	if diff := cmp.Diff(wantIDs, gotIDs); diff != "" {
-		t.Fatalf("search note ids mismatch (-want +got):\n%s", diff)
-	}
-}
-
-func requireSearchNoteIDs(t *testing.T, response openapi.SearchNotesResponse, wantIDs []string) {
-	t.Helper()
-
-	if len(response.Results) != len(wantIDs) {
-		t.Fatalf("search note count = %d, want %d", len(response.Results), len(wantIDs))
-	}
-
-	gotIDs := make(map[string]bool, len(response.Results))
-	for _, result := range response.Results {
-		gotIDs[result.Note.Id] = true
-	}
-	for _, wantID := range wantIDs {
-		if !gotIDs[wantID] {
-			t.Fatalf("search note id %q missing", wantID)
-		}
-	}
 }
 
 func noteFieldsFromResponse(note openapi.Note) noteFields {

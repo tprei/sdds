@@ -210,7 +210,7 @@ Required tools:
 - Go 1.26.
 - Node 24 or newer.
 - pnpm 11.5.2.
-- Docker and Docker Compose for the full local runtime and slow boundary checks.
+- Docker and Docker Compose for the full local runtime, the embedding sidecar, and slow boundary checks.
 
 Install JavaScript dependencies from the repo root:
 
@@ -348,7 +348,7 @@ EXPO_PUBLIC_SDDS_API_BASE_URL=http://localhost:8080 pnpm dev:mobile
 
 ### Fast checks
 
-`pnpm check` is the fast blocking repository gate. It does not start Docker or browsers and covers Go formatting/lint, OpenAPI lint, generated TypeScript/Go contract checks, TypeScript/mobile checks, API schema tests, mobile tests, and Go API tests:
+`pnpm check` is the fast blocking repository gate. It does not start Docker or browsers and covers Go formatting/lint, OpenAPI lint, generated TypeScript/Go contract checks, TypeScript/mobile checks, API schema tests, mobile tests, wire-contract unit tests, and Go API tests:
 
 ```sh
 pnpm check
@@ -369,41 +369,28 @@ pnpm typecheck:tokens
 pnpm typecheck:mobile
 ```
 
-Use the separate slow commands when their runtime boundary changes. Both require Docker with Docker Compose. The migration command needs no private secrets; `pnpm test:rustfs` generates temporary credentials. They do not represent a single combined lifecycle:
+### Slow checks
+
+Docker and browser gates run through the smoke runner, which owns prerequisites, per-run isolation, temporary credentials, OS-assigned ports, the Compose lifecycle, readiness, failure diagnostics, and cleanup. Each command requires Docker with Docker Compose, pnpm, and Node; `pnpm smoke api`, `pnpm smoke rustfs`, and `pnpm smoke all` also require Go; `pnpm smoke synthetics` and `pnpm smoke all` also require the Playwright browser (bundled Chromium locally, Chrome in CI). All commands also require `curl` and `openssl`; `pnpm smoke rustfs` additionally requires `shasum`. Changes under `services/embedding/**` require both `pnpm smoke api` and the blocking `embedding` CI job: the smoke gate proves Compose health, startup, and HTTP integration, while the CI job proves pinned model/export parity.
 
 ```sh
-# Validate migrations without starting dependencies or requiring media secrets.
-docker compose -f infra/compose/compose.yaml run --build --rm --no-deps api migrate
+# API Docker integration: the assembled image, migrations, routing, SQLite
+# persistence, generated Go client, and public HTTP contract together.
+pnpm smoke api
 
-# Exercise object-store behavior with temporary credentials.
-pnpm test:rustfs
+# Object-store behavior with temporary credentials, including drift recovery,
+# restart persistence, private access, and migration-without-media.
+pnpm smoke rustfs
+
+# Critical user-visible Expo web journeys, layout, and appearance against the
+# Dockerized API.
+pnpm smoke synthetics
+
+# All three suites, each once, with a fresh stack between them.
+pnpm smoke all
 ```
 
-The RustFS integration creates temporary credentials and removes its Compose project and volumes when it exits.
-
-Run the API integration test against the Dockerized stack:
-
-```sh
-docker compose -p sdds-api-integration -f infra/compose/compose.yaml down --volumes
-SDDS_HTTP_PORT=18080 docker compose -p sdds-api-integration -f infra/compose/compose.yaml up --build -d
-until curl --fail --silent http://127.0.0.1:18080/readyz >/dev/null; do sleep 1; done
-SDDS_API_BASE_URL=http://127.0.0.1:18080 pnpm test:api:integration
-docker compose -p sdds-api-integration -f infra/compose/compose.yaml down --volumes
-```
-
-`pnpm test:api:integration` expects a live API and exercises the generated Go OpenAPI client against the current authenticated product and operational endpoints. Keep it on the Compose path so it covers the built image, migrations, readiness, routing, SQLite persistence, and JSON contract together.
-
-Run the browser-level synthetic against the Dockerized stack:
-
-```sh
-docker compose -p sdds-synthetics -f infra/compose/compose.yaml down --volumes
-SDDS_HTTP_PORT=18080 SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE=60 SDDS_AUTH_LOGIN_REQUESTS_PER_MINUTE=60 docker compose -p sdds-synthetics -f infra/compose/compose.yaml up --build -d
-until curl --fail --silent http://127.0.0.1:18080/readyz >/dev/null; do sleep 1; done
-pnpm test:synthetics
-docker compose -p sdds-synthetics -f infra/compose/compose.yaml down --volumes
-```
-
-`pnpm test:synthetics` starts Expo web on `http://localhost:19006` and points it at `http://127.0.0.1:18080`. Keep the API on the Compose path so this check exercises `services/api/Dockerfile`, `infra/compose/compose.yaml`, the real HTTP API, and the web client together.
+The runner creates a collision-resistant Compose project, generates disposable random credentials in a private temporary directory, discovers OS-assigned ports, and removes its own containers, volumes, local images, and secret files on exit. Compose teardown errors are surfaced as warnings rather than silently suppressed. Set `SDDS_SMOKE_ARTIFACT_DIR` to a directory to collect timestamped, secret-redacted service logs on failure.
 
 ## References
 

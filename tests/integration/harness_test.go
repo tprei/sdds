@@ -566,3 +566,7 @@ func noteFieldsFromRequest(request openapi.CreateNoteRequest) noteFields {
 		CategorySlug: request.CategorySlug,
 	}
 }
+
+// ptr returns a pointer to value. Used for generated optional request fields
+// (e.g. *string, *openapi.CategorySlug) on PATCH and list-style requests.
+func ptr[T any](value T) *T { return &value }

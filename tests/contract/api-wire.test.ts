@@ -124,6 +124,15 @@ describe('isUpdateNoteRequest', () => {
   it('rejects an unknown key', () => {
     expect(isUpdateNoteRequest({ body: 'b', image_upload_ids: ['x'] })).toBe(false);
   });
+  it('rejects a non-string title', () => {
+    expect(isUpdateNoteRequest({ title: 42 })).toBe(false);
+  });
+  it('rejects a non-string body', () => {
+    expect(isUpdateNoteRequest({ body: true })).toBe(false);
+  });
+  it('rejects a null category_slug', () => {
+    expect(isUpdateNoteRequest({ category_slug: null })).toBe(false);
+  });
 });
 
 describe('isNoteImagesResponse', () => {

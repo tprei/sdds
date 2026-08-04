@@ -188,3 +188,36 @@ func TestDeleteNoteMapsErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateNoteEnforcesExactRequestSizeLimit(t *testing.T) {
+	validBody := append([]byte(`{"title":"x"}`), bytes.Repeat([]byte(" "), int(maxUpdateNoteRequestBytes)-len(`{"title":"x"}`))...)
+	if int64(len(validBody)) != maxUpdateNoteRequestBytes {
+		t.Fatalf("valid body length = %d, want %d", len(validBody), maxUpdateNoteRequestBytes)
+	}
+
+	editCalls := 0
+	router := newNoteEditTestRouter(fakeNoteEditor{
+		edit: func(_ context.Context, _ note.EditInput) (note.Note, error) {
+			editCalls++
+			return note.Note{ID: exampleNoteID, Title: "x", Body: "body", CategorySlug: note.CategorySlugFood}, nil
+		},
+	})
+
+	response, _ := doNoteEditRequest(t, router, http.MethodPatch, "/v1/notes/"+exampleNoteID, validBody)
+	if response.Code != http.StatusOK {
+		t.Fatalf("exact boundary status = %d, want %d", response.Code, http.StatusOK)
+	}
+	if editCalls != 1 {
+		t.Fatalf("edit calls = %d, want 1", editCalls)
+	}
+
+	oversized := append(validBody, ' ')
+	response, _ = doNoteEditRequest(t, router, http.MethodPatch, "/v1/notes/"+exampleNoteID, oversized)
+	if response.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized status = %d, want %d", response.Code, http.StatusRequestEntityTooLarge)
+	}
+	requireErrorCode(t, response, openapi.ErrorCodeRequestTooLarge)
+	if editCalls != 1 {
+		t.Fatalf("edit calls after oversized request = %d, want 1", editCalls)
+	}
+}

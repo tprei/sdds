@@ -259,7 +259,23 @@ export function isUpdateNoteRequest(value: unknown): value is UpdateNoteRequest 
   if (keys.length === 0) {
     return false;
   }
-  return keys.every((key) => updateNoteRequestKeys.includes(key as (typeof updateNoteRequestKeys)[number]));
+  if (
+    !keys.every((key) =>
+      updateNoteRequestKeys.includes(key as (typeof updateNoteRequestKeys)[number]),
+    )
+  ) {
+    return false;
+  }
+  if ('title' in value && typeof value.title !== 'string') {
+    return false;
+  }
+  if ('body' in value && typeof value.body !== 'string') {
+    return false;
+  }
+  if ('category_slug' in value && typeof value.category_slug !== 'string') {
+    return false;
+  }
+  return true;
 }
 
 export function isCommentResponse(value: unknown): value is CommentResponse {

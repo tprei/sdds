@@ -4446,6 +4446,7 @@ type UpdateNoteHTTPResponse struct {
 	JSON401      *ErrorResponse
 	JSON403      *ErrorResponse
 	JSON404      *ErrorResponse
+	JSON413      *ErrorResponse
 	JSON500      *ErrorResponse
 	JSON503      *ErrorResponse
 }
@@ -5937,6 +5938,13 @@ func ParseUpdateNoteHTTPResponse(rsp *http.Response) (*UpdateNoteHTTPResponse, e
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse

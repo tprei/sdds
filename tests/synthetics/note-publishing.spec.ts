@@ -220,7 +220,7 @@ test('edits and deletes an own note through the owner actions', async ({
 
   await expect(page).toHaveURL(/\/notes\/[^/?#]+(?:[?#]|$)/);
   await expect(page.getByRole('heading', { name: editedTitle })).toBeVisible();
-  await expect(page.getByText(/editado/)).toBeVisible();
+  await expect(page.getByText(/· editado/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Ações da nota' }).click();
   await page.getByRole('button', { name: 'Excluir nota' }).click();

@@ -236,6 +236,26 @@ describe('comment thread reducer', () => {
     expect(canDeleteComment(state, firstComment.id)).toBe(true);
   });
 
+  it('counts replies and allows deleting a visible reply', () => {
+    const reply = replyComment('reply-1', 'Uma resposta');
+    const state = reduce(createCommentThreadState(), {
+      type: 'initial_load_succeeded',
+      page: {
+        threads: [
+          {
+            comment: firstComment,
+            replies: [reply],
+            hasMoreReplies: false,
+          },
+        ],
+        nextCursor: null,
+      },
+    });
+
+    expect(displayedCommentCount(state)).toBe(2);
+    expect(canDeleteComment(state, reply.id)).toBe(true);
+  });
+
   it('keeps a deleted tail comment hidden after terminal settlement and later pages', () => {
     let state = reduce(createCommentThreadState(), {
       type: 'initial_load_succeeded',
@@ -316,6 +336,7 @@ describe('comment thread reducer', () => {
       type: 'draft_changed',
       draft: ' \n\t ',
     });
+
     expect(canSubmitComment(blankState)).toBe(false);
     expect(reduce(blankState, { type: 'submit_started' })).toBe(blankState);
 
@@ -334,6 +355,14 @@ function comment(id: string, body: string): Comment {
     createdAt: 1782993600000,
     id,
     parentCommentID: null,
+  };
+}
+
+function replyComment(id: string, body: string): Comment {
+  return {
+    ...comment(id, body),
+    author: { displayName: 'Lia', id: 'reply-author-id' },
+    parentCommentID: firstComment.id,
   };
 }
 

@@ -19,6 +19,8 @@ import {
   commentBodyMaxCodePoints,
   canSubmitComment,
   displayedCommentCount,
+  replyMaxPerParent,
+  visibleComments,
   visibleThreads,
   validateCommentDraft,
 } from './comment-thread';
@@ -267,8 +269,66 @@ function CommentList({
   onReportComment: (commentID: string) => void;
   onPressAuthor: (authorID: string) => void;
 }) {
-  return threads.map(({ comment }) => (
-    <View key={comment.id} style={styles.comment}>
+  return threads.map((thread) => {
+    const replies = visibleComments(
+      thread.replies,
+      deleteStatusByCommentID,
+    );
+    return (
+      <View key={thread.comment.id} style={styles.comment}>
+        <CommentRow
+          comment={thread.comment}
+          currentAuthorID={currentAuthorID}
+          deleteStatusByCommentID={deleteStatusByCommentID}
+          noteAuthorID={noteAuthorID}
+          onDeleteComment={onDeleteComment}
+          onPressAuthor={onPressAuthor}
+          onReportComment={onReportComment}
+        />
+        {replies.length > 0 ? (
+          <View style={styles.replyList}>
+            {replies.map((reply) => (
+              <View key={reply.id} style={styles.reply}>
+                <CommentRow
+                  comment={reply}
+                  currentAuthorID={currentAuthorID}
+                  deleteStatusByCommentID={deleteStatusByCommentID}
+                  noteAuthorID={noteAuthorID}
+                  onDeleteComment={onDeleteComment}
+                  onPressAuthor={onPressAuthor}
+                  onReportComment={onReportComment}
+                />
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {thread.hasMoreReplies ? (
+          <StatusMessage>{`Mostrando as primeiras ${replyMaxPerParent} respostas.`}</StatusMessage>
+        ) : null}
+      </View>
+    );
+  });
+}
+
+function CommentRow({
+  comment,
+  currentAuthorID,
+  deleteStatusByCommentID,
+  noteAuthorID,
+  onDeleteComment,
+  onPressAuthor,
+  onReportComment,
+}: {
+  comment: CommentThread['comment'];
+  currentAuthorID: string;
+  deleteStatusByCommentID: ReadonlyMap<string, CommentDeleteStatus>;
+  noteAuthorID: string;
+  onDeleteComment: (commentID: string) => void;
+  onPressAuthor: (authorID: string) => void;
+  onReportComment: (commentID: string) => void;
+}) {
+  return (
+    <View style={styles.commentRow}>
       <View style={styles.commentHeader}>
         <PressableScale
           accessibilityLabel={`Abrir perfil do autor: ${comment.author.displayName}`}
@@ -295,6 +355,7 @@ function CommentList({
             accessibilityLabel="Excluir comentário"
             icon={<IconTrash color={semanticColors.textMeta} size={componentMetrics.icon.sm} />}
             onPress={() => onDeleteComment(comment.id)}
+            size={componentMetrics.minTarget}
             testID={`comment-delete-${comment.id}`}
           />
         ) : null}
@@ -302,6 +363,7 @@ function CommentList({
           accessibilityLabel="Denunciar comentário"
           icon={<IconFlag color={semanticColors.textMeta} size={componentMetrics.icon.sm} />}
           onPress={() => onReportComment(comment.id)}
+          size={componentMetrics.minTarget}
           testID={`comment-report-${comment.id}`}
         />
       </View>
@@ -311,7 +373,7 @@ function CommentList({
         </AppText>
       ) : null}
     </View>
-  ));
+  );
 }
 
 function draftErrorMessage(error: 'required' | 'too_long'): string {

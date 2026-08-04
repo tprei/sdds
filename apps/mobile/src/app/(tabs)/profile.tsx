@@ -5,6 +5,8 @@ import { useRouter } from 'expo-router';
 import { semanticColors } from '@sdds/tokens';
 
 import { AuthorProfileContent } from '@/features/authors/author-profile-content';
+import { requestStatus } from '@/lib/api/request-error';
+import { unauthorizedStatus } from '@/lib/api/status';
 import { Screen } from '@/ui/screen';
 import { AppHeader } from '@/ui/app-header';
 import { EmptyState } from '@/ui/empty-state';
@@ -45,7 +47,11 @@ export default function ProfileScreen() {
     try {
       await apiClient.createAuthEmailVerification();
       setResendState({ status: 'sent' });
-    } catch {
+    } catch (error: unknown) {
+      if (requestStatus(error) === unauthorizedStatus) {
+        await logout().catch(() => undefined);
+        return;
+      }
       setResendState({
         message: 'Não foi possível reenviar agora. Tente de novo.',
         status: 'error',
@@ -87,7 +93,7 @@ export default function ProfileScreen() {
         </View>
         <View style={styles.emailSection}>
           <View style={styles.emailRow}>
-            <AppText variant="body" color={semanticColors.textStrong}>
+            <AppText style={styles.emailAddress} variant="body" color={semanticColors.textStrong}>
               {state.user.email ? state.user.email.address : 'Nenhum e-mail'}
             </AppText>
             <Badge
@@ -98,7 +104,7 @@ export default function ProfileScreen() {
           <Button
             label="Alterar e-mail"
             onPress={() => router.push('/email')}
-            size="sm"
+            size="md"
             testID="profile-change-email-button"
           />
           {state.user.email && !state.user.email.verified ? (
@@ -115,7 +121,7 @@ export default function ProfileScreen() {
                 disabled={resendState.status === 'submitting'}
                 label={resendState.status === 'submitting' ? 'Enviando…' : 'Reenviar confirmação'}
                 onPress={handleResendEmail}
-                size="sm"
+                size="md"
                 testID="profile-resend-verification-button"
                 variant="soft"
               />

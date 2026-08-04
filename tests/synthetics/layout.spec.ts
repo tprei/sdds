@@ -199,4 +199,14 @@ test.describe('layout geometry', () => {
     await expectWithinViewport(page, addImage, 'the add-image cell');
     await expectNoHorizontalClipping(addImage, 'the add-image cell');
   });
+
+  test('the account recovery screens fit the viewport', async ({ page }) => {
+    for (const path of ['/recover-password', '/new-password?token=dummy', '/verify-email?token=dummy']) {
+      await page.goto(path);
+      const header = page.getByTestId('app-header-row');
+      await expect(header).toBeVisible({ timeout: 10_000 });
+      await expectWithinViewport(page, header, `the ${path} screen header`);
+      await expectNoHorizontalClipping(header, `the ${path} screen header`);
+    }
+  });
 });

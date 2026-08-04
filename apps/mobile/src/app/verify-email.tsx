@@ -6,6 +6,7 @@ import { invalidTokenMessage } from '@/features/auth/auth-messages';
 import { styles } from '@/features/auth/auth-screen.styles';
 import { createAPIClient } from '@/lib/api/client';
 import { AuthAPIRequestError } from '@/lib/api/auth';
+import { useAuth } from '@/lib/auth/auth-provider';
 import { AppHeader } from '@/ui/app-header';
 import { Screen } from '@/ui/screen';
 import { AppText } from '@/ui/text';
@@ -17,20 +18,26 @@ type VerifyState =
   | { status: 'error' };
 
 export default function VerifyEmailScreen() {
-  const { token } = useLocalSearchParams<{ token?: string }>();
+  const { token } = useLocalSearchParams<{ token?: string | string[] }>();
+  const tokenParam = typeof token === 'string' ? token : undefined;
+  const { refresh } = useAuth();
   const [verifyState, setVerifyState] = useState<VerifyState>(() =>
-    token === undefined ? { status: 'invalid' } : { status: 'loading' },
+    tokenParam === undefined ? { status: 'invalid' } : { status: 'loading' },
   );
 
   useEffect(() => {
-    if (token === undefined) {
+    if (tokenParam === undefined) {
       return;
     }
 
     let active = true;
     createAPIClient()
-      .verifyAuthEmail(token)
-      .then(() => {
+      .verifyAuthEmail(tokenParam)
+      .then(async () => {
+        if (!active) {
+          return;
+        }
+        await refresh().catch(() => undefined);
         if (active) {
           setVerifyState({ status: 'success' });
         }
@@ -51,7 +58,7 @@ export default function VerifyEmailScreen() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [refresh, tokenParam]);
 
   return (
     <Screen header={<AppHeader back />}>
@@ -63,10 +70,10 @@ export default function VerifyEmailScreen() {
           <AppText variant="bodyLg">E-mail confirmado!</AppText>
         ) : null}
         {verifyState.status === 'invalid' ? (
-          <AppText variant="bodyLg">{invalidTokenMessage}</AppText>
+          <AppText variant="bodyLg" style={styles.statusError} accessibilityRole="alert">{invalidTokenMessage}</AppText>
         ) : null}
         {verifyState.status === 'error' ? (
-          <AppText variant="bodyLg">
+          <AppText variant="bodyLg" style={styles.statusError} accessibilityRole="alert">
             Não foi possível confirmar agora. Tente novamente mais tarde.
           </AppText>
         ) : null}

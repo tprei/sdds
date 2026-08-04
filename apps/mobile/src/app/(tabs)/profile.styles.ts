@@ -16,6 +16,10 @@ export const styles = StyleSheet.create({
     gap: spacing.sp3,
     justifyContent: 'space-between',
   },
+  emailAddress: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
   logoutSection: {
     gap: spacing.sp3,
     padding: spacing.sp4,

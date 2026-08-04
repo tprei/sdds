@@ -111,7 +111,7 @@ export default function LoginScreen() {
             block
             label="Esqueci minha senha"
             onPress={() => {
-              router.push('/recuperar-senha');
+              router.push('/recover-password');
             }}
             testID="login-forgot-password-button"
           />

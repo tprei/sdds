@@ -5,9 +5,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   invalidTokenMessage,
   loginValidationMessage,
+  sessionCleanupFailedMessage,
 } from '@/features/auth/auth-messages';
 import { styles } from '@/features/auth/auth-screen.styles';
 import { createAPIClient } from '@/lib/api/client';
+import { useAuth } from '@/lib/auth/auth-provider';
 import { AuthAPIRequestError } from '@/lib/api/auth';
 import { AppHeader } from '@/ui/app-header';
 import { Button } from '@/ui/button';
@@ -23,21 +25,22 @@ type PasswordState =
 
 export default function NewPasswordScreen() {
   const router = useRouter();
-  const { token } = useLocalSearchParams<{ token?: string }>();
+  const { logout } = useAuth();
+  const { token } = useLocalSearchParams<{ token?: string | string[] }>();
+  const tokenParam = typeof token === 'string' ? token : undefined;
   const [password, setPassword] = useState('');
   const [passwordState, setPasswordState] = useState<PasswordState>({
     status: 'idle',
   });
 
   async function handleSubmit() {
-    if (token === undefined || passwordState.status === 'submitting') {
+    if (tokenParam === undefined || passwordState.status === 'submitting') {
       return;
     }
 
     setPasswordState({ status: 'submitting' });
     try {
-      await createAPIClient().setAuthPassword(token, password);
-      router.replace('/login');
+      await createAPIClient().setAuthPassword(tokenParam, password);
     } catch (error: unknown) {
       if (
         error instanceof AuthAPIRequestError &&
@@ -50,6 +53,15 @@ export default function NewPasswordScreen() {
           status: 'error',
         });
       }
+      return;
+    }
+    // The server revoked every session; clear the local token before leaving
+    // the screen. A storage failure stays actionable instead of navigating.
+    try {
+      await logout();
+      router.replace('/login');
+    } catch {
+      setPasswordState({ message: sessionCleanupFailedMessage, status: 'error' });
     }
   }
 
@@ -57,20 +69,24 @@ export default function NewPasswordScreen() {
     return (
       <Screen header={<AppHeader back />}>
         <View style={styles.form}>
-          <AppText variant="bodyLg">{invalidTokenMessage}</AppText>
+          <AppText variant="bodyLg" style={styles.statusError} accessibilityRole="alert">{invalidTokenMessage}</AppText>
         </View>
       </Screen>
     );
   }
 
   const isSubmitting = passwordState.status === 'submitting';
-  const canSubmit = password.length > 0 && token !== undefined;
+  const canSubmit = password.length > 0 && tokenParam !== undefined;
 
   return (
     <Screen header={<AppHeader back />}>
       <View style={styles.form}>
         <TextField
           accessibilityLabel="Nova senha"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="new-password"
+          textContentType="newPassword"
           label="Nova senha"
           onChangeText={setPassword}
           placeholder="Nova senha"

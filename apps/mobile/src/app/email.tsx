@@ -5,6 +5,8 @@ import { useRouter } from 'expo-router';
 import { signupValidationMessage } from '@/features/auth/auth-messages';
 import { styles } from '@/features/auth/auth-screen.styles';
 import { AuthAPIRequestError } from '@/lib/api/auth';
+import { requestStatus } from '@/lib/api/request-error';
+import { unauthorizedStatus } from '@/lib/api/status';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { AppHeader } from '@/ui/app-header';
 import { Button } from '@/ui/button';
@@ -22,7 +24,7 @@ const successMessage = 'Enviamos um link de confirmação pro seu e-mail.';
 
 export default function EmailScreen() {
   const router = useRouter();
-  const { apiClient, state } = useAuth();
+  const { apiClient, logout, refresh, state } = useAuth();
   const initial =
     state.status === 'authenticated' ? state.user.email?.address ?? '' : '';
   const [email, setEmail] = useState(initial);
@@ -36,8 +38,13 @@ export default function EmailScreen() {
     setEmailState({ status: 'submitting' });
     try {
       await apiClient.setAuthEmail(email.trim());
+      await refresh().catch(() => undefined);
       setEmailState({ status: 'success' });
     } catch (error: unknown) {
+      if (requestStatus(error) === unauthorizedStatus) {
+        await logout().catch(() => undefined);
+        return;
+      }
       setEmailState({ message: emailErrorMessage(error), status: 'error' });
     }
   }

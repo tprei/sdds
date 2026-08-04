@@ -30,6 +30,7 @@ export type AuthController = {
   bootstrap(): Promise<AuthState>;
   login(input: LoginInput): Promise<AuthState>;
   logout(state: AuthState): Promise<AuthState>;
+  refresh(state: AuthState): Promise<AuthState>;
   signup(input: SignupInput): Promise<AuthState>;
 };
 
@@ -80,13 +81,22 @@ export function createAuthController(): AuthController {
         return { status: 'anonymous' };
       });
     },
+    async refresh(state) {
+      return runAuthMutation(async () => {
+        if (state.status !== 'authenticated') {
+          return state;
+        }
+        return bootstrapToken(state.token);
+      });
+    },
     async signup(input) {
       return runAuthMutation(async () => {
+        const normalizedEmail = input.email?.trim();
         const session = await createAPIClient().createAuthUser({
           displayName: input.displayName,
           password: input.password,
           username: input.username,
-          ...(input.email && input.email.trim().length > 0 ? { email: input.email.trim() } : {}),
+          ...(normalizedEmail ? { email: normalizedEmail } : {}),
         });
         return persistSession(session);
       });

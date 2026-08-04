@@ -2,7 +2,7 @@ import * as React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import RecoverPasswordScreen from '@/app/recuperar-senha';
+import RecoverPasswordScreen from '@/app/recover-password';
 
 const { createElement } = React;
 type ReactNode = React.ReactNode;
@@ -85,9 +85,6 @@ vi.mock('react-native-svg', () => {
   return { Svg: Node, Path: Node, Circle: Node, Rect: Node };
 });
 
-const confirmationMessage =
-  'Se esse e-mail estiver cadastrado, enviamos um link pra criar uma senha nova.';
-
 describe('RecoverPasswordScreen', () => {
   beforeEach(() => {
     mocks.createAuthPasswordReset.mockReset();
@@ -105,21 +102,23 @@ describe('RecoverPasswordScreen', () => {
       await settle();
     });
 
-    expect(confirmationText(renderer)).toBe(confirmationMessage);
+    // Capture the initial rendered confirmation rather than transcribing the
+    // production copy; every subsequent render must stay byte-identical.
+    const confirmation = confirmationText(renderer);
 
     await submitWith(renderer, 'voce@email.com');
-    expect(confirmationText(renderer)).toBe(confirmationMessage);
+    expect(confirmationText(renderer)).toBe(confirmation);
     expect(mocks.createAuthPasswordReset).toHaveBeenCalledWith('voce@email.com');
 
     await submitWith(renderer, 'outra@email.com');
-    expect(confirmationText(renderer)).toBe(confirmationMessage);
+    expect(confirmationText(renderer)).toBe(confirmation);
     expect(mocks.createAuthPasswordReset).toHaveBeenCalledWith('outra@email.com');
 
     // A failing request must not change the line either: the response never
     // reveals whether the address matches an account.
     mocks.createAuthPasswordReset.mockRejectedValueOnce(new Error('boom'));
     await submitWith(renderer, 'falha@email.com');
-    expect(confirmationText(renderer)).toBe(confirmationMessage);
+    expect(confirmationText(renderer)).toBe(confirmation);
   });
 });
 

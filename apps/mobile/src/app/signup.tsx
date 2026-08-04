@@ -30,6 +30,7 @@ export default function SignupScreen() {
   const returnPath = returnPathFromParam(next);
   const { signup, state } = useAuth();
   const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [submitState, setSubmitState] = useState<SubmitState>({
@@ -54,7 +55,7 @@ export default function SignupScreen() {
 
     setSubmitState({ status: 'submitting' });
     try {
-      await signup({ displayName, password, username });
+      await signup({ displayName, email: email.trim() || undefined, password, username });
       setSubmitState({ status: 'idle' });
     } catch (error) {
       setSubmitState({
@@ -81,6 +82,18 @@ export default function SignupScreen() {
             placeholder="Seu nome"
             testID="signup-display-name-input"
             value={displayName}
+          />
+          <TextField
+            accessibilityLabel="E-mail"
+            autoCapitalize="none"
+            autoCorrect={false}
+            hint="Pra recuperar a conta se esquecer a senha."
+            keyboardType="email-address"
+            label="E-mail (opcional)"
+            onChangeText={setEmail}
+            placeholder="voce@email.com"
+            testID="signup-email-input"
+            value={email}
           />
           <TextField
             accessibilityLabel="Nome de usuário"

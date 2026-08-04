@@ -21,6 +21,7 @@ export type LoginInput = {
 
 export type SignupInput = {
   displayName: string;
+  email?: string;
   password: string;
   username: string;
 };
@@ -81,7 +82,12 @@ export function createAuthController(): AuthController {
     },
     async signup(input) {
       return runAuthMutation(async () => {
-        const session = await createAPIClient().createAuthUser(input);
+        const session = await createAPIClient().createAuthUser({
+          displayName: input.displayName,
+          password: input.password,
+          username: input.username,
+          ...(input.email && input.email.trim().length > 0 ? { email: input.email.trim() } : {}),
+        });
         return persistSession(session);
       });
     },

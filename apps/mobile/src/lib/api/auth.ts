@@ -16,6 +16,7 @@ export type AuthAuthor = {
 
 export type AuthUser = {
   author: AuthAuthor;
+  email?: { address: string; verified: boolean };
   id: string;
   username: string;
 };
@@ -35,6 +36,7 @@ export type CreateAuthUserInput = {
   displayName: string;
   password: string;
   username: string;
+  email?: string;
 };
 
 export type CreateAuthSessionInput = {
@@ -47,6 +49,10 @@ type AuthorSummaryResponse = GeneratedSchemas['AuthorSummary'];
 type CreateSessionRequest = GeneratedSchemas['CreateSessionRequest'];
 type CreateUserRequest = GeneratedSchemas['CreateUserRequest'];
 type CurrentUserResponse = GeneratedSchemas['CurrentUser'];
+type SetUserEmailRequest = GeneratedSchemas['SetUserEmailRequest'];
+type VerifyEmailRequest = GeneratedSchemas['VerifyEmailRequest'];
+type CreatePasswordResetRequest = GeneratedSchemas['CreatePasswordResetRequest'];
+type SetPasswordRequest = GeneratedSchemas['SetPasswordRequest'];
 export type AuthAPIErrorField = APIValidationProblem;
 
 export class AuthAPIRequestError extends SharedAPIRequestError {
@@ -94,6 +100,7 @@ function parseCurrentSessionResponse(value: unknown): CurrentAuthSession {
 function parseCurrentUser(value: CurrentUserResponse): AuthUser {
   return {
     author: parseAuthorSummary(value.author),
+    email: value.email,
     id: value.id,
     username: value.username,
   };
@@ -112,6 +119,11 @@ export type AuthAPI = {
   createAuthSession(input: CreateAuthSessionInput): Promise<AuthSession>;
   getAuthSession(): Promise<CurrentAuthSession>;
   deleteAuthSession(): Promise<void>;
+  setAuthEmail(email: string): Promise<void>;
+  createAuthEmailVerification(): Promise<void>;
+  verifyAuthEmail(token: string): Promise<void>;
+  createAuthPasswordReset(email: string): Promise<void>;
+  setAuthPassword(token: string, password: string): Promise<void>;
 };
 
 function rewrapAuthTransportError(error: unknown): never {
@@ -128,6 +140,7 @@ export function bindAuthAPI(transport: TypedTransport): AuthAPI {
         display_name: input.displayName,
         password: input.password,
         username: input.username,
+        ...(input.email ? { email: input.email } : {}),
       };
       try {
         const { data } = await transport.POST('/v1/auth/users', { body: request });
@@ -162,6 +175,49 @@ export function bindAuthAPI(transport: TypedTransport): AuthAPI {
     async deleteAuthSession() {
       try {
         await transport.DELETE('/v1/auth/session');
+      } catch (error) {
+        rewrapAuthTransportError(error);
+      }
+    },
+    async setAuthEmail(email) {
+      const request: SetUserEmailRequest = { email };
+      try {
+        await transport.PUT('/v1/auth/email', { body: request });
+      } catch (error) {
+        rewrapAuthTransportError(error);
+      }
+    },
+
+    async createAuthEmailVerification() {
+      try {
+        await transport.POST('/v1/auth/email/verifications');
+      } catch (error) {
+        rewrapAuthTransportError(error);
+      }
+    },
+
+    async verifyAuthEmail(token) {
+      const request: VerifyEmailRequest = { token };
+      try {
+        await transport.POST('/v1/auth/email/verification', { body: request });
+      } catch (error) {
+        rewrapAuthTransportError(error);
+      }
+    },
+
+    async createAuthPasswordReset(email) {
+      const request: CreatePasswordResetRequest = { email };
+      try {
+        await transport.POST('/v1/auth/password-resets', { body: request });
+      } catch (error) {
+        rewrapAuthTransportError(error);
+      }
+    },
+
+    async setAuthPassword(token, password) {
+      const request: SetPasswordRequest = { password, token };
+      try {
+        await transport.POST('/v1/auth/password', { body: request });
       } catch (error) {
         rewrapAuthTransportError(error);
       }

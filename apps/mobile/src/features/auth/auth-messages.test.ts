@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { returnPathFromParam } from './auth-messages';
+import {
+  invalidTokenMessage,
+  returnPathFromParam,
+  signupValidationMessage,
+} from './auth-messages';
 
 describe('returnPathFromParam', () => {
   const validStatic = [
@@ -57,5 +61,33 @@ describe('returnPathFromParam', () => {
 
   it('rejects undefined', () => {
     expect(returnPathFromParam(undefined)).toBe('/');
+  });
+});
+
+describe('signupValidationMessage', () => {
+  it('maps email field codes to PT-BR copy', () => {
+    expect(
+      signupValidationMessage([{ code: 'required', field: 'email' }]),
+    ).toBe('Informe seu e-mail.');
+    expect(
+      signupValidationMessage([{ code: 'invalid', field: 'email' }]),
+    ).toBe('E-mail inválido.');
+    expect(
+      signupValidationMessage([{ code: 'too_long', field: 'email' }]),
+    ).toBe('E-mail muito longo.');
+  });
+
+  it('returns null for unmapped email codes', () => {
+    expect(
+      signupValidationMessage([{ code: 'too_short', field: 'email' }]),
+    ).toBeNull();
+  });
+});
+
+describe('invalidTokenMessage', () => {
+  it('exposes the expired token copy', () => {
+    expect(invalidTokenMessage).toBe(
+      'Esse link expirou ou já foi usado. Peça outro.',
+    );
   });
 });

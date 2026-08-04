@@ -62,6 +62,10 @@ export default function RootLayout() {
         <Stack.Screen name="compose" options={{ presentation: 'modal' }} />
         <Stack.Screen name="login" />
         <Stack.Screen name="signup" />
+        <Stack.Screen name="email" />
+        <Stack.Screen name="verificar-email" />
+        <Stack.Screen name="recuperar-senha" />
+        <Stack.Screen name="nova-senha" />
       </Stack>
       <StatusBar style="dark" />
       </ProductEventProvider>

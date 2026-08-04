@@ -11,6 +11,7 @@ import NoteDetailScreen from '@/app/notes/[id]';
 import type { Comment, CommentPage, CommentThread } from '@/lib/api/comments';
 import type { CommentThreadState } from '@/features/comments/comment-thread';
 import { registerPresentedNoteOrigin } from './presented-note-origin';
+import { isNoteDeleted } from '@/features/notes/deleted-notes';
 
 const { createElement } = React;
 type ReactNode = React.ReactNode;
@@ -59,6 +60,7 @@ const mocks = vi.hoisted(() => ({
   localParams: { id: 'note-id' } as LocalParams,
   logout: vi.fn(async () => undefined),
   push: vi.fn(),
+  replace: vi.fn(),
   record: vi.fn(),
 }));
 vi.mock('expo-crypto', () => ({
@@ -152,7 +154,7 @@ vi.mock('expo-router', async () => {
       react.useEffect(effect, [effect, mocks.focusVersion]);
     },
     useLocalSearchParams: () => mocks.localParams,
-    useRouter: () => ({ back: mocks.back, canGoBack: () => true, push: mocks.push, replace: vi.fn() }),
+    useRouter: () => ({ back: mocks.back, canGoBack: () => true, push: mocks.push, replace: mocks.replace }),
   };
 });
 
@@ -284,6 +286,7 @@ describe('NoteDetailScreen route', () => {
     mocks.logout.mockClear();
     mocks.back.mockClear();
     mocks.push.mockClear();
+    mocks.replace.mockClear();
     mocks.record.mockClear();
   });
 
@@ -1090,6 +1093,42 @@ describe('NoteDetailScreen route', () => {
 
     expect(mocks.back).not.toHaveBeenCalled();
     expect(hostCount(renderer, 'note-delete-error')).toBeGreaterThanOrEqual(1);
+  });
+
+  it('marks the note deleted and skips navigation when it unmounts before the delete resolves', async () => {
+    mocks.localParams = { id: 'note-delete-late' };
+    mocks.apiClient.getNote.mockResolvedValueOnce({
+      ...note,
+      author: { displayName: 'Thiago', id: 'author-id' },
+    });
+    const deleteDeferred = deferred<void>();
+    mocks.apiClient.deleteNote.mockReturnValueOnce(deleteDeferred.promise);
+    const renderer = await renderScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'note-owner-menu' }).props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      renderer.root.findByProps({ accessibilityLabel: 'Excluir nota' }).props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'note-delete-confirm' }).props.onPress();
+      await settle();
+    });
+
+    act(() => {
+      renderer.unmount();
+    });
+    await act(async () => {
+      deleteDeferred.resolve(undefined);
+      await settle();
+    });
+
+    expect(isNoteDeleted('note-delete-late')).toBe(true);
+    expect(mocks.back).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
   });
 });
 

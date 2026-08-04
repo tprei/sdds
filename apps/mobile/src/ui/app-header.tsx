@@ -8,6 +8,7 @@ import { AppText } from './text';
 import { IconButton } from './icon-button';
 import { IconChevronLeft } from './icons';
 import { PressableScale } from './pressable-scale';
+import { useBackFallback } from './use-back-fallback';
 
 import { styles } from './app-header.styles';
 
@@ -35,16 +36,7 @@ export function AppHeader({
   testID,
 }: AppHeaderProps) {
   const router = useRouter();
-
-  // The single canonical back behavior: pop the stack when there's a
-  // screen to return to, otherwise land on Início.
-  function handleBackPress() {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/');
-    }
-  }
+  const handleBackPress = useBackFallback();
 
   // Início passes its own onWordmarkPress to scroll the feed to the top,
   // labelled accordingly. Every other screen that shows the wordmark is

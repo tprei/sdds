@@ -29,8 +29,10 @@ const mocks = vi.hoisted(() => {
       user: { author: { displayName: 'Thiago', id: 'author-id' }, id: 'user-id' },
     },
     back: vi.fn(),
+    canGoBack: vi.fn(() => true),
     localParams: { id: 'note-id' },
     logout: vi.fn(async () => undefined),
+    replace: vi.fn(),
   };
 });
 
@@ -94,7 +96,12 @@ vi.mock('react-native-svg', () => {
 vi.mock('@/features/notes/compose-screen.styles', () => ({ styles: {} }));
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => mocks.localParams,
-  useRouter: () => ({ back: mocks.back, push: vi.fn() }),
+  useRouter: () => ({
+    back: mocks.back,
+    canGoBack: mocks.canGoBack,
+    push: vi.fn(),
+    replace: mocks.replace,
+  }),
 }));
 vi.mock('@/lib/auth/auth-provider', () => ({
   useAuth: () => ({ apiClient: mocks.apiClient, logout: mocks.logout, state: mocks.authState }),
@@ -223,6 +230,35 @@ describe('NoteEditScreen', () => {
 
     const errorText = renderer.root.findByProps({ testID: 'note-edit-error' });
     expect(errorText.props.children).toBe('Essa nota não está mais disponível.');
+    expect(mocks.back).not.toHaveBeenCalled();
+  });
+
+  it('logs out and skips the load error when the session expired while loading', async () => {
+    mocks.apiClient.getNote.mockRejectedValue(new mocks.APIRequestError(401));
+
+    const renderer = await renderScreen();
+
+    expect(mocks.logout).toHaveBeenCalledTimes(1);
+    expect(
+      renderer.root.findAllByProps({ title: 'Não deu pra carregar a nota.' }),
+    ).toHaveLength(0);
+  });
+
+  it('replaces to home on save when there is no back stack', async () => {
+    mocks.canGoBack.mockReturnValue(false);
+    const renderer = await renderScreen();
+    const titleInput = renderer.root.findByProps({ accessibilityLabel: 'Título da nota' });
+
+    await act(async () => {
+      titleInput.props.onChangeText('Cafe bom editado');
+      await settle();
+    });
+    await act(async () => {
+      submitButton(renderer).onPress();
+      await settle();
+    });
+
+    expect(mocks.replace).toHaveBeenCalledWith('/');
     expect(mocks.back).not.toHaveBeenCalled();
   });
 });

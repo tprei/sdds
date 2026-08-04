@@ -20,6 +20,7 @@ import { IconButton } from '@/ui/icon-button';
 import { IconDots, IconFlag } from '@/ui/icons';
 import { Avatar } from '@/ui/avatar';
 import { AppText } from '@/ui/text';
+import { useBackFallback } from '@/ui/use-back-fallback';
 import { NoteOwnerActions, type NoteOwnerActionsStep } from '@/features/notes/note-owner-actions';
 import { markNoteDeleted } from '@/features/notes/deleted-notes';
 import { PressableScale } from '@/ui/pressable-scale';
@@ -145,6 +146,7 @@ function AuthenticatedNoteDetailScreen({
   originNonce,
 }: AuthenticatedNoteDetailScreenProps) {
   const router = useRouter();
+  const goBack = useBackFallback();
   const productEvents = useProductEvents();
   const composerRef = useRef<TextInput>(null);
   const [presentedUsefulContext] = useState<UsefulContext | null>(() =>
@@ -493,6 +495,7 @@ function AuthenticatedNoteDetailScreen({
     if (deletingNote) {
       return;
     }
+    const generation = detailGenerationRef.current;
     setDeletingNote(true);
     try {
       await apiClient.deleteNote(noteID);
@@ -501,25 +504,28 @@ function AuthenticatedNoteDetailScreen({
       if (error instanceof APIRequestError && error.status === notFoundStatus) {
         markNoteDeleted(noteID);
       } else if (requestStatus(error) === unauthorizedStatus) {
-        setDeletingNote(false);
-        setOwnerActions('closed');
+        if (detailActiveRef.current && detailGenerationRef.current === generation) {
+          setDeletingNote(false);
+          setOwnerActions('closed');
+        }
         void onSessionExpired();
         return;
       } else {
-        setDeletingNote(false);
-        setOwnerActions('closed');
-        setDeleteError(true);
+        if (detailActiveRef.current && detailGenerationRef.current === generation) {
+          setDeletingNote(false);
+          setOwnerActions('closed');
+          setDeleteError(true);
+        }
         return;
       }
     }
+    if (!detailActiveRef.current || detailGenerationRef.current !== generation) {
+      return;
+    }
     setDeletingNote(false);
     setOwnerActions('closed');
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/');
-    }
-  }, [apiClient, deletingNote, noteID, onSessionExpired, router]);
+    goBack();
+  }, [apiClient, deletingNote, goBack, noteID, onSessionExpired]);
 
   const handleReportComment = useCallback(
     (commentID: string) => {

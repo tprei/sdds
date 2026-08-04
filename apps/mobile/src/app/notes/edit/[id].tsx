@@ -12,6 +12,7 @@ import { IconButton } from '@/ui/icon-button';
 import { IconX } from '@/ui/icons';
 import { CategoryChip } from '@/ui/category-chip';
 import { AppText } from '@/ui/text';
+import { useBackFallback } from '@/ui/use-back-fallback';
 import { ReadAuthGate } from '@/components/read-auth-gate';
 import { PostItComposer } from '@/features/notes/post-it-composer';
 import { evaluateComposeSubmission } from '@/features/notes/compose-policy';
@@ -81,7 +82,7 @@ function AuthenticatedNoteEditScreen({
   logout,
   noteID,
 }: AuthenticatedEditScreenProps) {
-  const router = useRouter();
+  const goBack = useBackFallback();
   const [loadState, setLoadState] = useState<EditState>({ status: 'loading' });
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -115,6 +116,10 @@ function AuthenticatedNoteEditScreen({
         if (cancelled) {
           return;
         }
+        if (requestStatus(caught) === unauthorizedStatus) {
+          void logout();
+          return;
+        }
         if (caught instanceof APIRequestError && caught.status === notFoundStatus) {
           setLoadState({ status: 'notFound' });
           return;
@@ -124,7 +129,7 @@ function AuthenticatedNoteEditScreen({
     return () => {
       cancelled = true;
     };
-  }, [apiClient, currentAuthorID, noteID, reloadKey]);
+  }, [apiClient, currentAuthorID, logout, noteID, reloadKey]);
 
   if (loadState.status === 'loading') {
     return (
@@ -189,7 +194,7 @@ function AuthenticatedNoteEditScreen({
     }
     try {
       await apiClient.updateNote(input);
-      router.back();
+      goBack();
     } catch (caught: unknown) {
       if (requestStatus(caught) === unauthorizedStatus) {
         setIsSaving(false);
@@ -219,7 +224,7 @@ function AuthenticatedNoteEditScreen({
               <IconButton
                 accessibilityLabel="Fechar"
                 icon={<IconX />}
-                onPress={() => router.back()}
+                onPress={() => goBack()}
               />
               <Button
                 disabled={!canSave}

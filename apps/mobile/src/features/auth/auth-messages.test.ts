@@ -15,6 +15,7 @@ describe('returnPathFromParam', () => {
     '/authors/018ff5b8-0000-7000-8000-000000000001',
     '/notes/note-abc123',
     '/authors/author-xyz',
+    '/notes/edit/note-abc123',
   ];
 
   const rejected = [
@@ -23,6 +24,9 @@ describe('returnPathFromParam', () => {
     '//evil.com',
     '/notes/..%2F..%2Fetc',
     '/notes/foo/bar',
+    '/notes/edit/',
+    '/notes/edit/a/b',
+    '/notes/edit/abc?x=1',
     '/authors/x?redirect=http://evil.com',
     '/authors/x#fragment',
     '/notes/a\\b',

@@ -31,7 +31,7 @@ export function NoteOwnerActions({
   }
 
   return (
-    <Sheet visible onClose={onCancel} testID="note-owner-sheet">
+    <Sheet visible onClose={deleting ? () => {} : onCancel} testID="note-owner-sheet">
       <View style={styles.body}>
         {step === 'menu' ? (
           <View style={styles.menu}>
@@ -58,14 +58,19 @@ export function NoteOwnerActions({
           </View>
         ) : (
           <View style={styles.prompt}>
-            <AppText color={semanticColors.textStrong} variant="bodyLg" weight="bold">
+            <AppText
+              accessibilityRole="header"
+              color={semanticColors.textStrong}
+              variant="bodyLg"
+              weight="bold"
+            >
               Excluir nota?
             </AppText>
             <AppText color={semanticColors.textBody} variant="body">
               Isso apaga a nota e os comentários dela pra sempre.
             </AppText>
             <View style={styles.actions}>
-              <Button label="Cancelar" onPress={onCancel} variant="secondary" />
+              <Button disabled={deleting} label="Cancelar" onPress={onCancel} variant="secondary" />
               <Button
                 disabled={deleting}
                 label={deleting ? 'Excluindo…' : 'Excluir'}

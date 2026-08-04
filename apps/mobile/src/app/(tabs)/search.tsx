@@ -449,9 +449,12 @@ function AuthenticatedSearchScreen({
         );
         const categoryChanged =
           resolvedCategorySlug !== selectedCategorySlugRef.current;
+        // Restart only when the catalog resolution changed the active
+        // category filter; a focus-driven refetch is issued by the focus
+        // effect itself, and runSearch already errors out before catalogs
+        // load, so a loading search never waits on this path.
         const shouldRestartSearch =
-          submittedQueryRef.current !== null &&
-          (categoryChanged || stateRef.current.status === 'loading');
+          submittedQueryRef.current !== null && categoryChanged;
 
         selectedCategorySlugRef.current = resolvedCategorySlug;
         setSelectedCategorySlug(resolvedCategorySlug);
@@ -579,13 +582,16 @@ function AuthenticatedSearchScreen({
     useCallback(() => {
       resetSearchLineage();
       loadCatalogs();
+      if (submittedQueryRef.current !== null) {
+        runSearch(submittedQueryRef.current, selectedCategorySlugRef.current);
+      }
 
       return () => {
         catalogRequestIDRef.current += 1;
         searchRequestIDRef.current += 1;
         resetSearchLineage();
       };
-    }, [loadCatalogs, resetSearchLineage]),
+    }, [loadCatalogs, resetSearchLineage, runSearch]),
   );
 
   function handleQueryChange(value: string) {
@@ -787,40 +793,50 @@ function SearchStateContent({
     );
   }
 
+  const visibleResults = state.results.filter((result) => !isNoteDeleted(result.note.id));
+
   return (
     <>
       <SearchFeedback
         categoryLabel={state.context.categoryLabel}
-        countLabel={searchResultCountLabel(state.context.resultCount)}
+        countLabel={searchResultCountLabel(visibleResults.length)}
         query={state.context.query}
       />
-      <MasonryGrid
-        columnCount={gridLayout.columnCount}
-        items={state.results.filter((result) => !isNoteDeleted(result.note.id))}
-        keyFor={(result) => result.note.id}
-        estimateHeight={(result) =>
-          estimateNoteCardHeight(result.note, gridLayout.columnWidth)
-        }
-        renderItem={(result) => (
-          <NoteCard
-            categoryHue={result.note.categoryHue}
-            categoryLabel={result.note.categoryLabel}
-            key={result.note.id}
-            note={result.note}
-            onPress={() => onOpenNote(result)}
-            onPressAuthor={() => onOpenAuthor(result.note.author.id)}
-            onPressUseful={() => {
-              void onToggleUseful(result);
-            }}
-            usefulError={
-              usefulMutations[result.note.id] === 'error'
-                ? NOTE_USEFUL_ERROR_MESSAGE
-                : null
-            }
-            usefulPending={usefulMutations[result.note.id] === 'pending'}
-          />
-        )}
-      />
+      {visibleResults.length === 0 ? (
+        <EmptyState
+          title="Nada por aqui ainda"
+          body="Que tal escrever o primeiro achado sobre isso?"
+          action={{ label: 'Escrever', onPress: onCompose }}
+        />
+      ) : (
+        <MasonryGrid
+          columnCount={gridLayout.columnCount}
+          items={visibleResults}
+          keyFor={(result) => result.note.id}
+          estimateHeight={(result) =>
+            estimateNoteCardHeight(result.note, gridLayout.columnWidth)
+          }
+          renderItem={(result) => (
+            <NoteCard
+              categoryHue={result.note.categoryHue}
+              categoryLabel={result.note.categoryLabel}
+              key={result.note.id}
+              note={result.note}
+              onPress={() => onOpenNote(result)}
+              onPressAuthor={() => onOpenAuthor(result.note.author.id)}
+              onPressUseful={() => {
+                void onToggleUseful(result);
+              }}
+              usefulError={
+                usefulMutations[result.note.id] === 'error'
+                  ? NOTE_USEFUL_ERROR_MESSAGE
+                  : null
+              }
+              usefulPending={usefulMutations[result.note.id] === 'pending'}
+            />
+          )}
+        />
+      )}
     </>
   );
 }

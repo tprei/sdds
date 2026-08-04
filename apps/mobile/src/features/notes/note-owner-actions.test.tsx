@@ -106,4 +106,50 @@ describe('NoteOwnerActions', () => {
     });
     expect(onConfirmDelete).toHaveBeenCalled();
   });
+
+  it('marks the confirm heading as a header for screen readers', () => {
+    const renderer = render('confirmDelete');
+    const header = renderer.root
+      .findAllByType('div')
+      .find((node) => node.props.accessibilityRole === 'header');
+    expect(header).toBeTruthy();
+  });
+
+  it('does not fire onCancel from the scrim while deleting', () => {
+    const onCancel = vi.fn();
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        React.createElement(NoteOwnerActions, {
+          deleting: true,
+          onCancel,
+          onConfirmDelete: vi.fn(),
+          onEdit: vi.fn(),
+          step: 'confirmDelete',
+        }),
+      );
+    });
+    const scrim = renderer.root.findByProps({ accessibilityLabel: 'Fechar' });
+    act(() => {
+      scrim.props.onPress();
+    });
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it('disables the cancel button while deleting', () => {
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(
+        React.createElement(NoteOwnerActions, {
+          deleting: true,
+          onCancel: vi.fn(),
+          onConfirmDelete: vi.fn(),
+          onEdit: vi.fn(),
+          step: 'confirmDelete',
+        }),
+      );
+    });
+    const cancel = renderer.root.findByProps({ label: 'Cancelar' });
+    expect(cancel.props.disabled).toBe(true);
+  });
 });

@@ -278,6 +278,48 @@ func getNote(t *testing.T, client *openapi.ClientWithResponses, id string) opena
 	return *response.JSON200
 }
 
+func updateNote(t *testing.T, client *openapi.ClientWithResponses, id string, body openapi.UpdateNoteJSONRequestBody) openapi.Note {
+	t.Helper()
+
+	response, err := client.UpdateNoteWithResponse(context.Background(), id, body)
+	if err != nil {
+		t.Fatalf("PATCH /v1/notes/{note_id}: %v", err)
+	}
+	requireStatus(t, "PATCH /v1/notes/{note_id}", response.StatusCode(), http.StatusOK, response.Body)
+	if response.JSON200 == nil {
+		t.Fatal("PATCH /v1/notes/{note_id} returned 200 without JSON body")
+	}
+	return *response.JSON200
+}
+
+func deleteNote(t *testing.T, client *openapi.ClientWithResponses, id string) {
+	t.Helper()
+
+	response, err := client.DeleteNoteWithResponse(context.Background(), id)
+	if err != nil {
+		t.Fatalf("DELETE /v1/notes/{note_id}: %v", err)
+	}
+	requireStatus(t, "DELETE /v1/notes/{note_id}", response.StatusCode(), http.StatusNoContent, response.Body)
+}
+
+func requireForbidden(t *testing.T, operation string, status int, body []byte) {
+	t.Helper()
+	requireStatus(t, operation, status, http.StatusForbidden, body)
+}
+
+func requireNoteNotFound(t *testing.T, client *openapi.ClientWithResponses, id string) {
+	t.Helper()
+
+	response, err := client.GetNoteWithResponse(context.Background(), id)
+	if err != nil {
+		t.Fatalf("GET /v1/notes/{note_id} missing: %v", err)
+	}
+	requireStatus(t, "GET /v1/notes/{note_id} missing", response.StatusCode(), http.StatusNotFound, response.Body)
+	if response.JSON404 == nil || response.JSON404.Code != openapi.ErrorCodeNotFound {
+		t.Fatalf("missing note code = %v, want not_found", response.JSON404)
+	}
+}
+
 func searchNotes(t *testing.T, client *openapi.ClientWithResponses, query string) openapi.SearchNotesResponse {
 	t.Helper()
 

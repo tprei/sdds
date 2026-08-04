@@ -262,6 +262,7 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config, embe
 	}
 	noteStore := sqlite.NewNoteStore(db)
 	publisher := note.NewPublisher(noteStore, embeddingClient)
+	editor := note.NewEditor(noteStore, embeddingClient)
 	searcher := note.NewHybridSearcher(noteStore, embeddingClient)
 	commentStore := sqlite.NewCommentStore(db)
 	catalogStore := sqlite.NewCatalogStore(db)
@@ -280,7 +281,7 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config, embe
 	cleanupCancel()
 	readiness := runtimeReadiness{database: db, media: store, embedding: embeddingClient}
 	server := newServer(config, httpapi.NewRouter(
-		httpapi.NotesDependencies{Stores: noteStore, Publisher: publisher, Searcher: searcher, Catalog: catalogStore},
+		httpapi.NotesDependencies{Stores: noteStore, Publisher: publisher, Searcher: searcher, Catalog: catalogStore, Editor: editor},
 		httpapi.CommentDependencies{Store: commentStore},
 		httpapi.ReportDependencies{Store: sqlite.NewReportStore(db), CommentTargets: commentStore},
 		httpapi.EventDependencies{Store: sqlite.NewEventStore(db), Limits: httpapi.DefaultEventLimits()},

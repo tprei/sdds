@@ -13,6 +13,7 @@ import (
 const recentNotesLimit = note.ListDefaultLimit
 const searchNotesLimit = note.SearchDefaultLimit
 const maxCreateNoteRequestBytes int64 = 32 * 1024
+const maxUpdateNoteRequestBytes int64 = 32 * 1024
 
 func (handler server) ListNotes(w http.ResponseWriter, r *http.Request, params openapi.ListNotesParams) {
 	current, ok := currentSessionFromContext(r.Context())
@@ -60,6 +61,69 @@ func (handler server) GetNote(w http.ResponseWriter, r *http.Request, noteID str
 	}
 
 	writeJSON(w, http.StatusOK, newNoteResponse(found))
+}
+
+func (handler server) UpdateNote(w http.ResponseWriter, r *http.Request, noteID string) {
+	current, ok := currentSessionFromContext(r.Context())
+	if !ok {
+		writeUnauthenticated(w)
+		return
+	}
+	var request openapi.UpdateNoteRequest
+	if !decodeJSONRequest(w, r, maxUpdateNoteRequestBytes, &request) {
+		return
+	}
+	updated, err := handler.notes.noteEditor.Edit(r.Context(), updateNoteInput(request, noteID, current.User.ID))
+	if err != nil {
+		writeNoteEditError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, newNoteResponse(updated))
+}
+
+func (handler server) DeleteNote(w http.ResponseWriter, r *http.Request, noteID string) {
+	current, ok := currentSessionFromContext(r.Context())
+	if !ok {
+		writeUnauthenticated(w)
+		return
+	}
+	if err := handler.notes.noteEditor.Delete(r.Context(), noteID, current.User.ID); err != nil {
+		writeNoteEditError(w, err)
+		return
+	}
+	noContent(w, r)
+}
+
+func updateNoteInput(request openapi.UpdateNoteRequest, noteID string, userID user.UserID) note.EditInput {
+	input := note.EditInput{NoteID: noteID, UserID: userID, Title: request.Title, Body: request.Body}
+	if request.CategorySlug != nil {
+		slug := note.CategorySlug(*request.CategorySlug)
+		input.CategorySlug = &slug
+	}
+	return input
+}
+
+func writeNoteEditError(w http.ResponseWriter, err error) {
+	var editValidationErr *note.EditValidationError
+	if errors.As(err, &editValidationErr) {
+		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, editValidationErr.ValidationProblems()))
+		return
+	}
+	var catalogValidationErr *note.CatalogValidationError
+	if errors.As(err, &catalogValidationErr) {
+		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, catalogValidationErr.ValidationProblems()))
+		return
+	}
+	switch {
+	case errors.Is(err, note.ErrNoteNotFound):
+		writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
+	case errors.Is(err, note.ErrNoteForbidden):
+		writeError(w, http.StatusForbidden, openapi.ErrorResponse{Code: openapi.ErrorCodeForbidden})
+	case errors.Is(err, note.ErrEmbeddingUnavailable):
+		writeError(w, http.StatusServiceUnavailable, openapi.ErrorResponse{Code: openapi.ErrorCodeEmbeddingUnavailable})
+	default:
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+	}
 }
 
 func (handler server) MarkNoteUseful(w http.ResponseWriter, r *http.Request, noteID string) {

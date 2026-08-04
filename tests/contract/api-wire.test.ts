@@ -11,6 +11,7 @@ import {
   isRecord,
   isSearchNoteResult,
   isSearchNotesResponse,
+  isUpdateNoteRequest,
   isValidationProblem,
   parseCommentResponse,
   parseErrorResponse,
@@ -107,6 +108,21 @@ describe('isNoteResponse', () => {
   });
   it('rejects a negative useful_count', () => {
     expect(isNoteResponse(noteFixture({ useful_count: -1 }))).toBe(false);
+  });
+});
+
+describe('isUpdateNoteRequest', () => {
+  it('accepts a single field', () => {
+    expect(isUpdateNoteRequest({ title: 'novo' })).toBe(true);
+  });
+  it('accepts all fields', () => {
+    expect(isUpdateNoteRequest({ body: 'b', category_slug: 'food', title: 't' })).toBe(true);
+  });
+  it('rejects an empty object', () => {
+    expect(isUpdateNoteRequest({})).toBe(false);
+  });
+  it('rejects an unknown key', () => {
+    expect(isUpdateNoteRequest({ body: 'b', image_upload_ids: ['x'] })).toBe(false);
   });
 });
 

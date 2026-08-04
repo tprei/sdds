@@ -168,10 +168,16 @@ export const listCategoriesResponseSchema = z.object({
   categories: z.array(catalogCategorySchema),
 }) satisfies z.ZodType<ListCategoriesResponse>;
 
+const userEmailSchema = z.object({
+  address: z.string(),
+  verified: z.boolean(),
+}) satisfies z.ZodType<GeneratedSchemas['UserEmail']>;
+
 export const currentUserSchema = z.object({
   id: z.string(),
   username: z.string(),
   author: authorSummarySchema,
+  email: userEmailSchema.optional(),
 }) satisfies z.ZodType<CurrentUserResponse>;
 
 export const authSessionResponseSchema = z.object({
@@ -221,6 +227,7 @@ export const errorCodeSchema = z.enum([
   'invalid_event_batch',
   'embedding_unavailable',
   'invalid_reply_target',
+  'invalid_email',
 ]) satisfies z.ZodType<ErrorCode>;
 
 export const validationFieldSchema = z.enum([
@@ -242,6 +249,7 @@ export const validationFieldSchema = z.enum([
   'reason',
   'details',
   'parent_comment_id',
+  'email',
 ]) satisfies z.ZodType<ValidationField>;
 
 const validationProblemCodeSchema = z.enum([

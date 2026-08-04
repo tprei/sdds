@@ -450,7 +450,7 @@ func TestCreateReportRejectsUnauthenticatedBeforeValidation(t *testing.T) {
 			return report.CreateResult{}, nil
 		}}},
 		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
-		AuthDependencies{Users: authenticatedFakeUserStore(fakeUserStore{}), Limits: DefaultAuthLimits()},
+		AuthDependencies{Users: authenticatedFakeUserStore(fakeUserStore{}), ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
 	)
@@ -547,7 +547,7 @@ func newReportRouter(reports fakeReportStore, notes fakeNoteStore, comments fake
 		CommentDependencies{Store: comments},
 		ReportDependencies{Store: reports, CommentTargets: comments},
 		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
-		AuthDependencies{Users: authenticatedFakeUserStore(fakeUserStore{}), Limits: DefaultAuthLimits()},
+		AuthDependencies{Users: authenticatedFakeUserStore(fakeUserStore{}), ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
 	))

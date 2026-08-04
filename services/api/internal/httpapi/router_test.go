@@ -128,7 +128,7 @@ func newRouterForTest(
 		CommentDependencies{Store: fakeCommentStore{}},
 		ReportDependencies{Store: fakeReportStore{}, CommentTargets: fakeCommentStore{}},
 		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
-		AuthDependencies{Users: users, Limits: authLimits},
+		AuthDependencies{Users: users, ContactChannels: fakeContactChannelStore{}, Limits: authLimits},
 		MediaDependencies{ImageUploads: uploadService, AttachedImages: imageReader},
 		SystemDependencies{Readiness: readiness},
 	)
@@ -155,6 +155,7 @@ func newRouterWithAuthSeamsForTest(
 		authHandlers{
 			users:                 users,
 			publicAuthors:         users,
+			contactChannels:       fakeContactChannelStore{},
 			passwordHasher:        passwordHasher,
 			invalidCredentialHash: invalidCredentialHash,
 			rateLimiters:          newAuthRateLimiters(authLimits, clock),
@@ -186,7 +187,7 @@ func TestNewRouterRequiresMediaDependencies(t *testing.T) {
 				CommentDependencies{Store: fakeCommentStore{}},
 				ReportDependencies{Store: fakeReportStore{}},
 				EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
-				AuthDependencies{Users: fakeUserStore{}, Limits: DefaultAuthLimits()},
+				AuthDependencies{Users: fakeUserStore{}, ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 				test.media,
 				SystemDependencies{Readiness: fakeReadiness{}},
 			)
@@ -205,7 +206,7 @@ func TestNewRouterRequiresCommentStore(t *testing.T) {
 		CommentDependencies{},
 		ReportDependencies{Store: fakeReportStore{}},
 		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
-		AuthDependencies{Users: fakeUserStore{}, Limits: DefaultAuthLimits()},
+		AuthDependencies{Users: fakeUserStore{}, ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
 	)
@@ -222,7 +223,7 @@ func TestNewRouterRequiresReportStore(t *testing.T) {
 		CommentDependencies{Store: fakeCommentStore{}},
 		ReportDependencies{},
 		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
-		AuthDependencies{Users: fakeUserStore{}, Limits: DefaultAuthLimits()},
+		AuthDependencies{Users: fakeUserStore{}, ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
 	)
@@ -634,4 +635,55 @@ func (store fakeUserStore) FindPublicAuthor(ctx context.Context, authorID author
 		return author.PublicAuthor{}, fmt.Errorf("find public author not implemented")
 	}
 	return store.findPublicAuthor(ctx, authorID)
+}
+
+type fakeContactChannelStore struct {
+	upsertUnverifiedEmail       func(ctx context.Context, userID user.UserID, value string, now time.Time) (user.ContactChannelRecord, error)
+	findEmailForUser            func(ctx context.Context, userID user.UserID) (user.ContactChannelRecord, error)
+	findVerifiedEmail           func(ctx context.Context, value string) (user.ContactChannelRecord, error)
+	createToken                 func(ctx context.Context, input user.CreateContactChannelTokenInput) error
+	consumeTokenAndMarkVerified func(ctx context.Context, tokenHash string, verifiedVia string, now time.Time) (user.ContactChannelRecord, error)
+	consumeTokenAndSetPassword  func(ctx context.Context, tokenHash string, secretHash string, now time.Time) (user.ContactChannelRecord, error)
+}
+
+func (store fakeContactChannelStore) UpsertUnverifiedEmail(ctx context.Context, userID user.UserID, value string, now time.Time) (user.ContactChannelRecord, error) {
+	if store.upsertUnverifiedEmail == nil {
+		return user.ContactChannelRecord{}, user.ErrContactChannelNotFound
+	}
+	return store.upsertUnverifiedEmail(ctx, userID, value, now)
+}
+
+func (store fakeContactChannelStore) FindEmailForUser(ctx context.Context, userID user.UserID) (user.ContactChannelRecord, error) {
+	if store.findEmailForUser == nil {
+		return user.ContactChannelRecord{}, user.ErrContactChannelNotFound
+	}
+	return store.findEmailForUser(ctx, userID)
+}
+
+func (store fakeContactChannelStore) FindVerifiedEmail(ctx context.Context, value string) (user.ContactChannelRecord, error) {
+	if store.findVerifiedEmail == nil {
+		return user.ContactChannelRecord{}, user.ErrContactChannelNotFound
+	}
+	return store.findVerifiedEmail(ctx, value)
+}
+
+func (store fakeContactChannelStore) CreateToken(ctx context.Context, input user.CreateContactChannelTokenInput) error {
+	if store.createToken == nil {
+		return nil
+	}
+	return store.createToken(ctx, input)
+}
+
+func (store fakeContactChannelStore) ConsumeTokenAndMarkVerified(ctx context.Context, tokenHash string, verifiedVia string, now time.Time) (user.ContactChannelRecord, error) {
+	if store.consumeTokenAndMarkVerified == nil {
+		return user.ContactChannelRecord{}, user.ErrContactChannelTokenInvalid
+	}
+	return store.consumeTokenAndMarkVerified(ctx, tokenHash, verifiedVia, now)
+}
+
+func (store fakeContactChannelStore) ConsumeTokenAndSetPassword(ctx context.Context, tokenHash string, secretHash string, now time.Time) (user.ContactChannelRecord, error) {
+	if store.consumeTokenAndSetPassword == nil {
+		return user.ContactChannelRecord{}, user.ErrContactChannelTokenInvalid
+	}
+	return store.consumeTokenAndSetPassword(ctx, tokenHash, secretHash, now)
 }

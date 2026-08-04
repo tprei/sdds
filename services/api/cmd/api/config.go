@@ -58,17 +58,27 @@ func loadAuthLimits() (httpapi.AuthLimits, error) {
 	if err != nil {
 		return httpapi.AuthLimits{}, err
 	}
+	verificationRequestsPerMinute, err := envPositiveInt("SDDS_AUTH_VERIFICATION_REQUESTS_PER_MINUTE", defaults.VerificationRequestsPerMinute)
+	if err != nil {
+		return httpapi.AuthLimits{}, err
+	}
+	verificationGlobalRequestsPerMinute, err := envPositiveInt("SDDS_AUTH_GLOBAL_VERIFICATION_REQUESTS_PER_MINUTE", defaults.VerificationGlobalRequestsPerMinute)
+	if err != nil {
+		return httpapi.AuthLimits{}, err
+	}
 	passwordHashConcurrency, err := envPositiveInt("SDDS_AUTH_HASH_CONCURRENCY", defaults.PasswordHashConcurrency)
 	if err != nil {
 		return httpapi.AuthLimits{}, err
 	}
 
 	return httpapi.AuthLimits{
-		SignupRequestsPerMinute:       signupRequestsPerMinute,
-		LoginRequestsPerMinute:        loginRequestsPerMinute,
-		SignupGlobalRequestsPerMinute: signupGlobalRequestsPerMinute,
-		LoginGlobalRequestsPerMinute:  loginGlobalRequestsPerMinute,
-		PasswordHashConcurrency:       passwordHashConcurrency,
+		SignupRequestsPerMinute:             signupRequestsPerMinute,
+		LoginRequestsPerMinute:              loginRequestsPerMinute,
+		SignupGlobalRequestsPerMinute:       signupGlobalRequestsPerMinute,
+		LoginGlobalRequestsPerMinute:        loginGlobalRequestsPerMinute,
+		VerificationRequestsPerMinute:       verificationRequestsPerMinute,
+		VerificationGlobalRequestsPerMinute: verificationGlobalRequestsPerMinute,
+		PasswordHashConcurrency:             passwordHashConcurrency,
 	}, nil
 }
 

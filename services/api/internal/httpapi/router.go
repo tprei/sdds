@@ -61,8 +61,9 @@ type ReportDependencies struct {
 }
 
 type AuthDependencies struct {
-	Users  UserStores
-	Limits AuthLimits
+	Users           UserStores
+	ContactChannels user.ContactChannelStore
+	Limits          AuthLimits
 }
 
 type MediaDependencies struct {
@@ -98,6 +99,7 @@ type reportHandlers struct {
 type authHandlers struct {
 	users                 user.Store
 	publicAuthors         author.PublicAuthorStore
+	contactChannels       user.ContactChannelStore
 	passwordHasher        passwordHasher
 	invalidCredentialHash string
 	rateLimiters          authRateLimiters
@@ -138,20 +140,24 @@ type ReadinessChecker interface {
 }
 
 type AuthLimits struct {
-	SignupRequestsPerMinute       int
-	LoginRequestsPerMinute        int
-	SignupGlobalRequestsPerMinute int
-	LoginGlobalRequestsPerMinute  int
-	PasswordHashConcurrency       int
+	SignupRequestsPerMinute             int
+	LoginRequestsPerMinute              int
+	SignupGlobalRequestsPerMinute       int
+	LoginGlobalRequestsPerMinute        int
+	VerificationRequestsPerMinute       int
+	VerificationGlobalRequestsPerMinute int
+	PasswordHashConcurrency             int
 }
 
 func DefaultAuthLimits() AuthLimits {
 	return AuthLimits{
-		SignupRequestsPerMinute:       5,
-		LoginRequestsPerMinute:        10,
-		SignupGlobalRequestsPerMinute: 60,
-		LoginGlobalRequestsPerMinute:  120,
-		PasswordHashConcurrency:       2,
+		SignupRequestsPerMinute:             5,
+		LoginRequestsPerMinute:              10,
+		SignupGlobalRequestsPerMinute:       60,
+		LoginGlobalRequestsPerMinute:        120,
+		VerificationRequestsPerMinute:       5,
+		VerificationGlobalRequestsPerMinute: 60,
+		PasswordHashConcurrency:             2,
 	}
 }
 
@@ -169,6 +175,7 @@ func NewRouter(notes NotesDependencies, comments CommentDependencies, reports Re
 		authHandlers{
 			users:                 auth.Users,
 			publicAuthors:         auth.Users,
+			contactChannels:       auth.ContactChannels,
 			passwordHasher:        hasher,
 			invalidCredentialHash: mustInvalidCredentialHash(hasher),
 			rateLimiters:          newAuthRateLimiters(auth.Limits, time.Now),
@@ -181,6 +188,9 @@ func NewRouter(notes NotesDependencies, comments CommentDependencies, reports Re
 }
 
 func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandlers, events eventHandlers, auth authHandlers, media mediaHandlers, system systemHandlers) http.Handler {
+	if auth.contactChannels == nil {
+		panic("contact channel store is required")
+	}
 	if comments.store == nil {
 		panic("comment store is required")
 	}
@@ -240,6 +250,7 @@ func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandl
 			router.Put("/notes/{note_id}/useful", wrapper.MarkNoteUseful)
 			router.Delete("/notes/{note_id}/useful", wrapper.UnmarkNoteUseful)
 			router.Post("/notes", wrapper.CreateNote)
+			router.Put("/auth/email", wrapper.SetAuthEmail)
 			router.Get("/auth/session", wrapper.GetAuthSession)
 			router.Delete("/auth/session", wrapper.DeleteAuthSession)
 		})

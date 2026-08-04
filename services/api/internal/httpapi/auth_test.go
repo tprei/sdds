@@ -569,11 +569,13 @@ func newAuthTestRouter(t *testing.T, users fakeUserStore) http.Handler {
 
 func authTestLimits() AuthLimits {
 	return AuthLimits{
-		SignupRequestsPerMinute:       1000,
-		LoginRequestsPerMinute:        1000,
-		SignupGlobalRequestsPerMinute: 1000,
-		LoginGlobalRequestsPerMinute:  1000,
-		PasswordHashConcurrency:       4,
+		SignupRequestsPerMinute:             1000,
+		LoginRequestsPerMinute:              1000,
+		SignupGlobalRequestsPerMinute:       1000,
+		LoginGlobalRequestsPerMinute:        1000,
+		VerificationRequestsPerMinute:       1000,
+		VerificationGlobalRequestsPerMinute: 1000,
+		PasswordHashConcurrency:             4,
 	}
 }
 

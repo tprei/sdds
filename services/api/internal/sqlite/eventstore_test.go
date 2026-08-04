@@ -8,18 +8,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tprei/sdds/services/api/internal/comment"
 	"github.com/tprei/sdds/services/api/internal/event"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
 
 const (
-	storeUserID      = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d11"
-	storeUserIDTwo   = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d12"
-	storeInstallID   = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d13"
-	storeEventID     = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d14"
-	storeEventIDTwo  = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d15"
-	storeSearchID    = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d16"
-	storeSearchIDTwo = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d17"
+	storeUserID              = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d11"
+	storeUserIDTwo           = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d12"
+	storeInstallID           = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d13"
+	storeEventID             = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d14"
+	storeEventIDTwo          = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d15"
+	storeSearchID            = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d16"
+	storeSearchIDTwo         = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d17"
+	storeEventIDComment      = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d19"
+	storeEventIDCommentReply = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d20"
+	storeCommentID           = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d21"
+	storeReplyCommentID      = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d22"
+	storeParentCommentID     = "018f2f5b-9f1f-7b42-9a43-7c9c6f8f1d23"
 )
 
 func TestApplyMigrationsCreatesEvents(t *testing.T) {
@@ -240,6 +246,42 @@ func TestEventStoreStreamsExportRowsInInsertionOrder(t *testing.T) {
 	}
 	if payload["query"] != "evento" {
 		t.Fatalf("query payload = %#v", payload["query"])
+	}
+}
+
+func TestEventStoreAppendBatchPersistsCommentParentAsNullOrString(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	insertEventTestUser(t, db, storeUserID)
+	store := NewEventStore(db)
+
+	topLevel := makeEventRecord(t, storeEventIDComment, storeUserID, event.KindCommentCreated, event.CommentCreatedPayload{
+		NoteID:    storeEventID,
+		CommentID: storeCommentID,
+	})
+	reply := makeEventRecord(t, storeEventIDCommentReply, storeUserID, event.KindCommentCreated, event.CommentCreatedPayload{
+		NoteID:          storeEventID,
+		CommentID:       storeReplyCommentID,
+		ParentCommentID: new(comment.CommentID(storeParentCommentID)),
+	})
+	if _, err := store.AppendBatch(ctx, []event.Record{topLevel, reply}, storeReceivedAt(0)); err != nil {
+		t.Fatalf("append comment events: %v", err)
+	}
+
+	var topLevelPayload string
+	if err := db.QueryRow(`SELECT payload_json FROM events WHERE id = ?`, storeEventIDComment).Scan(&topLevelPayload); err != nil {
+		t.Fatalf("query top-level comment payload: %v", err)
+	}
+	if !strings.Contains(topLevelPayload, `"parent_comment_id":null`) {
+		t.Fatalf("top-level comment payload = %q, want parent_comment_id:null", topLevelPayload)
+	}
+
+	var replyParent string
+	if err := db.QueryRow(`SELECT json_extract(payload_json, '$.parent_comment_id') FROM events WHERE id = ?`, storeEventIDCommentReply).Scan(&replyParent); err != nil {
+		t.Fatalf("query reply comment payload: %v", err)
+	}
+	if replyParent != storeParentCommentID {
+		t.Fatalf("reply parent_comment_id = %q, want %q", replyParent, storeParentCommentID)
 	}
 }
 

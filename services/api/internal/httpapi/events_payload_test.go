@@ -76,6 +76,33 @@ func TestDecodeEventPayloadDecodesValidEvents(t *testing.T) {
 				return ok && context.SearchID == "search-1" && context.Rank == 1
 			},
 		},
+		{
+			name:    "comment_created_top_level_absent_parent",
+			kind:    event.KindCommentCreated,
+			payload: `{"note_id":"note-1","comment_id":"comment-1"}`,
+			check: func(payload event.Payload) bool {
+				created, ok := payload.(event.CommentCreatedPayload)
+				return ok && created.NoteID == "note-1" && created.CommentID == "comment-1" && created.ParentCommentID == nil
+			},
+		},
+		{
+			name:    "comment_created_top_level_null_parent",
+			kind:    event.KindCommentCreated,
+			payload: `{"note_id":"note-1","comment_id":"comment-1","parent_comment_id":null}`,
+			check: func(payload event.Payload) bool {
+				created, ok := payload.(event.CommentCreatedPayload)
+				return ok && created.NoteID == "note-1" && created.CommentID == "comment-1" && created.ParentCommentID == nil
+			},
+		},
+		{
+			name:    "comment_created_reply_parent",
+			kind:    event.KindCommentCreated,
+			payload: `{"note_id":"note-1","comment_id":"reply-1","parent_comment_id":"parent-1"}`,
+			check: func(payload event.Payload) bool {
+				created, ok := payload.(event.CommentCreatedPayload)
+				return ok && created.NoteID == "note-1" && created.CommentID == "reply-1" && created.ParentCommentID != nil && *created.ParentCommentID == "parent-1"
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -115,6 +142,13 @@ func TestDecodeEventPayloadReportsProblems(t *testing.T) {
 		_, problems := decodeEventPayload(event.KindNotePublished, json.RawMessage(`"not-an-object"`), 2)
 		if !hasProblem(t, problems, "payload", string(openapi.Invalid)) {
 			t.Fatalf("expected invalid payload problem, got %+v", problems)
+		}
+	})
+	t.Run("malformed_comment_parent_comment_id", func(t *testing.T) {
+		t.Parallel()
+		_, problems := decodeEventPayload(event.KindCommentCreated, rawJSON(t, `{"note_id":"note-1","comment_id":"comment-1","parent_comment_id":123}`), 0)
+		if !hasProblem(t, problems, "payload.parent_comment_id", string(openapi.Invalid)) {
+			t.Fatalf("expected payload.parent_comment_id/invalid, got %+v", problems)
 		}
 	})
 }

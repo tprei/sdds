@@ -238,9 +238,12 @@ type NoteUnmarkedUsefulPayload struct {
 
 func (NoteUnmarkedUsefulPayload) payload() {}
 
+// CommentCreatedPayload records a comment creation. ParentCommentID is nil
+// for a top-level comment and the validated parent UUID for a reply.
 type CommentCreatedPayload struct {
-	NoteID    string            `json:"note_id"`
-	CommentID comment.CommentID `json:"comment_id"`
+	NoteID          string             `json:"note_id"`
+	CommentID       comment.CommentID  `json:"comment_id"`
+	ParentCommentID *comment.CommentID `json:"parent_comment_id"`
 }
 
 func (CommentCreatedPayload) payload() {}

@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import type { Page, Response } from '@playwright/test';
 import {
   createAuthUser,
+  createComment,
   createNote,
   isRecord,
   loginUser,
@@ -191,6 +192,86 @@ test('exports the authenticated search event lineage', async ({
   }
 });
 
+test('records the parent comment id on the reply comment_created event', async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(180000);
+  const timestamp = Date.now();
+  const username = `event-replier-${timestamp}`;
+  const title = `Nota respondida para evento ${timestamp}`;
+
+  // One session owns the note and seeds the top-level comment through the API,
+  // then logs into the browser and replies via the real composer so the browser
+  // emits the comment_created product event captured by /v1/events.
+  const session = await createAuthUser(request, {
+    display_name: `Respondente de eventos ${timestamp}`,
+    password: syntheticPassword,
+    username,
+  });
+  const note = await createNote(request, session.token, {
+    body: `Nota que receberá uma resposta ${timestamp}.`,
+    category_slug: 'food',
+    client_request_id: `synthetic-event-reply-note-${timestamp}`,
+    title,
+  });
+
+  const parentBody = `Comentário de origem ${timestamp}`;
+  const parent = await createComment(
+    request,
+    session.token,
+    note.id,
+    parentBody,
+  );
+
+  const capturedBatches: CapturedBatch[] = [];
+  page.on('request', (request) => {
+    if (
+      request.method() !== 'POST' ||
+      new URL(request.url()).pathname !== '/v1/events'
+    ) {
+      return;
+    }
+    const body = request.postData();
+    if (body === null) {
+      return;
+    }
+    const parsed: unknown = JSON.parse(body);
+    if (!isRecord(parsed) || !Array.isArray(parsed.events)) {
+      return;
+    }
+    capturedBatches.push({
+      events: parsed.events.filter(isRecord),
+    });
+  });
+
+  await loginUser(page, username, `/notes/${note.id}`);
+  await expect(page.getByRole('heading', { name: title })).toBeVisible();
+  await expect(page.getByText(parentBody, { exact: true })).toBeVisible();
+
+  // The reply travels through the composer, which posts to
+  // /v1/comments/{parent_id}/replies and records comment_created carrying the
+  // parent id; the buffer coalesces and flushes it to /v1/events.
+  await page.getByTestId(`comment-reply-${parent.id}`).click();
+  await expect(page.getByTestId('comment-reply-draft')).toBeVisible();
+
+  const replyBody = `Resposta registrada ${timestamp}`;
+  const replyCreated = waitForReplyResponse(page, parent.id);
+  const eventsResponse = waitForEventsResponse(page);
+  await page.getByTestId('comment-reply-draft').fill(replyBody);
+  await page.getByTestId('comment-reply-submit').click();
+  await replyCreated;
+  await eventsResponse;
+
+  await expect
+    .poll(() =>
+      hasCapturedEvent(capturedBatches, 'comment_created', (payload) =>
+        payload.parent_comment_id === parent.id,
+      ),
+    )
+    .toBe(true);
+});
+
 function waitForEventsResponse(page: Page): Promise<Response> {
   return page.waitForResponse((response) => {
     const request = response.request();
@@ -198,6 +279,21 @@ function waitForEventsResponse(page: Page): Promise<Response> {
       request.method() === 'POST' &&
       new URL(response.url()).pathname === '/v1/events' &&
       response.status() === 200
+    );
+  });
+}
+
+function waitForReplyResponse(
+  page: Page,
+  parentCommentID: string,
+): Promise<Response> {
+  return page.waitForResponse((current) => {
+    const currentRequest = current.request();
+    return (
+      currentRequest.method() === 'POST' &&
+      new URL(current.url()).pathname ===
+        `/v1/comments/${parentCommentID}/replies` &&
+      current.status() === 201
     );
   });
 }

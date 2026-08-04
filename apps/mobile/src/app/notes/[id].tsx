@@ -289,6 +289,7 @@ function AuthenticatedNoteDetailScreen({
           productEvents.record(productEventKinds.commentCreated, {
             commentID: comment.id,
             noteID,
+            parentCommentID: null,
           });
         } catch {}
         if (
@@ -368,6 +369,13 @@ function AuthenticatedNoteDetailScreen({
         parentCommentID: replyTarget.commentID,
       })
       .then((comment) => {
+        try {
+          productEvents.record(productEventKinds.commentCreated, {
+            commentID: comment.id,
+            noteID,
+            parentCommentID: replyTarget.commentID,
+          });
+        } catch {}
         if (
           detailGenerationRef.current !== generation ||
           commentReplyRequestRef.current !== requestID
@@ -408,6 +416,8 @@ function AuthenticatedNoteDetailScreen({
     commentThread,
     handleCommentSessionExpired,
     loadCommentPage,
+    noteID,
+    productEvents,
   ]);
 
   const handleDeleteComment = useCallback(

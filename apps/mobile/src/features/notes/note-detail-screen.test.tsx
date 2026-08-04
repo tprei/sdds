@@ -60,7 +60,6 @@ const mocks = vi.hoisted(() => ({
   localParams: { id: 'note-id' } as LocalParams,
   logout: vi.fn(async () => undefined),
   push: vi.fn(),
-  replace: vi.fn(),
   record: vi.fn(),
 }));
 vi.mock('expo-crypto', () => ({
@@ -154,7 +153,7 @@ vi.mock('expo-router', async () => {
       react.useEffect(effect, [effect, mocks.focusVersion]);
     },
     useLocalSearchParams: () => mocks.localParams,
-    useRouter: () => ({ back: mocks.back, canGoBack: () => true, push: mocks.push, replace: mocks.replace }),
+    useRouter: () => ({ back: mocks.back, push: mocks.push }),
   };
 });
 
@@ -286,7 +285,6 @@ describe('NoteDetailScreen route', () => {
     mocks.logout.mockClear();
     mocks.back.mockClear();
     mocks.push.mockClear();
-    mocks.replace.mockClear();
     mocks.record.mockClear();
   });
 
@@ -1128,7 +1126,6 @@ describe('NoteDetailScreen route', () => {
 
     expect(isNoteDeleted('note-delete-late')).toBe(true);
     expect(mocks.back).not.toHaveBeenCalled();
-    expect(mocks.replace).not.toHaveBeenCalled();
   });
 });
 

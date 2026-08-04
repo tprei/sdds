@@ -21,6 +21,11 @@ import { ProductEventProvider } from '@/lib/events/product-event-provider';
 
 SplashScreen.preventAutoHideAsync();
 
+// Deep links and direct URLs open a nested route with nothing beneath it.
+// Anchoring the stack on the tabs group puts Início under every such screen,
+// so the back affordance always has somewhere to go.
+export const unstable_settings = { anchor: '(tabs)' };
+
 export default function RootLayout() {
   const [fontsLoaded, fontsError] = useFonts({
     PlusJakartaSans_300Light,

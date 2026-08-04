@@ -8,7 +8,6 @@ import { AppText } from './text';
 import { IconButton } from './icon-button';
 import { IconChevronLeft } from './icons';
 import { PressableScale } from './pressable-scale';
-import { useBackFallback } from './use-back-fallback';
 
 import { styles } from './app-header.styles';
 
@@ -36,7 +35,6 @@ export function AppHeader({
   testID,
 }: AppHeaderProps) {
   const router = useRouter();
-  const handleBackPress = useBackFallback();
 
   // Início passes its own onWordmarkPress to scroll the feed to the top,
   // labelled accordingly. Every other screen that shows the wordmark is
@@ -57,7 +55,7 @@ export function AppHeader({
           <IconButton
             accessibilityLabel="Voltar"
             icon={<IconChevronLeft />}
-            onPress={handleBackPress}
+            onPress={() => router.back()}
           />
         ) : null}
         {showWordmark ? (

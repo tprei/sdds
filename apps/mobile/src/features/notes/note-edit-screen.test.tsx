@@ -29,10 +29,8 @@ const mocks = vi.hoisted(() => {
       user: { author: { displayName: 'Thiago', id: 'author-id' }, id: 'user-id' },
     },
     back: vi.fn(),
-    canGoBack: vi.fn(() => true),
     localParams: { id: 'note-id' },
     logout: vi.fn(async () => undefined),
-    replace: vi.fn(),
   };
 });
 
@@ -98,9 +96,7 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: () => mocks.localParams,
   useRouter: () => ({
     back: mocks.back,
-    canGoBack: mocks.canGoBack,
     push: vi.fn(),
-    replace: mocks.replace,
   }),
 }));
 vi.mock('@/lib/auth/auth-provider', () => ({
@@ -242,23 +238,5 @@ describe('NoteEditScreen', () => {
     expect(
       renderer.root.findAllByProps({ title: 'Não deu pra carregar a nota.' }),
     ).toHaveLength(0);
-  });
-
-  it('replaces to home on save when there is no back stack', async () => {
-    mocks.canGoBack.mockReturnValue(false);
-    const renderer = await renderScreen();
-    const titleInput = renderer.root.findByProps({ accessibilityLabel: 'Título da nota' });
-
-    await act(async () => {
-      titleInput.props.onChangeText('Cafe bom editado');
-      await settle();
-    });
-    await act(async () => {
-      submitButton(renderer).onPress();
-      await settle();
-    });
-
-    expect(mocks.replace).toHaveBeenCalledWith('/');
-    expect(mocks.back).not.toHaveBeenCalled();
   });
 });

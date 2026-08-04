@@ -20,7 +20,6 @@ import { IconButton } from '@/ui/icon-button';
 import { IconDots, IconFlag } from '@/ui/icons';
 import { Avatar } from '@/ui/avatar';
 import { AppText } from '@/ui/text';
-import { useBackFallback } from '@/ui/use-back-fallback';
 import { NoteOwnerActions, type NoteOwnerActionsStep } from '@/features/notes/note-owner-actions';
 import { markNoteDeleted } from '@/features/notes/deleted-notes';
 import { PressableScale } from '@/ui/pressable-scale';
@@ -146,7 +145,6 @@ function AuthenticatedNoteDetailScreen({
   originNonce,
 }: AuthenticatedNoteDetailScreenProps) {
   const router = useRouter();
-  const goBack = useBackFallback();
   const productEvents = useProductEvents();
   const composerRef = useRef<TextInput>(null);
   const [presentedUsefulContext] = useState<UsefulContext | null>(() =>
@@ -524,8 +522,8 @@ function AuthenticatedNoteDetailScreen({
     }
     setDeletingNote(false);
     setOwnerActions('closed');
-    goBack();
-  }, [apiClient, deletingNote, goBack, noteID, onSessionExpired]);
+    router.back();
+  }, [apiClient, deletingNote, noteID, onSessionExpired, router]);
 
   const handleReportComment = useCallback(
     (commentID: string) => {

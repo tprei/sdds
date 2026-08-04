@@ -10,17 +10,13 @@ type ReactNode = React.ReactNode;
 
 const mocks = vi.hoisted(() => ({
   back: vi.fn(),
-  canGoBack: vi.fn(() => true),
   navigate: vi.fn(),
-  replace: vi.fn(),
 }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({
     back: mocks.back,
-    canGoBack: mocks.canGoBack,
     navigate: mocks.navigate,
-    replace: mocks.replace,
   }),
 }));
 
@@ -82,7 +78,6 @@ function render(element: React.ReactElement): ReactTestRenderer {
 describe('AppHeader', () => {
   afterEach(() => {
     vi.clearAllMocks();
-    mocks.canGoBack.mockReturnValue(true);
   });
 
   it('hides the wordmark by default', () => {
@@ -126,24 +121,12 @@ describe('AppHeader', () => {
     ).toHaveLength(0);
   });
 
-  it('renders a labelled back control that pops the stack when one exists', () => {
-    mocks.canGoBack.mockReturnValue(true);
+  it('renders a labelled back control that pops the stack', () => {
     const renderer = render(createElement(AppHeader, { back: true }));
     act(() => {
       renderer.root.findByProps({ accessibilityLabel: 'Voltar' }).props.onPress();
     });
     expect(mocks.back).toHaveBeenCalledOnce();
-    expect(mocks.replace).not.toHaveBeenCalled();
-  });
-
-  it('replaces with Início when the back control has nothing to pop', () => {
-    mocks.canGoBack.mockReturnValue(false);
-    const renderer = render(createElement(AppHeader, { back: true }));
-    act(() => {
-      renderer.root.findByProps({ accessibilityLabel: 'Voltar' }).props.onPress();
-    });
-    expect(mocks.replace).toHaveBeenCalledWith('/');
-    expect(mocks.back).not.toHaveBeenCalled();
   });
 
   it('renders the center and right slots, including a passed-through testID', () => {

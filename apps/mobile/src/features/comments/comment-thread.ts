@@ -30,6 +30,10 @@ export type CommentThreadState = {
   loadMoreStatus: LoadMoreStatus;
   localTailThreads: CommentThread[];
   nextCursor: string | null;
+  replyTarget: { commentID: string; authorDisplayName: string } | null;
+  replyDraft: string;
+  replyDraftTouched: boolean;
+  replySubmitStatus: 'idle' | 'pending' | 'error';
   submitStatus: SubmitStatus;
 };
 
@@ -45,6 +49,16 @@ export type CommentThreadAction =
   | { type: 'submit_started' }
   | { type: 'submit_succeeded'; comment: Comment }
   | { type: 'submit_failed' }
+  | { type: 'reply_started'; commentID: string; authorDisplayName: string }
+  | { type: 'reply_cancelled' }
+  | { type: 'reply_draft_changed'; draft: string }
+  | { type: 'reply_submit_started' }
+  | {
+      type: 'reply_submit_succeeded';
+      parentCommentID: string;
+      comment: Comment;
+    }
+  | { type: 'reply_submit_failed' }
   | { type: 'delete_started'; commentID: string }
   | { type: 'delete_succeeded'; commentID: string }
   | { type: 'delete_not_found'; commentID: string }
@@ -60,6 +74,10 @@ export function createCommentThreadState(): CommentThreadState {
     loadMoreStatus: 'idle',
     localTailThreads: [],
     nextCursor: null,
+    replyTarget: null,
+    replyDraft: '',
+    replyDraftTouched: false,
+    replySubmitStatus: 'idle',
     submitStatus: 'idle',
   };
 }
@@ -194,6 +212,82 @@ export function commentThreadReducer(
       }
       return { ...state, submitStatus: 'error' };
 
+    case 'reply_started':
+      if (state.replySubmitStatus === 'pending') {
+        return state;
+      }
+      return {
+        ...state,
+        replyTarget: {
+          commentID: action.commentID,
+          authorDisplayName: action.authorDisplayName,
+        },
+        replyDraft: '',
+        replyDraftTouched: false,
+        replySubmitStatus: 'idle',
+      };
+
+    case 'reply_cancelled':
+      if (state.replySubmitStatus === 'pending') {
+        return state;
+      }
+      return {
+        ...state,
+        replyTarget: null,
+        replyDraft: '',
+        replyDraftTouched: false,
+        replySubmitStatus: 'idle',
+      };
+
+    case 'reply_draft_changed':
+      return {
+        ...state,
+        replyDraft: action.draft,
+        replyDraftTouched: true,
+        replySubmitStatus:
+          state.replySubmitStatus === 'error'
+            ? 'idle'
+            : state.replySubmitStatus,
+      };
+
+    case 'reply_submit_started':
+      if (!canSubmitReply(state)) {
+        return state;
+      }
+      return { ...state, replySubmitStatus: 'pending' };
+
+    case 'reply_submit_succeeded': {
+      if (state.replySubmitStatus !== 'pending') {
+        return state;
+      }
+      const loaded = appendReplyToThreads(
+        state.threads,
+        action.parentCommentID,
+        action.comment,
+      );
+      const localTail = appendReplyToThreads(
+        state.localTailThreads,
+        action.parentCommentID,
+        action.comment,
+      );
+      return {
+        ...state,
+        threads: loaded.threads,
+        localTailThreads: localTail.threads,
+        replyTarget: null,
+        replyDraft: '',
+        replyDraftTouched: false,
+        replySubmitStatus: 'idle',
+      };
+    }
+
+    case 'reply_submit_failed':
+      if (state.replySubmitStatus !== 'pending') {
+        return state;
+      }
+      return { ...state, replySubmitStatus: 'error' };
+ 
+
     case 'delete_started':
       if (!canDeleteComment(state, action.commentID)) {
         return state;
@@ -252,6 +346,14 @@ export function canSubmitComment(state: CommentThreadState): boolean {
   return (
     state.submitStatus !== 'pending' &&
     validateCommentDraft(state.draft).error === null
+  );
+}
+
+export function canSubmitReply(state: CommentThreadState): boolean {
+  return (
+    state.replyTarget !== null &&
+    state.replySubmitStatus !== 'pending' &&
+    validateCommentDraft(state.replyDraft).error === null
   );
 }
 
@@ -398,6 +500,30 @@ function appendUniqueThreads(
     return true;
   });
   return uniqueAdditions.length === 0 ? threads : [...threads, ...uniqueAdditions];
+}
+
+function appendReplyToThreads(
+  threads: CommentThread[],
+  parentCommentID: string,
+  reply: Comment,
+): { threads: CommentThread[]; found: boolean } {
+  let found = false;
+  let changed = false;
+  const nextThreads = threads.map((thread) => {
+    if (thread.comment.id !== parentCommentID) {
+      return thread;
+    }
+    found = true;
+    if (thread.replies.some((existing) => existing.id === reply.id)) {
+      return thread;
+    }
+    changed = true;
+    if (thread.replies.length >= replyMaxPerParent) {
+      return { ...thread, hasMoreReplies: true };
+    }
+    return { ...thread, replies: [...thread.replies, reply] };
+  });
+  return { threads: changed ? nextThreads : threads, found };
 }
 
 function withoutThreadIDs(

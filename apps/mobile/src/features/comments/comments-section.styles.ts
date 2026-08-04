@@ -37,6 +37,10 @@ export const styles = StyleSheet.create({
     borderLeftWidth: 1,
     paddingLeft: spacing.sp5,
   },
+  replyComposer: {
+    gap: spacing.sp3,
+    paddingLeft: spacing.sp5,
+  },
   composer: {
     gap: spacing.sp3,
   },

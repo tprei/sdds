@@ -4,6 +4,7 @@ import type { Comment, CommentPage, CommentThread } from '@/lib/api/comments';
 
 import {
   canDeleteComment,
+  canSubmitReply,
   canSubmitComment,
   commentBodyMaxCodePoints,
   commentThreadReducer,
@@ -254,6 +255,55 @@ describe('comment thread reducer', () => {
 
     expect(displayedCommentCount(state)).toBe(2);
     expect(canDeleteComment(state, reply.id)).toBe(true);
+  });
+
+  it('opens, guards, retries, and settles a reply submission', () => {
+    let state = reduce(createCommentThreadState(), {
+      type: 'initial_load_succeeded',
+      page: page([firstComment]),
+    });
+
+    state = reduce(state, {
+      type: 'reply_started',
+      commentID: firstComment.id,
+      authorDisplayName: firstComment.author.displayName,
+    });
+    expect(state.replyTarget).toEqual({
+      commentID: firstComment.id,
+      authorDisplayName: firstComment.author.displayName,
+    });
+    expect(canSubmitReply(state)).toBe(false);
+
+    state = reduce(state, {
+      type: 'reply_draft_changed',
+      draft: '  Resposta nova  ',
+    });
+    expect(canSubmitReply(state)).toBe(true);
+    state = reduce(state, { type: 'reply_submit_started' });
+    const pending = state;
+    expect(state.replySubmitStatus).toBe('pending');
+    expect(reduce(state, { type: 'reply_started', commentID: secondComment.id, authorDisplayName: 'Lia' })).toBe(pending);
+    expect(reduce(state, { type: 'reply_cancelled' })).toBe(pending);
+
+    state = reduce(state, { type: 'reply_submit_failed' });
+    expect(state.replySubmitStatus).toBe('error');
+    expect(state.replyDraft).toBe('  Resposta nova  ');
+    state = reduce(state, { type: 'reply_draft_changed', draft: 'Resposta de novo' });
+    expect(state.replySubmitStatus).toBe('idle');
+
+    state = reduce(state, { type: 'reply_submit_started' });
+    const reply = replyComment('reply-new', 'Resposta de novo');
+    state = reduce(state, {
+      type: 'reply_submit_succeeded',
+      parentCommentID: firstComment.id,
+      comment: reply,
+    });
+    expect(state.threads).toEqual([
+      { comment: firstComment, replies: [reply], hasMoreReplies: false },
+    ]);
+    expect(state.replyTarget).toBeNull();
+    expect(state.replyDraft).toBe('');
+    expect(state.replySubmitStatus).toBe('idle');
   });
 
   it('keeps a deleted tail comment hidden after terminal settlement and later pages', () => {

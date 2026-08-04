@@ -18,7 +18,16 @@ const (
 		WHERE id = ?
 	`
 	deleteNoteSearchSQL = `DELETE FROM note_search WHERE note_id = ?`
-	deleteNoteSQL       = `DELETE FROM notes WHERE id = ?`
+	// Detaching a consumed upload from a deleted note moves it into the retryable
+	// "deleting" state with no lease, which the upload retention sweep already
+	// claims and uses to delete the stored object bytes. consumed_note_id is
+	// cleared alongside the state change so the row satisfies the table CHECK
+	// constraint (a non-"consumed" row must not reference a note).
+	detachConsumedNoteImagesSQL = `
+		UPDATE image_uploads
+		SET state = 'deleting', consumed_note_id = NULL, write_lease_until = NULL, updated_at = ?
+		WHERE consumed_note_id = ? AND state = 'consumed'`
+	deleteNoteSQL = `DELETE FROM notes WHERE id = ?`
 )
 
 var _ note.EditStore = (*NoteStore)(nil)
@@ -122,6 +131,9 @@ func (store *NoteStore) DeleteNote(ctx context.Context, id string, userID user.U
 	}
 	if _, err := tx.ExecContext(ctx, deleteNoteSearchSQL, id); err != nil {
 		return fmt.Errorf("delete note search: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, detachConsumedNoteImagesSQL, unixMillis(normalizeTime(store.clock())), id); err != nil {
+		return fmt.Errorf("detach consumed note images: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, deleteNoteSQL, id); err != nil {
 		return fmt.Errorf("delete note: %w", err)

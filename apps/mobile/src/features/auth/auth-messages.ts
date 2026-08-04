@@ -6,6 +6,7 @@ export type ReturnPath =
   | '/profile'
   | '/search'
   | `/notes/${string}`
+  | `/notes/edit/${string}`
   | `/authors/${string}`;
 
 export const genericLoginErrorMessage =
@@ -40,6 +41,11 @@ export function returnPathFromParam(
   // encoded path separators, backslashes, percent-encoding, and other
   // characters that could be used for path traversal or injection.
   const idPattern = '[0-9a-zA-Z-]{1,128}';
+  const noteEditMatch = new RegExp(`^/notes/edit/(${idPattern})$`).exec(value);
+  if (noteEditMatch !== null) {
+    return value as `/notes/edit/${string}`;
+  }
+
   const notesMatch = new RegExp(`^/notes/(${idPattern})$`).exec(value);
   if (notesMatch !== null) {
     return value as `/notes/${string}`;

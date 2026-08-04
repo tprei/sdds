@@ -305,6 +305,19 @@ export function IconTrash({
   );
 }
 
+export function IconDots({
+  size = defaults.size,
+  color = defaults.color,
+}: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="5" r="1.6" fill="none" stroke={color} strokeWidth={STROKE_WIDTH} />
+      <Circle cx="12" cy="12" r="1.6" fill="none" stroke={color} strokeWidth={STROKE_WIDTH} />
+      <Circle cx="12" cy="19" r="1.6" fill="none" stroke={color} strokeWidth={STROKE_WIDTH} />
+    </Svg>
+  );
+}
+
 export function IconCheck({
   size = defaults.size,
   color = defaults.color,

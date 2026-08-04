@@ -36,16 +36,6 @@ export function AppHeader({
 }: AppHeaderProps) {
   const router = useRouter();
 
-  // The single canonical back behavior: pop the stack when there's a
-  // screen to return to, otherwise land on Início.
-  function handleBackPress() {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/');
-    }
-  }
-
   // Início passes its own onWordmarkPress to scroll the feed to the top,
   // labelled accordingly. Every other screen that shows the wordmark is
   // reached by push, so pressing it without a caller-supplied handler
@@ -65,7 +55,7 @@ export function AppHeader({
           <IconButton
             accessibilityLabel="Voltar"
             icon={<IconChevronLeft />}
-            onPress={handleBackPress}
+            onPress={() => router.back()}
           />
         ) : null}
         {showWordmark ? (

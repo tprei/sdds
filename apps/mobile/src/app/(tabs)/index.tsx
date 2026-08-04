@@ -16,6 +16,7 @@ import type { ListNotesInput, Note } from '@/lib/api/notes';
 import { useProductEvents } from '@/lib/events/product-event-provider';
 import { productEventKinds } from '@/lib/events/event-types';
 import { registerPresentedNoteOrigin } from '@/features/notes/presented-note-origin';
+import { isNoteDeleted } from '@/features/notes/deleted-notes';
 import { estimateNoteCardHeight } from '@/features/notes/note-card-estimate';
 import { HomeHeader } from '@/features/notes/home-header';
 import { BrandHeader } from '@/features/auth/brand-header';
@@ -554,7 +555,7 @@ function FeedContent({
   return (
     <MasonryGrid
       columnCount={gridLayout.columnCount}
-      items={state.notes}
+      items={state.notes.filter((presented) => !isNoteDeleted(presented.note.id))}
       keyFor={(presented) => presented.note.id}
       estimateHeight={(presented) =>
         estimateNoteCardHeight(presented.note, gridLayout.columnWidth)

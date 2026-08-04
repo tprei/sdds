@@ -49,6 +49,13 @@ export type CreateNoteInput = {
   title: string;
 };
 
+export type UpdateNoteInput = {
+  body?: string;
+  categorySlug?: string;
+  noteID: string;
+  title?: string;
+};
+
 export type ListNotesInput = {
   categorySlug?: string;
 };
@@ -73,6 +80,7 @@ export type SearchNotesResult = {
 type GeneratedSchemas = components['schemas'];
 type AuthorSummaryResponse = GeneratedSchemas['AuthorSummary'];
 type CreateNoteRequest = GeneratedSchemas['CreateNoteRequest'];
+type UpdateNoteRequest = GeneratedSchemas['UpdateNoteRequest'];
 type NoteResponse = GeneratedSchemas['Note'];
 type NoteImageResponse = GeneratedSchemas['NoteImage'];
 
@@ -99,6 +107,8 @@ export type NotesAPI = {
   unmarkNoteUseful(noteID: string): Promise<void>;
   searchNotes(input: SearchNotesInput): Promise<SearchNotesResult>;
   createNote(input: CreateNoteInput): Promise<Note>;
+  updateNote(input: UpdateNoteInput): Promise<Note>;
+  deleteNote(noteID: string): Promise<void>;
 };
 
 function rewrapTransportError(error: unknown): never {
@@ -174,6 +184,38 @@ export function bindNotesAPI(transport: TypedTransport): NotesAPI {
       try {
         const { data } = await transport.POST('/v1/notes', { body: request });
         return parseNoteResponse(data);
+      } catch (error) {
+        rewrapTransportError(error);
+      }
+    },
+
+    async updateNote(input) {
+      const request: UpdateNoteRequest = {};
+      if (input.body !== undefined) {
+        request.body = input.body;
+      }
+      if (input.categorySlug !== undefined) {
+        request.category_slug = input.categorySlug;
+      }
+      if (input.title !== undefined) {
+        request.title = input.title;
+      }
+      try {
+        const { data } = await transport.PATCH('/v1/notes/{note_id}', {
+          params: { path: { note_id: input.noteID } },
+          body: request,
+        });
+        return parseNoteResponse(data);
+      } catch (error) {
+        rewrapTransportError(error);
+      }
+    },
+
+    async deleteNote(noteID) {
+      try {
+        await transport.DELETE('/v1/notes/{note_id}', {
+          params: { path: { note_id: noteID } },
+        });
       } catch (error) {
         rewrapTransportError(error);
       }

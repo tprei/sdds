@@ -15,6 +15,7 @@ import {
   NOTE_USEFUL_ERROR_MESSAGE,
 } from '../../components/note-card';
 import { estimateNoteCardHeight } from '../notes/note-card-estimate';
+import { isNoteDeleted } from '../notes/deleted-notes';
 import { APIRequestError } from '../../lib/api/notes';
 import { requestStatus } from '../../lib/api/request-error';
 import { unauthorizedStatus } from '../../lib/api/status';
@@ -155,7 +156,7 @@ function ProfileNotes({
   return (
     <MasonryGrid
       columnCount={gridLayout.columnCount}
-      items={notes}
+      items={notes.filter((note) => !isNoteDeleted(note.id))}
       keyFor={(note) => note.id}
       estimateHeight={(note) => estimateNoteCardHeight(note, gridLayout.columnWidth)}
       renderItem={(note) => (

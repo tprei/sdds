@@ -61,7 +61,9 @@ func (handler server) CreateAuthUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if request.Email != nil && *request.Email != "" {
-		handler.captureSignupEmail(r.Context(), current.User.ID, *request.Email)
+		if channel, ok := handler.captureSignupEmail(r.Context(), current.User.ID, *request.Email); ok {
+			handler.auth.schedule(func() { handler.dispatchEmailVerification(channel) })
+		}
 	}
 	writeJSON(w, http.StatusCreated, handler.newAuthSessionResponse(r.Context(), current, token))
 }

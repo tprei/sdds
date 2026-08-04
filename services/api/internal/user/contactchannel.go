@@ -62,6 +62,7 @@ type CreateContactChannelTokenInput struct {
 type ContactChannelStore interface {
 	UpsertUnverifiedEmail(ctx context.Context, userID UserID, normalizedValue string, now time.Time) (ContactChannelRecord, error)
 	FindEmailForUser(ctx context.Context, userID UserID) (ContactChannelRecord, error)
+	FindPendingEmailForUser(ctx context.Context, userID UserID) (ContactChannelRecord, error)
 	FindVerifiedEmail(ctx context.Context, normalizedValue string) (ContactChannelRecord, error)
 	CreateToken(ctx context.Context, input CreateContactChannelTokenInput) error
 	ConsumeTokenAndMarkVerified(ctx context.Context, tokenHash string, verifiedVia string, now time.Time) (ContactChannelRecord, error)

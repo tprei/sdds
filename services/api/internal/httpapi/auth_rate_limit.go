@@ -4,6 +4,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -44,6 +45,12 @@ func newAuthRateLimiters(limits AuthLimits, clock func() time.Time) authRateLimi
 }
 
 func (limiters authRateLimiters) registerPurpose(purpose authRateLimitPurpose, perSource, globalPerMinute int) {
+	if perSource < 1 {
+		perSource = 1
+	}
+	if globalPerMinute < 1 {
+		globalPerMinute = 1
+	}
 	limiters.global[purpose] = newRequestsPerMinuteLimiter(globalPerMinute)
 	limiters.source[purpose] = newKeyedRequestsPerMinuteLimiters(perSource, authRateLimitMaxKeys)
 	limiters.identifier[purpose] = newKeyedRequestsPerMinuteLimiters(perSource, authRateLimitMaxKeys)
@@ -194,5 +201,12 @@ func takeRateLimitTokenLazy(now time.Time, suppliers ...func() *rate.Limiter) bo
 }
 
 func writeRateLimited(w http.ResponseWriter) {
+	writeError(w, http.StatusTooManyRequests, openapi.ErrorResponse{Code: openapi.ErrorCodeRateLimited})
+}
+
+func writeAuthRateLimited(w http.ResponseWriter, retryAfterSeconds int) {
+	if retryAfterSeconds > 0 {
+		w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds))
+	}
 	writeError(w, http.StatusTooManyRequests, openapi.ErrorResponse{Code: openapi.ErrorCodeRateLimited})
 }

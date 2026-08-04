@@ -39,6 +39,7 @@ const (
 	ErrorCodeInvalidReplyTarget        ErrorCode = "invalid_reply_target"
 	ErrorCodeInvalidReport             ErrorCode = "invalid_report"
 	ErrorCodeInvalidSearch             ErrorCode = "invalid_search"
+	ErrorCodeInvalidToken              ErrorCode = "invalid_token"
 	ErrorCodeMailUnavailable           ErrorCode = "mail_unavailable"
 	ErrorCodeMediaIntegrityError       ErrorCode = "media_integrity_error"
 	ErrorCodeMediaStagingQuotaExceeded ErrorCode = "media_staging_quota_exceeded"
@@ -86,6 +87,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeInvalidReport:
 		return true
 	case ErrorCodeInvalidSearch:
+		return true
+	case ErrorCodeInvalidToken:
 		return true
 	case ErrorCodeMailUnavailable:
 		return true
@@ -1511,6 +1514,11 @@ type ValidationProblem struct {
 // ValidationProblemCode defines model for ValidationProblem.Code.
 type ValidationProblemCode string
 
+// VerifyEmailRequest defines model for VerifyEmailRequest.
+type VerifyEmailRequest struct {
+	Token string `json:"token"`
+}
+
 // bearerAuthContextKey is the context key for bearerAuth security scheme
 type bearerAuthContextKey string
 
@@ -1551,6 +1559,9 @@ type SearchNotesParams struct {
 
 // SetAuthEmailJSONRequestBody defines body for SetAuthEmail for application/json ContentType.
 type SetAuthEmailJSONRequestBody = SetUserEmailRequest
+
+// VerifyAuthEmailJSONRequestBody defines body for VerifyAuthEmail for application/json ContentType.
+type VerifyAuthEmailJSONRequestBody = VerifyEmailRequest
 
 // CreateAuthSessionJSONRequestBody defines body for CreateAuthSession for application/json ContentType.
 type CreateAuthSessionJSONRequestBody = CreateSessionRequest
@@ -2263,6 +2274,14 @@ type ClientInterface interface {
 
 	SetAuthEmail(ctx context.Context, body SetAuthEmailJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// VerifyAuthEmailWithBody request with any body
+	VerifyAuthEmailWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	VerifyAuthEmail(ctx context.Context, body VerifyAuthEmailJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAuthEmailVerification request
+	CreateAuthEmailVerification(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteAuthSession request
 	DeleteAuthSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -2387,6 +2406,42 @@ func (c *Client) SetAuthEmailWithBody(ctx context.Context, contentType string, b
 
 func (c *Client) SetAuthEmail(ctx context.Context, body SetAuthEmailJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetAuthEmailRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) VerifyAuthEmailWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewVerifyAuthEmailRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) VerifyAuthEmail(ctx context.Context, body VerifyAuthEmailJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewVerifyAuthEmailRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAuthEmailVerification(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAuthEmailVerificationRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -2859,6 +2914,73 @@ func NewSetAuthEmailRequestWithBody(server string, contentType string, body io.R
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewVerifyAuthEmailRequest calls the generic VerifyAuthEmail builder with application/json body
+func NewVerifyAuthEmailRequest(server string, body VerifyAuthEmailJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewVerifyAuthEmailRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewVerifyAuthEmailRequestWithBody generates requests for VerifyAuthEmail with any type of body
+func NewVerifyAuthEmailRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/auth/email/verification")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewCreateAuthEmailVerificationRequest generates requests for CreateAuthEmailVerification
+func NewCreateAuthEmailVerificationRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/auth/email/verifications")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -3879,6 +4001,14 @@ type ClientWithResponsesInterface interface {
 
 	SetAuthEmailWithResponse(ctx context.Context, body SetAuthEmailJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAuthEmailHTTPResponse, error)
 
+	// VerifyAuthEmailWithBodyWithResponse request with any body
+	VerifyAuthEmailWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*VerifyAuthEmailHTTPResponse, error)
+
+	VerifyAuthEmailWithResponse(ctx context.Context, body VerifyAuthEmailJSONRequestBody, reqEditors ...RequestEditorFn) (*VerifyAuthEmailHTTPResponse, error)
+
+	// CreateAuthEmailVerificationWithResponse request
+	CreateAuthEmailVerificationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CreateAuthEmailVerificationHTTPResponse, error)
+
 	// DeleteAuthSessionWithResponse request
 	DeleteAuthSessionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteAuthSessionHTTPResponse, error)
 
@@ -4054,6 +4184,71 @@ func (r SetAuthEmailHTTPResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r SetAuthEmailHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type VerifyAuthEmailHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *ErrorResponse
+	JSON429      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r VerifyAuthEmailHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r VerifyAuthEmailHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r VerifyAuthEmailHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateAuthEmailVerificationHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *ErrorResponse
+	JSON429      *ErrorResponse
+	JSON500      *ErrorResponse
+	JSON503      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateAuthEmailVerificationHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAuthEmailVerificationHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateAuthEmailVerificationHTTPResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -4882,6 +5077,32 @@ func (c *ClientWithResponses) SetAuthEmailWithResponse(ctx context.Context, body
 	return ParseSetAuthEmailHTTPResponse(rsp)
 }
 
+// VerifyAuthEmailWithBodyWithResponse request with arbitrary body returning *VerifyAuthEmailHTTPResponse
+func (c *ClientWithResponses) VerifyAuthEmailWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*VerifyAuthEmailHTTPResponse, error) {
+	rsp, err := c.VerifyAuthEmailWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseVerifyAuthEmailHTTPResponse(rsp)
+}
+
+func (c *ClientWithResponses) VerifyAuthEmailWithResponse(ctx context.Context, body VerifyAuthEmailJSONRequestBody, reqEditors ...RequestEditorFn) (*VerifyAuthEmailHTTPResponse, error) {
+	rsp, err := c.VerifyAuthEmail(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseVerifyAuthEmailHTTPResponse(rsp)
+}
+
+// CreateAuthEmailVerificationWithResponse request returning *CreateAuthEmailVerificationHTTPResponse
+func (c *ClientWithResponses) CreateAuthEmailVerificationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CreateAuthEmailVerificationHTTPResponse, error) {
+	rsp, err := c.CreateAuthEmailVerification(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAuthEmailVerificationHTTPResponse(rsp)
+}
+
 // DeleteAuthSessionWithResponse request returning *DeleteAuthSessionHTTPResponse
 func (c *ClientWithResponses) DeleteAuthSessionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteAuthSessionHTTPResponse, error) {
 	rsp, err := c.DeleteAuthSession(ctx, reqEditors...)
@@ -5239,6 +5460,93 @@ func ParseSetAuthEmailHTTPResponse(rsp *http.Response) (*SetAuthEmailHTTPRespons
 			return nil, err
 		}
 		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseVerifyAuthEmailHTTPResponse parses an HTTP response from a VerifyAuthEmailWithResponse call
+func ParseVerifyAuthEmailHTTPResponse(rsp *http.Response) (*VerifyAuthEmailHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &VerifyAuthEmailHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateAuthEmailVerificationHTTPResponse parses an HTTP response from a CreateAuthEmailVerificationWithResponse call
+func ParseCreateAuthEmailVerificationHTTPResponse(rsp *http.Response) (*CreateAuthEmailVerificationHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAuthEmailVerificationHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest ErrorResponse

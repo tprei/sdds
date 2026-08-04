@@ -640,6 +640,7 @@ func (store fakeUserStore) FindPublicAuthor(ctx context.Context, authorID author
 type fakeContactChannelStore struct {
 	upsertUnverifiedEmail       func(ctx context.Context, userID user.UserID, value string, now time.Time) (user.ContactChannelRecord, error)
 	findEmailForUser            func(ctx context.Context, userID user.UserID) (user.ContactChannelRecord, error)
+	findPendingEmailForUser     func(ctx context.Context, userID user.UserID) (user.ContactChannelRecord, error)
 	findVerifiedEmail           func(ctx context.Context, value string) (user.ContactChannelRecord, error)
 	createToken                 func(ctx context.Context, input user.CreateContactChannelTokenInput) error
 	consumeTokenAndMarkVerified func(ctx context.Context, tokenHash string, verifiedVia string, now time.Time) (user.ContactChannelRecord, error)
@@ -658,6 +659,13 @@ func (store fakeContactChannelStore) FindEmailForUser(ctx context.Context, userI
 		return user.ContactChannelRecord{}, user.ErrContactChannelNotFound
 	}
 	return store.findEmailForUser(ctx, userID)
+}
+
+func (store fakeContactChannelStore) FindPendingEmailForUser(ctx context.Context, userID user.UserID) (user.ContactChannelRecord, error) {
+	if store.findPendingEmailForUser == nil {
+		return user.ContactChannelRecord{}, user.ErrContactChannelNotFound
+	}
+	return store.findPendingEmailForUser(ctx, userID)
 }
 
 func (store fakeContactChannelStore) FindVerifiedEmail(ctx context.Context, value string) (user.ContactChannelRecord, error) {

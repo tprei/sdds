@@ -393,6 +393,74 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/auth/email/verifications:
+    post:
+      operationId: createAuthEmailVerification
+      summary: Resend the email verification message
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      responses:
+        "202":
+          description: A verification message will be dispatched if a pending address exists.
+        "401":
+          description: The request is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too many requests.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not process the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Transactional email delivery is not configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/auth/email/verification:
+    post:
+      operationId: verifyAuthEmail
+      summary: Verify a contact email with a token
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailRequest"
+      responses:
+        "204":
+          description: The address was verified.
+        "400":
+          description: The token is missing, malformed, expired, or already used.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too many requests.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not verify the address.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/auth/session:
     get:
       operationId: getAuthSession
@@ -1610,6 +1678,16 @@ components:
         email:
           type: string
           maxLength: 254
+    VerifyEmailRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 512
     CurrentSessionResponse:
       type: object
       additionalProperties: false
@@ -1671,6 +1749,7 @@ components:
         - ErrorCodeInvalidReplyTarget
         - ErrorCodeInvalidEmail
         - ErrorCodeMailUnavailable
+        - ErrorCodeInvalidToken
       enum:
         - internal_error
         - forbidden
@@ -1700,6 +1779,7 @@ components:
         - invalid_reply_target
         - invalid_email
         - mail_unavailable
+        - invalid_token
     ErrorResponse:
       type: object
       additionalProperties: false

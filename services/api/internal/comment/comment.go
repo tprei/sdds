@@ -11,6 +11,8 @@ import (
 
 var ErrCommentNotFound = errors.New("comment not found")
 
+var ErrParentCommentNotTopLevel = errors.New("parent comment is not top level")
+
 type CommentID string
 
 type AuthorSummary struct {
@@ -25,6 +27,8 @@ type Comment struct {
 	Body      string
 	Author    AuthorSummary
 	CreatedAt time.Time
+	// ParentCommentID is empty for a top-level comment and set to the parent's id for a reply.
+	ParentCommentID CommentID
 }
 
 type CreateInput struct {
@@ -33,13 +37,23 @@ type CreateInput struct {
 	Body   string
 }
 
+// CreateReplyInput carries a reply's parent and body. The note is derived from
+// the parent comment, never from the caller.
+type CreateReplyInput struct {
+	ParentCommentID CommentID
+	UserID          user.UserID
+	Body            string
+}
+
 type Position struct {
 	PageKey int64
 }
 
 type ListedComment struct {
-	Comment  Comment
-	Position Position
+	Comment        Comment
+	Position       Position
+	Replies        []Comment
+	HasMoreReplies bool
 }
 
 type ListInput struct {
@@ -59,4 +73,6 @@ type Store interface {
 	FindComment(ctx context.Context, noteID, id string) (Comment, error)
 	ListNoteComments(ctx context.Context, input ListInput) (Page, error)
 	DeleteComment(ctx context.Context, id string) error
+	CreateReply(ctx context.Context, input CreateReplyInput) (Comment, error)
+	FindCommentByID(ctx context.Context, id string) (Comment, error)
 }

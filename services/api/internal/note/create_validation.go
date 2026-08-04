@@ -40,6 +40,16 @@ func ValidateCreateInput(input CreateInput) []ValidationProblem {
 	problems = appendImageUploadIDValidationProblems(problems, input.ImageUploadIDs)
 	return problems
 }
+
+// ValidateEditedNote checks the merged fields of an edited note against the
+// same title, body, and category rules the create path enforces.
+func ValidateEditedNote(title, body string, slug CategorySlug) []ValidationProblem {
+	problems := make([]ValidationProblem, 0, 3)
+	problems = appendTitleValidationProblems(problems, title)
+	problems = appendBodyValidationProblems(problems, body)
+	problems = appendCategoryValidationProblems(problems, slug)
+	return problems
+}
 func appendClientRequestIDValidationProblems(problems []ValidationProblem, clientRequestID string) []ValidationProblem {
 	clientRequestIDLength := utf8.RuneCountInString(clientRequestID)
 	if clientRequestIDLength == 0 {

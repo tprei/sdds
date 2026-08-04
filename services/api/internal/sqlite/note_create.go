@@ -103,7 +103,7 @@ func (store *NoteStore) createNoteInTransaction(ctx context.Context, tx *sql.Tx,
 		}
 		return created, nil
 	}
-	if err := validateNoteCreateCatalog(ctx, tx, input); err != nil {
+	if err := validateActiveCategory(ctx, tx, input.CategorySlug); err != nil {
 		return note.Note{}, err
 	}
 
@@ -136,17 +136,12 @@ func (store *NoteStore) createNoteInTransaction(ctx context.Context, tx *sql.Tx,
 	return created, nil
 }
 
-func validateNoteCreateCatalog(ctx context.Context, tx *sql.Tx, input note.CreateInput) error {
-	problems := make([]note.ValidationProblem, 0, 2)
-	if _, err := scanCategoryRow(tx.QueryRowContext(ctx, findActiveCategorySQL, string(input.CategorySlug))); err != nil {
+func validateActiveCategory(ctx context.Context, tx *sql.Tx, slug note.CategorySlug) error {
+	if _, err := scanCategoryRow(tx.QueryRowContext(ctx, findActiveCategorySQL, string(slug))); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			problems = append(problems, note.ValidationProblem{Field: "category_slug", Message: "unknown"})
-		} else {
-			return fmt.Errorf("check active category: %w", err)
+			return &note.CatalogValidationError{Problems: []note.ValidationProblem{{Field: "category_slug", Message: "unknown"}}}
 		}
-	}
-	if len(problems) > 0 {
-		return &note.CatalogValidationError{Problems: problems}
+		return fmt.Errorf("check active category: %w", err)
 	}
 	return nil
 }

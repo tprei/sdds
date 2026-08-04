@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -62,14 +63,20 @@ func (store *NoteStore) ListEmbeddingTargets(ctx context.Context, afterNoteID st
 	return targets, nil
 }
 
-// UpsertEmbedding writes or replaces a note's embedding row. Used by the
-// reindex/backfill command; note creation uses the atomic insert in
-// note_create.go instead, since it always writes a fresh row.
-func (store *NoteStore) UpsertEmbedding(ctx context.Context, noteID string, embedding note.Embedding, now time.Time) error {
+// noteEmbeddingExecer is the ExecContext seam shared by the transactional
+// write path and the public store method. *sql.DB and *sql.Tx both satisfy it.
+type noteEmbeddingExecer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+// upsertNoteEmbedding writes or replaces a note's embedding row through the
+// supplied executor, so a caller inside a transaction can reuse it without
+// the single-connection store deadlocking on itself.
+func upsertNoteEmbedding(ctx context.Context, exec noteEmbeddingExecer, noteID string, embedding note.Embedding, now time.Time) error {
 	if len(embedding.Vector) != note.EmbeddingDimension {
 		return fmt.Errorf("upsert note embedding: vector length %d, want %d", len(embedding.Vector), note.EmbeddingDimension)
 	}
-	if _, err := store.db.ExecContext(
+	if _, err := exec.ExecContext(
 		ctx,
 		upsertNoteEmbeddingSQL,
 		noteID,
@@ -84,4 +91,11 @@ func (store *NoteStore) UpsertEmbedding(ctx context.Context, noteID string, embe
 		return fmt.Errorf("upsert note embedding: %w", err)
 	}
 	return nil
+}
+
+// UpsertEmbedding writes or replaces a note's embedding row. Used by the
+// reindex/backfill command; note creation uses the atomic insert in
+// note_create.go instead, since it always writes a fresh row.
+func (store *NoteStore) UpsertEmbedding(ctx context.Context, noteID string, embedding note.Embedding, now time.Time) error {
+	return upsertNoteEmbedding(ctx, store.db, noteID, embedding, now)
 }

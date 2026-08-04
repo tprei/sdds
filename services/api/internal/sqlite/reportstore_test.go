@@ -487,6 +487,38 @@ func TestReportStoreListInspectionRows(t *testing.T) {
 	}
 }
 
+func TestReportStoreListInspectionRowsShowsMissingAfterNoteStoreDelete(t *testing.T) {
+	ctx := context.Background()
+	store, db := newReportStoreTestStore(t, ctx)
+	insertBareUsefulStoreUser(t, ctx, db, reportStoreReporterUserID)
+	insertAuthorStoreNote(t, ctx, db, reportStoreNoteID, reportStoreReporterUserID, 0)
+
+	if _, err := store.CreateReport(ctx, report.CreateInput{
+		TargetType: report.TargetTypeNote, TargetID: reportStoreNoteID, Reason: report.ReasonSpam, ReporterUserID: reportStoreReporterUserID,
+	}); err != nil {
+		t.Fatalf("create note report: %v", err)
+	}
+
+	noteStore := newNoteStore(db, time.Now)
+	if err := noteStore.DeleteNote(ctx, reportStoreNoteID, reportStoreReporterUserID); err != nil {
+		t.Fatalf("delete note through store: %v", err)
+	}
+
+	rows, err := store.ListInspectionRows(ctx)
+	if err != nil {
+		t.Fatalf("list inspection rows: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("inspection rows = %d, want 1", len(rows))
+	}
+	if rows[0].TargetType != report.TargetTypeNote || rows[0].TargetID != reportStoreNoteID {
+		t.Fatalf("row 0 = %+v, want the reported note", rows[0])
+	}
+	if !rows[0].TargetMissing || rows[0].TargetSummary != nil {
+		t.Fatalf("row 0 = %+v, want missing note (TargetMissing true, nil summary)", rows[0])
+	}
+}
+
 func TestCommentStoreFindCommentByID(t *testing.T) {
 	ctx := context.Background()
 	store, db, _ := newCommentStoreTestStore(t, ctx)

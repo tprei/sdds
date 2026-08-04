@@ -11,6 +11,7 @@ import (
 
 var (
 	ErrNoteNotFound           = errors.New("note not found")
+	ErrNoteForbidden          = errors.New("note forbidden")
 	ErrImageUploadUnavailable = errors.New("image upload unavailable")
 	ErrImageUploadExpired     = errors.New("image upload expired")
 )

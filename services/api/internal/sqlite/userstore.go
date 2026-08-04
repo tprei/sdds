@@ -37,6 +37,20 @@ const (
 		WHERE users.id = ?
 			AND users.state = ?
 	`
+	insertSessionForActiveUserWithCredentialSQL = `
+		INSERT INTO sessions (id, user_id, token_hash, created_at, expires_at, revoked_at)
+		SELECT ?, users.id, ?, ?, ?, NULL
+		FROM users
+		WHERE users.id = ?
+			AND users.state = ?
+			AND EXISTS (
+				SELECT 1 FROM user_login_identities
+				WHERE user_login_identities.user_id = users.id
+					AND user_login_identities.kind = ?
+					AND user_login_identities.provider = ?
+					AND user_login_identities.updated_at = ?
+			)
+	`
 	findPasswordLoginSQL = `
 		SELECT
 			users.id,
@@ -48,7 +62,8 @@ const (
 			authors.created_at,
 			authors.updated_at,
 			user_login_identities.normalized_identifier,
-			user_login_identities.secret_hash
+			user_login_identities.secret_hash,
+			user_login_identities.updated_at
 		FROM user_login_identities
 		JOIN users ON users.id = user_login_identities.user_id
 		JOIN authors ON authors.user_id = users.id
@@ -170,13 +185,13 @@ func (store *UserStore) FindPasswordLogin(ctx context.Context, normalizedUsernam
 		normalizedUsername,
 	)
 	login, err := scanPasswordLogin(row)
-	if err == nil {
-		return login, nil
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return user.PasswordLogin{}, user.ErrInvalidCredentials
+		}
+		return user.PasswordLogin{}, fmt.Errorf("find password login: %w", err)
 	}
-	if errors.Is(err, sql.ErrNoRows) {
-		return user.PasswordLogin{}, user.ErrInvalidCredentials
-	}
-	return user.PasswordLogin{}, fmt.Errorf("find password login: %w", err)
+	return login, nil
 }
 
 func (store *UserStore) CreateSession(ctx context.Context, input user.CreateSessionInput) (user.CurrentSession, error) {
@@ -189,16 +204,33 @@ func (store *UserStore) CreateSession(ctx context.Context, input user.CreateSess
 		return user.CurrentSession{}, fmt.Errorf("create session id: %w", err)
 	}
 
-	result, err := store.db.ExecContext(
-		ctx,
-		insertSessionForActiveUserSQL,
-		sessionID,
-		input.TokenHash,
-		unixMillis(now),
-		unixMillis(input.ExpiresAt),
-		input.UserID,
-		user.UserStateActive,
-	)
+	var result sql.Result
+	if input.FenceCredential {
+		result, err = store.db.ExecContext(
+			ctx,
+			insertSessionForActiveUserWithCredentialSQL,
+			sessionID,
+			input.TokenHash,
+			unixMillis(now),
+			unixMillis(input.ExpiresAt),
+			input.UserID,
+			user.UserStateActive,
+			user.LoginIdentityKindPassword,
+			user.LoginIdentityProviderLocal,
+			input.CredentialVersion,
+		)
+	} else {
+		result, err = store.db.ExecContext(
+			ctx,
+			insertSessionForActiveUserSQL,
+			sessionID,
+			input.TokenHash,
+			unixMillis(now),
+			unixMillis(input.ExpiresAt),
+			input.UserID,
+			user.UserStateActive,
+		)
+	}
 	if err != nil {
 		return user.CurrentSession{}, fmt.Errorf("insert session: %w", err)
 	}
@@ -207,6 +239,9 @@ func (store *UserStore) CreateSession(ctx context.Context, input user.CreateSess
 		return user.CurrentSession{}, fmt.Errorf("read inserted session count: %w", err)
 	}
 	if inserted == 0 {
+		if input.FenceCredential {
+			return user.CurrentSession{}, user.ErrInvalidCredentials
+		}
 		return user.CurrentSession{}, user.ErrUserDisabled
 	}
 
@@ -314,6 +349,7 @@ func scanPasswordLogin(scan *sql.Row) (user.PasswordLogin, error) {
 	var displayName string
 	var username string
 	var secretHash sql.NullString
+	var credentialUpdated int64
 	if err := scan.Scan(
 		&userID,
 		&state,
@@ -325,6 +361,7 @@ func scanPasswordLogin(scan *sql.Row) (user.PasswordLogin, error) {
 		&authorUpdatedAt,
 		&username,
 		&secretHash,
+		&credentialUpdated,
 	); err != nil {
 		return user.PasswordLogin{}, err
 	}
@@ -347,8 +384,9 @@ func scanPasswordLogin(scan *sql.Row) (user.PasswordLogin, error) {
 			CreatedAt:   timeFromUnixMillis(authorCreatedAt),
 			UpdatedAt:   timeFromUnixMillis(authorUpdatedAt),
 		},
-		Username:   username,
-		SecretHash: secretHash.String,
+		Username:          username,
+		SecretHash:        secretHash.String,
+		CredentialVersion: credentialUpdated,
 	}, nil
 }
 

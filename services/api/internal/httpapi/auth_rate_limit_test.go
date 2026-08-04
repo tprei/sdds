@@ -213,6 +213,66 @@ func TestCreateAuthSessionAllowsDifferentAccounts(t *testing.T) {
 	}
 }
 
+// TestCreateAuthSessionSharesRateLimitBucketAcrossIdentifierCasings proves the
+// identifier rate-limit bucket is keyed on the trimmed, case-folded username —
+// the same canonical value FindPasswordLogin receives — so " Thiago ", "thiago",
+// and "THIAGO" share one bucket instead of splitting it across casings.
+func TestCreateAuthSessionSharesRateLimitBucketAcrossIdentifierCasings(t *testing.T) {
+	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
+	var seenUsernames []string
+	secretHash := authTestPasswordHash(t, "secret-password")
+	users := fakeUserStore{
+		findPasswordLogin: func(_ context.Context, username string) (user.PasswordLogin, error) {
+			seenUsernames = append(seenUsernames, username)
+			return user.PasswordLogin{
+				User:       user.User{ID: "user-id-thiago", State: user.UserStateActive},
+				Author:     user.Author{ID: author.AuthorID("author-id-thiago"), UserID: "user-id-thiago", DisplayName: "Thiago"},
+				Username:   username,
+				SecretHash: secretHash,
+			}, nil
+		},
+		createSession: func(_ context.Context, input user.CreateSessionInput) (user.CurrentSession, error) {
+			return authCurrentSession("thiago", "Thiago", input.TokenHash, input.ExpiresAt), nil
+		},
+	}
+	router := newAuthRateLimitTestRouter(t, users, AuthLimits{
+		SignupRequestsPerMinute:       1000,
+		LoginRequestsPerMinute:        2,
+		SignupGlobalRequestsPerMinute: 1000,
+		LoginGlobalRequestsPerMinute:  1000,
+		PasswordHashConcurrency:       4,
+	}, func() time.Time { return now })
+
+	casings := []string{`" Thiago "`, `"thiago"`, `"THIAGO"`}
+	remoteAddrs := []string{"203.0.113.10:1000", "203.0.113.20:1000", "203.0.113.30:1000"}
+	for i, casing := range casings {
+		response := httptest.NewRecorder()
+		body := `{"username":` + casing + `,"password":"secret-password"}`
+		request := authRateLimitRequest(http.MethodPost, "/v1/auth/sessions", body, remoteAddrs[i])
+		router.ServeHTTP(response, request)
+		if i < 2 {
+			if response.Code != http.StatusCreated {
+				t.Fatalf("casing %d (%s) status = %d, want %d", i, casing, response.Code, http.StatusCreated)
+			}
+			continue
+		}
+		requireOpenAPIResponse(t, request, response)
+		if response.Code != http.StatusTooManyRequests {
+			t.Fatalf("casing %d (%s) status = %d, want %d", i, casing, response.Code, http.StatusTooManyRequests)
+		}
+		requireErrorCode(t, response, openapi.ErrorCodeRateLimited)
+	}
+
+	if len(seenUsernames) != 2 {
+		t.Fatalf("FindPasswordLogin calls = %d, want 2 (the third is rejected before the store)", len(seenUsernames))
+	}
+	for i, name := range seenUsernames {
+		if name != "thiago" {
+			t.Fatalf("FindPasswordLogin username %d = %q, want %q", i, name, "thiago")
+		}
+	}
+}
+
 func TestCreateAuthSessionGlobalRateLimitReturnsTooManyRequests(t *testing.T) {
 	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
 	findCalls := 0
@@ -255,24 +315,24 @@ func TestAuthRateLimitersDoNotCreateAccountBucketsAfterGlobalRejection(t *testin
 	}, func() time.Time { return now })
 	request := authRateLimitRequest(http.MethodPost, "/v1/auth/users", "{}", "203.0.113.10:1000")
 
-	if !limiters.allowSignup(request, "first") {
+	if _, ok := limiters.allow(request, authPurposeSignup, "first"); !ok {
 		t.Fatal("first signup was rejected")
 	}
-	if limiters.allowSignup(request, "second") {
+	if _, ok := limiters.allow(request, authPurposeSignup, "second"); ok {
 		t.Fatal("second signup was accepted")
 	}
-	if got := len(limiters.signupAccountLimiters.entries); got != 1 {
+	if got := len(limiters.identifier[authPurposeSignup].entries); got != 1 {
 		t.Fatalf("signup account bucket count = %d, want 1", got)
 	}
 
 	loginRequest := authRateLimitRequest(http.MethodPost, "/v1/auth/sessions", "{}", "203.0.113.10:1000")
-	if !limiters.allowLogin(loginRequest, "first") {
+	if _, ok := limiters.allow(loginRequest, authPurposeLogin, "first"); !ok {
 		t.Fatal("first login was rejected")
 	}
-	if limiters.allowLogin(loginRequest, "second") {
+	if _, ok := limiters.allow(loginRequest, authPurposeLogin, "second"); ok {
 		t.Fatal("second login was accepted")
 	}
-	if got := len(limiters.loginAccountLimiters.entries); got != 1 {
+	if got := len(limiters.identifier[authPurposeLogin].entries); got != 1 {
 		t.Fatalf("login account bucket count = %d, want 1", got)
 	}
 }
@@ -287,24 +347,24 @@ func TestAuthRateLimitersDoNotCreateAccountBucketsAfterSourceRejection(t *testin
 	}, func() time.Time { return now })
 	request := authRateLimitRequest(http.MethodPost, "/v1/auth/users", "{}", "203.0.113.10:1000")
 
-	if !limiters.allowSignup(request, "first") {
+	if _, ok := limiters.allow(request, authPurposeSignup, "first"); !ok {
 		t.Fatal("first signup was rejected")
 	}
-	if limiters.allowSignup(request, "second") {
+	if _, ok := limiters.allow(request, authPurposeSignup, "second"); ok {
 		t.Fatal("second signup was accepted")
 	}
-	if got := len(limiters.signupAccountLimiters.entries); got != 1 {
+	if got := len(limiters.identifier[authPurposeSignup].entries); got != 1 {
 		t.Fatalf("signup account bucket count = %d, want 1", got)
 	}
 
 	loginRequest := authRateLimitRequest(http.MethodPost, "/v1/auth/sessions", "{}", "203.0.113.10:1000")
-	if !limiters.allowLogin(loginRequest, "first") {
+	if _, ok := limiters.allow(loginRequest, authPurposeLogin, "first"); !ok {
 		t.Fatal("first login was rejected")
 	}
-	if limiters.allowLogin(loginRequest, "second") {
+	if _, ok := limiters.allow(loginRequest, authPurposeLogin, "second"); ok {
 		t.Fatal("second login was accepted")
 	}
-	if got := len(limiters.loginAccountLimiters.entries); got != 1 {
+	if got := len(limiters.identifier[authPurposeLogin].entries); got != 1 {
 		t.Fatalf("login account bucket count = %d, want 1", got)
 	}
 }

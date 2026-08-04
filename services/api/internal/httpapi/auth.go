@@ -25,7 +25,7 @@ func (handler server) CreateAuthUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, authValidationErrorResponse(openapi.ErrorCodeInvalidAuth, problems))
 		return
 	}
-	if !handler.auth.rateLimiters.allowSignup(r, input.Username) {
+	if _, allowed := handler.auth.rateLimiters.allow(r, authPurposeSignup, input.Username); !allowed {
 		writeRateLimited(w)
 		return
 	}
@@ -75,7 +75,7 @@ func (handler server) CreateAuthSession(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, authValidationErrorResponse(openapi.ErrorCodeInvalidAuth, problems))
 		return
 	}
-	if !handler.auth.rateLimiters.allowLogin(r, input.Username) {
+	if _, allowed := handler.auth.rateLimiters.allow(r, authPurposeLogin, input.Username); !allowed {
 		writeRateLimited(w)
 		return
 	}
@@ -111,11 +111,13 @@ func (handler server) CreateAuthSession(w http.ResponseWriter, r *http.Request) 
 	}
 	expiresAt := handler.auth.clock().Add(user.SessionLifetime)
 	current, err := handler.auth.users.CreateSession(r.Context(), user.CreateSessionInput{
-		UserID:    login.User.ID,
-		TokenHash: user.HashSessionToken(token),
-		ExpiresAt: expiresAt,
+		UserID:            login.User.ID,
+		TokenHash:         user.HashSessionToken(token),
+		ExpiresAt:         expiresAt,
+		CredentialVersion: login.CredentialVersion,
+		FenceCredential:   true,
 	})
-	if errors.Is(err, user.ErrUserDisabled) {
+	if errors.Is(err, user.ErrUserDisabled) || errors.Is(err, user.ErrInvalidCredentials) {
 		writeInvalidCredentials(w)
 		return
 	}

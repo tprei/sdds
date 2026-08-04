@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"math"
 	"net"
 	"net/http"
 	"sync"
@@ -13,26 +14,38 @@ import (
 
 const authRateLimitMaxKeys = 4096
 
+type authRateLimitPurpose string
+
+const (
+	authPurposeSignup        authRateLimitPurpose = "signup"
+	authPurposeLogin         authRateLimitPurpose = "login"
+	authPurposeVerification  authRateLimitPurpose = "verification"
+	authPurposePasswordReset authRateLimitPurpose = "password_reset"
+)
+
 type authRateLimiters struct {
-	signupGlobalLimiter   *rate.Limiter
-	loginGlobalLimiter    *rate.Limiter
-	signupSourceLimiters  *keyedRateLimiters
-	loginSourceLimiters   *keyedRateLimiters
-	signupAccountLimiters *keyedRateLimiters
-	loginAccountLimiters  *keyedRateLimiters
-	clock                 func() time.Time
+	global     map[authRateLimitPurpose]*rate.Limiter
+	source     map[authRateLimitPurpose]*keyedRateLimiters
+	identifier map[authRateLimitPurpose]*keyedRateLimiters
+	clock      func() time.Time
 }
 
 func newAuthRateLimiters(limits AuthLimits, clock func() time.Time) authRateLimiters {
-	return authRateLimiters{
-		signupGlobalLimiter:   newRequestsPerMinuteLimiter(limits.SignupGlobalRequestsPerMinute),
-		loginGlobalLimiter:    newRequestsPerMinuteLimiter(limits.LoginGlobalRequestsPerMinute),
-		signupSourceLimiters:  newKeyedRequestsPerMinuteLimiters(limits.SignupRequestsPerMinute, authRateLimitMaxKeys),
-		loginSourceLimiters:   newKeyedRequestsPerMinuteLimiters(limits.LoginRequestsPerMinute, authRateLimitMaxKeys),
-		signupAccountLimiters: newKeyedRequestsPerMinuteLimiters(limits.SignupRequestsPerMinute, authRateLimitMaxKeys),
-		loginAccountLimiters:  newKeyedRequestsPerMinuteLimiters(limits.LoginRequestsPerMinute, authRateLimitMaxKeys),
-		clock:                 clock,
+	limiters := authRateLimiters{
+		global:     map[authRateLimitPurpose]*rate.Limiter{},
+		source:     map[authRateLimitPurpose]*keyedRateLimiters{},
+		identifier: map[authRateLimitPurpose]*keyedRateLimiters{},
+		clock:      clock,
 	}
+	limiters.registerPurpose(authPurposeSignup, limits.SignupRequestsPerMinute, limits.SignupGlobalRequestsPerMinute)
+	limiters.registerPurpose(authPurposeLogin, limits.LoginRequestsPerMinute, limits.LoginGlobalRequestsPerMinute)
+	return limiters
+}
+
+func (limiters authRateLimiters) registerPurpose(purpose authRateLimitPurpose, perSource, globalPerMinute int) {
+	limiters.global[purpose] = newRequestsPerMinuteLimiter(globalPerMinute)
+	limiters.source[purpose] = newKeyedRequestsPerMinuteLimiters(perSource, authRateLimitMaxKeys)
+	limiters.identifier[purpose] = newKeyedRequestsPerMinuteLimiters(perSource, authRateLimitMaxKeys)
 }
 
 func newRequestsPerMinuteLimiter(requestsPerMinute int) *rate.Limiter {
@@ -48,32 +61,52 @@ func newKeyedRequestsPerMinuteLimiters(requestsPerMinute int, maxKeys int) *keye
 	}
 }
 
-func (limiters authRateLimiters) allowSignup(r *http.Request, username string) bool {
+func (limiters authRateLimiters) allow(r *http.Request, purpose authRateLimitPurpose, identifier string) (retryAfterSeconds int, allowed bool) {
 	now := limiters.clock()
-	return takeRateLimitTokenLazy(
-		now,
-		func() *rate.Limiter { return limiters.signupGlobalLimiter },
-		func() *rate.Limiter {
-			return limiters.signupSourceLimiters.limiterFor(requestSourceKey(r), now)
-		},
-		func() *rate.Limiter {
-			return limiters.signupAccountLimiters.limiterFor(username, now)
-		},
-	)
+	globalReservation := limiters.global[purpose].ReserveN(now, 1)
+	if delay := rejectDelay(globalReservation, now); delay >= 0 {
+		globalReservation.CancelAt(now)
+		return clampRetryAfter(delay), false
+	}
+	sourceReservation := limiters.source[purpose].limiterFor(requestSourceKey(r), now).ReserveN(now, 1)
+	if delay := rejectDelay(sourceReservation, now); delay >= 0 {
+		globalReservation.CancelAt(now)
+		sourceReservation.CancelAt(now)
+		return clampRetryAfter(delay), false
+	}
+	identifierReservation := limiters.identifier[purpose].limiterFor(identifier, now).ReserveN(now, 1)
+	if delay := rejectDelay(identifierReservation, now); delay >= 0 {
+		globalReservation.CancelAt(now)
+		sourceReservation.CancelAt(now)
+		identifierReservation.CancelAt(now)
+		return clampRetryAfter(delay), false
+	}
+	return 0, true
 }
 
-func (limiters authRateLimiters) allowLogin(r *http.Request, username string) bool {
-	now := limiters.clock()
-	return takeRateLimitTokenLazy(
-		now,
-		func() *rate.Limiter { return limiters.loginGlobalLimiter },
-		func() *rate.Limiter {
-			return limiters.loginSourceLimiters.limiterFor(requestSourceKey(r), now)
-		},
-		func() *rate.Limiter {
-			return limiters.loginAccountLimiters.limiterFor(username, now)
-		},
-	)
+// rejectDelay reports the non-negative delay a reservation would impose, or -1
+// when the reservation is immediately admissible. Reservations that exceed the
+// limiter burst budget report a negative OK and are treated as rejected with a
+// full-minute backoff.
+func rejectDelay(reservation *rate.Reservation, now time.Time) int {
+	if !reservation.OK() {
+		return 60
+	}
+	delay := reservation.DelayFrom(now)
+	if delay <= 0 {
+		return -1
+	}
+	return int(math.Ceil(delay.Seconds()))
+}
+
+func clampRetryAfter(seconds int) int {
+	if seconds < 1 {
+		seconds = 1
+	}
+	if seconds > 60 {
+		seconds = 60
+	}
+	return seconds
 }
 
 type keyedRateLimiters struct {

@@ -15,6 +15,12 @@ export type CreateNoteRequest = {
   title: string;
 };
 
+export type UpdateNoteRequest = {
+  body?: string;
+  category_slug?: string;
+  title?: string;
+};
+
 export type NoteImageResponse = {
   byte_size: number;
   content_type: 'image/jpeg' | 'image/png';
@@ -119,6 +125,7 @@ export const createNoteRequestKeys = [
   'image_upload_ids',
   'title',
 ] as const;
+export const updateNoteRequestKeys = ['body', 'category_slug', 'title'] as const;
 
 export const errorCodes: Record<string, true> = {
   internal_error: true,
@@ -242,6 +249,33 @@ export function isNoteResponse(value: unknown): value is NoteResponse {
     typeof value.useful_by_current_user === 'boolean' &&
     isNoteImagesResponse(value.images)
   );
+}
+
+export function isUpdateNoteRequest(value: unknown): value is UpdateNoteRequest {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const keys = Object.keys(value);
+  if (keys.length === 0) {
+    return false;
+  }
+  if (
+    !keys.every((key) =>
+      updateNoteRequestKeys.includes(key as (typeof updateNoteRequestKeys)[number]),
+    )
+  ) {
+    return false;
+  }
+  if ('title' in value && typeof value.title !== 'string') {
+    return false;
+  }
+  if ('body' in value && typeof value.body !== 'string') {
+    return false;
+  }
+  if ('category_slug' in value && typeof value.category_slug !== 'string') {
+    return false;
+  }
+  return true;
 }
 
 export function isCommentResponse(value: unknown): value is CommentResponse {

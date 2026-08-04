@@ -34,6 +34,11 @@ type NotePublisher interface {
 	Publish(ctx context.Context, input note.CreateInput) (note.Note, error)
 }
 
+type NoteEditor interface {
+	Edit(ctx context.Context, input note.EditInput) (note.Note, error)
+	Delete(ctx context.Context, noteID string, userID user.UserID) error
+}
+
 type NoteSearcher interface {
 	Search(ctx context.Context, input note.SearchInput) ([]note.SearchResult, error)
 }
@@ -43,6 +48,7 @@ type NotesDependencies struct {
 	Publisher NotePublisher
 	Searcher  NoteSearcher
 	Catalog   note.Catalog
+	Editor    NoteEditor
 }
 
 type CommentDependencies struct {
@@ -72,6 +78,7 @@ type noteHandlers struct {
 	noteStore       note.Store
 	notePublisher   NotePublisher
 	noteSearcher    NoteSearcher
+	noteEditor      NoteEditor
 	authorNoteStore note.AuthorNoteStore
 	usefulStore     note.UsefulStore
 	categoryCatalog note.Catalog
@@ -155,7 +162,7 @@ func NewRouter(notes NotesDependencies, comments CommentDependencies, reports Re
 		eventLimits = DefaultEventLimits()
 	}
 	return newRouter(
-		noteHandlers{noteStore: notes.Stores, notePublisher: notes.Publisher, noteSearcher: notes.Searcher, authorNoteStore: notes.Stores, usefulStore: notes.Stores, categoryCatalog: notes.Catalog},
+		noteHandlers{noteStore: notes.Stores, notePublisher: notes.Publisher, noteSearcher: notes.Searcher, noteEditor: notes.Editor, authorNoteStore: notes.Stores, usefulStore: notes.Stores, categoryCatalog: notes.Catalog},
 		commentHandlers{store: comments.Store, notes: notes.Stores},
 		reportHandlers{store: reports.Store, notes: notes.Stores, comments: reports.CommentTargets},
 		eventHandlers{store: events.Store, limits: newEventRateLimiters(eventLimits, time.Now), clock: time.Now},
@@ -219,6 +226,8 @@ func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandl
 			router.Get("/categories", wrapper.ListCategories)
 			router.Get("/notes", wrapper.ListNotes)
 			router.Get("/authors/{author_id}", wrapper.GetAuthor)
+			router.Patch("/notes/{note_id}", wrapper.UpdateNote)
+			router.Delete("/notes/{note_id}", wrapper.DeleteNote)
 			router.Get("/authors/{author_id}/notes", wrapper.ListAuthorNotes)
 			router.Get("/notes/{note_id}", wrapper.GetNote)
 			router.Get("/notes/{note_id}/comments", wrapper.ListNoteComments)

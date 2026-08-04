@@ -1468,6 +1468,13 @@ type SearchNotesResponse struct {
 // SearchVersion defines model for SearchVersion.
 type SearchVersion string
 
+// UpdateNoteRequest defines model for UpdateNoteRequest.
+type UpdateNoteRequest struct {
+	Body         *string       `json:"body,omitempty"`
+	CategorySlug *CategorySlug `json:"category_slug,omitempty"`
+	Title        *string       `json:"title,omitempty"`
+}
+
 // ValidationField defines model for ValidationField.
 type ValidationField string
 
@@ -1535,6 +1542,9 @@ type PrepareImageUploadMultipartRequestBody = PrepareImageUploadMultipart
 
 // CreateNoteJSONRequestBody defines body for CreateNote for application/json ContentType.
 type CreateNoteJSONRequestBody = CreateNoteRequest
+
+// UpdateNoteJSONRequestBody defines body for UpdateNote for application/json ContentType.
+type UpdateNoteJSONRequestBody = UpdateNoteRequest
 
 // CreateNoteCommentJSONRequestBody defines body for CreateNoteComment for application/json ContentType.
 type CreateNoteCommentJSONRequestBody = CreateCommentRequest
@@ -2270,8 +2280,16 @@ type ClientInterface interface {
 
 	CreateNote(ctx context.Context, body CreateNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeleteNote request
+	DeleteNote(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetNote request
 	GetNote(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateNoteWithBody request with any body
+	UpdateNoteWithBody(ctx context.Context, noteId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateNote(ctx context.Context, noteId string, body UpdateNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListNoteComments request
 	ListNoteComments(ctx context.Context, noteId string, params *ListNoteCommentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2539,8 +2557,44 @@ func (c *Client) CreateNote(ctx context.Context, body CreateNoteJSONRequestBody,
 	return c.Client.Do(req)
 }
 
+func (c *Client) DeleteNote(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteNoteRequest(c.Server, noteId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) GetNote(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetNoteRequest(c.Server, noteId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateNoteWithBody(ctx context.Context, noteId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateNoteRequestWithBody(c.Server, noteId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateNote(ctx context.Context, noteId string, body UpdateNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateNoteRequest(c.Server, noteId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3225,6 +3279,40 @@ func NewCreateNoteRequestWithBody(server string, contentType string, body io.Rea
 	return req, nil
 }
 
+// NewDeleteNoteRequest generates requests for DeleteNote
+func NewDeleteNoteRequest(server string, noteId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "note_id", noteId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/notes/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetNoteRequest generates requests for GetNote
 func NewGetNoteRequest(server string, noteId string) (*http.Request, error) {
 	var err error
@@ -3255,6 +3343,53 @@ func NewGetNoteRequest(server string, noteId string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewUpdateNoteRequest calls the generic UpdateNote builder with application/json body
+func NewUpdateNoteRequest(server string, noteId string, body UpdateNoteJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateNoteRequestWithBody(server, noteId, "application/json", bodyReader)
+}
+
+// NewUpdateNoteRequestWithBody generates requests for UpdateNote with any type of body
+func NewUpdateNoteRequestWithBody(server string, noteId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "note_id", noteId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/notes/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -3692,8 +3827,16 @@ type ClientWithResponsesInterface interface {
 
 	CreateNoteWithResponse(ctx context.Context, body CreateNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateNoteHTTPResponse, error)
 
+	// DeleteNoteWithResponse request
+	DeleteNoteWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*DeleteNoteHTTPResponse, error)
+
 	// GetNoteWithResponse request
 	GetNoteWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*GetNoteHTTPResponse, error)
+
+	// UpdateNoteWithBodyWithResponse request with any body
+	UpdateNoteWithBodyWithResponse(ctx context.Context, noteId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateNoteHTTPResponse, error)
+
+	UpdateNoteWithResponse(ctx context.Context, noteId string, body UpdateNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateNoteHTTPResponse, error)
 
 	// ListNoteCommentsWithResponse request
 	ListNoteCommentsWithResponse(ctx context.Context, noteId string, params *ListNoteCommentsParams, reqEditors ...RequestEditorFn) (*ListNoteCommentsHTTPResponse, error)
@@ -4228,6 +4371,39 @@ func (r CreateNoteHTTPResponse) ContentType() string {
 	return ""
 }
 
+type DeleteNoteHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *ErrorResponse
+	JSON403      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteNoteHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteNoteHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteNoteHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetNoteHTTPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4256,6 +4432,43 @@ func (r GetNoteHTTPResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetNoteHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateNoteHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Note
+	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
+	JSON403      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON413      *ErrorResponse
+	JSON500      *ErrorResponse
+	JSON503      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateNoteHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateNoteHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateNoteHTTPResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -4673,6 +4886,15 @@ func (c *ClientWithResponses) CreateNoteWithResponse(ctx context.Context, body C
 	return ParseCreateNoteHTTPResponse(rsp)
 }
 
+// DeleteNoteWithResponse request returning *DeleteNoteHTTPResponse
+func (c *ClientWithResponses) DeleteNoteWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*DeleteNoteHTTPResponse, error) {
+	rsp, err := c.DeleteNote(ctx, noteId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteNoteHTTPResponse(rsp)
+}
+
 // GetNoteWithResponse request returning *GetNoteHTTPResponse
 func (c *ClientWithResponses) GetNoteWithResponse(ctx context.Context, noteId string, reqEditors ...RequestEditorFn) (*GetNoteHTTPResponse, error) {
 	rsp, err := c.GetNote(ctx, noteId, reqEditors...)
@@ -4680,6 +4902,23 @@ func (c *ClientWithResponses) GetNoteWithResponse(ctx context.Context, noteId st
 		return nil, err
 	}
 	return ParseGetNoteHTTPResponse(rsp)
+}
+
+// UpdateNoteWithBodyWithResponse request with arbitrary body returning *UpdateNoteHTTPResponse
+func (c *ClientWithResponses) UpdateNoteWithBodyWithResponse(ctx context.Context, noteId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateNoteHTTPResponse, error) {
+	rsp, err := c.UpdateNoteWithBody(ctx, noteId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateNoteHTTPResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateNoteWithResponse(ctx context.Context, noteId string, body UpdateNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateNoteHTTPResponse, error) {
+	rsp, err := c.UpdateNote(ctx, noteId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateNoteHTTPResponse(rsp)
 }
 
 // ListNoteCommentsWithResponse request returning *ListNoteCommentsHTTPResponse
@@ -5550,6 +5789,53 @@ func ParseCreateNoteHTTPResponse(rsp *http.Response) (*CreateNoteHTTPResponse, e
 	return response, nil
 }
 
+// ParseDeleteNoteHTTPResponse parses an HTTP response from a DeleteNoteWithResponse call
+func ParseDeleteNoteHTTPResponse(rsp *http.Response) (*DeleteNoteHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteNoteHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetNoteHTTPResponse parses an HTTP response from a GetNoteWithResponse call
 func ParseGetNoteHTTPResponse(rsp *http.Response) (*GetNoteHTTPResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5598,6 +5884,81 @@ func ParseGetNoteHTTPResponse(rsp *http.Response) (*GetNoteHTTPResponse, error) 
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateNoteHTTPResponse parses an HTTP response from a UpdateNoteWithResponse call
+func ParseUpdateNoteHTTPResponse(rsp *http.Response) (*UpdateNoteHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateNoteHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Note
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

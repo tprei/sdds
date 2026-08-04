@@ -9,13 +9,20 @@ import (
 	"github.com/tprei/sdds/services/api/internal/openapi"
 )
 
-const createNoteGeneratedOperationID = "CreateNote"
+const (
+	createNoteGeneratedOperationID = "CreateNote"
+	updateNoteGeneratedOperationID = "UpdateNote"
+)
 
 func noteRequestValidationPolicy(operationID string) (requestValidationPolicy, bool) {
-	if operationID != createNoteGeneratedOperationID {
+	switch operationID {
+	case createNoteGeneratedOperationID:
+		return requestValidationPolicy{maxBodyBytes: maxCreateNoteRequestBytes}, true
+	case updateNoteGeneratedOperationID:
+		return requestValidationPolicy{maxBodyBytes: maxUpdateNoteRequestBytes}, true
+	default:
 		return requestValidationPolicy{}, false
 	}
-	return requestValidationPolicy{maxBodyBytes: maxCreateNoteRequestBytes}, true
 }
 
 func isTooManyCreateNoteImages(err error) bool {

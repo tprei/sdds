@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/comment"
+	"github.com/tprei/sdds/services/api/internal/mail"
 	"github.com/tprei/sdds/services/api/internal/media"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/openapi"
@@ -63,6 +64,7 @@ type ReportDependencies struct {
 type AuthDependencies struct {
 	Users           UserStores
 	ContactChannels user.ContactChannelStore
+	Mail            mail.Sender
 	Limits          AuthLimits
 }
 
@@ -95,11 +97,11 @@ type reportHandlers struct {
 	notes    note.Store
 	comments comment.ReportTargetStore
 }
-
 type authHandlers struct {
 	users                 user.Store
 	publicAuthors         author.PublicAuthorStore
 	contactChannels       user.ContactChannelStore
+	mail                  mail.Sender
 	passwordHasher        passwordHasher
 	invalidCredentialHash string
 	rateLimiters          authRateLimiters
@@ -176,6 +178,7 @@ func NewRouter(notes NotesDependencies, comments CommentDependencies, reports Re
 			users:                 auth.Users,
 			publicAuthors:         auth.Users,
 			contactChannels:       auth.ContactChannels,
+			mail:                  auth.Mail,
 			passwordHasher:        hasher,
 			invalidCredentialHash: mustInvalidCredentialHash(hasher),
 			rateLimiters:          newAuthRateLimiters(auth.Limits, time.Now),

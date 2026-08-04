@@ -39,6 +39,7 @@ const (
 	ErrorCodeInvalidReplyTarget        ErrorCode = "invalid_reply_target"
 	ErrorCodeInvalidReport             ErrorCode = "invalid_report"
 	ErrorCodeInvalidSearch             ErrorCode = "invalid_search"
+	ErrorCodeMailUnavailable           ErrorCode = "mail_unavailable"
 	ErrorCodeMediaIntegrityError       ErrorCode = "media_integrity_error"
 	ErrorCodeMediaStagingQuotaExceeded ErrorCode = "media_staging_quota_exceeded"
 	ErrorCodeMediaStorageUnavailable   ErrorCode = "media_storage_unavailable"
@@ -85,6 +86,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeInvalidReport:
 		return true
 	case ErrorCodeInvalidSearch:
+		return true
+	case ErrorCodeMailUnavailable:
 		return true
 	case ErrorCodeMediaIntegrityError:
 		return true
@@ -4030,6 +4033,7 @@ type SetAuthEmailHTTPResponse struct {
 	JSON413      *ErrorResponse
 	JSON429      *ErrorResponse
 	JSON500      *ErrorResponse
+	JSON503      *ErrorResponse
 }
 
 // Status returns HTTPResponse.Status
@@ -5249,6 +5253,13 @@ func ParseSetAuthEmailHTTPResponse(rsp *http.Response) (*SetAuthEmailHTTPRespons
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

@@ -178,3 +178,57 @@ test('creates a note and reads it from the API-backed home feed', async ({
     timeout: 30000,
   });
 });
+
+test('edits and deletes an own note through the owner actions', async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  const timestamp = Date.now();
+  const displayName = `Editor UI ${timestamp}`;
+  const username = `editor-${timestamp}`;
+  const title = `Achado original ${timestamp}`;
+  const body = `Texto original que vai mudar ${timestamp}.`;
+  const editedTitle = `Achado editado ${timestamp}`;
+  const editedBody = `Texto novo depois da edição ${timestamp}.`;
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Criar conta' }).click();
+  await page.getByTestId('signup-display-name-input').fill(displayName);
+  await page.getByTestId('signup-username-input').fill(username);
+  await page.getByTestId('signup-password-input').fill(syntheticPassword);
+  await page.getByRole('button', { name: 'Criar conta' }).click();
+  await expect(page.getByRole('tab', { name: /^Explorar$/ })).toBeVisible();
+
+  await openCompose(page);
+  await page.getByLabel('Título da nota').fill(title);
+  await page.getByLabel('Texto da nota').fill(body);
+  await page.getByRole('button', { name: 'Comida' }).click();
+  await page.getByRole('button', { name: 'Publicar achado' }).click();
+  await expect(page.getByRole('button', { name: `Abrir nota: ${title}` })).toBeVisible();
+
+  await page.getByRole('button', { name: `Abrir nota: ${title}` }).click();
+  await expect(page).toHaveURL(/\/notes\/[^/?#]+(?:[?#]|$)/);
+  const noteURL = page.url();
+
+  await page.getByRole('button', { name: 'Ações da nota' }).click();
+  await page.getByRole('button', { name: 'Editar nota' }).click();
+  await expect(page).toHaveURL(/\/notes\/edit\//);
+
+  await page.getByLabel('Título da nota').fill(editedTitle);
+  await page.getByLabel('Texto da nota').fill(editedBody);
+  await page.getByTestId('note-edit-submit').click();
+
+  await expect(page).toHaveURL(/\/notes\/[^/?#]+(?:[?#]|$)/);
+  await expect(page.getByRole('heading', { name: editedTitle })).toBeVisible();
+  await expect(page.getByText(/editado/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Ações da nota' }).click();
+  await page.getByRole('button', { name: 'Excluir nota' }).click();
+  await page.getByTestId('note-delete-confirm').click();
+
+  await expect(page).toHaveURL(/\/(?:[?#]|$)/);
+  await expect(page.getByRole('button', { name: `Abrir nota: ${editedTitle}` })).toHaveCount(0);
+
+  await page.goto(noteURL);
+  await expect(page.getByText('Nota não encontrada')).toBeVisible();
+});

@@ -17,9 +17,11 @@ import { AppHeader } from '@/ui/app-header';
 import { EmptyState } from '@/ui/empty-state';
 import { lightTick } from '@/ui/haptics';
 import { IconButton } from '@/ui/icon-button';
-import { IconFlag } from '@/ui/icons';
+import { IconDots, IconFlag } from '@/ui/icons';
 import { Avatar } from '@/ui/avatar';
 import { AppText } from '@/ui/text';
+import { NoteOwnerActions, type NoteOwnerActionsStep } from '@/features/notes/note-owner-actions';
+import { markNoteDeleted } from '@/features/notes/deleted-notes';
 import { PressableScale } from '@/ui/pressable-scale';
 import { CommentsSection } from '@/features/comments/comments-section';
 import {
@@ -163,6 +165,9 @@ function AuthenticatedNoteDetailScreen({
   const commentReplyRequestRef = useRef<number | null>(null);
   const commentDeleteRequestRefs = useRef(new Map<string, number>());
   const [state, setState] = useState<NoteDetailState>({ status: 'loading' });
+  const [ownerActions, setOwnerActions] = useState<NoteOwnerActionsStep>('closed');
+  const [deletingNote, setDeletingNote] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
   const [commentThread, dispatchCommentThread] = useReducer(
     commentThreadReducer,
     undefined,
@@ -479,6 +484,43 @@ function AuthenticatedNoteDetailScreen({
     dispatchReportForm({ type: 'open', target: { type: 'note', id: noteID } });
   }, [noteID, state.status]);
 
+  const handleEditNote = useCallback(() => {
+    setOwnerActions('closed');
+    router.push({ pathname: '/notes/edit/[id]', params: { id: noteID } });
+  }, [noteID, router]);
+
+  const handleDeleteNote = useCallback(async () => {
+    if (deletingNote) {
+      return;
+    }
+    setDeletingNote(true);
+    try {
+      await apiClient.deleteNote(noteID);
+      markNoteDeleted(noteID);
+    } catch (error: unknown) {
+      if (error instanceof APIRequestError && error.status === notFoundStatus) {
+        markNoteDeleted(noteID);
+      } else if (requestStatus(error) === unauthorizedStatus) {
+        setDeletingNote(false);
+        setOwnerActions('closed');
+        void onSessionExpired();
+        return;
+      } else {
+        setDeletingNote(false);
+        setOwnerActions('closed');
+        setDeleteError(true);
+        return;
+      }
+    }
+    setDeletingNote(false);
+    setOwnerActions('closed');
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  }, [apiClient, deletingNote, noteID, onSessionExpired, router]);
+
   const handleReportComment = useCallback(
     (commentID: string) => {
       dispatchReportForm({
@@ -766,6 +808,7 @@ function AuthenticatedNoteDetailScreen({
   }
 
   const readyNote = state.status === 'ready' ? state.note : undefined;
+  const isOwnNote = readyNote !== undefined && readyNote.author.id === currentAuthorID;
 
   return (
     <Screen
@@ -795,12 +838,24 @@ function AuthenticatedNoteDetailScreen({
           }
           right={
             readyNote ? (
-              <IconButton
-                accessibilityLabel="Denunciar nota"
-                icon={<IconFlag />}
-                onPress={handleReportNote}
-                testID="note-report"
-              />
+              isOwnNote ? (
+                <IconButton
+                  accessibilityLabel="Ações da nota"
+                  icon={<IconDots />}
+                  onPress={() => {
+                    setDeleteError(false);
+                    setOwnerActions('menu');
+                  }}
+                  testID="note-owner-menu"
+                />
+              ) : (
+                <IconButton
+                  accessibilityLabel="Denunciar nota"
+                  icon={<IconFlag />}
+                  onPress={handleReportNote}
+                  testID="note-report"
+                />
+              )
             ) : undefined
           }
         />
@@ -846,6 +901,17 @@ function AuthenticatedNoteDetailScreen({
               Não deu pra atualizar o Útil. Tenta de novo.
             </AppText>
           ) : null}
+          {deleteError ? (
+            <AppText
+              accessibilityRole="alert"
+              color={semanticColors.danger}
+              style={styles.usefulError}
+              testID="note-delete-error"
+              variant="sm"
+            >
+              Não deu pra excluir a nota. Tenta de novo.
+            </AppText>
+          ) : null}
           <NoteActionBar
             commentCount={displayedCommentCount(commentThread)}
             onFocusComposer={() => composerRef.current?.focus()}
@@ -877,6 +943,20 @@ function AuthenticatedNoteDetailScreen({
         }
         onCancel={() => dispatchReportForm({ type: 'close' })}
         onSubmit={handleSubmitReport}
+      />
+      <NoteOwnerActions
+        deleting={deletingNote}
+        onCancel={() => setOwnerActions('closed')}
+        onConfirmDelete={() => {
+          setDeleteError(false);
+          if (ownerActions === 'menu') {
+            setOwnerActions('confirmDelete');
+          } else {
+            void handleDeleteNote();
+          }
+        }}
+        onEdit={handleEditNote}
+        step={ownerActions}
       />
     </Screen>
   );

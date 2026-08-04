@@ -111,6 +111,72 @@ describe('notes API client', () => {
     ).rejects.toMatchObject(new APIRequestError(httpStatusBadRequest));
   });
 
+  it('sends update note requests with only the provided fields', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return jsonResponse(apiNote({ title: 'Cafe bom editado' }));
+    });
+
+    const client = createAPIClient(exampleToken);
+    await client.updateNote({
+      noteID: exampleNoteID,
+      title: 'Cafe bom editado',
+    });
+
+    const request = onlyFetchCall(calls);
+    expect(request.url).toBe(`http://localhost:8080/v1/notes/${exampleNoteID}`);
+    expect(request.method).toBe('PATCH');
+    expect(request.headers.get('content-type')).toBe('application/json');
+    await expect(requestJSON(request)).resolves.toEqual({ title: 'Cafe bom editado' });
+  });
+
+  it('parses updated notes from the API wire shape', async () => {
+    stubFetch(async () => jsonResponse(apiNote({ title: 'Cafe bom editado', body: 'corpo novo' })));
+
+    const client = createAPIClient(exampleToken);
+    const note = await client.updateNote({
+      noteID: exampleNoteID,
+      body: 'corpo novo',
+      title: 'Cafe bom editado',
+    });
+
+    expect(note.title).toBe('Cafe bom editado');
+  });
+
+  it('sends delete note requests', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return new Response(null, { status: 204 });
+    });
+
+    const client = createAPIClient(exampleToken);
+    await client.deleteNote(exampleNoteID);
+
+    const request = onlyFetchCall(calls);
+    expect(request.url).toBe(`http://localhost:8080/v1/notes/${exampleNoteID}`);
+    expect(request.method).toBe('DELETE');
+  });
+
+  it('raises a request error for a forbidden note delete', async () => {
+    stubFetch(async () => unreadableResponse(403));
+
+    const client = createAPIClient(exampleToken);
+    await expect(client.deleteNote(exampleNoteID)).rejects.toMatchObject(
+      new APIRequestError(403),
+    );
+  });
+
+  it('raises a request error for an unknown note update', async () => {
+    stubFetch(async () => unreadableResponse(httpStatusNotFound));
+
+    const client = createAPIClient(exampleToken);
+    await expect(
+      client.updateNote({ noteID: exampleNoteID, title: 'sumido' }),
+    ).rejects.toMatchObject(new APIRequestError(httpStatusNotFound));
+  });
+
   it('parses listed notes from the API list response shape', async () => {
     stubFetch(async () => jsonResponse(apiListNotesResponse()));
 

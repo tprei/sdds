@@ -51,6 +51,7 @@ const mocks = vi.hoisted(() => ({
     listNoteComments: vi.fn(),
     unmarkNoteUseful: vi.fn(),
     createReport: vi.fn(),
+    deleteNote: vi.fn(),
   },
   focusVersion: 0,
   authState: { status: 'loading' } as AuthStateMock,
@@ -136,6 +137,7 @@ vi.mock('@/ui/icon-button', () => ({
 }));
 vi.mock('@/ui/icons', () => ({
   IconChevronLeft: () => createElement('svg', null),
+  IconDots: () => createElement('svg', null),
   IconFlag: () => createElement('svg', null),
 }));
 vi.mock('@/ui/haptics', () => ({
@@ -150,7 +152,7 @@ vi.mock('expo-router', async () => {
       react.useEffect(effect, [effect, mocks.focusVersion]);
     },
     useLocalSearchParams: () => mocks.localParams,
-    useRouter: () => ({ back: mocks.back, push: mocks.push }),
+    useRouter: () => ({ back: mocks.back, canGoBack: () => true, push: mocks.push, replace: vi.fn() }),
   };
 });
 
@@ -242,7 +244,7 @@ function deferred<T>(): Deferred<T> {
 }
 
 const note = {
-  author: { displayName: 'Thiago', id: 'author-id' },
+  author: { displayName: 'Thiago', id: 'note-author-id' },
   body: 'Tem pão de queijo decente.',
   categorySlug: 'food',
   createdAt: testTimestamp(),
@@ -1038,6 +1040,56 @@ describe('NoteDetailScreen route', () => {
     expect(
       hostTextCount(renderer, 'Valeu por avisar! A gente cuida pra rede seguir feita pra humanos.'),
     ).toBe(0);
+  });
+
+  it('deletes an own note and pops back after the owner confirms', async () => {
+    mocks.apiClient.getNote.mockResolvedValueOnce({
+      ...note,
+      author: { displayName: 'Thiago', id: 'author-id' },
+    });
+    mocks.apiClient.deleteNote.mockResolvedValueOnce(undefined);
+    const renderer = await renderScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'note-owner-menu' }).props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      renderer.root.findByProps({ accessibilityLabel: 'Excluir nota' }).props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'note-delete-confirm' }).props.onPress();
+      await settle();
+    });
+
+    expect(mocks.apiClient.deleteNote).toHaveBeenCalledWith('note-id');
+    expect(mocks.back).toHaveBeenCalled();
+  });
+
+  it('surfaces a delete error and stays mounted when the note delete fails', async () => {
+    mocks.apiClient.getNote.mockResolvedValueOnce({
+      ...note,
+      author: { displayName: 'Thiago', id: 'author-id' },
+    });
+    mocks.apiClient.deleteNote.mockRejectedValueOnce(new Error('server down'));
+    const renderer = await renderScreen();
+
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'note-owner-menu' }).props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      renderer.root.findByProps({ accessibilityLabel: 'Excluir nota' }).props.onPress();
+      await settle();
+    });
+    await act(async () => {
+      renderer.root.findByProps({ testID: 'note-delete-confirm' }).props.onPress();
+      await settle();
+    });
+
+    expect(mocks.back).not.toHaveBeenCalled();
+    expect(hostCount(renderer, 'note-delete-error')).toBeGreaterThanOrEqual(1);
   });
 });
 

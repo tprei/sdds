@@ -33,6 +33,7 @@ import type { SearchVersion } from '@/lib/api/notes';
 import { useProductEvents } from '@/lib/events/product-event-provider';
 import { productEventKinds } from '@/lib/events/event-types';
 import { registerPresentedNoteOrigin } from '@/features/notes/presented-note-origin';
+import { isNoteDeleted } from '@/features/notes/deleted-notes';
 import { estimateNoteCardHeight } from '@/features/notes/note-card-estimate';
 import { SearchIdle } from '@/features/notes/search-idle';
 import { BrandHeader } from '@/features/auth/brand-header';
@@ -795,7 +796,7 @@ function SearchStateContent({
       />
       <MasonryGrid
         columnCount={gridLayout.columnCount}
-        items={state.results}
+        items={state.results.filter((result) => !isNoteDeleted(result.note.id))}
         keyFor={(result) => result.note.id}
         estimateHeight={(result) =>
           estimateNoteCardHeight(result.note, gridLayout.columnWidth)

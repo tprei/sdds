@@ -8,7 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import NoteDetailScreen from '@/app/notes/[id]';
-import type { Comment, CommentPage } from '@/lib/api/comments';
+import type { Comment, CommentPage, CommentThread } from '@/lib/api/comments';
 import type { CommentThreadState } from '@/features/comments/comment-thread';
 import { registerPresentedNoteOrigin } from './presented-note-origin';
 
@@ -269,7 +269,7 @@ describe('NoteDetailScreen route', () => {
     mocks.apiClient.listCatalogs.mockResolvedValue({ categories: [] });
     mocks.apiClient.getNote.mockResolvedValue(note);
     mocks.apiClient.listNoteComments.mockResolvedValue({
-      comments: [],
+      threads: [],
       nextCursor: null,
     });
     mocks.apiClient.createNoteComment.mockReset();
@@ -427,13 +427,13 @@ describe('NoteDetailScreen route', () => {
     expect(renderer.root.findByProps({ testID: 'useful-state' }).props.children).toBe(
       '1:true',
     );
-    expect(renderedCommentThread(renderer).comments).toEqual([secondComment]);
+    expect(renderedCommentThread(renderer).threads).toEqual([thread(secondComment)]);
 
     await act(async () => {
       refocusedNote.resolve(note);
       await settle();
     });
-    expect(renderedCommentThread(renderer).comments).toEqual([secondComment]);
+    expect(renderedCommentThread(renderer).threads).toEqual([thread(secondComment)]);
   });
 
 
@@ -488,7 +488,7 @@ describe('NoteDetailScreen route', () => {
       noteID: 'note-id',
     });
     expect(commentsSection(renderer).props.currentAuthorID).toBe('author-id');
-    expect(renderedCommentThread(renderer).comments).toEqual([firstComment]);
+    expect(renderedCommentThread(renderer).threads).toEqual([thread(firstComment)]);
 
     await act(async () => {
       commentsSection(renderer).props.onLoadMore();
@@ -499,9 +499,9 @@ describe('NoteDetailScreen route', () => {
       cursor: 'cursor-1',
       noteID: 'note-id',
     });
-    expect(renderedCommentThread(renderer).comments).toEqual([
-      firstComment,
-      secondComment,
+    expect(renderedCommentThread(renderer).threads).toEqual([
+      thread(firstComment),
+      thread(secondComment),
     ]);
   });
 
@@ -537,8 +537,8 @@ describe('NoteDetailScreen route', () => {
       noteID: 'note-id',
     });
     expect(renderedCommentThread(renderer).draft).toBe('');
-    expect(renderedCommentThread(renderer).localTailComments).toEqual([
-      submittedComment,
+    expect(renderedCommentThread(renderer).localTailThreads).toEqual([
+      thread(submittedComment),
     ]);
     expect(mocks.record).toHaveBeenCalledWith('comment_created', {
       commentID: submittedComment.id,
@@ -559,7 +559,7 @@ describe('NoteDetailScreen route', () => {
       await settle();
     });
     expect(renderedCommentThread(renderer).initialLoadStatus).toBe('ready');
-    expect(renderedCommentThread(renderer).comments).toEqual([firstComment]);
+    expect(renderedCommentThread(renderer).threads).toEqual([thread(firstComment)]);
 
     mocks.apiClient.createNoteComment.mockRejectedValueOnce({ status: 500 });
     await act(async () => {
@@ -677,13 +677,13 @@ describe('NoteDetailScreen route', () => {
       renderer.update(createElement(NoteDetailScreen));
       await settle();
     });
-    expect(renderedCommentThread(renderer).comments).toEqual([secondComment]);
+    expect(renderedCommentThread(renderer).threads).toEqual([thread(secondComment)]);
 
     await act(async () => {
       stalePage.resolve(commentPage([firstComment]));
       await settle();
     });
-    expect(renderedCommentThread(renderer).comments).toEqual([secondComment]);
+    expect(renderedCommentThread(renderer).threads).toEqual([thread(secondComment)]);
   });
 
   it('ignores create and delete completions after the note route changes', async () => {
@@ -719,19 +719,19 @@ describe('NoteDetailScreen route', () => {
       renderer.update(createElement(NoteDetailScreen));
       await settle();
     });
-    expect(renderedCommentThread(renderer).comments).toEqual([nextRouteComment]);
+    expect(renderedCommentThread(renderer).threads).toEqual([thread(nextRouteComment)]);
 
     await act(async () => {
       staleCreate.resolve(submittedComment);
       staleDelete.resolve();
       await settle();
     });
-    expect(renderedCommentThread(renderer).comments).toEqual([nextRouteComment]);
+    expect(renderedCommentThread(renderer).threads).toEqual([thread(nextRouteComment)]);
     expect(mocks.record).toHaveBeenCalledWith('comment_created', {
       commentID: submittedComment.id,
       noteID: 'note-id',
     });
-    expect(renderedCommentThread(renderer).localTailComments).toEqual([]);
+    expect(renderedCommentThread(renderer).localTailThreads).toEqual([]);
     expect(renderedCommentThread(renderer).deleteStatusByCommentID).toEqual(
       new Map(),
     );
@@ -971,14 +971,19 @@ function comment(id: string, body: string): Comment {
     body,
     createdAt: testTimestamp(),
     id,
+    parentCommentID: null,
   };
+}
+
+function thread(comment: Comment): CommentThread {
+  return { comment, replies: [], hasMoreReplies: false };
 }
 
 function commentPage(
   comments: Comment[],
   nextCursor: string | null = null,
 ): CommentPage {
-  return { comments, nextCursor };
+  return { threads: comments.map(thread), nextCursor };
 }
 
 function testTimestamp(): number {

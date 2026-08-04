@@ -53,7 +53,10 @@ func TestCreateNoteCommentReturnsPublicComment(t *testing.T) {
 		t.Fatal("CreateComment was not called")
 	}
 	wire := decodeResponseObject(t, response.Body.Bytes())
-	requireExactJSONKeys(t, wire, "id", "body", "author", "created_at")
+	requireExactJSONKeys(t, wire, "id", "body", "author", "created_at", "parent_comment_id")
+	if wire["parent_comment_id"] != nil {
+		t.Fatalf("parent_comment_id = %#v, want null for top-level comment", wire["parent_comment_id"])
+	}
 	if wire["id"] != exampleCommentID {
 		t.Fatalf("id = %#v, want %q", wire["id"], exampleCommentID)
 	}
@@ -139,16 +142,21 @@ func TestListNoteCommentsDefaultsLimitAndReturnsOpaqueCursor(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 	wire := decodeResponseObject(t, response.Body.Bytes())
-	requireExactJSONKeys(t, wire, "comments", "next_cursor")
-	commentsWire, ok := wire["comments"].([]any)
-	if !ok || len(commentsWire) != 1 {
-		t.Fatalf("comments = %#v, want one comment", wire["comments"])
+	requireExactJSONKeys(t, wire, "threads", "next_cursor")
+	threadsWire, ok := wire["threads"].([]any)
+	if !ok || len(threadsWire) != 1 {
+		t.Fatalf("threads = %#v, want one thread", wire["threads"])
 	}
-	commentWire, ok := commentsWire[0].(map[string]any)
+	threadWire, ok := threadsWire[0].(map[string]any)
 	if !ok {
-		t.Fatalf("comment = %T, want object", commentsWire[0])
+		t.Fatalf("thread = %T, want object", threadsWire[0])
 	}
-	requireExactJSONKeys(t, commentWire, "id", "body", "author", "created_at")
+	requireExactJSONKeys(t, threadWire, "comment", "replies", "has_more_replies")
+	commentWire, ok := threadWire["comment"].(map[string]any)
+	if !ok {
+		t.Fatalf("comment = %T, want object", threadWire["comment"])
+	}
+	requireExactJSONKeys(t, commentWire, "id", "body", "author", "created_at", "parent_comment_id")
 	nextCursor, ok := wire["next_cursor"].(string)
 	if !ok || nextCursor == "" {
 		t.Fatalf("next_cursor = %#v, want non-empty string", wire["next_cursor"])
@@ -192,9 +200,9 @@ func TestListNoteCommentsPassesContinuationCursor(t *testing.T) {
 	if wire["next_cursor"] != nil {
 		t.Fatalf("next_cursor = %#v, want null", wire["next_cursor"])
 	}
-	commentsWire, ok := wire["comments"].([]any)
-	if !ok || len(commentsWire) != 0 {
-		t.Fatalf("comments = %#v, want empty array", wire["comments"])
+	threadsWire, ok := wire["threads"].([]any)
+	if !ok || len(threadsWire) != 0 {
+		t.Fatalf("threads = %#v, want empty array", wire["threads"])
 	}
 }
 

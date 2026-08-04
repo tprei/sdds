@@ -45,6 +45,7 @@ export type CommentResponse = {
   body: string;
   created_at: number;
   id: string;
+  parent_comment_id: string | null;
 };
 
 export type PublicAuthorResponse = {
@@ -84,7 +85,7 @@ export type ValidationProblem = {
 };
 
 export const authorSummaryKeys = ['display_name', 'id'] as const;
-export const commentResponseKeys = ['author', 'body', 'created_at', 'id'] as const;
+export const commentResponseKeys = ['author', 'body', 'created_at', 'id', 'parent_comment_id'] as const;
 export const searchNoteResultKeys = ['note', 'retrieval_source'] as const;
 export const searchNotesResponseKeys = ['results', 'search_version'] as const;
 export const listNotesResponseKeys = ['notes'] as const;
@@ -254,7 +255,9 @@ export function isCommentResponse(value: unknown): value is CommentResponse {
     isAuthorSummary(value.author) &&
     typeof value.created_at === 'number' &&
     Number.isInteger(value.created_at) &&
-    value.created_at >= 0
+    value.created_at >= 0 &&
+    (typeof value.parent_comment_id === 'string' ||
+      value.parent_comment_id === null)
   );
 }
 

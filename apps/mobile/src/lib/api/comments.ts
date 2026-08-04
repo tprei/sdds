@@ -17,10 +17,17 @@ export type Comment = {
   body: string;
   author: CommentAuthor;
   createdAt: number;
+  parentCommentID: string | null;
+};
+
+export type CommentThread = {
+  comment: Comment;
+  replies: Comment[];
+  hasMoreReplies: boolean;
 };
 
 export type CommentPage = {
-  comments: Comment[];
+  threads: CommentThread[];
   nextCursor: string | null;
 };
 
@@ -32,6 +39,11 @@ export type ListNoteCommentsInput = {
 
 export type CreateNoteCommentInput = {
   noteID: string;
+  body: string;
+};
+
+export type CreateCommentReplyInput = {
+  parentCommentID: string;
   body: string;
 };
 
@@ -48,6 +60,7 @@ type CreateCommentRequest = GeneratedSchemas['CreateCommentRequest'];
 export type CommentsAPI = {
   listNoteComments(input: ListNoteCommentsInput): Promise<CommentPage>;
   createNoteComment(input: CreateNoteCommentInput): Promise<Comment>;
+  createCommentReply(input: CreateCommentReplyInput): Promise<Comment>;
   deleteNoteComment(input: DeleteNoteCommentInput): Promise<void>;
 };
 
@@ -74,6 +87,22 @@ export function bindCommentsAPI(transport: TypedTransport): CommentsAPI {
           params: { path: { note_id: input.noteID } },
           body: request,
         });
+        return parseCommentResponse(data);
+      } catch (error) {
+        rewrapTransportError(error);
+      }
+    },
+
+    async createCommentReply(input) {
+      const request: CreateCommentRequest = { body: input.body };
+      try {
+        const { data } = await transport.POST(
+          '/v1/comments/{comment_id}/replies',
+          {
+            params: { path: { comment_id: input.parentCommentID } },
+            body: request,
+          },
+        );
         return parseCommentResponse(data);
       } catch (error) {
         rewrapTransportError(error);
@@ -120,7 +149,11 @@ function parseCommentPage(value: unknown): CommentPage {
     throw new APIResponseError();
   }
   return {
-    comments: response.data.comments.map(mapCommentResponse),
+    threads: response.data.threads.map((thread) => ({
+      comment: mapCommentResponse(thread.comment),
+      replies: thread.replies.map(mapCommentResponse),
+      hasMoreReplies: thread.has_more_replies,
+    })),
     nextCursor: response.data.next_cursor,
   };
 }
@@ -142,5 +175,6 @@ function mapCommentResponse(value: CommentResponse): Comment {
       displayName: value.author.display_name,
     },
     createdAt: value.created_at,
+    parentCommentID: value.parent_comment_id,
   };
 }

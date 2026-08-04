@@ -79,7 +79,7 @@ func writeOpenAPIRequestValidationError(w http.ResponseWriter, r *http.Request, 
 		writeError(w, http.StatusRequestEntityTooLarge, openapi.ErrorResponse{Code: openapi.ErrorCodeRequestTooLarge})
 		return
 	}
-	if response, ok := invalidCreateNoteCommentBody(err); ok {
+	if response, ok := invalidCreateCommentBody(err); ok {
 		writeError(w, http.StatusBadRequest, response)
 		return
 	}

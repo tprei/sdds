@@ -224,6 +224,7 @@ func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandl
 			router.Get("/notes/{note_id}/comments", wrapper.ListNoteComments)
 			router.Post("/notes/{note_id}/comments", wrapper.CreateNoteComment)
 			router.Delete("/notes/{note_id}/comments/{comment_id}", wrapper.DeleteNoteComment)
+			router.Post("/comments/{comment_id}/replies", wrapper.CreateCommentReply)
 			router.Post("/reports", wrapper.CreateReport)
 			router.Post("/events", wrapper.CreateEvents)
 			router.Get("/search/notes", wrapper.SearchNotes)

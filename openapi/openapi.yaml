@@ -811,6 +811,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/comments/{comment_id}/replies:
+    post:
+      operationId: createCommentReply
+      summary: Reply to a top-level note comment
+      tags:
+        - Notes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: comment_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+      responses:
+        "201":
+          description: The created reply.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          description: Invalid JSON or reply body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is missing a valid authenticated session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The parent comment or its note was not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The parent comment is itself a reply.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: The request body exceeds 8 KiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not create the reply.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/notes/{note_id}/useful:
     put:
       operationId: markNoteUseful
@@ -1141,6 +1204,7 @@ components:
         - body
         - author
         - created_at
+        - parent_comment_id
       properties:
         id:
           type: string
@@ -1155,6 +1219,26 @@ components:
           format: int64
           minimum: 0
           description: Unix timestamp in milliseconds.
+        parent_comment_id:
+          type: string
+          nullable: true
+    CommentThread:
+      type: object
+      additionalProperties: false
+      required:
+        - comment
+        - replies
+        - has_more_replies
+      properties:
+        comment:
+          $ref: "#/components/schemas/Comment"
+        replies:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/Comment"
+        has_more_replies:
+          type: boolean
     ImageUploadReceipt:
       type: object
       additionalProperties: false
@@ -1382,6 +1466,7 @@ components:
         - ErrorCodeInvalidEvent
         - ErrorCodeInvalidEventBatch
         - ErrorCodeEmbeddingUnavailable
+        - ErrorCodeInvalidReplyTarget
       enum:
         - internal_error
         - forbidden
@@ -1408,6 +1493,7 @@ components:
         - invalid_event
         - invalid_event_batch
         - embedding_unavailable
+        - invalid_reply_target
     ErrorResponse:
       type: object
       additionalProperties: false
@@ -2168,13 +2254,13 @@ components:
       type: object
       additionalProperties: false
       required:
-        - comments
+        - threads
         - next_cursor
       properties:
-        comments:
+        threads:
           type: array
           items:
-            $ref: "#/components/schemas/Comment"
+            $ref: "#/components/schemas/CommentThread"
         next_cursor:
           type: string
           minLength: 1
@@ -2302,6 +2388,7 @@ components:
         - ValidationFieldTargetID
         - ValidationFieldReason
         - ValidationFieldDetails
+        - ValidationFieldParentCommentID
       enum:
         - title
         - body
@@ -2320,6 +2407,7 @@ components:
         - target_id
         - reason
         - details
+        - parent_comment_id
     ValidationProblem:
       type: object
       additionalProperties: false

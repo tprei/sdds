@@ -35,6 +35,7 @@ const (
 	ErrorCodeInvalidJSON               ErrorCode = "invalid_json"
 	ErrorCodeInvalidMedia              ErrorCode = "invalid_media"
 	ErrorCodeInvalidNote               ErrorCode = "invalid_note"
+	ErrorCodeInvalidReplyTarget        ErrorCode = "invalid_reply_target"
 	ErrorCodeInvalidReport             ErrorCode = "invalid_report"
 	ErrorCodeInvalidSearch             ErrorCode = "invalid_search"
 	ErrorCodeMediaIntegrityError       ErrorCode = "media_integrity_error"
@@ -75,6 +76,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeInvalidMedia:
 		return true
 	case ErrorCodeInvalidNote:
+		return true
+	case ErrorCodeInvalidReplyTarget:
 		return true
 	case ErrorCodeInvalidReport:
 		return true
@@ -738,6 +741,7 @@ const (
 	ValidationFieldFile            ValidationField = "file"
 	ValidationFieldImageUploadIDs  ValidationField = "image_upload_ids"
 	ValidationFieldLimit           ValidationField = "limit"
+	ValidationFieldParentCommentID ValidationField = "parent_comment_id"
 	ValidationFieldPassword        ValidationField = "password"
 	ValidationFieldQ               ValidationField = "q"
 	ValidationFieldReason          ValidationField = "reason"
@@ -768,6 +772,8 @@ func (e ValidationField) Valid() bool {
 	case ValidationFieldImageUploadIDs:
 		return true
 	case ValidationFieldLimit:
+		return true
+	case ValidationFieldParentCommentID:
 		return true
 	case ValidationFieldPassword:
 		return true
@@ -857,8 +863,16 @@ type Comment struct {
 	Body   string        `json:"body"`
 
 	// CreatedAt Unix timestamp in milliseconds.
-	CreatedAt int64  `json:"created_at"`
-	Id        string `json:"id"`
+	CreatedAt       int64   `json:"created_at"`
+	Id              string  `json:"id"`
+	ParentCommentId *string `json:"parent_comment_id"`
+}
+
+// CommentThread defines model for CommentThread.
+type CommentThread struct {
+	Comment        Comment   `json:"comment"`
+	HasMoreReplies bool      `json:"has_more_replies"`
+	Replies        []Comment `json:"replies"`
 }
 
 // CreateCommentRequest defines model for CreateCommentRequest.
@@ -1357,8 +1371,8 @@ type ListCategoriesResponse struct {
 
 // ListNoteCommentsResponse defines model for ListNoteCommentsResponse.
 type ListNoteCommentsResponse struct {
-	Comments   []Comment `json:"comments"`
-	NextCursor *string   `json:"next_cursor"`
+	NextCursor *string         `json:"next_cursor"`
+	Threads    []CommentThread `json:"threads"`
 }
 
 // ListNotesResponse defines model for ListNotesResponse.
@@ -1508,6 +1522,9 @@ type CreateAuthSessionJSONRequestBody = CreateSessionRequest
 
 // CreateAuthUserJSONRequestBody defines body for CreateAuthUser for application/json ContentType.
 type CreateAuthUserJSONRequestBody = CreateUserRequest
+
+// CreateCommentReplyJSONRequestBody defines body for CreateCommentReply for application/json ContentType.
+type CreateCommentReplyJSONRequestBody = CreateCommentRequest
 
 // CreateEventsJSONRequestBody defines body for CreateEvents for application/json ContentType.
 type CreateEventsJSONRequestBody = CreateEventsRequest
@@ -2228,6 +2245,11 @@ type ClientInterface interface {
 	// ListCategories request
 	ListCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CreateCommentReplyWithBody request with any body
+	CreateCommentReplyWithBody(ctx context.Context, commentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateCommentReply(ctx context.Context, commentId string, body CreateCommentReplyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// CreateEventsWithBody request with any body
 	CreateEventsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -2398,6 +2420,30 @@ func (c *Client) ListAuthorNotes(ctx context.Context, authorId string, params *L
 
 func (c *Client) ListCategories(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListCategoriesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateCommentReplyWithBody(ctx context.Context, commentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateCommentReplyRequestWithBody(c.Server, commentId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateCommentReply(ctx context.Context, commentId string, body CreateCommentReplyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateCommentReplyRequest(c.Server, commentId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2930,6 +2976,53 @@ func NewListCategoriesRequest(server string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewCreateCommentReplyRequest calls the generic CreateCommentReply builder with application/json body
+func NewCreateCommentReplyRequest(server string, commentId string, body CreateCommentReplyJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateCommentReplyRequestWithBody(server, commentId, "application/json", bodyReader)
+}
+
+// NewCreateCommentReplyRequestWithBody generates requests for CreateCommentReply with any type of body
+func NewCreateCommentReplyRequestWithBody(server string, commentId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "comment_id", commentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/comments/%s/replies", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -3574,6 +3667,11 @@ type ClientWithResponsesInterface interface {
 	// ListCategoriesWithResponse request
 	ListCategoriesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCategoriesHTTPResponse, error)
 
+	// CreateCommentReplyWithBodyWithResponse request with any body
+	CreateCommentReplyWithBodyWithResponse(ctx context.Context, commentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateCommentReplyHTTPResponse, error)
+
+	CreateCommentReplyWithResponse(ctx context.Context, commentId string, body CreateCommentReplyJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateCommentReplyHTTPResponse, error)
+
 	// CreateEventsWithBodyWithResponse request with any body
 	CreateEventsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateEventsHTTPResponse, error)
 
@@ -3912,6 +4010,42 @@ func (r ListCategoriesHTTPResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListCategoriesHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateCommentReplyHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *Comment
+	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
+	JSON404      *ErrorResponse
+	JSON409      *ErrorResponse
+	JSON413      *ErrorResponse
+	JSON500      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateCommentReplyHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateCommentReplyHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateCommentReplyHTTPResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -4458,6 +4592,23 @@ func (c *ClientWithResponses) ListCategoriesWithResponse(ctx context.Context, re
 		return nil, err
 	}
 	return ParseListCategoriesHTTPResponse(rsp)
+}
+
+// CreateCommentReplyWithBodyWithResponse request with arbitrary body returning *CreateCommentReplyHTTPResponse
+func (c *ClientWithResponses) CreateCommentReplyWithBodyWithResponse(ctx context.Context, commentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateCommentReplyHTTPResponse, error) {
+	rsp, err := c.CreateCommentReplyWithBody(ctx, commentId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateCommentReplyHTTPResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateCommentReplyWithResponse(ctx context.Context, commentId string, body CreateCommentReplyJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateCommentReplyHTTPResponse, error) {
+	rsp, err := c.CreateCommentReply(ctx, commentId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateCommentReplyHTTPResponse(rsp)
 }
 
 // CreateEventsWithBodyWithResponse request with arbitrary body returning *CreateEventsHTTPResponse
@@ -5012,6 +5163,74 @@ func ParseListCategoriesHTTPResponse(rsp *http.Response) (*ListCategoriesHTTPRes
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateCommentReplyHTTPResponse parses an HTTP response from a CreateCommentReplyWithResponse call
+func ParseCreateCommentReplyHTTPResponse(rsp *http.Response) (*CreateCommentReplyHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateCommentReplyHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Comment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse

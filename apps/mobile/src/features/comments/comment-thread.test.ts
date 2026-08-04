@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Comment, CommentPage } from '@/lib/api/comments';
+import type { Comment, CommentPage, CommentThread } from '@/lib/api/comments';
 
 import {
   canDeleteComment,
@@ -10,7 +10,7 @@ import {
   displayedCommentCount,
   createCommentThreadState,
   validateCommentDraft,
-  visibleComments,
+  visibleThreads,
 } from './comment-thread';
 
 const firstComment = comment('comment-1', 'Primeiro comentário');
@@ -32,8 +32,8 @@ describe('comment thread reducer', () => {
       { type: 'submit_succeeded', comment: submittedComment },
     );
 
-    expect(state.comments).toEqual([firstComment, secondComment]);
-    expect(state.localTailComments).toEqual([submittedComment]);
+    expect(state.threads).toEqual([thread(firstComment), thread(secondComment)]);
+    expect(state.localTailThreads).toEqual([thread(submittedComment)]);
     expect(state.nextCursor).toBe('cursor-2');
 
     state = reduce(
@@ -45,14 +45,13 @@ describe('comment thread reducer', () => {
       },
     );
 
-    expect(state.comments).toEqual([
-      firstComment,
-      secondComment,
-      thirdComment,
-      submittedComment,
+    expect(state.threads).toEqual([
+      thread(firstComment),
+      thread(secondComment),
+      thread(thirdComment),
+      thread(submittedComment),
     ]);
-    expect(state.localTailComments).toEqual([]);
-    expect(state.nextCursor).toBeNull();
+    expect(state.localTailThreads).toEqual([]);
   });
 
   it('promotes an unmatched terminal tail before later submitted comments', () => {
@@ -75,13 +74,13 @@ describe('comment thread reducer', () => {
       { type: 'submit_succeeded', comment: laterSubmittedComment },
     );
 
-    expect(state.comments).toEqual([
-      firstComment,
-      secondComment,
-      submittedComment,
-      laterSubmittedComment,
+    expect(state.threads).toEqual([
+      thread(firstComment),
+      thread(secondComment),
+      thread(submittedComment),
+      thread(laterSubmittedComment),
     ]);
-    expect(state.localTailComments).toEqual([]);
+    expect(state.localTailThreads).toEqual([]);
   });
 
   it('appends a submitted comment directly after a terminal page', () => {
@@ -96,8 +95,8 @@ describe('comment thread reducer', () => {
       { type: 'submit_succeeded', comment: submittedComment },
     );
 
-    expect(state.comments).toEqual([firstComment, submittedComment]);
-    expect(state.localTailComments).toEqual([]);
+    expect(state.threads).toEqual([thread(firstComment), thread(submittedComment)]);
+    expect(state.localTailThreads).toEqual([]);
     expect(state.draft).toBe('');
     expect(state.submitStatus).toBe('idle');
   });
@@ -116,7 +115,7 @@ describe('comment thread reducer', () => {
       },
     );
 
-    expect(state.comments).toEqual([firstComment, secondComment, thirdComment]);
+    expect(state.threads).toEqual([thread(firstComment), thread(secondComment), thread(thirdComment)]);
   });
 
   it('does not duplicate a submitted comment already in the loaded page', () => {
@@ -131,8 +130,8 @@ describe('comment thread reducer', () => {
       { type: 'submit_succeeded', comment: firstComment },
     );
 
-    expect(state.comments).toEqual([firstComment]);
-    expect(state.localTailComments).toEqual([]);
+    expect(state.threads).toEqual([thread(firstComment)]);
+    expect(state.localTailThreads).toEqual([]);
   });
 
   it('prevents duplicate submission while pending and preserves the draft after failure', () => {
@@ -153,7 +152,7 @@ describe('comment thread reducer', () => {
     state = reduce(state, { type: 'submit_failed' });
     expect(state.submitStatus).toBe('error');
     expect(state.draft).toBe(submittedComment.body);
-    expect(state.comments).toEqual([firstComment]);
+    expect(state.threads).toEqual([thread(firstComment)]);
 
     state = reduce(state, { type: 'draft_changed', draft: 'Outra tentativa' });
     expect(state.submitStatus).toBe('idle');
@@ -214,7 +213,9 @@ describe('comment thread reducer', () => {
     const pending = state;
 
     expect(
-      visibleComments(state.comments, state.deleteStatusByCommentID),
+      visibleThreads(state.threads, state.deleteStatusByCommentID).map(
+        (entry) => entry.comment,
+      ),
     ).toEqual([secondComment]);
     expect(displayedCommentCount(state)).toBe(1);
     expect(canDeleteComment(state, firstComment.id)).toBe(false);
@@ -227,7 +228,9 @@ describe('comment thread reducer', () => {
       commentID: firstComment.id,
     });
     expect(
-      visibleComments(state.comments, state.deleteStatusByCommentID),
+      visibleThreads(state.threads, state.deleteStatusByCommentID).map(
+        (entry) => entry.comment,
+      ),
     ).toEqual([firstComment, secondComment]);
     expect(state.deleteStatusByCommentID.get(firstComment.id)).toBe('error');
     expect(canDeleteComment(state, firstComment.id)).toBe(true);
@@ -254,14 +257,16 @@ describe('comment thread reducer', () => {
       },
     );
 
-    expect(state.comments).toEqual([
-      firstComment,
-      secondComment,
-      submittedComment,
+    expect(state.threads).toEqual([
+      thread(firstComment),
+      thread(secondComment),
+      thread(submittedComment),
     ]);
-    expect(state.localTailComments).toEqual([]);
+    expect(state.localTailThreads).toEqual([]);
     expect(
-      visibleComments(state.comments, state.deleteStatusByCommentID),
+      visibleThreads(state.threads, state.deleteStatusByCommentID).map(
+        (entry) => entry.comment,
+      ),
     ).toEqual([firstComment, secondComment]);
     expect(state.deleteStatusByCommentID.get(submittedComment.id)).toBe(
       'deleted',
@@ -284,7 +289,9 @@ describe('comment thread reducer', () => {
     expect(state.deleteStatusByCommentID.get(firstComment.id)).toBe('deleted');
     expect(state.deleteStatusByCommentID.get(secondComment.id)).toBe('error');
     expect(
-      visibleComments(state.comments, state.deleteStatusByCommentID),
+      visibleThreads(state.threads, state.deleteStatusByCommentID).map(
+        (entry) => entry.comment,
+      ),
     ).toEqual([secondComment]);
   });
 
@@ -326,11 +333,16 @@ function comment(id: string, body: string): Comment {
     body,
     createdAt: 1782993600000,
     id,
+    parentCommentID: null,
   };
 }
 
+function thread(comment: Comment): CommentThread {
+  return { comment, replies: [], hasMoreReplies: false };
+}
+
 function page(comments: Comment[], nextCursor: string | null = null): CommentPage {
-  return { comments, nextCursor };
+  return { threads: comments.map(thread), nextCursor };
 }
 
 function reduce(

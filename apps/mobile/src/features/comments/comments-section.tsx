@@ -4,7 +4,7 @@ import { View } from 'react-native';
 
 import { componentMetrics, semanticColors } from '@sdds/tokens';
 
-import type { Comment } from '@/lib/api/comments';
+import type { CommentThread } from '@/lib/api/comments';
 import { Avatar } from '@/ui/avatar';
 import { Badge } from '@/ui/badge';
 import { Button } from '@/ui/button';
@@ -19,7 +19,7 @@ import {
   commentBodyMaxCodePoints,
   canSubmitComment,
   displayedCommentCount,
-  visibleComments,
+  visibleThreads,
   validateCommentDraft,
 } from './comment-thread';
 import { styles } from './comments-section.styles';
@@ -64,7 +64,7 @@ export function CommentsSection({
       <AppText accessibilityRole="header" variant="title" weight="extraBold">
         {displayedCommentCount(thread)} comentários
       </AppText>
-      <CommentThread
+      <CommentThreadView
         currentAuthorID={currentAuthorID}
         noteAuthorID={noteAuthorID}
         onDeleteComment={onDeleteComment}
@@ -110,7 +110,7 @@ export function CommentsSection({
   );
 }
 
-function CommentThread({
+function CommentThreadView({
   currentAuthorID,
   noteAuthorID,
   onDeleteComment,
@@ -160,8 +160,8 @@ function CommentThread({
         <StatusMessage>Ainda não tem comentário. Quer começar?</StatusMessage>
       ) : null}
       <CommentList
-        comments={visibleComments(
-          thread.comments,
+        threads={visibleThreads(
+          thread.threads,
           thread.deleteStatusByCommentID,
         )}
         currentAuthorID={currentAuthorID}
@@ -173,8 +173,8 @@ function CommentThread({
       />
       <LoadMoreControl onLoadMore={onLoadMore} thread={thread} />
       <CommentList
-        comments={visibleComments(
-          thread.localTailComments,
+        threads={visibleThreads(
+          thread.localTailThreads,
           thread.deleteStatusByCommentID,
         )}
         currentAuthorID={currentAuthorID}
@@ -251,7 +251,7 @@ function StatusMessage({ children }: { children: string }) {
 }
 
 function CommentList({
-  comments,
+  threads,
   currentAuthorID,
   deleteStatusByCommentID,
   noteAuthorID,
@@ -259,7 +259,7 @@ function CommentList({
   onPressAuthor,
   onReportComment,
 }: {
-  comments: Comment[];
+  threads: CommentThread[];
   currentAuthorID: string;
   deleteStatusByCommentID: ReadonlyMap<string, CommentDeleteStatus>;
   noteAuthorID: string;
@@ -267,7 +267,7 @@ function CommentList({
   onReportComment: (commentID: string) => void;
   onPressAuthor: (authorID: string) => void;
 }) {
-  return comments.map((comment) => (
+  return threads.map(({ comment }) => (
     <View key={comment.id} style={styles.comment}>
       <View style={styles.commentHeader}>
         <PressableScale

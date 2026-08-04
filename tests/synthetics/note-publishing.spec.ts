@@ -214,8 +214,8 @@ test('edits and deletes an own note through the owner actions', async ({
   await page.getByRole('button', { name: 'Editar nota' }).click();
   await expect(page).toHaveURL(/\/notes\/edit\//);
 
-  await page.getByLabel('Título da nota').fill(editedTitle);
-  await page.getByLabel('Texto da nota').fill(editedBody);
+  await page.getByLabel('Título da nota', { exact: true }).fill(editedTitle);
+  await page.getByLabel('Texto da nota', { exact: true }).fill(editedBody);
   await page.getByTestId('note-edit-submit').click();
 
   await expect(page).toHaveURL(/\/notes\/[^/?#]+(?:[?#]|$)/);

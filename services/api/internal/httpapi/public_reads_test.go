@@ -64,6 +64,7 @@ func publicReadTestRouter(t *testing.T) http.Handler {
 		AuthDependencies{Users: users, ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
+		PublicReadDependencies{Limits: DefaultPublicReadLimits()},
 	)
 }
 

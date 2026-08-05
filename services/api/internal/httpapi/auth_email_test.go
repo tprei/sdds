@@ -34,6 +34,7 @@ func newSQLiteAuthRouter(t *testing.T) (http.Handler, *sql.DB) {
 		AuthDependencies{Users: userStore, ContactChannels: channelStore, Mail: &recordingMailSender{}, Schedule: func(fn func()) { fn() }, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
+		PublicReadDependencies{},
 	)
 	return router, db
 }
@@ -227,6 +228,7 @@ func TestSetAuthEmailRateLimitsPerAccount(t *testing.T) {
 		},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
+		PublicReadDependencies{},
 	)
 	token := signupWithEmailTestUser(t, router, "rate-thiago", "")
 	body := `{"email":"first@example.com"}`

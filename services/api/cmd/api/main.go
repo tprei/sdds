@@ -16,6 +16,7 @@ import (
 	"github.com/tprei/sdds/services/api/internal/embedding"
 	"github.com/tprei/sdds/services/api/internal/eventexport"
 	"github.com/tprei/sdds/services/api/internal/httpapi"
+	"github.com/tprei/sdds/services/api/internal/mail"
 	"github.com/tprei/sdds/services/api/internal/media"
 	"github.com/tprei/sdds/services/api/internal/note"
 	"github.com/tprei/sdds/services/api/internal/s3store"
@@ -97,6 +98,27 @@ var newEmbeddingClient = func(config embedding.Config) (embeddingStore, error) {
 }
 
 var loadEmbeddingConfig = embedding.LoadConfigFromEnv
+
+// newMailSender loads transactional-email configuration from the environment and
+// builds the provider client. SDDS_MAIL_MODE=disabled explicitly turns mail
+// off (the caller gets a nil sender). Any other missing or invalid
+// configuration is fatal: a partially configured sender would accept requests
+// that can never be delivered.
+var newMailSender = func() (mail.Sender, error) {
+	if mail.DisabledByEnv() {
+		slog.Warn("transactional email disabled; mail endpoints will return 503", "env", "SDDS_MAIL_MODE=disabled")
+		return nil, nil
+	}
+	config, err := mail.LoadConfigFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("load mail config: %w", err)
+	}
+	sender, err := mail.New(config)
+	if err != nil {
+		return nil, fmt.Errorf("build mail sender: %w", err)
+	}
+	return sender, nil
+}
 
 var listenAndServe = func(server *http.Server) error {
 	return server.ListenAndServe()
@@ -273,6 +295,10 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config, embe
 		return fmt.Errorf("create upload service: %w", err)
 	}
 	imageReader := media.NewImageReader(noteStore, store)
+	mailSender, err := newMailSender()
+	if err != nil {
+		return err
+	}
 	cleanupCtx, cleanupCancel := context.WithTimeout(ctx, startupReadinessTimeout)
 	if err := uploadService.CleanupExpired(cleanupCtx, time.Now()); err != nil {
 		cleanupCancel()
@@ -285,7 +311,7 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config, embe
 		httpapi.CommentDependencies{Store: commentStore},
 		httpapi.ReportDependencies{Store: sqlite.NewReportStore(db), CommentTargets: commentStore},
 		httpapi.EventDependencies{Store: sqlite.NewEventStore(db), Limits: httpapi.DefaultEventLimits()},
-		httpapi.AuthDependencies{Users: userStore, ContactChannels: sqlite.NewContactChannelStore(db), Limits: config.authLimits},
+		httpapi.AuthDependencies{Users: userStore, ContactChannels: sqlite.NewContactChannelStore(db), Mail: mailSender, Limits: config.authLimits},
 		httpapi.MediaDependencies{ImageUploads: uploadService, AttachedImages: imageReader},
 		httpapi.SystemDependencies{Readiness: readiness},
 	))

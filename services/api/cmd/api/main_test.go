@@ -90,6 +90,7 @@ func TestRunMigrateDoesNotLoadS3Config(t *testing.T) {
 func TestRunLoadsS3ConfigForServer(t *testing.T) {
 	clearConfigEnv(t)
 	t.Setenv("SDDS_DATABASE_PATH", filepath.Join(t.TempDir(), "sdds.db"))
+	t.Setenv("SDDS_MAIL_MODE", "disabled")
 	originalArgs := os.Args
 	os.Args = []string{"api"}
 	t.Cleanup(func() { os.Args = originalArgs })
@@ -477,6 +478,7 @@ func seedExpiredUpload(t *testing.T, databasePath string) {
 
 func testServerConfig(t *testing.T) config {
 	t.Helper()
+	t.Setenv("SDDS_MAIL_MODE", "disabled")
 	return config{
 		authLimits:   httpapi.DefaultAuthLimits(),
 		databasePath: filepath.Join(t.TempDir(), "sdds.db"),

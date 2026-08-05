@@ -387,6 +387,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Transactional email delivery is not configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/auth/session:
     get:
       operationId: getAuthSession
@@ -1664,6 +1670,7 @@ components:
         - ErrorCodeEmbeddingUnavailable
         - ErrorCodeInvalidReplyTarget
         - ErrorCodeInvalidEmail
+        - ErrorCodeMailUnavailable
       enum:
         - internal_error
         - forbidden
@@ -1692,6 +1699,7 @@ components:
         - embedding_unavailable
         - invalid_reply_target
         - invalid_email
+        - mail_unavailable
     ErrorResponse:
       type: object
       additionalProperties: false

@@ -23,6 +23,10 @@ func (handler server) SetAuthEmail(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, authValidationErrorResponse(openapi.ErrorCodeInvalidEmail, problems))
 		return
 	}
+	if handler.auth.mail == nil {
+		writeError(w, http.StatusServiceUnavailable, openapi.ErrorResponse{Code: openapi.ErrorCodeMailUnavailable})
+		return
+	}
 
 	current, ok := currentSessionFromContext(r.Context())
 	if !ok {

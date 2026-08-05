@@ -91,6 +91,17 @@ Auth has process-local operational limits to protect the small VM from expensive
 - `SDDS_AUTH_GLOBAL_LOGIN_REQUESTS_PER_MINUTE`, default `120`.
 - `SDDS_AUTH_HASH_CONCURRENCY`, default `2`.
 
+Transactional email (verification and password-reset messages) is delivered through the Resend provider (`https://api.resend.com/emails` by default). Server startup is fatal when any required mail variable is missing or invalid; there is no silent degraded mode:
+
+- `SDDS_MAIL_API_TOKEN`, required — Resend API bearer token.
+- `SDDS_MAIL_FROM_ADDRESS`, required — verified sender identity.
+- `SDDS_APP_BASE_URL`, required — absolute `https` origin (the verification/reset links are built from it; `http` is allowed only for `localhost`/`127.0.0.1`).
+- `SDDS_MAIL_API_URL`, optional, defaults to `https://api.resend.com/emails`.
+- `SDDS_MAIL_TIMEOUT_MS`, optional, defaults to `5000`.
+- `SDDS_MAIL_MODE`, optional — set to `disabled` to start without a provider (local development and CI). The mail-backed endpoints then return `503 mail_unavailable` instead of attempting delivery.
+
+Verification and reset links point at mobile routes (`verify-email`, `recover-password`, `new-password`) that ship with the mobile app. Deploy the API with `SDDS_MAIL_MODE` unset only from a revision whose mobile build registers those routes; keep `SDDS_MAIL_MODE=disabled` on any earlier revision.
+
 The current product endpoints are:
 
 - `GET /healthz` reports process liveness.

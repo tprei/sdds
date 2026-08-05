@@ -16,13 +16,9 @@ const maxCreateNoteRequestBytes int64 = 32 * 1024
 const maxUpdateNoteRequestBytes int64 = 32 * 1024
 
 func (handler server) ListNotes(w http.ResponseWriter, r *http.Request, params openapi.ListNotesParams) {
-	current, ok := currentSessionFromContext(r.Context())
-	if !ok {
-		writeUnauthenticated(w)
-		return
-	}
+	viewerID, viewerAuthenticated := viewerUserID(r.Context())
 	input := listNotesInput(params)
-	input.ViewerUserID = current.User.ID
+	input.ViewerUserID = viewerID
 	if problems := note.ValidateListInput(input); len(problems) > 0 {
 		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, problems))
 		return
@@ -41,16 +37,12 @@ func (handler server) ListNotes(w http.ResponseWriter, r *http.Request, params o
 		return
 	}
 
-	writeJSON(w, http.StatusOK, newListNotesResponse(notes))
+	writeJSON(w, http.StatusOK, newListNotesResponse(notes, viewerAuthenticated))
 }
 
 func (handler server) GetNote(w http.ResponseWriter, r *http.Request, noteID string) {
-	current, ok := currentSessionFromContext(r.Context())
-	if !ok {
-		writeUnauthenticated(w)
-		return
-	}
-	found, err := handler.notes.noteStore.FindNote(r.Context(), noteID, current.User.ID)
+	viewerID, viewerAuthenticated := viewerUserID(r.Context())
+	found, err := handler.notes.noteStore.FindNote(r.Context(), noteID, viewerID)
 	if errors.Is(err, note.ErrNoteNotFound) {
 		writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
 		return
@@ -60,7 +52,7 @@ func (handler server) GetNote(w http.ResponseWriter, r *http.Request, noteID str
 		return
 	}
 
-	writeJSON(w, http.StatusOK, newNoteResponse(found))
+	writeJSON(w, http.StatusOK, newNoteResponse(found, viewerAuthenticated))
 }
 
 func (handler server) UpdateNote(w http.ResponseWriter, r *http.Request, noteID string) {
@@ -78,7 +70,7 @@ func (handler server) UpdateNote(w http.ResponseWriter, r *http.Request, noteID 
 		writeNoteEditError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, newNoteResponse(updated))
+	writeJSON(w, http.StatusOK, newNoteResponse(updated, true))
 }
 
 func (handler server) DeleteNote(w http.ResponseWriter, r *http.Request, noteID string) {
@@ -225,17 +217,13 @@ func (handler server) CreateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, newNoteResponse(created))
+	writeJSON(w, http.StatusCreated, newNoteResponse(created, true))
 }
 
 func (handler server) SearchNotes(w http.ResponseWriter, r *http.Request, params openapi.SearchNotesParams) {
-	current, ok := currentSessionFromContext(r.Context())
-	if !ok {
-		writeUnauthenticated(w)
-		return
-	}
+	viewerID, viewerAuthenticated := viewerUserID(r.Context())
 	input := searchNoteInput(params)
-	input.ViewerUserID = current.User.ID
+	input.ViewerUserID = viewerID
 	if problems := note.ValidateSearchInput(input); len(problems) > 0 {
 		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidSearch, problems))
 		return
@@ -258,7 +246,7 @@ func (handler server) SearchNotes(w http.ResponseWriter, r *http.Request, params
 		return
 	}
 
-	writeJSON(w, http.StatusOK, newSearchNotesResponse(results))
+	writeJSON(w, http.StatusOK, newSearchNotesResponse(results, viewerAuthenticated))
 }
 
 func validationErrorResponse(code openapi.ErrorCode, problems []note.ValidationProblem) openapi.ErrorResponse {
@@ -328,28 +316,28 @@ func searchNoteInput(params openapi.SearchNotesParams) note.SearchInput {
 	})
 }
 
-func newListNotesResponse(notes []note.Note) openapi.ListNotesResponse {
+func newListNotesResponse(notes []note.Note, viewerAuthenticated bool) openapi.ListNotesResponse {
 	response := openapi.ListNotesResponse{Notes: make([]openapi.Note, 0, len(notes))}
 	for _, found := range notes {
-		response.Notes = append(response.Notes, newNoteResponse(found))
+		response.Notes = append(response.Notes, newNoteResponse(found, viewerAuthenticated))
 	}
 	return response
 }
-func newSearchNotesResponse(results []note.SearchResult) openapi.SearchNotesResponse {
+func newSearchNotesResponse(results []note.SearchResult, viewerAuthenticated bool) openapi.SearchNotesResponse {
 	response := openapi.SearchNotesResponse{
 		SearchVersion: openapi.SearchVersion(note.CurrentSearchVersion),
 		Results:       make([]openapi.SearchNoteResult, 0, len(results)),
 	}
 	for _, result := range results {
 		response.Results = append(response.Results, openapi.SearchNoteResult{
-			Note:            newNoteResponse(result.Note),
+			Note:            newNoteResponse(result.Note, viewerAuthenticated),
 			RetrievalSource: openapi.RetrievalSource(result.RetrievalSource),
 		})
 	}
 	return response
 }
 
-func newNoteResponse(found note.Note) openapi.Note {
+func newNoteResponse(found note.Note, viewerAuthenticated bool) openapi.Note {
 	images := make([]openapi.NoteImage, 0, len(found.Images))
 	for _, image := range found.Images {
 		images = append(images, openapi.NoteImage{
@@ -365,7 +353,7 @@ func newNoteResponse(found note.Note) openapi.Note {
 		})
 	}
 
-	return openapi.Note{
+	response := openapi.Note{
 		Id:           found.ID,
 		Title:        found.Title,
 		Body:         found.Body,
@@ -374,10 +362,14 @@ func newNoteResponse(found note.Note) openapi.Note {
 			Id:          string(found.Author.ID),
 			DisplayName: found.Author.DisplayName,
 		},
-		Images:              images,
-		UsefulCount:         found.UsefulCount,
-		UsefulByCurrentUser: found.UsefulByCurrentUser,
-		CreatedAt:           found.CreatedAt.UTC().UnixMilli(),
-		UpdatedAt:           found.UpdatedAt.UTC().UnixMilli(),
+		Images:      images,
+		UsefulCount: found.UsefulCount,
+		CreatedAt:   found.CreatedAt.UTC().UnixMilli(),
+		UpdatedAt:   found.UpdatedAt.UTC().UnixMilli(),
 	}
+	if viewerAuthenticated {
+		usefulByCurrentUser := found.UsefulByCurrentUser
+		response.UsefulByCurrentUser = &usefulByCurrentUser
+	}
+	return response
 }

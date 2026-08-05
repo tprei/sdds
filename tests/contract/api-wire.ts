@@ -43,7 +43,7 @@ export type NoteResponse = {
   title: string;
   updated_at: number;
   useful_count: number;
-  useful_by_current_user: boolean;
+  useful_by_current_user?: boolean;
 };
 
 export type CommentResponse = {
@@ -117,6 +117,19 @@ export const noteResponseKeys = [
   'updated_at',
   'useful_count',
   'useful_by_current_user',
+] as const;
+// useful_by_current_user is optional: present for authenticated callers, absent
+// for anonymous public reads. Every other note key is required.
+export const requiredNoteResponseKeys = [
+  'author',
+  'body',
+  'category_slug',
+  'created_at',
+  'id',
+  'images',
+  'title',
+  'updated_at',
+  'useful_count',
 ] as const;
 export const createNoteRequestKeys = [
   'body',
@@ -201,6 +214,10 @@ export function hasOnlyKeys(
   );
 }
 
+// (allowed/required key checks for note responses are inlined in isNoteResponse
+// because useful_by_current_user is optional there and required everywhere else
+// hasOnlyKeys is used.)
+
 export function isListNotesResponse(value: unknown): value is ListNotesResponse {
   return (
     isRecord(value) &&
@@ -235,7 +252,8 @@ export function isSearchNoteResult(value: unknown): value is SearchNoteResult {
 export function isNoteResponse(value: unknown): value is NoteResponse {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, noteResponseKeys) &&
+    Object.keys(value).every((key) => noteResponseKeys.includes(key)) &&
+    requiredNoteResponseKeys.every((key) => Object.prototype.hasOwnProperty.call(value, key)) &&
     typeof value.id === 'string' &&
     isAuthorSummary(value.author) &&
     typeof value.title === 'string' &&
@@ -246,7 +264,7 @@ export function isNoteResponse(value: unknown): value is NoteResponse {
     typeof value.useful_count === 'number' &&
     Number.isInteger(value.useful_count) &&
     value.useful_count >= 0 &&
-    typeof value.useful_by_current_user === 'boolean' &&
+    (value.useful_by_current_user === undefined || typeof value.useful_by_current_user === 'boolean') &&
     isNoteImagesResponse(value.images)
   );
 }

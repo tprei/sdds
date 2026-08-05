@@ -215,8 +215,7 @@ paths:
       summary: List category catalog
       tags:
         - Catalog
-      security:
-        - bearerAuth: []
+      security: []
       responses:
         "200":
           description: Category catalog rows.
@@ -659,8 +658,7 @@ paths:
       summary: Get a public author profile
       tags:
         - Authors
-      security:
-        - bearerAuth: []
+      security: []
       parameters:
         - name: author_id
           in: path
@@ -704,8 +702,7 @@ paths:
       summary: List an author's notes
       tags:
         - Authors
-      security:
-        - bearerAuth: []
+      security: []
       parameters:
         - name: author_id
           in: path
@@ -766,8 +763,7 @@ paths:
       summary: List recent notes
       tags:
         - Notes
-      security:
-        - bearerAuth: []
+      security: []
       parameters:
         - name: category_slug
           in: query
@@ -862,8 +858,7 @@ paths:
       summary: Get a note
       tags:
         - Notes
-      security:
-        - bearerAuth: []
+      security: []
       parameters:
         - name: note_id
           in: path
@@ -1015,8 +1010,7 @@ paths:
       summary: List note comments
       tags:
         - Notes
-      security:
-        - bearerAuth: []
+      security: []
       parameters:
         - name: note_id
           in: path
@@ -1309,8 +1303,7 @@ paths:
       summary: Search notes
       tags:
         - Notes
-      security:
-        - bearerAuth: []
+      security: []
       parameters:
         - name: q
           in: query
@@ -2791,7 +2784,6 @@ components:
         - updated_at
         - images
         - useful_count
-        - useful_by_current_user
       properties:
         id:
           type: string
@@ -2822,7 +2814,7 @@ components:
           description: Number of users who marked this note useful.
         useful_by_current_user:
           type: boolean
-          description: Whether the current authenticated user marked this note useful.
+          description: Whether the current authenticated user marked this note useful. Absent for unauthenticated callers.
     ValidationField:
       type: string
       x-enum-varnames:

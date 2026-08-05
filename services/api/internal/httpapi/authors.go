@@ -43,14 +43,10 @@ func (handler server) ListAuthorNotes(w http.ResponseWriter, r *http.Request, au
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
 	}
-	current, ok := currentSessionFromContext(r.Context())
-	if !ok {
-		writeUnauthenticated(w)
-		return
-	}
+	viewerID, viewerAuthenticated := viewerUserID(r.Context())
 	cursor, problems := decodeAuthorNotesCursor(params.Cursor)
 	input := note.NormalizeAuthorNotesInput(authorNotesInput(authorID, params, cursor))
-	input.ViewerUserID = current.User.ID
+	input.ViewerUserID = viewerID
 	problems = append(problems, note.ValidateAuthorNotesInput(input)...)
 	if len(problems) > 0 {
 		writeError(w, http.StatusBadRequest, validationErrorResponse(openapi.ErrorCodeInvalidNote, problems))
@@ -71,7 +67,7 @@ func (handler server) ListAuthorNotes(w http.ResponseWriter, r *http.Request, au
 		return
 	}
 
-	response, err := newAuthorNotesPageResponse(page)
+	response, err := newAuthorNotesPageResponse(page, viewerAuthenticated)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
 		return
@@ -114,13 +110,13 @@ func newPublicAuthorResponse(profile author.PublicAuthor) openapi.PublicAuthor {
 	}
 }
 
-func newAuthorNotesPageResponse(page note.AuthorNotesPage) (openapi.AuthorNotesPage, error) {
+func newAuthorNotesPageResponse(page note.AuthorNotesPage, viewerAuthenticated bool) (openapi.AuthorNotesPage, error) {
 	response := openapi.AuthorNotesPage{
 		Notes:      make([]openapi.Note, 0, len(page.Notes)),
 		NextCursor: nil,
 	}
 	for _, found := range page.Notes {
-		response.Notes = append(response.Notes, newNoteResponse(found.Note))
+		response.Notes = append(response.Notes, newNoteResponse(found.Note, viewerAuthenticated))
 	}
 	if page.HasMore && len(page.Notes) > 0 {
 		last := page.Notes[len(page.Notes)-1]

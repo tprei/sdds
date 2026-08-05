@@ -120,7 +120,7 @@ describe('AuthorProfileScreen auth gate', () => {
     vi.clearAllMocks();
   });
 
-  it('does not render product content before authentication', async () => {
+  it('renders the profile for an anonymous visitor and gates writes', async () => {
     mocks.authState = { status: 'anonymous' };
 
     await act(async () => {
@@ -128,7 +128,13 @@ describe('AuthorProfileScreen auth gate', () => {
       await settle();
     });
 
-    expect(mocks.authorProfileContent).not.toHaveBeenCalled();
+    expect(mocks.authorProfileContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authorID: 'author-id',
+        isOwnProfile: false,
+        requireAuth: expect.any(Function),
+      }),
+    );
   });
 
   it('passes token and session-expiry handler to AuthorProfileContent', async () => {

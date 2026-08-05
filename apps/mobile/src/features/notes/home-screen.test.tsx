@@ -183,8 +183,9 @@ describe('HomeScreen auth gate', () => {
     vi.clearAllMocks();
   });
 
-  it('does not start product reads before authentication', async () => {
+  it('renders the feed for an anonymous visitor and gates writes behind login', async () => {
     mocks.authState = { status: 'anonymous' };
+    mocks.apiClient.listNotes.mockResolvedValueOnce([exploreNote('note-id')]);
 
     let renderer!: ReactTestRenderer;
     await act(async () => {
@@ -192,9 +193,22 @@ describe('HomeScreen auth gate', () => {
       await settle();
     });
 
-    expect(mocks.apiClient.listCatalogs).not.toHaveBeenCalled();
-    expect(mocks.apiClient.listNotes).not.toHaveBeenCalled();
-    expect(renderer.root.findByProps({ title: 'Entre para continuar' })).toBeDefined();
+    // Anonymous visitors read the feed rather than hitting an auth wall.
+    expect(mocks.apiClient.listCatalogs).toHaveBeenCalledWith();
+    expect(mocks.apiClient.listNotes).toHaveBeenCalledWith({});
+    expect(() => renderer.root.findByProps({ title: 'Entre para continuar' })).toThrow();
+
+    const card = renderer.root.findByProps({ testID: 'note-card' });
+    await act(async () => {
+      await card.props.onPressUseful();
+      await settle();
+    });
+
+    expect(mocks.apiClient.markNoteUseful).not.toHaveBeenCalled();
+    expect(mocks.push).toHaveBeenCalledWith({
+      pathname: '/login',
+      params: { next: '/' },
+    });
   });
 
   it('passes the bearer token to the initial product reads', async () => {

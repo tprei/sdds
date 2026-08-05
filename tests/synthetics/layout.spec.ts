@@ -4,7 +4,6 @@ import { expect, test } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
 
 import {
-  expectCentered,
   expectEqualInsets,
   expectEvenlySpacedCenters,
   expectNoHorizontalClipping,
@@ -25,7 +24,7 @@ import {
 const gutter = 16;
 const masonryGap = 12;
 const maxAppWidth = 430;
-const tabSlotCount = 5;
+const tabSlotCount = 4;
 
 type LayoutFixture = { displayName: string; titles: string[] };
 
@@ -60,7 +59,7 @@ async function signInWithNotes(
 }
 
 test.describe('layout geometry', () => {
-  test('the bottom nav spaces its five slots evenly', async ({
+  test('the bottom nav spaces its four slots evenly', async ({
     page,
     request,
   }) => {
@@ -70,17 +69,16 @@ test.describe('layout geometry', () => {
     await expectWithinViewport(page, bar, 'tab bar');
     await expectNoHorizontalClipping(bar, 'tab bar');
 
-    // All five slots carry equal weight, so their centers form one evenly
-    // spaced series. Asserting it over the four tab items alone would be
+    // All four slots carry equal weight, so their centers form one evenly
+    // spaced series. Asserting it over the three tab items alone would be
     // wrong: the FAB sits between the second and third tab, so that middle
     // gap is legitimately double.
-    const tabNames = ['index', 'search', 'saved', 'profile'];
+    const tabNames = ['index', 'search', 'profile'];
     const slots = [
       ...tabNames.map((name) => page.getByTestId(`tab-item-${name}`)),
       page.getByTestId('tab-fab-slot'),
     ];
     await expectEvenlySpacedCenters(slots, 'tab bar slots');
-    await expectCentered(bar, page.getByTestId('tab-fab-slot'), 'the FAB slot');
 
     // Equal centers alone would also hold if the FAB slot were resized and
     // the tabs shifted to match, so pin its weight to a tab item's too.

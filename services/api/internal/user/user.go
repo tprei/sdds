@@ -123,5 +123,6 @@ type Store interface {
 	CreateSession(ctx context.Context, input CreateSessionInput) (CurrentSession, error)
 	FindCurrentSession(ctx context.Context, tokenHash string, now time.Time) (CurrentSession, error)
 	RevokeSession(ctx context.Context, sessionID SessionID, revokedAt time.Time) error
+	DeleteUser(ctx context.Context, userID UserID, deletedAt time.Time) error
 	FindAuthorByUserID(ctx context.Context, userID UserID) (Author, error)
 }

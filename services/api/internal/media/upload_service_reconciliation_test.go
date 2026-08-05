@@ -28,6 +28,10 @@ type fakeUploadRepository struct {
 	expired            []Upload
 	finalizeErrors     []error
 	compactErrors      []error
+	orphanedObjects    []ObjectKey
+	orphanClaimErrors  []error
+	orphanForgetErrors []error
+	orphanForgetCalls  []ObjectKey
 	findCalls          int
 	pendingInputs      []PendingInput
 	readyInputs        []ReadyInput
@@ -166,6 +170,27 @@ func (repo *fakeUploadRepository) CompactExpired(_ context.Context, now time.Tim
 }
 func (repo *fakeUploadRepository) QuotaSnapshot(_ context.Context, _ string, _ time.Time) (Quota, error) {
 	return Quota{}, nil
+}
+func (repo *fakeUploadRepository) ClaimOrphanedObjects(_ context.Context, limit int) ([]ObjectKey, error) {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	if err := nextError(&repo.orphanClaimErrors); err != nil {
+		return nil, err
+	}
+	if len(repo.orphanedObjects) <= limit {
+		keys := repo.orphanedObjects
+		repo.orphanedObjects = nil
+		return keys, nil
+	}
+	keys := repo.orphanedObjects[:limit]
+	repo.orphanedObjects = repo.orphanedObjects[limit:]
+	return keys, nil
+}
+func (repo *fakeUploadRepository) ForgetOrphanedObject(_ context.Context, key ObjectKey) error {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	repo.orphanForgetCalls = append(repo.orphanForgetCalls, key)
+	return nextError(&repo.orphanForgetErrors)
 }
 func (repo *fakeUploadRepository) updateLease(input LeaseInput, update func(*Upload)) {
 	for key, upload := range repo.uploads {

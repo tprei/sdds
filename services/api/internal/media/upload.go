@@ -146,6 +146,11 @@ type UploadRepository interface {
 	FinalizeExpired(context.Context, string, time.Time) error
 	CompactExpired(context.Context, time.Time, int) (int64, error)
 	QuotaSnapshot(context.Context, string, time.Time) (Quota, error)
+	// ClaimOrphanedObjects and ForgetOrphanedObject drain storage keys queued
+	// for bucket deletion when the owning image_uploads row was removed in the
+	// same transaction that deleted its user.
+	ClaimOrphanedObjects(context.Context, int) ([]ObjectKey, error)
+	ForgetOrphanedObject(context.Context, ObjectKey) error
 }
 
 // UploadReceipt is the service-produced result after a ready upload is

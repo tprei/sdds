@@ -211,6 +211,7 @@ func (service *UploadService) CleanupExpired(ctx context.Context, now time.Time)
 	if _, err := service.repository.CompactExpired(cleanupCtx, now, service.config.CleanupBatch); err != nil {
 		cleanupErr = errors.Join(cleanupErr, service.mapRepositoryError(err))
 	}
+	cleanupErr = errors.Join(cleanupErr, service.cleanupOrphanedObjects(cleanupCtx))
 	if cleanupErr != nil {
 		if errors.Is(cleanupErr, ErrMediaIntegrity) || errors.Is(cleanupErr, context.Canceled) || errors.Is(cleanupErr, context.DeadlineExceeded) {
 			return cleanupErr
@@ -231,6 +232,28 @@ func (service *UploadService) cleanupDelete(ctx context.Context, key ObjectKey) 
 		}
 	}
 	return err
+}
+
+// cleanupOrphanedObjects deletes bucket objects whose image_uploads row was
+// removed in a user-account purge, then forgets the queued key. A failed
+// delete leaves the key queued for the next sweep; object-store errors are
+// mapped the same way as the expired-upload cleanup above.
+func (service *UploadService) cleanupOrphanedObjects(ctx context.Context) error {
+	keys, err := service.repository.ClaimOrphanedObjects(ctx, service.config.CleanupBatch)
+	if err != nil {
+		return service.mapRepositoryError(err)
+	}
+	var cleanupErr error
+	for _, key := range keys {
+		if err := service.cleanupDelete(ctx, key); err != nil {
+			cleanupErr = errors.Join(cleanupErr, err)
+			continue
+		}
+		if err := service.repository.ForgetOrphanedObject(ctx, key); err != nil {
+			cleanupErr = errors.Join(cleanupErr, service.mapRepositoryError(err))
+		}
+	}
+	return cleanupErr
 }
 func (service *UploadService) replayExisting(upload Upload, now time.Time) (bool, error) {
 	switch upload.State {

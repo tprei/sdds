@@ -562,6 +562,7 @@ type fakeUserStore struct {
 	createSession      func(ctx context.Context, input user.CreateSessionInput) (user.CurrentSession, error)
 	findCurrentSession func(ctx context.Context, tokenHash string, now time.Time) (user.CurrentSession, error)
 	revokeSession      func(ctx context.Context, sessionID user.SessionID, revokedAt time.Time) error
+	deleteUser         func(ctx context.Context, userID user.UserID, deletedAt time.Time) error
 	findAuthorByUserID func(ctx context.Context, userID user.UserID) (user.Author, error)
 	findPublicAuthor   func(ctx context.Context, authorID author.AuthorID) (author.PublicAuthor, error)
 }
@@ -602,9 +603,10 @@ func testCurrentUserSessionResolver(_ context.Context, tokenHash string, _ time.
 		return user.CurrentSession{}, user.ErrSessionNotFound
 	}
 	return user.CurrentSession{
-		Session: user.Session{UserID: "user-id-thiago", TokenHash: tokenHash},
-		User:    user.User{ID: "user-id-thiago", State: user.UserStateActive},
-		Author:  user.Author{ID: "author-id-thiago", UserID: "user-id-thiago", DisplayName: "Thiago"},
+		Session:  user.Session{UserID: "user-id-thiago", TokenHash: tokenHash},
+		User:     user.User{ID: "user-id-thiago", State: user.UserStateActive},
+		Author:   user.Author{ID: "author-id-thiago", UserID: "user-id-thiago", DisplayName: "Thiago"},
+		Username: "thiago",
 	}, nil
 }
 
@@ -621,6 +623,12 @@ func (store fakeUserStore) RevokeSession(ctx context.Context, sessionID user.Ses
 		return fmt.Errorf("revoke session not implemented")
 	}
 	return store.revokeSession(ctx, sessionID, revokedAt)
+}
+func (store fakeUserStore) DeleteUser(ctx context.Context, userID user.UserID, deletedAt time.Time) error {
+	if store.deleteUser == nil {
+		return fmt.Errorf("delete user not implemented")
+	}
+	return store.deleteUser(ctx, userID, deletedAt)
 }
 
 func (store fakeUserStore) FindAuthorByUserID(ctx context.Context, userID user.UserID) (user.Author, error) {

@@ -161,6 +161,38 @@ func (handler server) DeleteAuthSession(w http.ResponseWriter, r *http.Request) 
 	noContent(w, r)
 }
 
+// DeleteAuthUser permanently removes the current user's account after
+// verifying the account password. A live session always carries a password
+// identity, so a missing identity is an invariant break rather than a
+// credential failure. The store purge is transactional; a mid-transaction
+// failure leaves the account intact and surfaces as a 500.
+func (handler server) DeleteAuthUser(w http.ResponseWriter, r *http.Request) {
+	var request openapi.DeleteUserRequest
+	if !decodeJSONRequest(w, r, maxAuthRequestBytes, &request) {
+		return
+	}
+	current, ok := currentSessionFromContext(r.Context())
+	if !ok {
+		writeUnauthenticated(w)
+		return
+	}
+	login, err := handler.auth.users.FindPasswordLogin(r.Context(), current.Username)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+	matches, err := handler.auth.passwordHasher.Verify(request.Password, login.SecretHash)
+	if err != nil || !matches {
+		writeError(w, http.StatusForbidden, openapi.ErrorResponse{Code: openapi.ErrorCodeForbidden})
+		return
+	}
+	if err := handler.auth.users.DeleteUser(r.Context(), current.User.ID, handler.auth.clock()); err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+	noContent(w, r)
+}
+
 func authValidationErrorResponse(code openapi.ErrorCode, problems []user.ValidationProblem) openapi.ErrorResponse {
 	fields := make([]openapi.ValidationProblem, 0, len(problems))
 	for _, problem := range problems {

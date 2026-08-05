@@ -39,10 +39,16 @@ type NoteSearcher interface {
 	Search(ctx context.Context, input note.SearchInput) ([]note.SearchResult, error)
 }
 
+type NoteEditor interface {
+	Edit(ctx context.Context, input note.EditInput) (note.Note, error)
+	Delete(ctx context.Context, noteID string, userID user.UserID) error
+}
+
 type NotesDependencies struct {
 	Stores    NoteStores
 	Publisher NotePublisher
 	Searcher  NoteSearcher
+	Editor    NoteEditor
 	Catalog   note.Catalog
 }
 
@@ -82,6 +88,7 @@ type noteHandlers struct {
 	noteStore       note.Store
 	notePublisher   NotePublisher
 	noteSearcher    NoteSearcher
+	noteEditor      NoteEditor
 	authorNoteStore note.AuthorNoteStore
 	usefulStore     note.UsefulStore
 	categoryCatalog note.Catalog
@@ -186,7 +193,7 @@ func NewRouter(notes NotesDependencies, comments CommentDependencies, reports Re
 		eventLimits = DefaultEventLimits()
 	}
 	return newRouter(
-		noteHandlers{noteStore: notes.Stores, notePublisher: notes.Publisher, noteSearcher: notes.Searcher, authorNoteStore: notes.Stores, usefulStore: notes.Stores, categoryCatalog: notes.Catalog},
+		noteHandlers{noteStore: notes.Stores, notePublisher: notes.Publisher, noteSearcher: notes.Searcher, noteEditor: notes.Editor, authorNoteStore: notes.Stores, usefulStore: notes.Stores, categoryCatalog: notes.Catalog},
 		commentHandlers{store: comments.Store, notes: notes.Stores},
 		reportHandlers{store: reports.Store, notes: notes.Stores, comments: reports.CommentTargets},
 		eventHandlers{store: events.Store, limits: newEventRateLimiters(eventLimits, time.Now), clock: time.Now},
@@ -277,6 +284,8 @@ func registerAuthenticatedRoutes(router chi.Router, wrapper openapi.ServerInterf
 		router.Get("/authors/{author_id}", wrapper.GetAuthor)
 		router.Get("/authors/{author_id}/notes", wrapper.ListAuthorNotes)
 		router.Get("/notes/{note_id}", wrapper.GetNote)
+		router.Patch("/notes/{note_id}", wrapper.UpdateNote)
+		router.Delete("/notes/{note_id}", wrapper.DeleteNote)
 		router.Get("/notes/{note_id}/comments", wrapper.ListNoteComments)
 		router.Post("/notes/{note_id}/comments", wrapper.CreateNoteComment)
 		router.Delete("/notes/{note_id}/comments/{comment_id}", wrapper.DeleteNoteComment)

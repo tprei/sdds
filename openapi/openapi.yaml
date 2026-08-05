@@ -291,6 +291,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/auth/users/me:
+    delete:
+      operationId: deleteAuthUser
+      summary: Permanently delete the authenticated user's account
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteUserRequest"
+      responses:
+        "204":
+          description: The account and all of its content were deleted.
+        "400":
+          description: The request does not match the API contract.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is not authenticated, or the password did not match.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: The request body is too large.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too many account-deletion attempts are in flight.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not delete the account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/auth/sessions:
     post:
       operationId: createAuthSession
@@ -1724,6 +1771,17 @@ components:
           type: string
         password:
           type: string
+    DeleteUserRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - password
+      properties:
+        password:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: The account's current password, re-entered to confirm deletion.
     CreateUserRequest:
       type: object
       additionalProperties: false

@@ -161,10 +161,46 @@ func (handler server) DeleteAuthSession(w http.ResponseWriter, r *http.Request) 
 	noContent(w, r)
 }
 
-// DeleteAuthUser satisfies the generated ServerInterface. The handler returns
-// 501 Not Implemented.
+// DeleteAuthUser permanently deletes the authenticated account after
+// re-verifying the password. The cascade (notes, comments, sessions, events,
+// image-upload reclaim) runs transactionally in the store.
 func (handler server) DeleteAuthUser(w http.ResponseWriter, r *http.Request) {
-	writeError(w, http.StatusNotImplemented, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+	current, ok := currentSessionFromContext(r.Context())
+	if !ok {
+		writeUnauthenticated(w)
+		return
+	}
+	var request openapi.DeleteUserRequest
+	if !decodeJSONRequest(w, r, maxAuthRequestBytes, &request) {
+		return
+	}
+	if _, allowed := handler.auth.rateLimiters.allow(r, authPurposeLogin, current.Username); !allowed {
+		writeRateLimited(w)
+		return
+	}
+	login, err := handler.auth.users.FindPasswordLogin(r.Context(), current.Username)
+	if errors.Is(err, user.ErrInvalidCredentials) {
+		writeInvalidCredentials(w)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+	verified, err := handler.auth.passwordHasher.Verify(request.Password, login.SecretHash)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+	if !verified {
+		writeInvalidCredentials(w)
+		return
+	}
+	if err := handler.auth.users.DeleteUser(r.Context(), current.User.ID, handler.auth.clock()); err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+	noContent(w, r)
 }
 
 func authValidationErrorResponse(code openapi.ErrorCode, problems []user.ValidationProblem) openapi.ErrorResponse {

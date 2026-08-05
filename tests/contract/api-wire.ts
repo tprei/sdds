@@ -252,7 +252,7 @@ export function isSearchNoteResult(value: unknown): value is SearchNoteResult {
 export function isNoteResponse(value: unknown): value is NoteResponse {
   return (
     isRecord(value) &&
-    Object.keys(value).every((key) => noteResponseKeys.includes(key)) &&
+    Object.keys(value).every((key) => (noteResponseKeys as readonly string[]).includes(key)) &&
     requiredNoteResponseKeys.every((key) => Object.prototype.hasOwnProperty.call(value, key)) &&
     typeof value.id === 'string' &&
     isAuthorSummary(value.author) &&

@@ -66,6 +66,7 @@ export default function RootLayout() {
         <Stack.Screen name="verify-email" />
         <Stack.Screen name="recover-password" />
         <Stack.Screen name="new-password" />
+        <Stack.Screen name="delete-account" />
       </Stack>
       <StatusBar style="dark" />
       </ProductEventProvider>

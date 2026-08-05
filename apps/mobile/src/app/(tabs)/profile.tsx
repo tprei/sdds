@@ -12,6 +12,7 @@ import { AppHeader } from '@/ui/app-header';
 import { EmptyState } from '@/ui/empty-state';
 import { Button } from '@/ui/button';
 import { AppText } from '@/ui/text';
+import { PressableScale } from '@/ui/pressable-scale';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { Badge } from '@/ui/badge';
 
@@ -142,6 +143,17 @@ export default function ProfileScreen() {
             testID="profile-logout-button"
             variant="ghost"
           />
+          <PressableScale
+            accessibilityLabel="Excluir conta"
+            accessibilityRole="button"
+            onPress={() => router.push('/delete-account')}
+            style={styles.deleteAccountRow}
+            testID="profile-delete-account-button"
+          >
+            <AppText color={semanticColors.danger} variant="body" weight="semibold">
+              Excluir conta
+            </AppText>
+          </PressableScale>
         </View>
       </Screen>
     );

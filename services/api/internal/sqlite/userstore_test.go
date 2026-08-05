@@ -132,6 +132,66 @@ func TestUserStoreCreatesAdditionalSessionsForActiveUsers(t *testing.T) {
 	}
 }
 
+func TestUserStoreCreateSessionCredentialFence(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
+	db := openMigratedDatabase(t, ctx)
+	store := newUserStore(db, func() time.Time { return now })
+	current := createTestPasswordUser(t, ctx, store, now, "thiago", "session-token-a")
+
+	login, err := store.FindPasswordLogin(ctx, "thiago")
+	if err != nil {
+		t.Fatalf("find password login: %v", err)
+	}
+
+	t.Run("rejects when credential moved", func(t *testing.T) {
+		staleHash := user.HashSessionToken("stale-token")
+		_, err := store.CreateSession(ctx, user.CreateSessionInput{
+			UserID:            current.User.ID,
+			TokenHash:         staleHash,
+			ExpiresAt:         now.Add(user.SessionLifetime),
+			FenceCredential:   true,
+			CredentialVersion: login.CredentialVersion - 1,
+		})
+		if !errors.Is(err, user.ErrInvalidCredentials) {
+			t.Fatalf("fenced stale-credential error = %v, want ErrInvalidCredentials", err)
+		}
+		var count int
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions WHERE token_hash = ?`, staleHash).Scan(&count); err != nil {
+			t.Fatalf("count fenced sessions: %v", err)
+		}
+		if count != 0 {
+			t.Fatalf("fenced stale-credential session count = %d, want 0", count)
+		}
+	})
+
+	t.Run("admits when credential matches", func(t *testing.T) {
+		freshHash := user.HashSessionToken("fresh-token")
+		_, err := store.CreateSession(ctx, user.CreateSessionInput{
+			UserID:            current.User.ID,
+			TokenHash:         freshHash,
+			ExpiresAt:         now.Add(user.SessionLifetime),
+			FenceCredential:   true,
+			CredentialVersion: login.CredentialVersion,
+		})
+		if err != nil {
+			t.Fatalf("fenced matching-credential create session: %v", err)
+		}
+	})
+
+	t.Run("unfenced insert still works without a credential version", func(t *testing.T) {
+		plainHash := user.HashSessionToken("plain-token")
+		_, err := store.CreateSession(ctx, user.CreateSessionInput{
+			UserID:    current.User.ID,
+			TokenHash: plainHash,
+			ExpiresAt: now.Add(user.SessionLifetime),
+		})
+		if err != nil {
+			t.Fatalf("unfenced create session: %v", err)
+		}
+	})
+}
+
 func TestUserStoreRejectsExpiredSessionCreationWithoutInsertingRows(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)

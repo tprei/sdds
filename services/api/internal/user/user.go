@@ -80,10 +80,11 @@ type CurrentSession struct {
 }
 
 type PasswordLogin struct {
-	User       User
-	Author     Author
-	Username   string
-	SecretHash string
+	User              User
+	Author            Author
+	Username          string
+	SecretHash        string
+	CredentialVersion int64
 }
 
 type CreateUserInput struct {
@@ -109,6 +110,11 @@ type CreateSessionInput struct {
 	UserID    UserID
 	TokenHash string
 	ExpiresAt time.Time
+	// FenceCredential requires the password credential to still be at
+	// CredentialVersion when the session row is inserted. Callers that did
+	// not verify a password credential leave it false.
+	FenceCredential   bool
+	CredentialVersion int64
 }
 
 type Store interface {

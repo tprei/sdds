@@ -110,6 +110,7 @@ allocate_web_port() {
 phase_port() {
   smoke_log_phase port
   export SDDS_HTTP_PORT=0
+  export SDDS_MAILSINK_PORT=0
 }
 
 realize_web_port() {
@@ -126,15 +127,28 @@ phase_build_start() {
     api|synthetics|all)
       export SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE=60
       export SDDS_AUTH_LOGIN_REQUESTS_PER_MINUTE=60
+      export SDDS_MAIL_MODE=enabled
+      export SDDS_MAIL_API_TOKEN=smoke-token
+      export SDDS_MAIL_FROM_ADDRESS=smoke@sdds.test
+      export SDDS_MAIL_API_URL=http://mail-sink:8090/emails
+      export SDDS_MAIL_TIMEOUT_MS=2000
+      export SDDS_APP_BASE_URL=http://localhost:8081
       ;;
   esac
-  smoke_compose up --build -d api >/dev/null
+  smoke_compose up --build -d api mail-sink >/dev/null
 }
 
 phase_readiness() {
   smoke_log_phase readiness
   smoke_wait_for_api_readiness
   export SDDS_SYNTHETICS_API_BASE_URL="$SDDS_API_BASE_URL"
+  smoke_mailsink_published=$(smoke_compose port mail-sink 8090 2>/dev/null || :)
+  smoke_mailsink_port=${smoke_mailsink_published##*:}
+  if [ -z "$smoke_mailsink_port" ]; then
+    smoke_die "could not resolve the mail-sink published port"
+  fi
+  export SDDS_MAILSINK_URL="http://127.0.0.1:$smoke_mailsink_port"
+  export SDDS_SYNTHETICS_MAILSINK_URL="$SDDS_MAILSINK_URL"
 }
 
 run_suite() {

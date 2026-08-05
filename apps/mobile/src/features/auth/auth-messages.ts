@@ -15,6 +15,12 @@ export const genericSignupErrorMessage =
   'Não deu pra criar a conta agora. Tente de novo em instantes.';
 export const usernameTakenErrorMessage =
   'Esse nome de usuário já está em uso.';
+export const invalidTokenMessage =
+  'Esse link expirou ou já foi usado. Peça outro.';
+export const mailUnavailableMessage =
+  'Não conseguimos enviar e-mails agora. Tenta de novo mais tarde.';
+export const sessionCleanupFailedMessage =
+  'Não foi possível sair da sessão atual. Tenta de novo.';
 
 const staticReturnPaths: readonly ReturnPath[] = [
   '/',
@@ -97,6 +103,8 @@ function validationFieldMessage(
       return includesDisplayName
         ? displayNameValidationMessage(field.code)
         : null;
+    case 'email':
+      return emailValidationMessage(field.code);
     default:
       return null;
   }
@@ -144,6 +152,21 @@ function displayNameValidationMessage(
       return 'Seu nome precisa ter no máximo 60 caracteres.';
     case 'required':
       return 'Escreva seu nome.';
+    default:
+      return null;
+  }
+}
+
+function emailValidationMessage(
+  code: AuthAPIErrorField['code'],
+): string | null {
+  switch (code) {
+    case 'required':
+      return 'Informe seu e-mail.';
+    case 'invalid':
+      return 'E-mail inválido.';
+    case 'too_long':
+      return 'E-mail muito longo.';
     default:
       return null;
   }

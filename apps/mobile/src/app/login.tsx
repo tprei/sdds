@@ -109,6 +109,15 @@ export default function LoginScreen() {
           <Button
             variant="ghost"
             block
+            label="Esqueci minha senha"
+            onPress={() => {
+              router.push('/recover-password');
+            }}
+            testID="login-forgot-password-button"
+          />
+          <Button
+            variant="ghost"
+            block
             label="Criar conta"
             onPress={() => {
               router.push({

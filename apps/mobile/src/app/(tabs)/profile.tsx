@@ -5,12 +5,15 @@ import { useRouter } from 'expo-router';
 import { semanticColors } from '@sdds/tokens';
 
 import { AuthorProfileContent } from '@/features/authors/author-profile-content';
+import { requestStatus } from '@/lib/api/request-error';
+import { unauthorizedStatus } from '@/lib/api/status';
 import { Screen } from '@/ui/screen';
 import { AppHeader } from '@/ui/app-header';
 import { EmptyState } from '@/ui/empty-state';
 import { Button } from '@/ui/button';
 import { AppText } from '@/ui/text';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { Badge } from '@/ui/badge';
 
 import { styles } from './profile.styles';
 
@@ -19,12 +22,42 @@ type LogoutState =
   | { status: 'submitting' }
   | { message: string; status: 'error' };
 
+type ResendState =
+  | { status: 'idle' }
+  | { status: 'submitting' }
+  | { status: 'sent' }
+  | { message: string; status: 'error' };
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { apiClient, logout, state } = useAuth();
   const [logoutState, setLogoutState] = useState<LogoutState>({
     status: 'idle',
   });
+  const [resendState, setResendState] = useState<ResendState>({
+    status: 'idle',
+  });
+
+  async function handleResendEmail() {
+    if (resendState.status === 'submitting') {
+      return;
+    }
+
+    setResendState({ status: 'submitting' });
+    try {
+      await apiClient.createAuthEmailVerification();
+      setResendState({ status: 'sent' });
+    } catch (error: unknown) {
+      if (requestStatus(error) === unauthorizedStatus) {
+        await logout().catch(() => undefined);
+        return;
+      }
+      setResendState({
+        message: 'Não foi possível reenviar agora. Tente de novo.',
+        status: 'error',
+      });
+    }
+  }
 
   async function handleLogout() {
     if (logoutState.status === 'submitting') {
@@ -57,6 +90,43 @@ export default function ProfileScreen() {
             }
             onSessionExpired={logout}
           />
+        </View>
+        <View style={styles.emailSection}>
+          <View style={styles.emailRow}>
+            <AppText style={styles.emailAddress} variant="body" color={semanticColors.textStrong}>
+              {state.user.email ? state.user.email.address : 'Nenhum e-mail'}
+            </AppText>
+            <Badge
+              label={state.user.email?.verified ? 'Confirmado' : 'Não confirmado'}
+              tone={state.user.email?.verified ? 'accent' : 'neutral'}
+            />
+          </View>
+          <Button
+            label="Alterar e-mail"
+            onPress={() => router.push('/email')}
+            size="md"
+            testID="profile-change-email-button"
+          />
+          {state.user.email && !state.user.email.verified ? (
+            resendState.status === 'error' ? (
+              <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm">
+                {resendState.message}
+              </AppText>
+            ) : resendState.status === 'sent' ? (
+              <AppText color={semanticColors.textBody} variant="sm">
+                E-mail enviado. Confira sua caixa de entrada.
+              </AppText>
+            ) : (
+              <Button
+                disabled={resendState.status === 'submitting'}
+                label={resendState.status === 'submitting' ? 'Enviando…' : 'Reenviar confirmação'}
+                onPress={handleResendEmail}
+                size="md"
+                testID="profile-resend-verification-button"
+                variant="soft"
+              />
+            )
+          ) : null}
         </View>
         <View style={styles.logoutSection}>
           {logoutState.status === 'error' ? (

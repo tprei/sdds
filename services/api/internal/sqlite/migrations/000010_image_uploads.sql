@@ -1,6 +1,10 @@
+-- An upload row is the ledger for the bytes it wrote to the object store, and
+-- only the retention sweep deletes those bytes. The row therefore outlives both
+-- the note it was consumed by and the user who uploaded it: both owners clear to
+-- NULL instead of cascading, so the sweep can still reclaim the bytes.
 CREATE TABLE image_uploads (
 	id TEXT NOT NULL PRIMARY KEY CHECK (typeof(id) = 'text' AND length(id) > 0),
-	user_id TEXT NOT NULL REFERENCES users(id),
+	user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
 	storage_key TEXT NOT NULL UNIQUE CHECK (typeof(storage_key) = 'text' AND length(storage_key) > 0),
 	upload_request_id TEXT NOT NULL CHECK (typeof(upload_request_id) = 'text' AND length(upload_request_id) BETWEEN 1 AND 128),
 	state TEXT NOT NULL CHECK (typeof(state) = 'text' AND state IN ('pending', 'ready', 'consumed', 'deleting', 'expired')),

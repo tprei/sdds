@@ -9,7 +9,7 @@ ALTER TABLE notes RENAME TO notes_legacy;
 
 CREATE TABLE notes (
 	id TEXT NOT NULL UNIQUE CHECK (typeof(id) = 'text'),
-	user_id TEXT NOT NULL REFERENCES users(id),
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	title TEXT NOT NULL CHECK (length(trim(title)) BETWEEN 3 AND 120),
 	body TEXT NOT NULL CHECK (length(trim(body)) BETWEEN 1 AND 4000),
 	category_slug TEXT NOT NULL REFERENCES categories(slug),

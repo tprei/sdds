@@ -324,6 +324,7 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config, embe
 		httpapi.AuthDependencies{Users: userStore, ContactChannels: sqlite.NewContactChannelStore(db), Mail: mailSender, AppBaseURL: appBaseURL, Limits: config.authLimits},
 		httpapi.MediaDependencies{ImageUploads: uploadService, AttachedImages: imageReader},
 		httpapi.SystemDependencies{Readiness: readiness},
+		httpapi.PublicReadDependencies{Limits: config.publicReadLimits},
 	))
 
 	slog.Info("api listening", "addr", config.httpAddr)

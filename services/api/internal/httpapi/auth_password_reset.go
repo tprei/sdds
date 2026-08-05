@@ -31,7 +31,7 @@ func (handler server) CreateAuthPasswordReset(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if retry, allowed := handler.auth.rateLimiters.allow(r, authPurposePasswordReset, normalized); !allowed {
-		writeAuthRateLimited(w, retry)
+		writeRetryableRateLimited(w, retry)
 		return
 	}
 
@@ -60,7 +60,7 @@ func (handler server) SetAuthPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if retry, allowed := handler.auth.rateLimiters.allow(r, authPurposePasswordReset, requestSourceKey(r)); !allowed {
-		writeAuthRateLimited(w, retry)
+		writeRetryableRateLimited(w, retry)
 		return
 	}
 

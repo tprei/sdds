@@ -30,9 +30,10 @@ func TestLoadConfigUsesDefaults(t *testing.T) {
 	}
 
 	want := config{
-		authLimits:   httpapi.DefaultAuthLimits(),
-		databasePath: defaultDatabasePath,
-		httpAddr:     defaultHTTPAddr,
+		authLimits:       httpapi.DefaultAuthLimits(),
+		publicReadLimits: httpapi.DefaultPublicReadLimits(),
+		databasePath:     defaultDatabasePath,
+		httpAddr:         defaultHTTPAddr,
 	}
 	if diff := cmp.Diff(want, got, cmp.AllowUnexported(config{})); diff != "" {
 		t.Fatalf("config mismatch (-want +got):\n%s", diff)
@@ -68,8 +69,9 @@ func TestLoadConfigUsesEnvironmentOverrides(t *testing.T) {
 			PasswordResetGlobalRequestsPerMinute: 30,
 			PasswordHashConcurrency:              3,
 		},
-		databasePath: "/tmp/sdds-test.db",
-		httpAddr:     "127.0.0.1:18080",
+		publicReadLimits: httpapi.DefaultPublicReadLimits(),
+		databasePath:     "/tmp/sdds-test.db",
+		httpAddr:         "127.0.0.1:18080",
 	}
 	if diff := cmp.Diff(want, got, cmp.AllowUnexported(config{})); diff != "" {
 		t.Fatalf("config mismatch (-want +got):\n%s", diff)

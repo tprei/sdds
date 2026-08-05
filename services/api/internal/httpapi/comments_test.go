@@ -658,6 +658,7 @@ func TestCommentRoutesRejectUnauthenticatedSessions(t *testing.T) {
 				}, ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 				MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 				SystemDependencies{Readiness: fakeReadiness{}},
+				PublicReadDependencies{},
 			)
 			request := jsonRequest(http.MethodPost, "/v1/notes/"+exampleNoteID+"/comments", `{"body":"ok"}`)
 			if test.authorization != "" {
@@ -685,6 +686,7 @@ func newCommentRouter(notes fakeNoteStore, comments fakeCommentStore) http.Handl
 		AuthDependencies{Users: authenticatedFakeUserStore(fakeUserStore{}), ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
+		PublicReadDependencies{},
 	))
 }
 

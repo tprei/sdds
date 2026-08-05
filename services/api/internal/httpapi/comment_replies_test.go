@@ -95,6 +95,7 @@ func TestCreateCommentReplyRequiresSession(t *testing.T) {
 		}, ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
+		PublicReadDependencies{},
 	)
 	request := jsonRequest(http.MethodPost, "/v1/comments/"+exampleCommentID+"/replies", `{"body":"ok"}`)
 	response := httptest.NewRecorder()

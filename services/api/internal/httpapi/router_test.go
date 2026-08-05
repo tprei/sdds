@@ -131,6 +131,7 @@ func newRouterForTest(
 		AuthDependencies{Users: users, ContactChannels: fakeContactChannelStore{}, Limits: authLimits},
 		MediaDependencies{ImageUploads: uploadService, AttachedImages: imageReader},
 		SystemDependencies{Readiness: readiness},
+		PublicReadDependencies{Limits: DefaultPublicReadLimits()},
 	)
 }
 
@@ -164,6 +165,7 @@ func newRouterWithAuthSeamsForTest(
 		},
 		mediaHandlers{imageUploads: uploadService, attachedImages: imageReader},
 		systemHandlers{readiness: readiness},
+		newPublicReadRateLimiters(DefaultPublicReadLimits(), clock),
 	)
 }
 
@@ -190,6 +192,7 @@ func TestNewRouterRequiresMediaDependencies(t *testing.T) {
 				AuthDependencies{Users: fakeUserStore{}, ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 				test.media,
 				SystemDependencies{Readiness: fakeReadiness{}},
+				PublicReadDependencies{},
 			)
 		})
 	}
@@ -209,6 +212,7 @@ func TestNewRouterRequiresCommentStore(t *testing.T) {
 		AuthDependencies{Users: fakeUserStore{}, ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
+		PublicReadDependencies{},
 	)
 }
 
@@ -226,6 +230,7 @@ func TestNewRouterRequiresReportStore(t *testing.T) {
 		AuthDependencies{Users: fakeUserStore{}, ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
+		PublicReadDependencies{},
 	)
 }
 

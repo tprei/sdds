@@ -161,6 +161,12 @@ func (handler server) DeleteAuthSession(w http.ResponseWriter, r *http.Request) 
 	noContent(w, r)
 }
 
+// DeleteAuthUser satisfies the generated ServerInterface. The handler returns
+// 501 Not Implemented.
+func (handler server) DeleteAuthUser(w http.ResponseWriter, r *http.Request) {
+	writeError(w, http.StatusNotImplemented, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+}
+
 func authValidationErrorResponse(code openapi.ErrorCode, problems []user.ValidationProblem) openapi.ErrorResponse {
 	fields := make([]openapi.ValidationProblem, 0, len(problems))
 	for _, problem := range problems {

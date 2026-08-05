@@ -476,3 +476,14 @@ func isUniqueConstraintError(err error) bool {
 	var sqliteErr *modernsqlite.Error
 	return errors.As(err, &sqliteErr) && sqliteErr.Code() == sqlite3.SQLITE_CONSTRAINT_UNIQUE
 }
+
+// isConstraintConflictError reports a duplicate row from either a unique index
+// or a primary key; SQLite reports those as distinct result codes.
+func isConstraintConflictError(err error) bool {
+	var sqliteErr *modernsqlite.Error
+	if !errors.As(err, &sqliteErr) {
+		return false
+	}
+	code := sqliteErr.Code()
+	return code == sqlite3.SQLITE_CONSTRAINT_UNIQUE || code == sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY
+}

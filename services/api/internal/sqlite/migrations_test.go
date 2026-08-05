@@ -25,9 +25,11 @@ func TestApplyMigrationsCreatesInitialSchema(t *testing.T) {
 		"user_login_identities",
 		"sessions",
 		"note_images",
-		"note_create_requests",
 		"note_useful_reactions",
 		"note_comments",
+		"note_create_requests",
+		"user_contact_channels",
+		"user_contact_channel_tokens",
 	}
 	for _, table := range tables {
 		t.Run(table, func(t *testing.T) {
@@ -55,9 +57,12 @@ func TestApplyMigrationsCreatesCatalogIndexes(t *testing.T) {
 		"user_login_identities_one_password_provider_per_user_idx",
 		"sessions_user_idx",
 		"sessions_active_expiry_idx",
-		"note_useful_reactions_user_idx",
 		"note_comments_note_page_idx",
 		"note_comments_user_idx",
+		"note_useful_reactions_user_idx",
+		"user_contact_channels_user_idx",
+		"user_contact_channels_verified_value_idx",
+		"user_contact_channel_tokens_channel_idx",
 	}
 	for _, index := range indexes {
 		t.Run(index, func(t *testing.T) {

@@ -91,6 +91,7 @@ export default function ProfileScreen() {
               router.push({ pathname: '/notes/[id]', params: { id: noteID } })
             }
             onSessionExpired={logout}
+            requireAuth={null}
           />
         </View>
         <View style={styles.emailSection}>

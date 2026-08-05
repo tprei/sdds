@@ -7,7 +7,7 @@ CREATE TABLE users (
 
 CREATE TABLE authors (
 	id TEXT PRIMARY KEY,
-	user_id TEXT NOT NULL UNIQUE REFERENCES users(id),
+	user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
 	display_name TEXT NOT NULL CHECK (length(trim(display_name)) BETWEEN 1 AND 60),
 	created_at INTEGER NOT NULL,
 	updated_at INTEGER NOT NULL
@@ -15,7 +15,7 @@ CREATE TABLE authors (
 
 CREATE TABLE user_login_identities (
 	id TEXT PRIMARY KEY,
-	user_id TEXT NOT NULL REFERENCES users(id),
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	kind TEXT NOT NULL CHECK (kind IN ('password', 'oidc')),
 	provider TEXT NOT NULL CHECK (length(trim(provider)) > 0),
 	normalized_identifier TEXT NOT NULL CHECK (length(trim(normalized_identifier)) > 0),
@@ -36,7 +36,7 @@ CREATE UNIQUE INDEX user_login_identities_one_password_provider_per_user_idx
 
 CREATE TABLE sessions (
 	id TEXT PRIMARY KEY,
-	user_id TEXT NOT NULL REFERENCES users(id),
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	token_hash TEXT NOT NULL UNIQUE,
 	created_at INTEGER NOT NULL,
 	expires_at INTEGER NOT NULL,

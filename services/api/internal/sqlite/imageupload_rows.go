@@ -39,6 +39,7 @@ func (store *ImageUploadStore) FindByUserRequest(ctx context.Context, userID, re
 func (store *ImageUploadStore) findUpload(ctx context.Context, row interface{ Scan(...any) error }) (media.Upload, error) {
 	var (
 		upload                media.Upload
+		userID                sql.NullString
 		storageKey            string
 		state                 string
 		consumedNoteID        sql.NullString
@@ -50,7 +51,7 @@ func (store *ImageUploadStore) findUpload(ctx context.Context, row interface{ Sc
 	)
 	if err := row.Scan(
 		&upload.ID,
-		&upload.UserID,
+		&userID,
 		&storageKey,
 		&upload.UploadRequestID,
 		&state,
@@ -71,6 +72,7 @@ func (store *ImageUploadStore) findUpload(ctx context.Context, row interface{ Sc
 		}
 		return media.Upload{}, err
 	}
+	upload.UserID = userID.String
 	upload.StorageKey = media.ObjectKey(storageKey)
 	upload.State = media.UploadState(state)
 	upload.ConsumedNoteID = consumedNoteID.String

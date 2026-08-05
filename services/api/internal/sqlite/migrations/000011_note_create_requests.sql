@@ -1,5 +1,5 @@
 CREATE TABLE note_create_requests (
-	user_id           TEXT NOT NULL REFERENCES users(id),
+	user_id           TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	client_request_id TEXT NOT NULL
 		CHECK (typeof(client_request_id) = 'text' AND length(client_request_id) BETWEEN 1 AND 128),
 	request_sha256    TEXT NOT NULL

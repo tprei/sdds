@@ -6,7 +6,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { componentMetrics, motion, semanticColors } from '@sdds/tokens';
 
 import {
-  IconBookmark,
   IconHome,
   IconPlus,
   IconSearch,
@@ -34,17 +33,16 @@ type TabConfig = {
 const tabs: readonly TabConfig[] = [
   { name: 'index', label: 'Início', Icon: IconHome },
   { name: 'search', label: 'Buscar', Icon: IconSearch },
-  { name: 'saved', label: 'Salvos', Icon: IconBookmark },
   { name: 'profile', label: 'Perfil', Icon: IconUser },
 ];
 
 /**
  * The bottom tab bar lays out TAB_BAR_SLOT_COUNT equal-width slots in a row:
- * two tab buttons, the FAB slot, then two more tab buttons. Every slot
+ * two tab buttons, the FAB slot, then one more tab button. Every slot
  * shares the same flex weight in tab-bar.styles.ts; tab-bar.test.tsx
  * asserts that many slots render.
  */
-export const TAB_BAR_SLOT_COUNT = 5;
+export const TAB_BAR_SLOT_COUNT = 4;
 
 export function AppTabBar({ state, navigation }: AppTabBarProps) {
   const router = useRouter();
@@ -70,8 +68,8 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
         />
       ))}
       {/*
-        fabSlot shares the item style's flex: 1 weight, so all five slots in
-        this row (2 tabs, the FAB, 2 tabs) divide the bar width evenly.
+        fabSlot shares the item style's flex: 1 weight, so all four slots in
+        this row (2 tabs, the FAB, 1 tab) divide the bar width evenly.
         tests/synthetics/geometry.ts proves that spacing in a real browser.
       */}
       <PressableScale

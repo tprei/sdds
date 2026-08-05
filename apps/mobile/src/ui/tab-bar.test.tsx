@@ -77,7 +77,6 @@ function slotStyle(node: ReactTestRendererJSON | undefined): unknown {
 const routes = [
   { key: 'index', name: 'index' },
   { key: 'search', name: 'search' },
-  { key: 'saved', name: 'saved' },
   { key: 'profile', name: 'profile' },
 ];
 
@@ -92,10 +91,10 @@ function renderBar(index: number): ReactTestRenderer {
 }
 
 describe('AppTabBar', () => {
-  it('renders the four tabs and the create FAB', () => {
+  it('renders the three tabs and the create FAB', () => {
     const renderer = renderBar(0);
     const text = JSON.stringify(renderer.toJSON());
-    for (const label of ['Início', 'Buscar', 'Salvos', 'Perfil', 'Escrever um achado']) {
+    for (const label of ['Início', 'Buscar', 'Perfil', 'Escrever um achado']) {
       expect(text).toContain(label);
     }
   });

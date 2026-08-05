@@ -49,8 +49,39 @@ func tokenFromMessage(t *testing.T, message mail.Message) string {
 }
 
 func newSQLiteAuthRouterWithMail(t *testing.T, sender mail.Sender) http.Handler {
+	return newSQLiteAuthRouterWithMailLimits(t, sender, DefaultAuthLimits())
+}
+
+// newSQLiteAuthRouterWithMailAsync wires the production goroutine dispatcher
+// (no synchronous schedule), so detached mail dispatch runs off the request
+// goroutine exactly as it does in the server.
+func newSQLiteAuthRouterWithMailAsync(t *testing.T, sender mail.Sender) http.Handler {
 	t.Helper()
-	return newSQLiteAuthRouterWithMailAndLimits(t, sender, DefaultAuthLimits())
+	ctx := context.Background()
+	db, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := sqlite.ApplyMigrations(ctx, db); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+	userStore := sqlite.NewUserStore(db)
+	channelStore := sqlite.NewContactChannelStore(db)
+	return NewRouter(
+		NotesDependencies{Stores: fakeNoteStore{}, Publisher: fakeNoteStore{}, Searcher: fakeNoteStore{}, Catalog: fakeCatalog{}},
+		CommentDependencies{Store: fakeCommentStore{}},
+		ReportDependencies{Store: fakeReportStore{}, CommentTargets: fakeCommentStore{}},
+		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
+		AuthDependencies{Users: userStore, ContactChannels: channelStore, Mail: sender, AppBaseURL: "https://app.sdds.test", Limits: DefaultAuthLimits()},
+		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
+		SystemDependencies{Readiness: fakeReadiness{}},
+	)
+}
+
+func newSQLiteAuthRouterWithMailLimits(t *testing.T, sender mail.Sender, limits AuthLimits) http.Handler {
+	t.Helper()
+	return newSQLiteAuthRouterWithMailAndLimits(t, sender, limits)
 }
 
 func newSQLiteAuthRouterWithMailAndLimits(t *testing.T, sender mail.Sender, limits AuthLimits) http.Handler {

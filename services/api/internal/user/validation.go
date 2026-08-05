@@ -88,17 +88,22 @@ func appendDisplayNameValidationProblems(problems []ValidationProblem, displayNa
 }
 
 func appendPasswordValidationProblems(problems []ValidationProblem, password string) []ValidationProblem {
+	return append(problems, ValidatePassword(password)...)
+}
+
+// ValidatePassword applies the password length rules used by signup and reset.
+func ValidatePassword(password string) []ValidationProblem {
 	passwordLength := utf8.RuneCountInString(password)
 	if passwordLength == 0 {
-		return append(problems, ValidationProblem{Field: "password", Code: "required"})
+		return []ValidationProblem{{Field: "password", Code: "required"}}
 	}
 	if passwordLength < PasswordMinLength {
-		return append(problems, ValidationProblem{Field: "password", Code: "too_short"})
+		return []ValidationProblem{{Field: "password", Code: "too_short"}}
 	}
 	if passwordLength > PasswordMaxLength {
-		return append(problems, ValidationProblem{Field: "password", Code: "too_long"})
+		return []ValidationProblem{{Field: "password", Code: "too_long"}}
 	}
-	return problems
+	return nil
 }
 
 func hasValidUsernameCharacters(value string) bool {

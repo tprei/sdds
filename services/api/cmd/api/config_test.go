@@ -58,13 +58,15 @@ func TestLoadConfigUsesEnvironmentOverrides(t *testing.T) {
 
 	want := config{
 		authLimits: httpapi.AuthLimits{
-			SignupRequestsPerMinute:             7,
-			LoginRequestsPerMinute:              11,
-			SignupGlobalRequestsPerMinute:       70,
-			LoginGlobalRequestsPerMinute:        110,
-			VerificationRequestsPerMinute:       9,
-			VerificationGlobalRequestsPerMinute: 90,
-			PasswordHashConcurrency:             3,
+			SignupRequestsPerMinute:              7,
+			LoginRequestsPerMinute:               11,
+			SignupGlobalRequestsPerMinute:        70,
+			LoginGlobalRequestsPerMinute:         110,
+			VerificationRequestsPerMinute:        9,
+			VerificationGlobalRequestsPerMinute:  90,
+			PasswordResetRequestsPerMinute:       3,
+			PasswordResetGlobalRequestsPerMinute: 30,
+			PasswordHashConcurrency:              3,
 		},
 		databasePath: "/tmp/sdds-test.db",
 		httpAddr:     "127.0.0.1:18080",

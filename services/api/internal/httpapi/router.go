@@ -144,24 +144,28 @@ type ReadinessChecker interface {
 }
 
 type AuthLimits struct {
-	SignupRequestsPerMinute             int
-	LoginRequestsPerMinute              int
-	SignupGlobalRequestsPerMinute       int
-	LoginGlobalRequestsPerMinute        int
-	VerificationRequestsPerMinute       int
-	VerificationGlobalRequestsPerMinute int
-	PasswordHashConcurrency             int
+	SignupRequestsPerMinute              int
+	LoginRequestsPerMinute               int
+	SignupGlobalRequestsPerMinute        int
+	LoginGlobalRequestsPerMinute         int
+	VerificationRequestsPerMinute        int
+	VerificationGlobalRequestsPerMinute  int
+	PasswordResetRequestsPerMinute       int
+	PasswordResetGlobalRequestsPerMinute int
+	PasswordHashConcurrency              int
 }
 
 func DefaultAuthLimits() AuthLimits {
 	return AuthLimits{
-		SignupRequestsPerMinute:             5,
-		LoginRequestsPerMinute:              10,
-		SignupGlobalRequestsPerMinute:       60,
-		LoginGlobalRequestsPerMinute:        120,
-		VerificationRequestsPerMinute:       5,
-		VerificationGlobalRequestsPerMinute: 60,
-		PasswordHashConcurrency:             2,
+		SignupRequestsPerMinute:              5,
+		LoginRequestsPerMinute:               10,
+		SignupGlobalRequestsPerMinute:        60,
+		LoginGlobalRequestsPerMinute:         120,
+		VerificationRequestsPerMinute:        5,
+		VerificationGlobalRequestsPerMinute:  60,
+		PasswordResetRequestsPerMinute:       3,
+		PasswordResetGlobalRequestsPerMinute: 30,
+		PasswordHashConcurrency:              2,
 	}
 }
 
@@ -251,6 +255,8 @@ func registerPublicRoutes(router chi.Router, wrapper openapi.ServerInterfaceWrap
 		router.Post("/auth/users", wrapper.CreateAuthUser)
 		router.Post("/auth/sessions", wrapper.CreateAuthSession)
 		router.Post("/auth/email/verification", wrapper.VerifyAuthEmail)
+		router.Post("/auth/password-resets", wrapper.CreateAuthPasswordReset)
+		router.Post("/auth/password", wrapper.SetAuthPassword)
 	})
 }
 

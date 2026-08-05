@@ -340,6 +340,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/auth/email:
+    put:
+      operationId: setAuthEmail
+      summary: Set or change the current user's contact email
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetUserEmailRequest"
+      responses:
+        "202":
+          description: The address was accepted and a verification message will be dispatched.
+        "400":
+          description: The email is missing or malformed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: The request body is too large.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too many requests.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not store the address.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/auth/session:
     get:
       operationId: getAuthSession
@@ -1533,6 +1580,30 @@ components:
           type: string
         display_name:
           type: string
+        email:
+          type: string
+          maxLength: 254
+          description: Optional contact address collected at signup and verified out of band.
+    UserEmail:
+      type: object
+      additionalProperties: false
+      required:
+        - address
+        - verified
+      properties:
+        address:
+          type: string
+        verified:
+          type: boolean
+    SetUserEmailRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          maxLength: 254
     CurrentSessionResponse:
       type: object
       additionalProperties: false
@@ -1561,6 +1632,8 @@ components:
           type: string
         author:
           $ref: "#/components/schemas/AuthorSummary"
+        email:
+          $ref: "#/components/schemas/UserEmail"
     ErrorCode:
       type: string
       x-enum-varnames:
@@ -1590,6 +1663,7 @@ components:
         - ErrorCodeInvalidEventBatch
         - ErrorCodeEmbeddingUnavailable
         - ErrorCodeInvalidReplyTarget
+        - ErrorCodeInvalidEmail
       enum:
         - internal_error
         - forbidden
@@ -1617,6 +1691,7 @@ components:
         - invalid_event_batch
         - embedding_unavailable
         - invalid_reply_target
+        - invalid_email
     ErrorResponse:
       type: object
       additionalProperties: false
@@ -2517,6 +2592,7 @@ components:
         - ValidationFieldReason
         - ValidationFieldDetails
         - ValidationFieldParentCommentID
+        - ValidationFieldEmail
       enum:
         - title
         - body
@@ -2536,6 +2612,7 @@ components:
         - reason
         - details
         - parent_comment_id
+        - email
     ValidationProblem:
       type: object
       additionalProperties: false

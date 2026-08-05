@@ -39,6 +39,7 @@ func newAuthRateLimiters(limits AuthLimits, clock func() time.Time) authRateLimi
 	}
 	limiters.registerPurpose(authPurposeSignup, limits.SignupRequestsPerMinute, limits.SignupGlobalRequestsPerMinute)
 	limiters.registerPurpose(authPurposeLogin, limits.LoginRequestsPerMinute, limits.LoginGlobalRequestsPerMinute)
+	limiters.registerPurpose(authPurposeVerification, limits.VerificationRequestsPerMinute, limits.VerificationGlobalRequestsPerMinute)
 	return limiters
 }
 

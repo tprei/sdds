@@ -22,11 +22,13 @@ func TestCreateAuthUserRateLimitReturnsTooManyRequestsForSameSource(t *testing.T
 			return authCurrentSession(input.Username, input.DisplayName, input.TokenHash, input.ExpiresAt), nil
 		},
 	}, AuthLimits{
-		SignupRequestsPerMinute:       1,
-		LoginRequestsPerMinute:        1000,
-		SignupGlobalRequestsPerMinute: 1000,
-		LoginGlobalRequestsPerMinute:  1000,
-		PasswordHashConcurrency:       4,
+		SignupRequestsPerMinute:             1,
+		LoginRequestsPerMinute:              1000,
+		SignupGlobalRequestsPerMinute:       1000,
+		LoginGlobalRequestsPerMinute:        1000,
+		VerificationRequestsPerMinute:       1000,
+		VerificationGlobalRequestsPerMinute: 1000,
+		PasswordHashConcurrency:             4,
 	}, func() time.Time { return now })
 
 	firstResponse := httptest.NewRecorder()
@@ -59,11 +61,13 @@ func TestCreateAuthUserAllowsDifferentSources(t *testing.T) {
 			return authCurrentSession(input.Username, input.DisplayName, input.TokenHash, input.ExpiresAt), nil
 		},
 	}, AuthLimits{
-		SignupRequestsPerMinute:       1,
-		LoginRequestsPerMinute:        1000,
-		SignupGlobalRequestsPerMinute: 1000,
-		LoginGlobalRequestsPerMinute:  1000,
-		PasswordHashConcurrency:       4,
+		SignupRequestsPerMinute:             1,
+		LoginRequestsPerMinute:              1000,
+		SignupGlobalRequestsPerMinute:       1000,
+		LoginGlobalRequestsPerMinute:        1000,
+		VerificationRequestsPerMinute:       1000,
+		VerificationGlobalRequestsPerMinute: 1000,
+		PasswordHashConcurrency:             4,
 	}, func() time.Time { return now })
 
 	firstResponse := httptest.NewRecorder()
@@ -93,11 +97,13 @@ func TestMalformedSignupDoesNotConsumeAuthLimit(t *testing.T) {
 			return authCurrentSession(input.Username, input.DisplayName, input.TokenHash, input.ExpiresAt), nil
 		},
 	}, AuthLimits{
-		SignupRequestsPerMinute:       1000,
-		LoginRequestsPerMinute:        1000,
-		SignupGlobalRequestsPerMinute: 1,
-		LoginGlobalRequestsPerMinute:  1000,
-		PasswordHashConcurrency:       4,
+		SignupRequestsPerMinute:             1000,
+		LoginRequestsPerMinute:              1000,
+		SignupGlobalRequestsPerMinute:       1,
+		LoginGlobalRequestsPerMinute:        1000,
+		VerificationRequestsPerMinute:       1000,
+		VerificationGlobalRequestsPerMinute: 1000,
+		PasswordHashConcurrency:             4,
 	}, func() time.Time { return now })
 
 	malformedResponse := httptest.NewRecorder()
@@ -127,11 +133,13 @@ func TestInvalidSignupDoesNotConsumeAuthLimit(t *testing.T) {
 			return authCurrentSession(input.Username, input.DisplayName, input.TokenHash, input.ExpiresAt), nil
 		},
 	}, AuthLimits{
-		SignupRequestsPerMinute:       1,
-		LoginRequestsPerMinute:        1000,
-		SignupGlobalRequestsPerMinute: 1,
-		LoginGlobalRequestsPerMinute:  1000,
-		PasswordHashConcurrency:       4,
+		SignupRequestsPerMinute:             1,
+		LoginRequestsPerMinute:              1000,
+		SignupGlobalRequestsPerMinute:       1,
+		LoginGlobalRequestsPerMinute:        1000,
+		VerificationRequestsPerMinute:       1000,
+		VerificationGlobalRequestsPerMinute: 1000,
+		PasswordHashConcurrency:             4,
 	}, func() time.Time { return now })
 
 	invalidResponse := httptest.NewRecorder()
@@ -156,11 +164,13 @@ func TestCreateAuthSessionRateLimitReturnsTooManyRequestsForSameAccount(t *testi
 	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
 	findCalls := 0
 	router := newAuthRateLimitTestRouter(t, newAuthRateLimitLoginStore(t, &findCalls), AuthLimits{
-		SignupRequestsPerMinute:       1000,
-		LoginRequestsPerMinute:        1,
-		SignupGlobalRequestsPerMinute: 1000,
-		LoginGlobalRequestsPerMinute:  1000,
-		PasswordHashConcurrency:       4,
+		SignupRequestsPerMinute:             1000,
+		LoginRequestsPerMinute:              1,
+		SignupGlobalRequestsPerMinute:       1000,
+		LoginGlobalRequestsPerMinute:        1000,
+		VerificationRequestsPerMinute:       1000,
+		VerificationGlobalRequestsPerMinute: 1000,
+		PasswordHashConcurrency:             4,
 	}, func() time.Time { return now })
 
 	firstResponse := httptest.NewRecorder()
@@ -188,11 +198,13 @@ func TestCreateAuthSessionAllowsDifferentAccounts(t *testing.T) {
 	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
 	findCalls := 0
 	router := newAuthRateLimitTestRouter(t, newAuthRateLimitLoginStore(t, &findCalls), AuthLimits{
-		SignupRequestsPerMinute:       1000,
-		LoginRequestsPerMinute:        1,
-		SignupGlobalRequestsPerMinute: 1000,
-		LoginGlobalRequestsPerMinute:  1000,
-		PasswordHashConcurrency:       4,
+		SignupRequestsPerMinute:             1000,
+		LoginRequestsPerMinute:              1,
+		SignupGlobalRequestsPerMinute:       1000,
+		LoginGlobalRequestsPerMinute:        1000,
+		VerificationRequestsPerMinute:       1000,
+		VerificationGlobalRequestsPerMinute: 1000,
+		PasswordHashConcurrency:             4,
 	}, func() time.Time { return now })
 
 	firstResponse := httptest.NewRecorder()
@@ -236,11 +248,13 @@ func TestCreateAuthSessionSharesRateLimitBucketAcrossIdentifierCasings(t *testin
 		},
 	}
 	router := newAuthRateLimitTestRouter(t, users, AuthLimits{
-		SignupRequestsPerMinute:       1000,
-		LoginRequestsPerMinute:        2,
-		SignupGlobalRequestsPerMinute: 1000,
-		LoginGlobalRequestsPerMinute:  1000,
-		PasswordHashConcurrency:       4,
+		SignupRequestsPerMinute:             1000,
+		LoginRequestsPerMinute:              2,
+		SignupGlobalRequestsPerMinute:       1000,
+		LoginGlobalRequestsPerMinute:        1000,
+		VerificationRequestsPerMinute:       1000,
+		VerificationGlobalRequestsPerMinute: 1000,
+		PasswordHashConcurrency:             4,
 	}, func() time.Time { return now })
 
 	casings := []string{`" Thiago "`, `"thiago"`, `"THIAGO"`}
@@ -277,11 +291,13 @@ func TestCreateAuthSessionGlobalRateLimitReturnsTooManyRequests(t *testing.T) {
 	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
 	findCalls := 0
 	router := newAuthRateLimitTestRouter(t, newAuthRateLimitLoginStore(t, &findCalls), AuthLimits{
-		SignupRequestsPerMinute:       1000,
-		LoginRequestsPerMinute:        1000,
-		SignupGlobalRequestsPerMinute: 1000,
-		LoginGlobalRequestsPerMinute:  1,
-		PasswordHashConcurrency:       4,
+		SignupRequestsPerMinute:             1000,
+		LoginRequestsPerMinute:              1000,
+		SignupGlobalRequestsPerMinute:       1000,
+		LoginGlobalRequestsPerMinute:        1,
+		VerificationRequestsPerMinute:       1000,
+		VerificationGlobalRequestsPerMinute: 1000,
+		PasswordHashConcurrency:             4,
 	}, func() time.Time { return now })
 
 	firstResponse := httptest.NewRecorder()
@@ -308,10 +324,12 @@ func TestCreateAuthSessionGlobalRateLimitReturnsTooManyRequests(t *testing.T) {
 func TestAuthRateLimitersDoNotCreateAccountBucketsAfterGlobalRejection(t *testing.T) {
 	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
 	limiters := newAuthRateLimiters(AuthLimits{
-		SignupRequestsPerMinute:       1000,
-		LoginRequestsPerMinute:        1000,
-		SignupGlobalRequestsPerMinute: 1,
-		LoginGlobalRequestsPerMinute:  1,
+		SignupRequestsPerMinute:             1000,
+		LoginRequestsPerMinute:              1000,
+		SignupGlobalRequestsPerMinute:       1,
+		LoginGlobalRequestsPerMinute:        1,
+		VerificationRequestsPerMinute:       1000,
+		VerificationGlobalRequestsPerMinute: 1000,
 	}, func() time.Time { return now })
 	request := authRateLimitRequest(http.MethodPost, "/v1/auth/users", "{}", "203.0.113.10:1000")
 
@@ -340,10 +358,12 @@ func TestAuthRateLimitersDoNotCreateAccountBucketsAfterGlobalRejection(t *testin
 func TestAuthRateLimitersDoNotCreateAccountBucketsAfterSourceRejection(t *testing.T) {
 	now := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
 	limiters := newAuthRateLimiters(AuthLimits{
-		SignupRequestsPerMinute:       1,
-		LoginRequestsPerMinute:        1,
-		SignupGlobalRequestsPerMinute: 1000,
-		LoginGlobalRequestsPerMinute:  1000,
+		SignupRequestsPerMinute:             1,
+		LoginRequestsPerMinute:              1,
+		SignupGlobalRequestsPerMinute:       1000,
+		LoginGlobalRequestsPerMinute:        1000,
+		VerificationRequestsPerMinute:       1000,
+		VerificationGlobalRequestsPerMinute: 1000,
 	}, func() time.Time { return now })
 	request := authRateLimitRequest(http.MethodPost, "/v1/auth/users", "{}", "203.0.113.10:1000")
 
@@ -383,11 +403,13 @@ func TestAuthRateLimitersAreIndependentAndRefill(t *testing.T) {
 			return authCurrentSession("thiago", "Thiago", input.TokenHash, input.ExpiresAt), nil
 		},
 	}, AuthLimits{
-		SignupRequestsPerMinute:       1,
-		LoginRequestsPerMinute:        1,
-		SignupGlobalRequestsPerMinute: 1000,
-		LoginGlobalRequestsPerMinute:  1000,
-		PasswordHashConcurrency:       4,
+		SignupRequestsPerMinute:             1,
+		LoginRequestsPerMinute:              1,
+		SignupGlobalRequestsPerMinute:       1000,
+		LoginGlobalRequestsPerMinute:        1000,
+		VerificationRequestsPerMinute:       1000,
+		VerificationGlobalRequestsPerMinute: 1000,
+		PasswordHashConcurrency:             4,
 	}, func() time.Time { return now })
 
 	signupResponse := httptest.NewRecorder()

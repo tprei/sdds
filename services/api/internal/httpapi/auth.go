@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/tprei/sdds/services/api/internal/openapi"
@@ -58,7 +60,10 @@ func (handler server) CreateAuthUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, newAuthSessionResponse(current, token))
+	if request.Email != nil && *request.Email != "" {
+		handler.captureSignupEmail(r.Context(), current.User.ID, *request.Email)
+	}
+	writeJSON(w, http.StatusCreated, handler.newAuthSessionResponse(r.Context(), current, token))
 }
 
 func (handler server) CreateAuthSession(w http.ResponseWriter, r *http.Request) {
@@ -126,7 +131,7 @@ func (handler server) CreateAuthSession(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, newAuthSessionResponse(current, token))
+	writeJSON(w, http.StatusCreated, handler.newAuthSessionResponse(r.Context(), current, token))
 }
 
 func (handler server) GetAuthSession(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +141,7 @@ func (handler server) GetAuthSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, newCurrentSessionResponse(current))
+	writeJSON(w, http.StatusOK, handler.newCurrentSessionResponse(r.Context(), current))
 }
 
 func (handler server) DeleteAuthSession(w http.ResponseWriter, r *http.Request) {
@@ -185,23 +190,23 @@ func (handler server) writeInvalidCredentialsAfterVerification(w http.ResponseWr
 	writeInvalidCredentials(w)
 }
 
-func newAuthSessionResponse(current user.CurrentSession, token string) openapi.AuthSessionResponse {
+func (handler server) newAuthSessionResponse(ctx context.Context, current user.CurrentSession, token string) openapi.AuthSessionResponse {
 	return openapi.AuthSessionResponse{
 		Token:     token,
 		ExpiresAt: current.Session.ExpiresAt.UTC().UnixMilli(),
-		User:      newCurrentUserResponse(current),
+		User:      handler.newCurrentUserResponse(ctx, current),
 	}
 }
 
-func newCurrentSessionResponse(current user.CurrentSession) openapi.CurrentSessionResponse {
+func (handler server) newCurrentSessionResponse(ctx context.Context, current user.CurrentSession) openapi.CurrentSessionResponse {
 	return openapi.CurrentSessionResponse{
 		ExpiresAt: current.Session.ExpiresAt.UTC().UnixMilli(),
-		User:      newCurrentUserResponse(current),
+		User:      handler.newCurrentUserResponse(ctx, current),
 	}
 }
 
-func newCurrentUserResponse(current user.CurrentSession) openapi.CurrentUser {
-	return openapi.CurrentUser{
+func (handler server) newCurrentUserResponse(ctx context.Context, current user.CurrentSession) openapi.CurrentUser {
+	response := openapi.CurrentUser{
 		Id:       string(current.User.ID),
 		Username: current.Username,
 		Author: openapi.AuthorSummary{
@@ -209,4 +214,13 @@ func newCurrentUserResponse(current user.CurrentSession) openapi.CurrentUser {
 			DisplayName: current.Author.DisplayName,
 		},
 	}
+	channel, err := handler.auth.contactChannels.FindEmailForUser(ctx, current.User.ID)
+	if err != nil {
+		if !errors.Is(err, user.ErrContactChannelNotFound) {
+			log.Printf("find email for user %s: %v", current.User.ID, err)
+		}
+		return response
+	}
+	response.Email = &openapi.UserEmail{Address: channel.Value, Verified: channel.VerifiedAt != nil}
+	return response
 }

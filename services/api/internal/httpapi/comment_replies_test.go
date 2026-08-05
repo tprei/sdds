@@ -92,7 +92,7 @@ func TestCreateCommentReplyRequiresSession(t *testing.T) {
 			findCurrentSession: func(context.Context, string, time.Time) (user.CurrentSession, error) {
 				return user.CurrentSession{}, user.ErrSessionNotFound
 			},
-		}, Limits: DefaultAuthLimits()},
+		}, ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
 	)

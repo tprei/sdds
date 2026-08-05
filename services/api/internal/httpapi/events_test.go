@@ -49,6 +49,7 @@ func newEventHTTPRouterWithSessionError(t *testing.T, store EventStore, limits E
 		authHandlers{
 			users:                 users,
 			publicAuthors:         users,
+			contactChannels:       fakeContactChannelStore{},
 			passwordHasher:        hasher,
 			invalidCredentialHash: mustInvalidCredentialHash(hasher),
 			rateLimiters:          newAuthRateLimiters(DefaultAuthLimits(), clock),

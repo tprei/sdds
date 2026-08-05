@@ -47,6 +47,8 @@ func TestLoadConfigUsesEnvironmentOverrides(t *testing.T) {
 	t.Setenv("SDDS_AUTH_LOGIN_REQUESTS_PER_MINUTE", "11")
 	t.Setenv("SDDS_AUTH_GLOBAL_SIGNUP_REQUESTS_PER_MINUTE", "70")
 	t.Setenv("SDDS_AUTH_GLOBAL_LOGIN_REQUESTS_PER_MINUTE", "110")
+	t.Setenv("SDDS_AUTH_VERIFICATION_REQUESTS_PER_MINUTE", "9")
+	t.Setenv("SDDS_AUTH_GLOBAL_VERIFICATION_REQUESTS_PER_MINUTE", "90")
 	t.Setenv("SDDS_AUTH_HASH_CONCURRENCY", "3")
 
 	got, err := loadConfig()
@@ -56,11 +58,13 @@ func TestLoadConfigUsesEnvironmentOverrides(t *testing.T) {
 
 	want := config{
 		authLimits: httpapi.AuthLimits{
-			SignupRequestsPerMinute:       7,
-			LoginRequestsPerMinute:        11,
-			SignupGlobalRequestsPerMinute: 70,
-			LoginGlobalRequestsPerMinute:  110,
-			PasswordHashConcurrency:       3,
+			SignupRequestsPerMinute:             7,
+			LoginRequestsPerMinute:              11,
+			SignupGlobalRequestsPerMinute:       70,
+			LoginGlobalRequestsPerMinute:        110,
+			VerificationRequestsPerMinute:       9,
+			VerificationGlobalRequestsPerMinute: 90,
+			PasswordHashConcurrency:             3,
 		},
 		databasePath: "/tmp/sdds-test.db",
 		httpAddr:     "127.0.0.1:18080",
@@ -245,7 +249,7 @@ func writeMediaFile(t *testing.T, path, contents string) {
 
 func clearConfigEnv(t *testing.T) {
 	t.Helper()
-	for _, name := range []string{"SDDS_DATABASE_PATH", "SDDS_HTTP_ADDR", "SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE", "SDDS_AUTH_LOGIN_REQUESTS_PER_MINUTE", "SDDS_AUTH_GLOBAL_SIGNUP_REQUESTS_PER_MINUTE", "SDDS_AUTH_GLOBAL_LOGIN_REQUESTS_PER_MINUTE", "SDDS_AUTH_HASH_CONCURRENCY", mediaEndpointEnv, mediaRegionEnv, mediaBucketEnv, mediaPathStyleEnv, mediaAccessKeyFileEnv, mediaSecretKeyFileEnv} {
+	for _, name := range []string{"SDDS_DATABASE_PATH", "SDDS_HTTP_ADDR", "SDDS_AUTH_SIGNUP_REQUESTS_PER_MINUTE", "SDDS_AUTH_LOGIN_REQUESTS_PER_MINUTE", "SDDS_AUTH_GLOBAL_SIGNUP_REQUESTS_PER_MINUTE", "SDDS_AUTH_GLOBAL_LOGIN_REQUESTS_PER_MINUTE", "SDDS_AUTH_VERIFICATION_REQUESTS_PER_MINUTE", "SDDS_AUTH_GLOBAL_VERIFICATION_REQUESTS_PER_MINUTE", "SDDS_AUTH_HASH_CONCURRENCY", mediaEndpointEnv, mediaRegionEnv, mediaBucketEnv, mediaPathStyleEnv, mediaAccessKeyFileEnv, mediaSecretKeyFileEnv} {
 		t.Setenv(name, "")
 	}
 }

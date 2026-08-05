@@ -6,11 +6,12 @@ import (
 
 func withMailEnv(t *testing.T, fn func()) {
 	t.Helper()
-	for _, name := range []string{apiURLEnv, apiTokenEnv, fromAddressEnv, timeoutMsEnv} {
+	for _, name := range []string{apiURLEnv, apiTokenEnv, fromAddressEnv, timeoutMsEnv, appBaseURLEnv} {
 		t.Setenv(name, "")
 	}
 	t.Setenv(apiTokenEnv, "token")
 	t.Setenv(fromAddressEnv, "sender@sdds.test")
+	t.Setenv(appBaseURLEnv, "https://app.sdds.test")
 	fn()
 }
 

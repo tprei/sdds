@@ -35,11 +35,6 @@ type NotePublisher interface {
 	Publish(ctx context.Context, input note.CreateInput) (note.Note, error)
 }
 
-type NoteEditor interface {
-	Edit(ctx context.Context, input note.EditInput) (note.Note, error)
-	Delete(ctx context.Context, noteID string, userID user.UserID) error
-}
-
 type NoteSearcher interface {
 	Search(ctx context.Context, input note.SearchInput) ([]note.SearchResult, error)
 }
@@ -49,7 +44,6 @@ type NotesDependencies struct {
 	Publisher NotePublisher
 	Searcher  NoteSearcher
 	Catalog   note.Catalog
-	Editor    NoteEditor
 }
 
 type CommentDependencies struct {
@@ -61,10 +55,17 @@ type ReportDependencies struct {
 	CommentTargets comment.ReportTargetStore
 }
 
+// scheduleFunc runs a deferred callback, either on a new goroutine (production)
+// or inline (tests). The named type keeps signatures that would otherwise read
+// as func(func(func())) readable.
+type scheduleFunc func(func())
+
 type AuthDependencies struct {
 	Users           UserStores
 	ContactChannels user.ContactChannelStore
 	Mail            mail.Sender
+	AppBaseURL      string
+	Schedule        scheduleFunc
 	Limits          AuthLimits
 }
 
@@ -81,7 +82,6 @@ type noteHandlers struct {
 	noteStore       note.Store
 	notePublisher   NotePublisher
 	noteSearcher    NoteSearcher
-	noteEditor      NoteEditor
 	authorNoteStore note.AuthorNoteStore
 	usefulStore     note.UsefulStore
 	categoryCatalog note.Catalog
@@ -102,6 +102,8 @@ type authHandlers struct {
 	publicAuthors         author.PublicAuthorStore
 	contactChannels       user.ContactChannelStore
 	mail                  mail.Sender
+	appBaseURL            string
+	schedule              scheduleFunc
 	passwordHasher        passwordHasher
 	invalidCredentialHash string
 	rateLimiters          authRateLimiters
@@ -163,6 +165,16 @@ func DefaultAuthLimits() AuthLimits {
 	}
 }
 
+// defaultSchedule runs post-response mail dispatch off the request goroutine so
+// the client-visible response time never depends on the mail provider. Tests
+// inject a synchronous schedule.
+func defaultSchedule(schedule scheduleFunc) scheduleFunc {
+	if schedule != nil {
+		return schedule
+	}
+	return func(fn func()) { go fn() }
+}
+
 func NewRouter(notes NotesDependencies, comments CommentDependencies, reports ReportDependencies, events EventDependencies, auth AuthDependencies, media MediaDependencies, system SystemDependencies) http.Handler {
 	hasher := newBoundedPasswordHasher(user.NewPasswordHasher(), auth.Limits.PasswordHashConcurrency)
 	eventLimits := events.Limits
@@ -170,7 +182,7 @@ func NewRouter(notes NotesDependencies, comments CommentDependencies, reports Re
 		eventLimits = DefaultEventLimits()
 	}
 	return newRouter(
-		noteHandlers{noteStore: notes.Stores, notePublisher: notes.Publisher, noteSearcher: notes.Searcher, noteEditor: notes.Editor, authorNoteStore: notes.Stores, usefulStore: notes.Stores, categoryCatalog: notes.Catalog},
+		noteHandlers{noteStore: notes.Stores, notePublisher: notes.Publisher, noteSearcher: notes.Searcher, authorNoteStore: notes.Stores, usefulStore: notes.Stores, categoryCatalog: notes.Catalog},
 		commentHandlers{store: comments.Store, notes: notes.Stores},
 		reportHandlers{store: reports.Store, notes: notes.Stores, comments: reports.CommentTargets},
 		eventHandlers{store: events.Store, limits: newEventRateLimiters(eventLimits, time.Now), clock: time.Now},
@@ -179,6 +191,8 @@ func NewRouter(notes NotesDependencies, comments CommentDependencies, reports Re
 			publicAuthors:         auth.Users,
 			contactChannels:       auth.ContactChannels,
 			mail:                  auth.Mail,
+			appBaseURL:            auth.AppBaseURL,
+			schedule:              defaultSchedule(auth.Schedule),
 			passwordHasher:        hasher,
 			invalidCredentialHash: mustInvalidCredentialHash(hasher),
 			rateLimiters:          newAuthRateLimiters(auth.Limits, time.Now),
@@ -222,44 +236,56 @@ func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandl
 	router.With(validateOpenAPIRequest).Get("/healthz", wrapper.GetHealth)
 	router.With(validateOpenAPIRequest).Get("/readyz", wrapper.GetReadiness)
 	router.Route("/v1", func(router chi.Router) {
-		router.Group(func(router chi.Router) {
-			router.Use(validateOpenAPIRequest)
-			router.Get("/media/images/{image_id}", wrapper.GetMediaImage)
-			router.Post("/auth/users", wrapper.CreateAuthUser)
-			router.Post("/auth/sessions", wrapper.CreateAuthSession)
-		})
-		router.Group(func(router chi.Router) {
-			router.Use(requireCurrentSession)
-			router.Use(validateOpenAPIRequest)
-			router.Post("/media/image-uploads", wrapper.PrepareImageUpload)
-		})
-		router.Group(func(router chi.Router) {
-			router.Use(requireCurrentSession)
-			router.Use(validateOpenAPIRequest)
-			router.Get("/categories", wrapper.ListCategories)
-			router.Get("/notes", wrapper.ListNotes)
-			router.Get("/authors/{author_id}", wrapper.GetAuthor)
-			router.Patch("/notes/{note_id}", wrapper.UpdateNote)
-			router.Delete("/notes/{note_id}", wrapper.DeleteNote)
-			router.Get("/authors/{author_id}/notes", wrapper.ListAuthorNotes)
-			router.Get("/notes/{note_id}", wrapper.GetNote)
-			router.Get("/notes/{note_id}/comments", wrapper.ListNoteComments)
-			router.Post("/notes/{note_id}/comments", wrapper.CreateNoteComment)
-			router.Delete("/notes/{note_id}/comments/{comment_id}", wrapper.DeleteNoteComment)
-			router.Post("/comments/{comment_id}/replies", wrapper.CreateCommentReply)
-			router.Post("/reports", wrapper.CreateReport)
-			router.Post("/events", wrapper.CreateEvents)
-			router.Get("/search/notes", wrapper.SearchNotes)
-			router.Put("/notes/{note_id}/useful", wrapper.MarkNoteUseful)
-			router.Delete("/notes/{note_id}/useful", wrapper.UnmarkNoteUseful)
-			router.Post("/notes", wrapper.CreateNote)
-			router.Put("/auth/email", wrapper.SetAuthEmail)
-			router.Get("/auth/session", wrapper.GetAuthSession)
-			router.Delete("/auth/session", wrapper.DeleteAuthSession)
-		})
+		registerPublicRoutes(router, wrapper, validateOpenAPIRequest)
+		registerUploadRoutes(router, wrapper, requireCurrentSession, validateOpenAPIRequest)
+		registerAuthenticatedRoutes(router, wrapper, requireCurrentSession, validateOpenAPIRequest)
 	})
 
 	return router
+}
+
+func registerPublicRoutes(router chi.Router, wrapper openapi.ServerInterfaceWrapper, validateOpenAPIRequest func(http.Handler) http.Handler) {
+	router.Group(func(router chi.Router) {
+		router.Use(validateOpenAPIRequest)
+		router.Get("/media/images/{image_id}", wrapper.GetMediaImage)
+		router.Post("/auth/users", wrapper.CreateAuthUser)
+		router.Post("/auth/sessions", wrapper.CreateAuthSession)
+		router.Post("/auth/email/verification", wrapper.VerifyAuthEmail)
+	})
+}
+
+func registerUploadRoutes(router chi.Router, wrapper openapi.ServerInterfaceWrapper, requireCurrentSession func(http.Handler) http.Handler, validateOpenAPIRequest func(http.Handler) http.Handler) {
+	router.Group(func(router chi.Router) {
+		router.Use(requireCurrentSession)
+		router.Use(validateOpenAPIRequest)
+		router.Post("/media/image-uploads", wrapper.PrepareImageUpload)
+	})
+}
+
+func registerAuthenticatedRoutes(router chi.Router, wrapper openapi.ServerInterfaceWrapper, requireCurrentSession func(http.Handler) http.Handler, validateOpenAPIRequest func(http.Handler) http.Handler) {
+	router.Group(func(router chi.Router) {
+		router.Use(requireCurrentSession)
+		router.Use(validateOpenAPIRequest)
+		router.Get("/categories", wrapper.ListCategories)
+		router.Get("/notes", wrapper.ListNotes)
+		router.Get("/authors/{author_id}", wrapper.GetAuthor)
+		router.Get("/authors/{author_id}/notes", wrapper.ListAuthorNotes)
+		router.Get("/notes/{note_id}", wrapper.GetNote)
+		router.Get("/notes/{note_id}/comments", wrapper.ListNoteComments)
+		router.Post("/notes/{note_id}/comments", wrapper.CreateNoteComment)
+		router.Delete("/notes/{note_id}/comments/{comment_id}", wrapper.DeleteNoteComment)
+		router.Post("/comments/{comment_id}/replies", wrapper.CreateCommentReply)
+		router.Post("/reports", wrapper.CreateReport)
+		router.Post("/events", wrapper.CreateEvents)
+		router.Get("/search/notes", wrapper.SearchNotes)
+		router.Put("/notes/{note_id}/useful", wrapper.MarkNoteUseful)
+		router.Delete("/notes/{note_id}/useful", wrapper.UnmarkNoteUseful)
+		router.Post("/notes", wrapper.CreateNote)
+		router.Put("/auth/email", wrapper.SetAuthEmail)
+		router.Post("/auth/email/verifications", wrapper.CreateAuthEmailVerification)
+		router.Get("/auth/session", wrapper.GetAuthSession)
+		router.Delete("/auth/session", wrapper.DeleteAuthSession)
+	})
 }
 
 func mustInvalidCredentialHash(hasher passwordHasher) string {

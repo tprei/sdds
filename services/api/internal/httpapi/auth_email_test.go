@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tprei/sdds/services/api/internal/mail"
 	"github.com/tprei/sdds/services/api/internal/openapi"
 	"github.com/tprei/sdds/services/api/internal/sqlite"
 )
@@ -32,30 +31,11 @@ func newSQLiteAuthRouter(t *testing.T) (http.Handler, *sql.DB) {
 		CommentDependencies{Store: fakeCommentStore{}},
 		ReportDependencies{Store: fakeReportStore{}, CommentTargets: fakeCommentStore{}},
 		EventDependencies{Store: fakeEventStore{}, Limits: DefaultEventLimits()},
-		AuthDependencies{Users: userStore, ContactChannels: channelStore, Mail: newRecordingMailSender(), Limits: DefaultAuthLimits()},
+		AuthDependencies{Users: userStore, ContactChannels: channelStore, Mail: &recordingMailSender{}, Schedule: func(fn func()) { fn() }, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
 	)
 	return router, db
-}
-
-// recordingMailSender captures every message so tests can assert dispatch
-// without a real provider.
-type recordingMailSender struct {
-	messages []mail.Message
-	err      error
-}
-
-func newRecordingMailSender() *recordingMailSender {
-	return &recordingMailSender{}
-}
-
-func (sender *recordingMailSender) Send(_ context.Context, message mail.Message) error {
-	if sender.err != nil {
-		return sender.err
-	}
-	sender.messages = append(sender.messages, message)
-	return nil
 }
 
 func authRequest(method, path, token, body string) *http.Request {
@@ -270,7 +250,3 @@ func TestSetAuthEmailRateLimitsPerAccount(t *testing.T) {
 		t.Fatalf("second PUT code = %s, want %s", errorBody.Code, openapi.ErrorCodeRateLimited)
 	}
 }
-
-type noopMailSender struct{}
-
-func (noopMailSender) Send(context.Context, mail.Message) error { return nil }

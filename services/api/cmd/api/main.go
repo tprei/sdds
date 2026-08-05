@@ -104,20 +104,20 @@ var loadEmbeddingConfig = embedding.LoadConfigFromEnv
 // off (the caller gets a nil sender). Any other missing or invalid
 // configuration is fatal: a partially configured sender would accept requests
 // that can never be delivered.
-var newMailSender = func() (mail.Sender, error) {
+var newMailSender = func() (mail.Sender, string, error) {
 	if mail.DisabledByEnv() {
 		slog.Warn("transactional email disabled; mail endpoints will return 503", "env", "SDDS_MAIL_MODE=disabled")
-		return nil, nil
+		return nil, "", nil
 	}
 	config, err := mail.LoadConfigFromEnv()
 	if err != nil {
-		return nil, fmt.Errorf("load mail config: %w", err)
+		return nil, "", fmt.Errorf("load mail config: %w", err)
 	}
 	sender, err := mail.New(config)
 	if err != nil {
-		return nil, fmt.Errorf("build mail sender: %w", err)
+		return nil, "", fmt.Errorf("build mail sender: %w", err)
 	}
-	return sender, nil
+	return sender, config.AppBaseURL(), nil
 }
 
 var listenAndServe = func(server *http.Server) error {
@@ -295,23 +295,23 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config, embe
 		return fmt.Errorf("create upload service: %w", err)
 	}
 	imageReader := media.NewImageReader(noteStore, store)
-	mailSender, err := newMailSender()
-	if err != nil {
-		return err
-	}
 	cleanupCtx, cleanupCancel := context.WithTimeout(ctx, startupReadinessTimeout)
 	if err := uploadService.CleanupExpired(cleanupCtx, time.Now()); err != nil {
 		cleanupCancel()
 		return fmt.Errorf("cleanup expired uploads: %w", err)
 	}
 	cleanupCancel()
+	mailSender, appBaseURL, err := newMailSender()
+	if err != nil {
+		return err
+	}
 	readiness := runtimeReadiness{database: db, media: store, embedding: embeddingClient}
 	server := newServer(config, httpapi.NewRouter(
 		httpapi.NotesDependencies{Stores: noteStore, Publisher: publisher, Searcher: searcher, Catalog: catalogStore, Editor: editor},
 		httpapi.CommentDependencies{Store: commentStore},
 		httpapi.ReportDependencies{Store: sqlite.NewReportStore(db), CommentTargets: commentStore},
 		httpapi.EventDependencies{Store: sqlite.NewEventStore(db), Limits: httpapi.DefaultEventLimits()},
-		httpapi.AuthDependencies{Users: userStore, ContactChannels: sqlite.NewContactChannelStore(db), Mail: mailSender, Limits: config.authLimits},
+		httpapi.AuthDependencies{Users: userStore, ContactChannels: sqlite.NewContactChannelStore(db), Mail: mailSender, AppBaseURL: appBaseURL, Limits: config.authLimits},
 		httpapi.MediaDependencies{ImageUploads: uploadService, AttachedImages: imageReader},
 		httpapi.SystemDependencies{Readiness: readiness},
 	))

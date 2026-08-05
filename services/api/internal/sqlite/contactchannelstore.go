@@ -30,6 +30,13 @@ const (
 		ORDER BY verified_at IS NULL, updated_at DESC
 		LIMIT 1
 	`
+	findPendingEmailForUserSQL = `
+		SELECT id, user_id, channel, normalized_value, verified_at, verified_via, created_at, updated_at
+		FROM user_contact_channels
+		WHERE user_id = ? AND channel = 'email' AND verified_at IS NULL
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`
 	findVerifiedEmailSQL = `
 		SELECT id, user_id, channel, normalized_value, verified_at, verified_via, created_at, updated_at
 		FROM user_contact_channels
@@ -176,6 +183,17 @@ func (store *ContactChannelStore) FindEmailForUser(ctx context.Context, userID u
 	record, found, err := queryContactChannel(ctx, store.db.QueryRowContext(ctx, findEmailForUserSQL, userID))
 	if err != nil {
 		return user.ContactChannelRecord{}, fmt.Errorf("find email for user: %w", err)
+	}
+	if !found {
+		return user.ContactChannelRecord{}, user.ErrContactChannelNotFound
+	}
+	return record, nil
+}
+
+func (store *ContactChannelStore) FindPendingEmailForUser(ctx context.Context, userID user.UserID) (user.ContactChannelRecord, error) {
+	record, found, err := queryContactChannel(ctx, store.db.QueryRowContext(ctx, findPendingEmailForUserSQL, userID))
+	if err != nil {
+		return user.ContactChannelRecord{}, fmt.Errorf("find pending email: %w", err)
 	}
 	if !found {
 		return user.ContactChannelRecord{}, user.ErrContactChannelNotFound

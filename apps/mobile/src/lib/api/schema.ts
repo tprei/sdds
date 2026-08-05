@@ -229,6 +229,7 @@ export const errorCodeSchema = z.enum([
   'invalid_reply_target',
   'invalid_email',
   'mail_unavailable',
+  'invalid_token',
 ]) satisfies z.ZodType<ErrorCode>;
 
 export const validationFieldSchema = z.enum([

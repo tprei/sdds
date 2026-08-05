@@ -16,6 +16,7 @@ const (
 	timeoutMsEnv     = "SDDS_MAIL_TIMEOUT_MS"
 	modeEnv          = "SDDS_MAIL_MODE"
 	modeDisabled     = "disabled"
+	appBaseURLEnv    = "SDDS_APP_BASE_URL"
 	defaultAPIURL    = "https://api.resend.com/emails"
 	defaultTimeoutMs = 5000
 )
@@ -27,8 +28,15 @@ type Config struct {
 	apiURL      string
 	apiToken    string
 	fromAddress string
+	appBaseURL  string
 	timeout     time.Duration
 	loaded      bool
+}
+
+// AppBaseURL returns the public origin used to build verification and reset
+// links that are embedded in delivered messages.
+func (c Config) AppBaseURL() string {
+	return c.appBaseURL
 }
 
 // LoadConfigFromEnv reads the transactional mail provider settings from the
@@ -48,6 +56,14 @@ func LoadConfigFromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	appBaseURL, err := requiredString(appBaseURLEnv)
+	if err != nil {
+		return Config{}, err
+	}
+	appBaseURL, err = validateAppBaseURL(appBaseURLEnv, appBaseURL)
+	if err != nil {
+		return Config{}, err
+	}
 	timeoutMs, err := positiveIntWithDefault(timeoutMsEnv, defaultTimeoutMs)
 	if err != nil {
 		return Config{}, err
@@ -56,6 +72,7 @@ func LoadConfigFromEnv() (Config, error) {
 		apiURL:      apiURL,
 		apiToken:    apiToken,
 		fromAddress: fromAddress,
+		appBaseURL:  appBaseURL,
 		timeout:     time.Duration(timeoutMs) * time.Millisecond,
 		loaded:      true,
 	}, nil
@@ -106,4 +123,25 @@ func positiveIntWithDefault(name string, fallback int) (int, error) {
 // mail_unavailable instead of silently accepting requests.
 func DisabledByEnv() bool {
 	return strings.EqualFold(strings.TrimSpace(os.Getenv(modeEnv)), modeDisabled)
+}
+
+// validateAppBaseURL requires an absolute http(s) URL and trims any trailing
+// slash so verification/reset links never double-slash. http is allowed only
+// for localhost so local development is not forced onto TLS.
+func validateAppBaseURL(name string, raw string) (string, error) {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("%s must be an absolute http(s) URL", name)
+	}
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", fmt.Errorf("%s must be an absolute http(s) URL without credentials, query, or fragment", name)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", fmt.Errorf("%s must be an absolute http(s) URL", name)
+	}
+	host := parsed.Hostname()
+	if parsed.Scheme == "http" && host != "localhost" && host != "127.0.0.1" {
+		return "", fmt.Errorf("%s must use https", name)
+	}
+	return strings.TrimRight(parsed.String(), "/"), nil
 }

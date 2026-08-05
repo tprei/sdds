@@ -140,6 +140,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/email/verifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resend the email verification message */
+        post: operations["createAuthEmailVerification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/email/verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify a contact email with a token */
+        post: operations["verifyAuthEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/session": {
         parameters: {
             query?: never;
@@ -478,6 +512,9 @@ export interface components {
         SetUserEmailRequest: {
             email: string;
         };
+        VerifyEmailRequest: {
+            token: string;
+        };
         CurrentSessionResponse: {
             /**
              * Format: int64
@@ -493,7 +530,7 @@ export interface components {
             email?: components["schemas"]["UserEmail"];
         };
         /** @enum {string} */
-        ErrorCode: "internal_error" | "forbidden" | "invalid_auth" | "invalid_comment" | "invalid_json" | "invalid_note" | "invalid_report" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken" | "invalid_media" | "unsupported_media_type" | "idempotency_conflict" | "upload_in_progress" | "upload_expired" | "media_staging_quota_exceeded" | "media_storage_unavailable" | "media_integrity_error" | "too_many_images" | "invalid_event" | "invalid_event_batch" | "embedding_unavailable" | "invalid_reply_target" | "invalid_email" | "mail_unavailable";
+        ErrorCode: "internal_error" | "forbidden" | "invalid_auth" | "invalid_comment" | "invalid_json" | "invalid_note" | "invalid_report" | "invalid_search" | "not_found" | "rate_limited" | "request_too_large" | "unauthenticated" | "username_taken" | "invalid_media" | "unsupported_media_type" | "idempotency_conflict" | "upload_in_progress" | "upload_expired" | "media_staging_quota_exceeded" | "media_storage_unavailable" | "media_integrity_error" | "too_many_images" | "invalid_event" | "invalid_event_batch" | "embedding_unavailable" | "invalid_reply_target" | "invalid_email" | "mail_unavailable" | "invalid_token";
         ErrorResponse: {
             code: components["schemas"]["ErrorCode"];
             fields?: components["schemas"]["ValidationProblem"][];
@@ -1377,6 +1414,109 @@ export interface operations {
             };
             /** @description Transactional email delivery is not configured. */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createAuthEmailVerification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A verification message will be dispatched if a pending address exists. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The request is not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many requests. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not process the request. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Transactional email delivery is not configured. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    verifyAuthEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyEmailRequest"];
+            };
+        };
+        responses: {
+            /** @description The address was verified. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The token is missing, malformed, expired, or already used. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Too many requests. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The API could not verify the address. */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

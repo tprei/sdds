@@ -21,6 +21,7 @@ import type { Catalogs } from '@/lib/api/catalogs';
 import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { useAPIClient } from '@/lib/api/api-client-provider';
 import type { APIClient } from '@/lib/api/client';
 
 import { styles } from '@/features/notes/compose-screen.styles';
@@ -44,7 +45,8 @@ type AuthenticatedEditScreenProps = {
 
 export default function NoteEditScreen() {
   const router = useRouter();
-  const { apiClient, logout, state } = useAuth();
+  const apiClient = useAPIClient();
+  const { logout, state } = useAuth();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const noteID = resolveNoteID(params.id);
 

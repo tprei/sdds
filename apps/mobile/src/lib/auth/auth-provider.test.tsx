@@ -5,17 +5,12 @@ import { AuthProvider, useAuth } from './auth-provider';
 import type { AuthState } from './session';
 
 const mocks = vi.hoisted(() => ({
-  apiClient: {},
   controller: {
     bootstrap: vi.fn<() => Promise<AuthState>>(),
     login: vi.fn(),
     logout: vi.fn(),
     signup: vi.fn(),
   },
-}));
-
-vi.mock('@/lib/api/client', () => ({
-  createAPIClient: () => mocks.apiClient,
 }));
 
 vi.mock('./session', () => ({

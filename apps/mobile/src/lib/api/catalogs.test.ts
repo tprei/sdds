@@ -43,7 +43,7 @@ describe('catalogs API client', () => {
       });
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.listCategories()).resolves.toEqual([
       {
         active: true,
@@ -72,7 +72,7 @@ describe('catalogs API client', () => {
       return jsonResponse({ code: 'not_found' }, httpStatusNotFound);
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.listCatalogs()).resolves.toEqual({
       categories: [
         {
@@ -90,7 +90,7 @@ describe('catalogs API client', () => {
     stubFetch(async () =>
       jsonResponse({ code: 'internal_error' }, httpStatusInternalServerError),
     );
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.listCategories()).rejects.toMatchObject(
       new APIRequestError(httpStatusInternalServerError, {
         code: 'internal_error',
@@ -109,7 +109,7 @@ describe('catalogs API client', () => {
       }),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.listCategories()).rejects.toThrow(CatalogAPIResponseError);
   });
 });

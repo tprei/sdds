@@ -8,6 +8,7 @@ import { AuthAPIRequestError } from '@/lib/api/auth';
 import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { useAPIClient } from '@/lib/api/api-client-provider';
 import { AppHeader } from '@/ui/app-header';
 import { Button } from '@/ui/button';
 import { Screen } from '@/ui/screen';
@@ -24,7 +25,8 @@ const successMessage = 'Enviamos um link de confirmação pro seu e-mail.';
 
 export default function EmailScreen() {
   const router = useRouter();
-  const { apiClient, logout, refresh, state } = useAuth();
+  const apiClient = useAPIClient();
+  const { logout, refresh, state } = useAuth();
   const initial =
     state.status === 'authenticated' ? state.user.email?.address ?? '' : '';
   const [email, setEmail] = useState(initial);

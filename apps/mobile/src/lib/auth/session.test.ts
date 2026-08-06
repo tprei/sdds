@@ -35,6 +35,7 @@ vi.mock('@/lib/api/auth', () => ({
 }));
 
 vi.mock('@/lib/api/client', () => ({
+  anonymousSession: { kind: 'anonymous' },
   createAPIClient: mocks.createAPIClient,
 }));
 
@@ -76,7 +77,7 @@ describe('auth session controller', () => {
       token: 'stored-token',
       user: apiUser(),
     });
-    expect(createAPIClient).toHaveBeenCalledWith('stored-token');
+    expect(createAPIClient).toHaveBeenCalledWith({ kind: 'authenticated', token: 'stored-token' });
     expect(clearSessionToken).not.toHaveBeenCalled();
   });
 
@@ -126,8 +127,8 @@ describe('auth session controller', () => {
       user: apiUser(),
     });
     expect(clearSessionToken).not.toHaveBeenCalled();
-    expect(createAPIClient).toHaveBeenNthCalledWith(1, 'expired-token');
-    expect(createAPIClient).toHaveBeenNthCalledWith(2, 'fresh-token');
+    expect(createAPIClient).toHaveBeenNthCalledWith(1, { kind: 'authenticated', token: 'expired-token' });
+    expect(createAPIClient).toHaveBeenNthCalledWith(2, { kind: 'authenticated', token: 'fresh-token' });
   });
 
   it('does not clear storage when the token is removed during boot', async () => {
@@ -291,7 +292,7 @@ describe('auth session controller', () => {
         user: apiUser(),
       }),
     ).resolves.toEqual({ status: 'anonymous' });
-    expect(createAPIClient).toHaveBeenCalledWith('session-token');
+    expect(createAPIClient).toHaveBeenCalledWith({ kind: 'authenticated', token: 'session-token' });
     expect(clearSessionToken).toHaveBeenCalledOnce();
   });
 
@@ -320,7 +321,7 @@ describe('auth session controller', () => {
         user: apiUser(),
       }),
     ).resolves.toEqual({ status: 'anonymous' });
-    expect(createAPIClient).toHaveBeenCalledWith('session-token');
+    expect(createAPIClient).toHaveBeenCalledWith({ kind: 'authenticated', token: 'session-token' });
     expect(clearSessionToken).toHaveBeenCalledOnce();
   });
 
@@ -336,7 +337,7 @@ describe('auth session controller', () => {
         user: apiUser(),
       }),
     ).rejects.toBe(clearError);
-    expect(createAPIClient).toHaveBeenCalledWith('session-token');
+    expect(createAPIClient).toHaveBeenCalledWith({ kind: 'authenticated', token: 'session-token' });
     expect(clearSessionToken).toHaveBeenCalledOnce();
   });
 
@@ -352,7 +353,7 @@ describe('auth session controller', () => {
         user: apiUser(),
       }),
     ).rejects.toBe(clearError);
-    expect(createAPIClient).toHaveBeenCalledWith('session-token');
+    expect(createAPIClient).toHaveBeenCalledWith({ kind: 'authenticated', token: 'session-token' });
     expect(clearSessionToken).toHaveBeenCalledOnce();
   });
 });

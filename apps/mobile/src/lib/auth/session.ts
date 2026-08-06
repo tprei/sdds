@@ -1,6 +1,6 @@
 import type { AuthSession, AuthUser } from '@/lib/api/auth';
 import { AuthAPIRequestError } from '@/lib/api/auth';
-import { createAPIClient } from '@/lib/api/client';
+import { anonymousSession, createAPIClient } from '@/lib/api/client';
 
 import {
   clearSessionToken,
@@ -61,7 +61,7 @@ export function createAuthController(): AuthController {
     },
     async login(input) {
       return runAuthMutation(async () => {
-        const session = await createAPIClient().createAuthSession(input);
+        const session = await createAPIClient(anonymousSession).createAuthSession(input);
         return persistSession(session);
       });
     },
@@ -69,7 +69,7 @@ export function createAuthController(): AuthController {
       return runAuthMutation(async () => {
         if (state.status === 'authenticated') {
           try {
-            await createAPIClient(state.token).deleteAuthSession();
+            await createAPIClient({ kind: 'authenticated', token: state.token }).deleteAuthSession();
           } catch (error: unknown) {
             if (!isUnauthenticatedRequest(error)) {
               await clearSessionToken();
@@ -92,7 +92,7 @@ export function createAuthController(): AuthController {
     async signup(input) {
       return runAuthMutation(async () => {
         const normalizedEmail = input.email?.trim();
-        const session = await createAPIClient().createAuthUser({
+        const session = await createAPIClient(anonymousSession).createAuthUser({
           displayName: input.displayName,
           password: input.password,
           username: input.username,
@@ -112,7 +112,7 @@ async function bootstrapToken(token: string | null): Promise<AuthState> {
   }
 
   try {
-    const session = await createAPIClient(token).getAuthSession();
+    const session = await createAPIClient({ kind: 'authenticated', token }).getAuthSession();
     return {
       status: 'authenticated',
       token,

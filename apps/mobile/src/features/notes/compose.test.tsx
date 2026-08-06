@@ -110,8 +110,11 @@ vi.mock('expo-router', () => ({
     React.useEffect(effect, [effect]),
   useRouter: () => mocks.router,
 }));
+vi.mock('@/lib/api/api-client-provider', () => ({
+  useAPIClient: () => mocks.apiClient,
+}));
 vi.mock('@/lib/auth/auth-provider', () => ({
-  useAuth: () => ({ apiClient: mocks.apiClient, logout: mocks.logout, state: mocks.authState }),
+  useAuth: () => ({ logout: mocks.logout, state: mocks.authState }),
 }));
 vi.mock('@/lib/events/product-event-provider', () => {
   const productEvents = { record: mocks.record };

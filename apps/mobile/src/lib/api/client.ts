@@ -26,13 +26,21 @@ export type APIClient = NotesAPI &
   ImageUploadsAPI &
   ReportsAPI;
 
-export function createAPIClient(token?: string): APIClient {
+// APISession makes anonymous reads a first-class case rather than a missing
+// token: an anonymous client sends no Authorization header at all.
+export type APISession =
+  | { kind: 'anonymous' }
+  | { kind: 'authenticated'; token: string };
+
+export const anonymousSession: APISession = { kind: 'anonymous' };
+
+export function createAPIClient(session: APISession = anonymousSession): APIClient {
   const boundFetch: BoundFetch = (request) => {
-    if (token === undefined) {
+    if (session.kind === 'anonymous') {
       return fetch(request);
     }
     const headers = new Headers(request.headers);
-    headers.set('Authorization', `Bearer ${token}`);
+    headers.set('Authorization', `Bearer ${session.token}`);
     return fetch(new Request(request, { headers }));
   };
 

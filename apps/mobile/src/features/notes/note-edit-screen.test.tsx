@@ -99,8 +99,11 @@ vi.mock('expo-router', () => ({
     push: vi.fn(),
   }),
 }));
+vi.mock('@/lib/api/api-client-provider', () => ({
+  useAPIClient: () => mocks.apiClient,
+}));
 vi.mock('@/lib/auth/auth-provider', () => ({
-  useAuth: () => ({ apiClient: mocks.apiClient, logout: mocks.logout, state: mocks.authState }),
+  useAuth: () => ({ logout: mocks.logout, state: mocks.authState }),
 }));
 vi.mock('@/lib/api/notes', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api/notes')>('@/lib/api/notes');

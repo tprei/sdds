@@ -4,7 +4,7 @@ import { semanticColors } from '@sdds/tokens';
 
 import { mailUnavailableMessage } from '@/features/auth/auth-messages';
 import { styles } from '@/features/auth/auth-screen.styles';
-import { createAPIClient } from '@/lib/api/client';
+import { useAPIClient } from '@/lib/api/api-client-provider';
 import { AuthAPIRequestError } from '@/lib/api/auth';
 import { requestStatus } from '@/lib/api/request-error';
 import { AppHeader } from '@/ui/app-header';
@@ -26,6 +26,7 @@ type RecoverState =
 
 export default function RecoverPasswordScreen() {
   const [email, setEmail] = useState('');
+  const apiClient = useAPIClient();
   const [recoverState, setRecoverState] = useState<RecoverState>({
     status: 'idle',
   });
@@ -37,7 +38,7 @@ export default function RecoverPasswordScreen() {
 
     setRecoverState({ status: 'submitting' });
     try {
-      await createAPIClient().createAuthPasswordReset(email.trim());
+      await apiClient.createAuthPasswordReset(email.trim());
       setRecoverState({ status: 'sent' });
     } catch (error: unknown) {
       if (

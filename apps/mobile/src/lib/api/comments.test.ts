@@ -54,7 +54,7 @@ describe('comments API client', () => {
       });
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.listNoteComments({ noteID, cursor: 'after-cursor', limit: 2 }),
     ).resolves.toEqual({
@@ -80,7 +80,7 @@ describe('comments API client', () => {
       return jsonResponse(apiComment({ body: 'Comentário novo', id: 'comment-new' }), 201);
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.createNoteComment({ noteID, body: 'Comentário novo' }),
     ).resolves.toEqual(expectedComment({ body: 'Comentário novo', id: 'comment-new' }));
@@ -103,7 +103,7 @@ describe('comments API client', () => {
       );
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.createCommentReply({ parentCommentID: 'comment-1', body: 'Resposta' }),
     ).resolves.toEqual(
@@ -125,7 +125,7 @@ describe('comments API client', () => {
       return new Response(null, { status: 204 });
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.deleteNoteComment({ commentID: 'comment-id', noteID }),
     ).resolves.toBeUndefined();
@@ -141,7 +141,7 @@ describe('comments API client', () => {
   it('preserves a terminal null cursor', async () => {
     stubFetch(async () => jsonResponse({ threads: [], next_cursor: null }));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.listNoteComments({ noteID })).resolves.toEqual({
       threads: [],
       nextCursor: null,
@@ -154,7 +154,7 @@ describe('comments API client', () => {
       jsonResponse({ threads: [apiThread(apiComment({ body }))], next_cursor: null }),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.listNoteComments({ noteID })).resolves.toEqual({
       threads: [expectedThread(expectedComment({ body }))],
       nextCursor: null,
@@ -166,7 +166,7 @@ describe('comments API client', () => {
     async (_name, response) => {
       stubFetch(async () => jsonResponse(response));
 
-      const client = createAPIClient(exampleToken);
+      const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
       await expect(client.listNoteComments({ noteID })).rejects.toThrow(
         APIResponseError,
       );
@@ -184,7 +184,7 @@ describe('comments API client', () => {
       ),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     const error = await client
       .createNoteComment({ noteID, body: ' ' })
       .catch((caught: unknown) => caught);
@@ -208,7 +208,7 @@ describe('comments API client', () => {
   ])('retains %s request errors', async (_name, status, code) => {
     stubFetch(async () => jsonResponse({ code }, status));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.createNoteComment({ noteID, body: 'ok' })).rejects.toMatchObject({
       body: { code },
       code,
@@ -219,7 +219,7 @@ describe('comments API client', () => {
   it('retains an invalid-reply-target conflict from a reply request', async () => {
     stubFetch(async () => jsonResponse({ code: 'invalid_reply_target' }, 409));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.createCommentReply({ parentCommentID: 'comment-1', body: 'Resposta' }),
     ).rejects.toMatchObject({
@@ -238,7 +238,7 @@ describe('comments API client', () => {
   ])('retains %s delete errors', async (_name, status, code) => {
     stubFetch(async () => jsonResponse({ code }, status));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.deleteNoteComment({ commentID: 'comment-id', noteID }),
     ).rejects.toMatchObject({

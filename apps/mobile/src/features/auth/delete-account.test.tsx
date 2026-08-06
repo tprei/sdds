@@ -25,8 +25,8 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@/lib/api/client', () => ({
-  createAPIClient: () => ({ deleteAuthUser: mocks.deleteAuthUser }),
+vi.mock('@/lib/api/api-client-provider', () => ({
+  useAPIClient: () => ({ deleteAuthUser: mocks.deleteAuthUser }),
 }));
 
 vi.mock('@/lib/auth/auth-provider', () => ({

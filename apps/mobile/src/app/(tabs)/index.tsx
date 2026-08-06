@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { ReadAuthGate } from '@/components/read-auth-gate';
 import { NoteCard, NOTE_USEFUL_ERROR_MESSAGE } from '@/components/note-card';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { useAPIClient } from '@/lib/api/api-client-provider';
 import type { APIClient } from '@/lib/api/client';
 import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
@@ -82,7 +83,8 @@ function presentExploreNotes(
 }
 
 export default function HomeScreen() {
-  const { apiClient, logout, state } = useAuth();
+  const apiClient = useAPIClient();
+  const { logout, state } = useAuth();
   const router = useRouter();
 
   if (state.status === 'loading') {

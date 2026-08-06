@@ -33,7 +33,7 @@ it.each(noteErrorCases)(
           },
         ),
     );
-    const client = createAPIClient('session-token');
+    const client = createAPIClient({ kind: 'authenticated', token: 'session-token' });
     const caught = await client.createNote(noteInput).catch(
       (error: unknown) => error,
     );

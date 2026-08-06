@@ -99,6 +99,7 @@ vi.mock('react-native', () => {
     Modal: ({ children }: NativeProps) =>
       createElement('div', null, typeof children === 'function' ? null : children),
     Pressable: NativePressable,
+    Platform: { OS: 'web' },
     ScrollView: NativeView,
     StyleSheet: { create: (styles: Record<string, unknown>) => styles },
     Text: NativeView,
@@ -292,7 +293,7 @@ describe('NoteDetailScreen route', () => {
     vi.clearAllMocks();
   });
 
-  it('does not start product reads before authentication', async () => {
+  it('renders the note for an anonymous visitor and gates writes behind login', async () => {
     mocks.authState = { status: 'anonymous' };
 
     let renderer!: ReactTestRenderer;
@@ -301,12 +302,23 @@ describe('NoteDetailScreen route', () => {
       await settle();
     });
 
-    expect(mocks.apiClient.listCatalogs).not.toHaveBeenCalled();
-    expect(mocks.apiClient.getNote).not.toHaveBeenCalled();
-    expect(mocks.apiClient.listNoteComments).not.toHaveBeenCalled();
-    expect(
+    // Anonymous visitors read the note and its comments rather than hitting a wall.
+    expect(mocks.apiClient.getNote).toHaveBeenCalledWith('note-id');
+    expect(mocks.apiClient.listNoteComments).toHaveBeenCalled();
+    expect(() =>
       renderer.root.findByProps({ title: 'Entre para continuar' }),
-    ).toBeDefined();
+    ).toThrow();
+
+    const usefulButton = renderer.root.findByProps({ testID: 'useful-button' });
+    await act(async () => {
+      usefulButton.props.onPress();
+      await settle();
+    });
+    expect(mocks.apiClient.markNoteUseful).not.toHaveBeenCalled();
+    expect(mocks.push).toHaveBeenCalledWith({
+      pathname: '/login',
+      params: { next: '/notes/note-id' },
+    });
   });
 
   it('disables the useful button while pending and flips state after 204', async () => {

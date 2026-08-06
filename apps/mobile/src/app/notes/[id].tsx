@@ -17,7 +17,7 @@ import { AppHeader } from '@/ui/app-header';
 import { EmptyState } from '@/ui/empty-state';
 import { lightTick } from '@/ui/haptics';
 import { IconButton } from '@/ui/icon-button';
-import { IconDots, IconFlag } from '@/ui/icons';
+import { IconDots, IconFlag, IconShare } from '@/ui/icons';
 import { Avatar } from '@/ui/avatar';
 import { AppText } from '@/ui/text';
 import { NoteOwnerActions, type NoteOwnerActionsStep } from '@/features/notes/note-owner-actions';
@@ -50,6 +50,8 @@ import { unauthorizedStatus } from '@/lib/api/status';
 import { useAuth } from '@/lib/auth/auth-provider';
 import type { APIClient } from '@/lib/api/client';
 import { useProductEvents } from '@/lib/events/product-event-provider';
+import { publicNoteURL } from '@/lib/share/note-url';
+import { shareNote } from '@/lib/share/share-note';
 import { productEventKinds, type UsefulContext } from '@/lib/events/event-types';
 import {
   consumePresentedNoteOrigin,
@@ -69,12 +71,14 @@ type NoteDetailState =
   | { status: 'notFound' }
   | { status: 'error' };
 
-type AuthenticatedNoteDetailScreenProps = {
+type NoteDetailScreenContentProps = {
   apiClient: APIClient;
-  currentAuthorID: string;
+  currentAuthorID: string | null;
   noteID: string;
   onSessionExpired: () => Promise<void>;
   originNonce: string | undefined;
+  /** Non-null when the viewer is signed out: call it instead of performing a write. */
+  requireAuth: (() => void) | null;
 };
 
 const noteDetailUsefulContext: UsefulContext = { source: 'note_detail' };
@@ -103,47 +107,54 @@ export default function NoteDetailScreen() {
     );
   }
 
-  if (state.status === 'authenticated') {
+  if (state.status === 'loading') {
     return (
-      <AuthenticatedNoteDetailScreen
-        key={`${state.user.id}:${trimmedNoteID}:${originNonce ?? ''}`}
-        apiClient={apiClient}
-        currentAuthorID={state.user.author.id}
-        noteID={trimmedNoteID}
-        onSessionExpired={logout}
-        originNonce={originNonce}
-      />
+      <Screen scroll={false} header={<AppHeader back />}>
+        <View style={styles.fallback}>
+          <ReadAuthGate
+            onLogin={() =>
+              router.push({ pathname: '/login', params: { next: `/notes/${trimmedNoteID}` } })
+            }
+            onSignup={() =>
+              router.push({
+                pathname: '/signup',
+                params: { next: `/notes/${trimmedNoteID}` },
+              })
+            }
+            status="loading"
+          />
+        </View>
+      </Screen>
     );
   }
 
-  return (
-    <Screen scroll={false} header={<AppHeader back />}>
-      <View style={styles.fallback}>
-        <ReadAuthGate
-          onLogin={() =>
-            router.push({ pathname: '/login', params: { next: `/notes/${trimmedNoteID}` } })
-          }
-          onSignup={() =>
-            router.push({
-              pathname: '/signup',
-              params: { next: `/notes/${trimmedNoteID}` },
-            })
-          }
-          status={state.status}
-        />
+  const requireAuth =
+    state.status === 'authenticated'
+      ? null
+      : () =>
+          router.push({ pathname: '/login', params: { next: `/notes/${trimmedNoteID}` } });
 
-      </View>
-    </Screen>
+  return (
+    <NoteDetailScreenContent
+      key={`${state.status === 'authenticated' ? state.user.id : 'anonymous'}:${trimmedNoteID}:${originNonce ?? ''}`}
+      apiClient={apiClient}
+      currentAuthorID={state.status === 'authenticated' ? state.user.author.id : null}
+      noteID={trimmedNoteID}
+      onSessionExpired={logout}
+      originNonce={originNonce}
+      requireAuth={requireAuth}
+    />
   );
 }
 
-function AuthenticatedNoteDetailScreen({
+function NoteDetailScreenContent({
   apiClient,
   currentAuthorID,
   noteID,
   onSessionExpired,
   originNonce,
-}: AuthenticatedNoteDetailScreenProps) {
+  requireAuth,
+}: NoteDetailScreenContentProps) {
   const router = useRouter();
   const productEvents = useProductEvents();
   const composerRef = useRef<TextInput>(null);
@@ -168,6 +179,7 @@ function AuthenticatedNoteDetailScreen({
   const [ownerActions, setOwnerActions] = useState<NoteOwnerActionsStep>('closed');
   const [deletingNote, setDeletingNote] = useState(false);
   const [deleteError, setDeleteError] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [commentThread, dispatchCommentThread] = useReducer(
     commentThreadReducer,
     undefined,
@@ -274,6 +286,10 @@ function AuthenticatedNoteDetailScreen({
   ]);
 
   const handleSubmitComment = useCallback(() => {
+    if (requireAuth !== null) {
+      requireAuth();
+      return;
+    }
     if (
       commentCreateRequestRef.current !== null ||
       !canSubmitComment(commentThread)
@@ -335,6 +351,7 @@ function AuthenticatedNoteDetailScreen({
     handleCommentSessionExpired,
     noteID,
     productEvents,
+    requireAuth,
   ]);
 
   const handleStartReply = useCallback(
@@ -354,6 +371,10 @@ function AuthenticatedNoteDetailScreen({
 
   const handleSubmitReply = useCallback(() => {
     const replyTarget = commentThread.replyTarget;
+    if (requireAuth !== null) {
+      requireAuth();
+      return;
+    }
     if (
       commentReplyRequestRef.current !== null ||
       replyTarget === null ||
@@ -423,6 +444,7 @@ function AuthenticatedNoteDetailScreen({
     loadCommentPage,
     noteID,
     productEvents,
+    requireAuth,
   ]);
 
   const handleDeleteComment = useCallback(
@@ -478,11 +500,29 @@ function AuthenticatedNoteDetailScreen({
     [apiClient, commentThread, handleCommentSessionExpired, noteID],
   );
   const handleReportNote = useCallback(() => {
+    if (requireAuth !== null) {
+      requireAuth();
+      return;
+    }
     if (state.status !== 'ready') {
       return;
     }
     dispatchReportForm({ type: 'open', target: { type: 'note', id: noteID } });
-  }, [noteID, state.status]);
+  }, [noteID, requireAuth, state.status]);
+
+  async function handleShareNote() {
+    if (state.status !== 'ready') {
+      return;
+    }
+    const url = publicNoteURL(noteID);
+    if (url === null) {
+      return;
+    }
+    const outcome = await shareNote(url, state.note.title);
+    if (outcome === 'copied') {
+      setShareCopied(true);
+    }
+  }
 
   const handleEditNote = useCallback(() => {
     setOwnerActions('closed');
@@ -527,12 +567,16 @@ function AuthenticatedNoteDetailScreen({
 
   const handleReportComment = useCallback(
     (commentID: string) => {
+      if (requireAuth !== null) {
+        requireAuth();
+        return;
+      }
       dispatchReportForm({
         type: 'open',
         target: { type: 'comment', id: commentID },
       });
     },
-    [],
+    [requireAuth],
   );
 
   const handleSubmitReport = useCallback(() => {
@@ -804,6 +848,7 @@ function AuthenticatedNoteDetailScreen({
             }
             onSubmitReply={handleSubmitReply}
             onSubmit={handleSubmitComment}
+            requireAuth={requireAuth}
             thread={commentThread}
           />
         </View>
@@ -842,24 +887,34 @@ function AuthenticatedNoteDetailScreen({
           }
           right={
             readyNote ? (
-              isOwnNote ? (
-                <IconButton
-                  accessibilityLabel="Ações da nota"
-                  icon={<IconDots />}
-                  onPress={() => {
-                    setDeleteError(false);
-                    setOwnerActions('menu');
-                  }}
-                  testID="note-owner-menu"
-                />
-              ) : (
-                <IconButton
-                  accessibilityLabel="Denunciar nota"
-                  icon={<IconFlag />}
-                  onPress={handleReportNote}
-                  testID="note-report"
-                />
-              )
+              <View style={styles.headerActions}>
+                {publicNoteURL(noteID) !== null ? (
+                  <IconButton
+                    accessibilityLabel="Compartilhar nota"
+                    icon={<IconShare />}
+                    onPress={handleShareNote}
+                    testID="note-share"
+                  />
+                ) : null}
+                {requireAuth !== null ? null : isOwnNote ? (
+                  <IconButton
+                    accessibilityLabel="Ações da nota"
+                    icon={<IconDots />}
+                    onPress={() => {
+                      setDeleteError(false);
+                      setOwnerActions('menu');
+                    }}
+                    testID="note-owner-menu"
+                  />
+                ) : (
+                  <IconButton
+                    accessibilityLabel="Denunciar nota"
+                    icon={<IconFlag />}
+                    onPress={handleReportNote}
+                    testID="note-report"
+                  />
+                )}
+              </View>
             ) : undefined
           }
         />
@@ -891,6 +946,16 @@ function AuthenticatedNoteDetailScreen({
             Esse conteúdo não está mais disponível.
           </AppText>
         ) : null}
+        {shareCopied ? (
+          <AppText
+            accessibilityRole="alert"
+            color={semanticColors.accent}
+            style={styles.notice}
+            variant="sm"
+          >
+            Link copiado! Manda pra quem precisa.
+          </AppText>
+        ) : null}
       </ScrollView>
       {state.status === 'ready' ? (
         <>
@@ -918,11 +983,21 @@ function AuthenticatedNoteDetailScreen({
           ) : null}
           <NoteActionBar
             commentCount={displayedCommentCount(commentThread)}
-            onFocusComposer={() => composerRef.current?.focus()}
+            onFocusComposer={() => {
+              if (requireAuth !== null) {
+                requireAuth();
+                return;
+              }
+              composerRef.current?.focus();
+            }}
             useful={{
               count: state.note.usefulCount,
               marked: state.note.usefulByCurrentUser,
               onToggle: () => {
+                if (requireAuth !== null) {
+                  requireAuth();
+                  return;
+                }
                 void handleToggleUseful(state.note);
               },
               pending: getMutationState(state.note.id) === 'pending',

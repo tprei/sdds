@@ -153,6 +153,36 @@ describe('auth API client', () => {
     expect(request.headers.get('authorization')).toBe(`Bearer ${exampleToken}`);
   });
 
+  it('deletes the current user account with a password body', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return new Response(null, { status: httpStatusNoContent });
+    });
+
+    const client = createAPIClient(exampleToken);
+    await client.deleteAuthUser('senha-secreta');
+
+    const request = onlyFetchCall(calls);
+    expect(request.url).toBe('http://localhost:8080/v1/auth/users/me');
+    expect(request.method).toBe('DELETE');
+    expect(request.headers.get('authorization')).toBe(`Bearer ${exampleToken}`);
+    expect(request.headers.get('content-type')).toBe('application/json');
+    await expect(requestJSON(request)).resolves.toEqual({ password: 'senha-secreta' });
+  });
+
+  it('surfaces a wrong-password account deletion as a forbidden request error', async () => {
+    stubFetch(async () =>
+      jsonResponse({ code: 'forbidden' }, httpStatusForbidden),
+    );
+
+    const client = createAPIClient(exampleToken);
+    await expect(client.deleteAuthUser('wrong-password')).rejects.toMatchObject({
+      status: httpStatusForbidden,
+      code: 'forbidden',
+    });
+  });
+
   it('raises request errors from status even when the error body fails', async () => {
     stubFetch(async () => unreadableResponse(httpStatusUnauthorized));
 
@@ -355,6 +385,7 @@ describe('auth API client', () => {
 const httpStatusCreated = 201;
 const httpStatusBadRequest = 400;
 const httpStatusConflict = 409;
+const httpStatusForbidden = 403;
 const httpStatusNoContent = 204;
 const httpStatusTooManyRequests = 429;
 const httpStatusUnauthorized = 401;

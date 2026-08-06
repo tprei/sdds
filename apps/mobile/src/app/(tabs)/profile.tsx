@@ -142,6 +142,13 @@ export default function ProfileScreen() {
             testID="profile-logout-button"
             variant="ghost"
           />
+          <Button
+            label="Excluir conta"
+            onPress={() => router.push('/delete-account')}
+            size="sm"
+            testID="profile-delete-account-button"
+            variant="ghost"
+          />
         </View>
       </Screen>
     );

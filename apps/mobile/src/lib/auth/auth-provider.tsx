@@ -18,6 +18,7 @@ type AuthContextValue = {
   apiClient: APIClient;
   login(input: LoginInput): Promise<void>;
   logout(): Promise<void>;
+  deleteAccount(password: string): Promise<void>;
   refresh(): Promise<void>;
   signup(input: SignupInput): Promise<void>;
   state: AuthState;
@@ -90,6 +91,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = useCallback(async () => {
     await enqueueAuthMutation(() => controller.logout(stateRef.current));
   }, [controller, enqueueAuthMutation]);
+  const deleteAccount = useCallback(
+    async (password: string) => {
+      await enqueueAuthMutation(() => controller.deleteAccount(stateRef.current, password));
+    },
+    [controller, enqueueAuthMutation],
+  );
 
   const refresh = useCallback(async () => {
     await enqueueAuthMutation(() => controller.refresh(stateRef.current));
@@ -99,8 +106,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const apiClient = useMemo(() => createAPIClient(token), [token]);
 
   const value = useMemo(
-    () => ({ apiClient, login, logout, refresh, signup, state }),
-    [apiClient, login, logout, refresh, signup, state],
+    () => ({ apiClient, deleteAccount, login, logout, refresh, signup, state }),
+    [apiClient, deleteAccount, login, logout, refresh, signup, state],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

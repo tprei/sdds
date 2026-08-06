@@ -50,6 +50,7 @@ type CreateSessionRequest = GeneratedSchemas['CreateSessionRequest'];
 type CreateUserRequest = GeneratedSchemas['CreateUserRequest'];
 type CurrentUserResponse = GeneratedSchemas['CurrentUser'];
 type SetUserEmailRequest = GeneratedSchemas['SetUserEmailRequest'];
+type DeleteUserRequest = GeneratedSchemas['DeleteUserRequest'];
 type VerifyEmailRequest = GeneratedSchemas['VerifyEmailRequest'];
 type CreatePasswordResetRequest = GeneratedSchemas['CreatePasswordResetRequest'];
 type SetPasswordRequest = GeneratedSchemas['SetPasswordRequest'];
@@ -119,6 +120,7 @@ export type AuthAPI = {
   createAuthSession(input: CreateAuthSessionInput): Promise<AuthSession>;
   getAuthSession(): Promise<CurrentAuthSession>;
   deleteAuthSession(): Promise<void>;
+  deleteAuthUser(password: string): Promise<void>;
   setAuthEmail(email: string): Promise<void>;
   createAuthEmailVerification(): Promise<void>;
   verifyAuthEmail(token: string): Promise<void>;
@@ -175,6 +177,14 @@ export function bindAuthAPI(transport: TypedTransport): AuthAPI {
     async deleteAuthSession() {
       try {
         await transport.DELETE('/v1/auth/session');
+      } catch (error) {
+        rewrapAuthTransportError(error);
+      }
+    },
+    async deleteAuthUser(password) {
+      const request: DeleteUserRequest = { password };
+      try {
+        await transport.DELETE('/v1/auth/users/me', { body: request });
       } catch (error) {
         rewrapAuthTransportError(error);
       }

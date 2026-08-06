@@ -31,6 +31,7 @@ export type AuthController = {
   login(input: LoginInput): Promise<AuthState>;
   logout(state: AuthState): Promise<AuthState>;
   refresh(state: AuthState): Promise<AuthState>;
+  deleteAccount(state: AuthState, password: string): Promise<AuthState>;
   signup(input: SignupInput): Promise<AuthState>;
 };
 
@@ -99,6 +100,16 @@ export function createAuthController(): AuthController {
           ...(normalizedEmail ? { email: normalizedEmail } : {}),
         });
         return persistSession(session);
+      });
+    },
+    async deleteAccount(state, password) {
+      return runAuthMutation(async () => {
+        if (state.status !== 'authenticated') {
+          return state;
+        }
+        await createAPIClient(state.token).deleteAuthUser(password);
+        await clearSessionToken();
+        return { status: 'anonymous' };
       });
     },
   };

@@ -42,7 +42,7 @@ describe('notes API client', () => {
       return jsonResponse(apiNote(), httpStatusCreated);
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await client.createNote(
       {
         body: 'Tem pao de queijo decente.',
@@ -68,7 +68,7 @@ describe('notes API client', () => {
   it('parses created notes from the API wire shape', async () => {
     stubFetch(async () => jsonResponse(apiNote(), httpStatusCreated));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     const note = await client.createNote(
       {
         body: 'Tem pao de queijo decente.',
@@ -98,7 +98,7 @@ describe('notes API client', () => {
   it('raises request errors from status even when the error body fails', async () => {
     stubFetch(async () => unreadableResponse(httpStatusBadRequest));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.createNote(
         {
@@ -118,7 +118,7 @@ describe('notes API client', () => {
       return jsonResponse(apiNote({ title: 'Cafe bom editado' }));
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await client.updateNote({
       noteID: exampleNoteID,
       title: 'Cafe bom editado',
@@ -134,7 +134,7 @@ describe('notes API client', () => {
   it('parses updated notes from the API wire shape', async () => {
     stubFetch(async () => jsonResponse(apiNote({ title: 'Cafe bom editado', body: 'corpo novo' })));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     const note = await client.updateNote({
       noteID: exampleNoteID,
       body: 'corpo novo',
@@ -151,7 +151,7 @@ describe('notes API client', () => {
       return new Response(null, { status: 204 });
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await client.deleteNote(exampleNoteID);
 
     const request = onlyFetchCall(calls);
@@ -162,7 +162,7 @@ describe('notes API client', () => {
   it('raises a request error for a forbidden note delete', async () => {
     stubFetch(async () => unreadableResponse(403));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.deleteNote(exampleNoteID)).rejects.toMatchObject(
       new APIRequestError(403),
     );
@@ -171,7 +171,7 @@ describe('notes API client', () => {
   it('raises a request error for an unknown note update', async () => {
     stubFetch(async () => unreadableResponse(httpStatusNotFound));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.updateNote({ noteID: exampleNoteID, title: 'sumido' }),
     ).rejects.toMatchObject(new APIRequestError(httpStatusNotFound));
@@ -180,7 +180,7 @@ describe('notes API client', () => {
   it('parses listed notes from the API list response shape', async () => {
     stubFetch(async () => jsonResponse(apiListNotesResponse()));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     const notes = await client.listNotes({});
 
     expect(notes).toEqual([expectedNote()]);
@@ -193,7 +193,7 @@ describe('notes API client', () => {
       return jsonResponse(apiListNotesResponse());
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await client.listNotes({});
 
     const request = onlyFetchCall(calls);
@@ -210,7 +210,7 @@ describe('notes API client', () => {
       return jsonResponse(apiListNotesResponse());
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await client.listNotes({ categorySlug: 'food' });
 
     const request = onlyFetchCall(calls);
@@ -227,7 +227,7 @@ describe('notes API client', () => {
       return jsonResponse(apiNote());
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await client.getNote(exampleNoteID);
 
     const request = onlyFetchCall(calls);
@@ -238,7 +238,7 @@ describe('notes API client', () => {
   it('parses fetched notes from the API wire shape', async () => {
     stubFetch(async () => jsonResponse(apiNote()));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     const note = await client.getNote(exampleNoteID);
 
     expect(note).toEqual(expectedNote());
@@ -251,7 +251,7 @@ describe('notes API client', () => {
       return new Response(null, { status: 204 });
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await client.markNoteUseful(exampleNoteID);
 
     const request = onlyFetchCall(calls);
@@ -269,7 +269,7 @@ describe('notes API client', () => {
       return new Response(null, { status: 204 });
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await client.unmarkNoteUseful(exampleNoteID);
 
     const request = onlyFetchCall(calls);
@@ -296,7 +296,7 @@ describe('notes API client', () => {
       ),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.getNote(exampleNoteID)).resolves.toMatchObject({
       images: [
         {
@@ -330,7 +330,7 @@ describe('notes API client', () => {
       ),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.getNote(exampleNoteID)).resolves.toMatchObject({
       images: [{ url: 'https://api.example.com/v1/media/images/image-id' }],
     });
@@ -341,7 +341,7 @@ describe('notes API client', () => {
       jsonResponse(apiNote({ images: [apiImage({ url: 'http://[::1' })] })),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.getNote(exampleNoteID)).rejects.toThrow(APIResponseError);
   });
 
@@ -350,7 +350,7 @@ describe('notes API client', () => {
     delete note.images;
     stubFetch(async () => jsonResponse({ notes: [note] }));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.listNotes({})).rejects.toThrow(APIResponseError);
   });
 
@@ -359,7 +359,7 @@ describe('notes API client', () => {
       jsonResponse({ code: 'not_found' }, httpStatusNotFound),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.getNote('missing-note')).rejects.toMatchObject(
       new APIRequestError(httpStatusNotFound, { code: 'not_found' }),
     );
@@ -374,7 +374,7 @@ describe('notes API client', () => {
       ),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.getNote(exampleNoteID)).resolves.toMatchObject({
       categorySlug: 'future-category',
     });
@@ -398,7 +398,7 @@ describe('notes API client', () => {
       return jsonResponse(apiSearchNotesResponse());
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await client.searchNotes({ query: 'restaurante brasileiro Dublin 12 barato' });
 
     const request = onlyFetchCall(calls);
@@ -419,7 +419,7 @@ describe('notes API client', () => {
       return jsonResponse(apiSearchNotesResponse());
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await client.searchNotes({ categorySlug: 'food', query: 'cafe' });
 
     const request = onlyFetchCall(calls);
@@ -437,7 +437,7 @@ describe('notes API client', () => {
       return jsonResponse(apiSearchNotesResponse());
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await client.searchNotes({ query: '  cafe bom  ' });
 
     const request = onlyFetchCall(calls);
@@ -448,7 +448,7 @@ describe('notes API client', () => {
   it('parses searched notes from the API list response shape', async () => {
     stubFetch(async () => jsonResponse(apiSearchNotesResponse()));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     const notes = await client.searchNotes({ query: 'cafe' });
     expect(notes).toEqual({
       results: [
@@ -468,7 +468,7 @@ describe('notes API client', () => {
       }),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     const notes = await client.searchNotes({ query: 'cafe' });
     expect(notes.searchVersion).toBe('hybrid-serafim100m-fts5-v1');
   });
@@ -477,7 +477,7 @@ describe('notes API client', () => {
       apiSearchNotesResponse();
     stubFetch(async () => jsonResponse(response));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.searchNotes({ query: 'cafe' })).rejects.toThrow(
       APIResponseError,
     );
@@ -488,7 +488,7 @@ describe('notes API client', () => {
       jsonResponse({ ...apiSearchNotesResponse(), extra: true }),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.searchNotes({ query: 'cafe' })).rejects.toThrow(
       APIResponseError,
     );
@@ -505,7 +505,7 @@ describe('notes API client', () => {
       }),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.searchNotes({ query: 'cafe' })).rejects.toThrow(
       APIResponseError,
     );
@@ -516,7 +516,7 @@ describe('notes API client', () => {
       jsonResponse({ code: 'invalid_search' }, httpStatusBadRequest),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.searchNotes({ query: '' })).rejects.toMatchObject(
       new APIRequestError(httpStatusBadRequest, { code: 'invalid_search' }),
     );
@@ -533,7 +533,7 @@ describe('notes API client', () => {
       }),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.searchNotes({ query: 'cafe' })).rejects.toThrow(
       APIResponseError,
     );
@@ -555,7 +555,7 @@ describe('notes API client', () => {
       }),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.listNotes({})).rejects.toThrow(APIResponseError);
   });
 
@@ -571,7 +571,7 @@ describe('notes API client', () => {
       }),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.listNotes({})).resolves.toEqual([expectedNote()]);
   });
 
@@ -588,7 +588,7 @@ describe('notes API client', () => {
       }),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.listNotes({})).rejects.toThrow(APIResponseError);
   });
 
@@ -607,7 +607,7 @@ describe('notes API client', () => {
       }),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.listNotes({})).rejects.toThrow(APIResponseError);
   });
 
@@ -623,7 +623,7 @@ describe('notes API client', () => {
       }),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.listNotes({})).resolves.toEqual([expectedNote()]);
   });
 });

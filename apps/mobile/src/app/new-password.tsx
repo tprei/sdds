@@ -8,7 +8,7 @@ import {
   sessionCleanupFailedMessage,
 } from '@/features/auth/auth-messages';
 import { styles } from '@/features/auth/auth-screen.styles';
-import { createAPIClient } from '@/lib/api/client';
+import { useAPIClient } from '@/lib/api/api-client-provider';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { AuthAPIRequestError } from '@/lib/api/auth';
 import { AppHeader } from '@/ui/app-header';
@@ -26,6 +26,7 @@ type PasswordState =
 export default function NewPasswordScreen() {
   const router = useRouter();
   const { logout } = useAuth();
+  const apiClient = useAPIClient();
   const { token } = useLocalSearchParams<{ token?: string | string[] }>();
   const tokenParam = typeof token === 'string' ? token : undefined;
   const [password, setPassword] = useState('');
@@ -40,7 +41,7 @@ export default function NewPasswordScreen() {
 
     setPasswordState({ status: 'submitting' });
     try {
-      await createAPIClient().setAuthPassword(tokenParam, password);
+      await apiClient.setAuthPassword(tokenParam, password);
     } catch (error: unknown) {
       if (
         error instanceof AuthAPIRequestError &&

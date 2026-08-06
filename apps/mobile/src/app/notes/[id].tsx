@@ -48,6 +48,7 @@ import type { Note } from '@/lib/api/notes';
 import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { useAPIClient } from '@/lib/api/api-client-provider';
 import type { APIClient } from '@/lib/api/client';
 import { useProductEvents } from '@/lib/events/product-event-provider';
 import { publicNoteURL } from '@/lib/share/note-url';
@@ -86,7 +87,8 @@ const notFoundStatus = 404;
 
 export default function NoteDetailScreen() {
   const router = useRouter();
-  const { apiClient, logout, state } = useAuth();
+  const apiClient = useAPIClient();
+  const { logout, state } = useAuth();
   const { id, origin } = useLocalSearchParams<{
     id?: string | string[];
     origin?: string | string[];

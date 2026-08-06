@@ -6,6 +6,7 @@ import { AuthorProfileContent } from '@/features/authors/author-profile-content'
 import { ReadAuthGate } from '@/components/read-auth-gate';
 import { EmptyState } from '@/ui/empty-state';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { useAPIClient } from '@/lib/api/api-client-provider';
 import { Screen } from '@/ui/screen';
 import { AppHeader } from '@/ui/app-header';
 
@@ -14,7 +15,8 @@ import { styles } from './author-profile-screen.styles';
 export default function AuthorProfileScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const router = useRouter();
-  const { apiClient, logout, state } = useAuth();
+  const apiClient = useAPIClient();
+  const { logout, state } = useAuth();
   const authorID = typeof id === 'string' ? id.trim() : '';
 
   function openNote(noteID: string) {

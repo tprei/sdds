@@ -17,6 +17,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider } from '@/lib/auth/auth-provider';
+import { APIClientProvider } from '@/lib/api/api-client-provider';
 import { ProductEventProvider } from '@/lib/events/product-event-provider';
 
 SplashScreen.preventAutoHideAsync();
@@ -49,6 +50,7 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
+      <APIClientProvider>
       <ProductEventProvider appVersion={appConfig.expo.version}>
       <Stack
         screenOptions={{
@@ -72,6 +74,7 @@ export default function RootLayout() {
       </Stack>
       <StatusBar style="dark" />
       </ProductEventProvider>
+      </APIClientProvider>
     </AuthProvider>
   );
 }

@@ -23,8 +23,8 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@/lib/api/client', () => ({
-  createAPIClient: () => ({ createAuthPasswordReset: mocks.createAuthPasswordReset }),
+vi.mock('@/lib/api/api-client-provider', () => ({
+  useAPIClient: () => ({ createAuthPasswordReset: mocks.createAuthPasswordReset }),
 }));
 
 vi.mock('expo-router', () => ({

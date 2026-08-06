@@ -13,12 +13,10 @@ test('creates a note and reads it from the API-backed home feed', async ({
   const title = `Café certeiro ${timestamp}`;
   const body = `Coado gostoso, balcão simpático e pão na chapa no ponto ${timestamp}.`;
 
-  await page.goto('/');
-  await expect(page.getByText('Entre para continuar')).toBeVisible();
-  await expect(
-    page.getByText('Entre ou crie uma conta para acessar as notas.'),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Criar conta' }).click();
+  // The home feed is public now; an anonymous visitor lands on it directly
+  // rather than an auth gate. Signup is reached the same way the feed's own
+  // write actions would route there.
+  await page.goto('/signup');
   await expect(page.getByTestId('signup-submit-button')).toBeVisible();
   await page.getByTestId('signup-display-name-input').fill(displayName);
   await page.getByTestId('signup-username-input').fill(username);
@@ -191,8 +189,7 @@ test('edits and deletes an own note through the owner actions', async ({
   const editedTitle = `Achado editado ${timestamp}`;
   const editedBody = `Texto novo depois da edição ${timestamp}.`;
 
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Criar conta' }).click();
+  await page.goto('/signup');
   await page.getByTestId('signup-display-name-input').fill(displayName);
   await page.getByTestId('signup-username-input').fill(username);
   await page.getByTestId('signup-password-input').fill(syntheticPassword);

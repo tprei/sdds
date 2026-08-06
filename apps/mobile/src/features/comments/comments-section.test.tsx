@@ -491,6 +491,7 @@ function ReplyHarness({
       onDeleteComment={() => undefined}
       onRetryInitial={() => undefined}
       onSubmit={() => undefined}
+      requireAuth={null}
       onStartReply={(commentID, authorDisplayName) =>
         dispatch({ type: 'reply_started', commentID, authorDisplayName })
       }
@@ -527,6 +528,7 @@ function ComposerHarness({ onSubmit }: { onSubmit: (body: string) => void }) {
       onPressAuthor={() => undefined}
       onDeleteComment={() => undefined}
       onRetryInitial={() => undefined}
+      requireAuth={null}
       onSubmit={(body) => {
         dispatch({ type: 'submit_started' });
         onSubmit(body);
@@ -549,6 +551,7 @@ function renderSection(
       onDeleteComment={() => undefined}
       onRetryInitial={() => undefined}
       onSubmit={() => undefined}
+      requireAuth={null}
       thread={readyThread()}
       {...overrides}
     />,

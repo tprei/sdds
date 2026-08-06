@@ -61,6 +61,7 @@ export default defineConfig({
     env: {
       EXPO_NO_TELEMETRY: '1',
       EXPO_PUBLIC_SDDS_API_BASE_URL: apiBaseURL,
+      EXPO_PUBLIC_SDDS_WEB_BASE_URL: webBaseURL,
       RCT_METRO_PORT: webPort,
     },
     reuseExistingServer: !process.env.CI,

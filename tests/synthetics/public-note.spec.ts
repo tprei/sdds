@@ -39,12 +39,21 @@ test('an anonymous visitor reads a note and gates writes behind login', async ({
 
   // The author profile is also public.
   await page.goto(`/authors/${note.author.id}`);
-  await expect(page.getByTestId('author-profile-header')).toBeVisible();
-  await expect(page.getByText(note.author.display_name)).toBeVisible();
+  const profileHeader = page.getByTestId('author-profile-header');
+  await expect(profileHeader).toBeVisible();
+  await expect(
+    profileHeader.getByRole('heading', { name: note.author.display_name }),
+  ).toBeVisible();
 
-  // The feed and search render for a signed-out visitor.
+  // The feed and search render for a signed-out visitor. The feed itself is
+  // shared with every other synthetic test creating notes concurrently, so
+  // assert the category filter renders rather than depending on this note's
+  // position in the recency-sorted list.
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: title })).toBeVisible();
+  await expect(
+    page.getByRole('button', { exact: true, name: 'Tudo, selecionado' }),
+  ).toBeVisible();
+  await expect(page.getByText('Entre para continuar')).toHaveCount(0);
   await page.goto('/search');
   await expect(page.getByPlaceholder(/busc/i)).toBeVisible();
 

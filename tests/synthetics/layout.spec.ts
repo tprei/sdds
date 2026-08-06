@@ -203,7 +203,12 @@ test.describe('layout geometry', () => {
   test('the account recovery screens fit the viewport', async ({ page }) => {
     for (const path of ['/recover-password', '/new-password?token=dummy', '/verify-email?token=dummy']) {
       await page.goto(path);
-      const header = page.getByTestId('app-header-row');
+      // _layout.tsx anchors every deep link on the (tabs) group so the back
+      // affordance always has somewhere to go. That anchor screen stays
+      // mounted (aria-hidden, display:none) beneath the pushed screen, so it
+      // still carries its own app-header-row; narrow to the one actually
+      // on screen rather than the raw (2-element) testID match.
+      const header = page.getByTestId('app-header-row').and(page.locator(':visible'));
       await expect(header).toBeVisible({ timeout: 10_000 });
       await expectWithinViewport(page, header, `the ${path} screen header`);
       await expectNoHorizontalClipping(header, `the ${path} screen header`);

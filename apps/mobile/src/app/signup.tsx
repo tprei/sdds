@@ -3,6 +3,7 @@ import { ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { BrandHeader } from '@/features/auth/brand-header';
+import { SignupLegalNotice } from '@/features/legal/signup-legal-notice';
 import { styles } from '@/features/auth/auth-screen.styles';
 import {
   genericSignupErrorMessage,
@@ -123,6 +124,7 @@ export default function SignupScreen() {
               {submitState.message}
             </AppText>
           ) : null}
+          <SignupLegalNotice />
           <Button
             variant="primary"
             size="lg"

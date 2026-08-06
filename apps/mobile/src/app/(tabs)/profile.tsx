@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { semanticColors } from '@sdds/tokens';
 
 import { AuthorProfileContent } from '@/features/authors/author-profile-content';
+import { LegalLinksSection } from '@/features/legal/legal-links-section';
 import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
 import { Screen } from '@/ui/screen';
@@ -129,6 +130,7 @@ export default function ProfileScreen() {
             )
           ) : null}
         </View>
+        <LegalLinksSection />
         <View style={styles.logoutSection}>
           {logoutState.status === 'error' ? (
             <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm">
@@ -201,6 +203,7 @@ export default function ProfileScreen() {
             testID="profile-login-button"
             variant="secondary"
           />
+          <LegalLinksSection />
         </>
       ) : null}
     </Screen>

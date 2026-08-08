@@ -107,7 +107,7 @@ The current product endpoints are:
 - `GET /healthz` reports process liveness.
 - `GET /readyz` reports SQLite, media, and embedding-sidecar readiness.
 - `GET /v1/categories` and `GET /v1/places` require authentication and return catalogs.
-- `POST /v1/auth/users`, `POST /v1/auth/sessions`, and `GET`/`DELETE /v1/auth/session` own account/session operations.
+- `POST /v1/auth/users`, `POST /v1/auth/sessions`, and `GET`/`DELETE /v1/auth/session` own account/session operations; `DELETE /v1/auth/users/me` requires authentication and the account password and permanently deletes, in one transaction, the account, its author profile, its notes, its comments and replies, its useful reactions, its reports, its contact channels, and its events; its staged images are detached from the account in the same transaction and their bytes removed from the private bucket by the existing retention sweep shortly after.
 - `GET /v1/authors/{author_id}` and `GET /v1/authors/{author_id}/notes` require authentication and return an author plus that author’s paginated notes.
 - `GET /v1/notes` requires authentication and returns a bounded list of up to 50 recent/category-filtered notes; `GET /v1/notes/{note_id}` requires authentication and returns one note; `GET /v1/search/notes` requires authentication and runs hybrid (lexical + semantic) search, returning `503 embedding_unavailable` if the embedding sidecar cannot be reached.
 - `PUT /v1/notes/{note_id}/useful` and `DELETE /v1/notes/{note_id}/useful` require authentication and idempotently mark or unmark a note as useful.
@@ -122,6 +122,8 @@ SQLite remains the metadata and search database and requires no database server.
 The schema stays portable enough that we can later migrate to Postgres if product needs justify it. Do not add SQLite-specific cleverness to core domain logic unless it buys a real product advantage.
 
 The `events` table is append-only SQLite in the same database. It is operator-only: there is no public event-read route, and export and deletion happen through operator commands or direct SQL. The `user_id` column is `REFERENCES users(id) ON DELETE CASCADE` and the API opens every connection with `PRAGMA foreign_keys = ON`, so deleting a user automatically removes that user's events; rows can also be purged by `installation_id`. Event rows never foreign-key payload entity IDs, so historical content events survive note and comment deletion. Initial retention is 90 days by `received_at`.
+
+Account deletion runs one transactional purge: `note_search` is cleared explicitly (the FTS5 table carries no foreign key), and the user's `image_uploads` rows are moved to the `deleting` state so the existing retention sweep reclaims their object bytes (`image_uploads.user_id` is `ON DELETE SET NULL`, and the sweep runs every `media.DefaultRetentionSweepInterval`, 5 minutes by default). Every other personal row — the author profile, login identities, sessions, notes (cascading their images, embeddings, comments and replies, and useful reactions), note-create requests, the user's comments and reactions on other people's notes, filed reports, events, and contact channels with their tokens — cascades from the `users` row delete under `PRAGMA foreign_keys = ON`.
 
 ### Search
 
@@ -404,6 +406,15 @@ pnpm smoke all
 ```
 
 The runner creates a collision-resistant Compose project, generates disposable random credentials in a private temporary directory, discovers OS-assigned ports, and removes its own containers, volumes, local images, and secret files on exit. Compose teardown errors are surfaced as warnings rather than silently suppressed. Set `SDDS_SMOKE_ARTIFACT_DIR` to a directory to collect timestamped, secret-redacted service logs on failure.
+
+## Legal
+
+The published legal surfaces are routes in the Expo web static export (`apps/mobile/app.json` → `web.output: "static"`), served from the same origin configured as `SDDS_APP_BASE_URL`, so the verification and password-reset email links and the legal links always share one origin. Changing the deployed origin means changing `SDDS_APP_BASE_URL` and these two URLs together.
+
+- Privacy policy: `https://sdds.app/privacy` — the URL given to Apple App Store Connect and Google Play at submission.
+- Terms of use: `https://sdds.app/terms`
+
+Contact address: `contato@sdds.app`, published in the app under `Perfil` → `Fale com a gente` and in both documents. It is defined once in `apps/mobile/src/features/legal/legal-content.ts`.
 
 ## References
 

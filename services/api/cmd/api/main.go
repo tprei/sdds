@@ -301,6 +301,16 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config, embe
 		return fmt.Errorf("cleanup expired uploads: %w", err)
 	}
 	cleanupCancel()
+	sweepCtx, stopSweep := context.WithCancel(ctx)
+	sweepDone := make(chan struct{})
+	go func() {
+		defer close(sweepDone)
+		media.NewRetentionSweeper(uploadService, media.DefaultRetentionSweepInterval, time.Now).Run(sweepCtx)
+	}()
+	defer func() {
+		stopSweep()
+		<-sweepDone
+	}()
 	mailSender, appBaseURL, err := newMailSender()
 	if err != nil {
 		return err

@@ -23,6 +23,8 @@ import (
 
 const exampleNoteID = "018ff5b8-0000-7000-8000-000000000000"
 
+func boolPtr(value bool) *bool { return &value }
+
 func TestListNotesReturnsRecentNotes(t *testing.T) {
 	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
 	router := newTestRouter(fakeNoteStore{
@@ -59,13 +61,14 @@ func TestListNotesReturnsRecentNotes(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	want := openapi.ListNotesResponse{Notes: []openapi.Note{{
-		Id:           exampleNoteID,
-		Title:        "Café bom",
-		Body:         "Tem pão de queijo decente.",
-		CategorySlug: string(note.CategorySlugFood),
-		Images:       []openapi.NoteImage{},
-		CreatedAt:    now.UnixMilli(),
-		UpdatedAt:    now.UnixMilli(),
+		Id:                  exampleNoteID,
+		Title:               "Café bom",
+		Body:                "Tem pão de queijo decente.",
+		CategorySlug:        string(note.CategorySlugFood),
+		Images:              []openapi.NoteImage{},
+		UsefulByCurrentUser: boolPtr(false),
+		CreatedAt:           now.UnixMilli(),
+		UpdatedAt:           now.UnixMilli(),
 	}}}
 	if diff := cmp.Diff(want, body); diff != "" {
 		t.Fatalf("response body mismatch (-want +got):\n%s", diff)
@@ -241,13 +244,14 @@ func TestSearchNotesReturnsMatchingNotes(t *testing.T) {
 		SearchVersion: openapi.SearchVersion(note.CurrentSearchVersion),
 		Results: []openapi.SearchNoteResult{{
 			Note: openapi.Note{
-				Id:           exampleNoteID,
-				Title:        "Café bom",
-				Body:         "Tem pão de queijo decente.",
-				CategorySlug: string(note.CategorySlugFood),
-				Images:       []openapi.NoteImage{},
-				CreatedAt:    now.UnixMilli(),
-				UpdatedAt:    now.UnixMilli(),
+				Id:                  exampleNoteID,
+				Title:               "Café bom",
+				Body:                "Tem pão de queijo decente.",
+				CategorySlug:        string(note.CategorySlugFood),
+				Images:              []openapi.NoteImage{},
+				CreatedAt:           now.UnixMilli(),
+				UpdatedAt:           now.UnixMilli(),
+				UsefulByCurrentUser: boolPtr(false),
 			},
 			RetrievalSource: openapi.Lexical,
 		}},
@@ -662,13 +666,14 @@ func TestGetNoteReturnsNote(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	want := openapi.Note{
-		Id:           exampleNoteID,
-		Title:        "Café bom",
-		Body:         "Tem pão de queijo decente.",
-		CategorySlug: string(note.CategorySlugFood),
-		Images:       []openapi.NoteImage{},
-		CreatedAt:    now.UnixMilli(),
-		UpdatedAt:    now.UnixMilli(),
+		Id:                  exampleNoteID,
+		Title:               "Café bom",
+		Body:                "Tem pão de queijo decente.",
+		CategorySlug:        string(note.CategorySlugFood),
+		Images:              []openapi.NoteImage{},
+		CreatedAt:           now.UnixMilli(),
+		UpdatedAt:           now.UnixMilli(),
+		UsefulByCurrentUser: boolPtr(false),
 	}
 	if diff := cmp.Diff(want, body); diff != "" {
 		t.Fatalf("response body mismatch (-want +got):\n%s", diff)
@@ -800,8 +805,9 @@ func TestCreateNoteReturnsCreatedNote(t *testing.T) {
 			CreatedAt:   imageCreatedAt.UnixMilli(),
 			UpdatedAt:   now.UnixMilli(),
 		}},
-		CreatedAt: now.UnixMilli(),
-		UpdatedAt: now.UnixMilli(),
+		CreatedAt:           now.UnixMilli(),
+		UpdatedAt:           now.UnixMilli(),
+		UsefulByCurrentUser: boolPtr(false),
 	}
 	if diff := cmp.Diff(want, body); diff != "" {
 		t.Fatalf("response body mismatch (-want +got):\n%s", diff)

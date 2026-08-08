@@ -285,7 +285,7 @@ export function mapNoteResponse(value: NoteResponse): Note {
     title: value.title,
     updatedAt: value.updated_at,
     usefulCount: value.useful_count,
-    usefulByCurrentUser: value.useful_by_current_user,
+    usefulByCurrentUser: value.useful_by_current_user ?? false,
   };
 }
 

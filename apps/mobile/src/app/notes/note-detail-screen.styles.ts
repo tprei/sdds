@@ -12,6 +12,11 @@ export const styles = StyleSheet.create({
     gap: spacing.sp2,
     minHeight: componentMetrics.minTarget,
   },
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sp1,
+  },
   scroll: {
     flex: 1,
   },

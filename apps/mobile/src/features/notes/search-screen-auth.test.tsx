@@ -140,7 +140,7 @@ describe('SearchScreen auth gate', () => {
     vi.clearAllMocks();
   });
 
-  it('does not start product reads before authentication', async () => {
+  it('renders the search screen for an anonymous visitor', async () => {
     mocks.authState = { status: 'anonymous' };
 
     await act(async () => {
@@ -148,7 +148,8 @@ describe('SearchScreen auth gate', () => {
       await settle();
     });
 
-    expect(mocks.apiClient.listCatalogs).not.toHaveBeenCalled();
+    // Anonymous visitors load the catalog rather than hitting an auth wall.
+    expect(mocks.apiClient.listCatalogs).toHaveBeenCalledWith();
   });
 
   it('passes the bearer token to catalog reads', async () => {

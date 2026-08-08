@@ -28,18 +28,7 @@ export default function AuthorProfileScreen() {
         <EmptyState title="Perfil não encontrado" />
       </View>
     );
-  } else if (state.status === 'authenticated') {
-    content = (
-      <AuthorProfileContent
-        apiClient={apiClient}
-        authorID={authorID}
-        isOwnProfile={authorID === state.user.author.id}
-        onCompose={() => router.push('/compose')}
-        onPressNote={openNote}
-        onSessionExpired={logout}
-      />
-    );
-  } else {
+  } else if (state.status === 'loading') {
     content = (
       <View style={styles.fallback}>
         <ReadAuthGate
@@ -55,9 +44,35 @@ export default function AuthorProfileScreen() {
               params: { next: `/authors/${authorID}` },
             })
           }
-          status={state.status}
+          status="loading"
         />
       </View>
+    );
+  } else {
+    content = (
+      <AuthorProfileContent
+        apiClient={apiClient}
+        authorID={authorID}
+        isOwnProfile={
+          state.status === 'authenticated' && authorID === state.user.author.id
+        }
+        onCompose={
+          state.status === 'authenticated'
+            ? () => router.push('/compose')
+            : undefined
+        }
+        onPressNote={openNote}
+        onSessionExpired={logout}
+        requireAuth={
+          state.status === 'authenticated'
+            ? null
+            : () =>
+                router.push({
+                  pathname: '/login',
+                  params: { next: `/authors/${authorID}` },
+                })
+        }
+      />
     );
   }
 

@@ -76,6 +76,7 @@ func newSQLiteAuthRouterWithMailAsync(t *testing.T, sender mail.Sender) http.Han
 		AuthDependencies{Users: userStore, ContactChannels: channelStore, Mail: sender, AppBaseURL: "https://app.sdds.test", Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
+		PublicReadDependencies{},
 	)
 }
 
@@ -105,6 +106,7 @@ func newSQLiteAuthRouterWithMailAndLimits(t *testing.T, sender mail.Sender, limi
 		AuthDependencies{Users: userStore, ContactChannels: channelStore, Mail: sender, AppBaseURL: "https://app.sdds.test", Schedule: func(fn func()) { fn() }, Limits: limits},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
+		PublicReadDependencies{},
 	)
 }
 

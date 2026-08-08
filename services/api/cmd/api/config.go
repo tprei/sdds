@@ -14,9 +14,10 @@ const (
 )
 
 type config struct {
-	authLimits   httpapi.AuthLimits
-	databasePath string
-	httpAddr     string
+	authLimits       httpapi.AuthLimits
+	publicReadLimits httpapi.PublicReadLimits
+	databasePath     string
+	httpAddr         string
 }
 
 func loadConfig() (config, error) {
@@ -24,11 +25,16 @@ func loadConfig() (config, error) {
 	if err != nil {
 		return config{}, err
 	}
+	publicReadLimits, err := loadPublicReadLimits()
+	if err != nil {
+		return config{}, err
+	}
 
 	return config{
-		authLimits:   authLimits,
-		databasePath: envString("SDDS_DATABASE_PATH", defaultDatabasePath),
-		httpAddr:     envString("SDDS_HTTP_ADDR", defaultHTTPAddr),
+		authLimits:       authLimits,
+		publicReadLimits: publicReadLimits,
+		databasePath:     envString("SDDS_DATABASE_PATH", defaultDatabasePath),
+		httpAddr:         envString("SDDS_HTTP_ADDR", defaultHTTPAddr),
 	}, nil
 }
 
@@ -89,6 +95,22 @@ func loadAuthLimits() (httpapi.AuthLimits, error) {
 		PasswordResetRequestsPerMinute:       passwordResetRequestsPerMinute,
 		PasswordResetGlobalRequestsPerMinute: passwordResetGlobalRequestsPerMinute,
 		PasswordHashConcurrency:              passwordHashConcurrency,
+	}, nil
+}
+
+func loadPublicReadLimits() (httpapi.PublicReadLimits, error) {
+	defaults := httpapi.DefaultPublicReadLimits()
+	sourceRequestsPerMinute, err := envPositiveInt("SDDS_PUBLIC_READ_REQUESTS_PER_MINUTE", defaults.SourceRequestsPerMinute)
+	if err != nil {
+		return httpapi.PublicReadLimits{}, err
+	}
+	globalRequestsPerMinute, err := envPositiveInt("SDDS_PUBLIC_READ_GLOBAL_REQUESTS_PER_MINUTE", defaults.GlobalRequestsPerMinute)
+	if err != nil {
+		return httpapi.PublicReadLimits{}, err
+	}
+	return httpapi.PublicReadLimits{
+		SourceRequestsPerMinute: sourceRequestsPerMinute,
+		GlobalRequestsPerMinute: globalRequestsPerMinute,
 	}, nil
 }
 

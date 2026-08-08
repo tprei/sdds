@@ -150,6 +150,10 @@ type ReadinessChecker interface {
 	Check(context.Context) error
 }
 
+type PublicReadDependencies struct {
+	Limits PublicReadLimits
+}
+
 type AuthLimits struct {
 	SignupRequestsPerMinute              int
 	LoginRequestsPerMinute               int
@@ -186,11 +190,15 @@ func defaultSchedule(schedule scheduleFunc) scheduleFunc {
 	return func(fn func()) { go fn() }
 }
 
-func NewRouter(notes NotesDependencies, comments CommentDependencies, reports ReportDependencies, events EventDependencies, auth AuthDependencies, media MediaDependencies, system SystemDependencies) http.Handler {
+func NewRouter(notes NotesDependencies, comments CommentDependencies, reports ReportDependencies, events EventDependencies, auth AuthDependencies, media MediaDependencies, system SystemDependencies, publicReads PublicReadDependencies) http.Handler {
 	hasher := newBoundedPasswordHasher(user.NewPasswordHasher(), auth.Limits.PasswordHashConcurrency)
 	eventLimits := events.Limits
 	if eventLimits.UserEventsPerMinute == 0 || eventLimits.GlobalEventsPerMinute == 0 {
 		eventLimits = DefaultEventLimits()
+	}
+	publicReadLimits := publicReads.Limits
+	if publicReadLimits.GlobalRequestsPerMinute == 0 || publicReadLimits.SourceRequestsPerMinute == 0 {
+		publicReadLimits = DefaultPublicReadLimits()
 	}
 	return newRouter(
 		noteHandlers{noteStore: notes.Stores, notePublisher: notes.Publisher, noteSearcher: notes.Searcher, noteEditor: notes.Editor, authorNoteStore: notes.Stores, usefulStore: notes.Stores, categoryCatalog: notes.Catalog},
@@ -212,10 +220,11 @@ func NewRouter(notes NotesDependencies, comments CommentDependencies, reports Re
 		},
 		mediaHandlers{imageUploads: media.ImageUploads, attachedImages: media.AttachedImages},
 		systemHandlers{readiness: system.Readiness},
+		newPublicReadRateLimiters(publicReadLimits, time.Now),
 	)
 }
 
-func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandlers, events eventHandlers, auth authHandlers, media mediaHandlers, system systemHandlers) http.Handler {
+func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandlers, events eventHandlers, auth authHandlers, media mediaHandlers, system systemHandlers, publicReads publicReadRateLimiters) http.Handler {
 	if auth.contactChannels == nil {
 		panic("contact channel store is required")
 	}
@@ -249,7 +258,7 @@ func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandl
 	router.With(validateOpenAPIRequest).Get("/readyz", wrapper.GetReadiness)
 	router.Route("/v1", func(router chi.Router) {
 		registerPublicRoutes(router, wrapper, validateOpenAPIRequest)
-		registerPublicReadRoutes(router, wrapper, optionalCurrentSession, validateOpenAPIRequest)
+		registerPublicReadRoutes(router, wrapper, publicReads.middleware(), optionalCurrentSession, validateOpenAPIRequest)
 		registerUploadRoutes(router, wrapper, requireCurrentSession, validateOpenAPIRequest)
 		registerAuthenticatedRoutes(router, wrapper, requireCurrentSession, validateOpenAPIRequest)
 	})
@@ -269,8 +278,9 @@ func registerPublicRoutes(router chi.Router, wrapper openapi.ServerInterfaceWrap
 	})
 }
 
-func registerPublicReadRoutes(router chi.Router, wrapper openapi.ServerInterfaceWrapper, optionalCurrentSession func(http.Handler) http.Handler, validateOpenAPIRequest func(http.Handler) http.Handler) {
+func registerPublicReadRoutes(router chi.Router, wrapper openapi.ServerInterfaceWrapper, rateLimit func(http.Handler) http.Handler, optionalCurrentSession func(http.Handler) http.Handler, validateOpenAPIRequest func(http.Handler) http.Handler) {
 	router.Group(func(router chi.Router) {
+		router.Use(rateLimit)
 		router.Use(optionalCurrentSession)
 		router.Use(validateOpenAPIRequest)
 		router.Get("/categories", wrapper.ListCategories)

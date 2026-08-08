@@ -205,7 +205,10 @@ func writeRateLimited(w http.ResponseWriter) {
 	writeError(w, http.StatusTooManyRequests, openapi.ErrorResponse{Code: openapi.ErrorCodeRateLimited})
 }
 
-func writeAuthRateLimited(w http.ResponseWriter, retryAfterSeconds int) {
+// writeRetryableRateLimited writes a 429 with the rate_limited error code and,
+// when retryAfterSeconds is positive, a Retry-After header. Shared by the auth
+// flow limiters and the public-read limiter.
+func writeRetryableRateLimited(w http.ResponseWriter, retryAfterSeconds int) {
 	if retryAfterSeconds > 0 {
 		w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds))
 	}

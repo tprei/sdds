@@ -80,8 +80,11 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: () => mocks.localParams,
   useRouter: () => ({ back: mocks.back, push: mocks.push }),
 }));
+vi.mock('@/lib/api/api-client-provider', () => ({
+  useAPIClient: () => mocks.apiClient,
+}));
 vi.mock('@/lib/auth/auth-provider', () => ({
-  useAuth: () => ({ apiClient: mocks.apiClient, logout: mocks.logout, state: mocks.authState }),
+  useAuth: () => ({ logout: mocks.logout, state: mocks.authState }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }: { children: ReactNode }) => children,

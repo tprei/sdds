@@ -12,6 +12,7 @@ import {
 import { Platform } from 'react-native';
 import type { APIClient } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { useAPIClient } from '@/lib/api/api-client-provider';
 import { createEventBuffer, type EventBuffer } from './event-buffer';
 import type {
   EventPlatform,
@@ -44,7 +45,8 @@ const maxOccurredAt = 253402300799999;
 const pendingEventLimit = 100;
 
 export function ProductEventProvider({ appVersion, children }: ProductEventProviderProps) {
-  const { apiClient, state } = useAuth();
+  const apiClient = useAPIClient();
+  const { state } = useAuth();
   const bufferRef = useRef<EventBuffer | null>(null);
   const activeOwnerRef = useRef<APIClient | null>(null);
   const installationIDRef = useRef<string | null>(null);

@@ -75,7 +75,7 @@ describe('image upload API client', () => {
       return jsonResponse(apiReceipt(uppercaseImageUploadID), 201);
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.prepareImageUpload(imageAsset, {
         uploadRequestId: uppercaseUploadRequestID,
@@ -104,7 +104,7 @@ describe('image upload API client', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.prepareImageUpload(imageAsset, {
         signal: controller.signal,
@@ -126,7 +126,7 @@ describe('image upload API client', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.prepareImageUpload(imageAsset, {
         signal: controller.signal,
@@ -152,7 +152,7 @@ describe('image upload API client', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     try {
-      const client = createAPIClient(exampleToken);
+      const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
       const upload = client.prepareImageUpload(imageAsset, {
         maxAttempts: 2,
         signal: controller.signal,
@@ -185,7 +185,7 @@ describe('image upload API client', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.prepareImageUpload(imageAsset, {
         maxAttempts: 3,
@@ -208,7 +208,7 @@ describe('image upload API client', () => {
       ),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.prepareImageUpload(imageAsset, {
         uploadRequestId: uploadRequestID,
@@ -237,7 +237,7 @@ describe('image upload API client', () => {
       return jsonResponse(apiReceipt(), 201);
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     const actual = await client.prepareImageUpload(imageAsset, {
       maxDelayMs: 3000,
       sleep: async (delayMs) => {
@@ -264,7 +264,7 @@ describe('image upload API client', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.prepareImageUpload(imageAsset, {
         maxAttempts: 3,
@@ -302,7 +302,7 @@ describe('image upload API client', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.prepareImageUpload(imageAsset, {
         uploadRequestId: 'request-1',

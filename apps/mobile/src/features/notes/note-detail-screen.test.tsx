@@ -158,9 +158,12 @@ vi.mock('expo-router', async () => {
   };
 });
 
+vi.mock('@/lib/api/api-client-provider', () => ({
+  useAPIClient: () => mocks.apiClient,
+}));
+
 vi.mock('@/lib/auth/auth-provider', () => ({
   useAuth: () => ({
-    apiClient: mocks.apiClient,
     logout: mocks.logout,
     state: mocks.authState,
   }),

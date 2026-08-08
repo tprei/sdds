@@ -117,7 +117,7 @@ describe('auth API client', () => {
       return jsonResponse(apiCurrentSession());
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     const session = await client.getAuthSession();
 
     const request = onlyFetchCall(calls);
@@ -144,7 +144,7 @@ describe('auth API client', () => {
       return new Response(null, { status: httpStatusNoContent });
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await client.deleteAuthSession();
 
     const request = onlyFetchCall(calls);
@@ -156,7 +156,7 @@ describe('auth API client', () => {
   it('raises request errors from status even when the error body fails', async () => {
     stubFetch(async () => unreadableResponse(httpStatusUnauthorized));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.getAuthSession()).rejects.toMatchObject(
       new AuthAPIRequestError(httpStatusUnauthorized),
     );
@@ -323,7 +323,7 @@ describe('auth API client', () => {
       }),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.getAuthSession()).rejects.toThrow(
       AuthAPIResponseError,
     );
@@ -337,7 +337,7 @@ describe('auth API client', () => {
       }),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.getAuthSession()).resolves.toEqual({
       expiresAt: 1782993600000,
       user: {

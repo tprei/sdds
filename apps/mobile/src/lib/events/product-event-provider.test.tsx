@@ -13,8 +13,10 @@ const mocks = vi.hoisted(() => ({
   createEventBuffer: vi.fn(),
   readInstallationID: vi.fn(),
   saveInstallationID: vi.fn(),
+  useAPIClient: vi.fn(),
   useAuth: vi.fn(),
 }));
+vi.mock('@/lib/api/api-client-provider', () => ({ useAPIClient: mocks.useAPIClient }));
 vi.mock('@/lib/auth/auth-provider', () => ({ useAuth: mocks.useAuth }));
 vi.mock('./event-buffer', () => ({ createEventBuffer: mocks.createEventBuffer }));
 vi.mock('./installation-storage', () => ({
@@ -47,7 +49,8 @@ describe('ProductEventProvider', () => {
       enqueue: vi.fn(() => true),
       flush: vi.fn(),
     };
-    mocks.useAuth.mockReturnValue({ apiClient: mocks.apiClient, state: { status: 'loading' } });
+    mocks.useAPIClient.mockReturnValue(mocks.apiClient);
+    mocks.useAuth.mockReturnValue({ state: { status: 'loading' } });
     mocks.readInstallationID.mockResolvedValue(
       '018ff5b8-0000-7000-8000-000000000001',
     );
@@ -65,8 +68,8 @@ describe('ProductEventProvider', () => {
   });
 
   it('disables recording when installation storage fails', async () => {
+    mocks.useAPIClient.mockReturnValue(mocks.apiClient);
     mocks.useAuth.mockReturnValue({
-      apiClient: mocks.apiClient,
       state: { status: 'authenticated', token: 'token' },
     });
     mocks.readInstallationID.mockRejectedValue(new Error('storage_unavailable'));
@@ -77,16 +80,16 @@ describe('ProductEventProvider', () => {
   });
 
   it('drops stale records across same-client logout and failed reauthentication', async () => {
+    mocks.useAPIClient.mockReturnValue(mocks.apiClient);
     mocks.useAuth.mockReturnValue({
-      apiClient: mocks.apiClient,
       state: { status: 'authenticated', token: 'token-a' },
     });
     mocks.readInstallationID.mockRejectedValue(new Error('storage_unavailable'));
     const renderer = await mountProvider();
     const oldRecorder = recorder;
 
+    mocks.useAPIClient.mockReturnValue(mocks.apiClient);
     mocks.useAuth.mockReturnValue({
-      apiClient: mocks.apiClient,
       state: { status: 'loading' },
     });
     await act(async () => {
@@ -107,8 +110,8 @@ describe('ProductEventProvider', () => {
     mocks.readInstallationID.mockResolvedValue(
       '018ff5b8-0000-7000-8000-000000000001',
     );
+    mocks.useAPIClient.mockReturnValue(mocks.apiClient);
     mocks.useAuth.mockReturnValue({
-      apiClient: mocks.apiClient,
       state: { status: 'authenticated', token: 'token-b' },
     });
     await act(async () => {
@@ -129,8 +132,8 @@ describe('ProductEventProvider', () => {
   });
 
   it('records valid authenticated metadata and drops invalid options', async () => {
+    mocks.useAPIClient.mockReturnValue(mocks.apiClient);
     mocks.useAuth.mockReturnValue({
-      apiClient: mocks.apiClient,
       state: { status: 'authenticated', token: 'token' },
     });
     const renderer = await mountProvider();
@@ -155,8 +158,8 @@ describe('ProductEventProvider', () => {
 
   it('queues child-effect records before provider initialization completes', async () => {
     const installation = deferred<string>();
+    mocks.useAPIClient.mockReturnValue(mocks.apiClient);
     mocks.useAuth.mockReturnValue({
-      apiClient: mocks.apiClient,
       state: { status: 'authenticated', token: 'token' },
     });
     mocks.readInstallationID.mockReturnValue(installation.promise);
@@ -190,8 +193,8 @@ describe('ProductEventProvider', () => {
       flush: vi.fn(),
     };
     const firstRecorderBuffer = buffer;
+    mocks.useAPIClient.mockReturnValue(firstAPIClient);
     mocks.useAuth.mockReturnValue({
-      apiClient: firstAPIClient,
       state: { status: 'authenticated', token: 'token-a' },
     });
     mocks.createEventBuffer
@@ -201,8 +204,8 @@ describe('ProductEventProvider', () => {
     const renderer = await mountProvider();
     const firstRecorder = recorder;
 
+    mocks.useAPIClient.mockReturnValue(secondAPIClient);
     mocks.useAuth.mockReturnValue({
-      apiClient: secondAPIClient,
       state: { status: 'authenticated', token: 'token-b' },
     });
     await act(async () => {
@@ -236,8 +239,8 @@ describe('ProductEventProvider', () => {
       enqueue: vi.fn(() => true),
       flush: vi.fn(),
     };
+    mocks.useAPIClient.mockReturnValue(mocks.apiClient);
     mocks.useAuth.mockReturnValue({
-      apiClient: mocks.apiClient,
       state: { status: 'authenticated', token: 'token' },
     });
     mocks.readInstallationID

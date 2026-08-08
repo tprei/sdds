@@ -563,6 +563,7 @@ type fakeUserStore struct {
 	findCurrentSession func(ctx context.Context, tokenHash string, now time.Time) (user.CurrentSession, error)
 	revokeSession      func(ctx context.Context, sessionID user.SessionID, revokedAt time.Time) error
 	findAuthorByUserID func(ctx context.Context, userID user.UserID) (user.Author, error)
+	deleteUser         func(ctx context.Context, userID user.UserID, deletedAt time.Time) error
 	findPublicAuthor   func(ctx context.Context, authorID author.AuthorID) (author.PublicAuthor, error)
 }
 
@@ -628,6 +629,13 @@ func (store fakeUserStore) FindAuthorByUserID(ctx context.Context, userID user.U
 		return user.Author{}, fmt.Errorf("find author by user id not implemented")
 	}
 	return store.findAuthorByUserID(ctx, userID)
+}
+
+func (store fakeUserStore) DeleteUser(ctx context.Context, userID user.UserID, deletedAt time.Time) error {
+	if store.deleteUser == nil {
+		return fmt.Errorf("delete user not implemented")
+	}
+	return store.deleteUser(ctx, userID, deletedAt)
 }
 
 func (store fakeUserStore) FindPublicAuthor(ctx context.Context, authorID author.AuthorID) (author.PublicAuthor, error) {

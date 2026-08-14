@@ -40,7 +40,7 @@ func (handler server) SetAuthEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if retry, allowed := handler.auth.rateLimiters.allow(r, authPurposeVerification, string(current.User.ID)); !allowed {
-		writeAuthRateLimited(w, retry)
+		writeRetryableRateLimited(w, retry)
 		return
 	}
 
@@ -69,7 +69,7 @@ func (handler server) CreateAuthEmailVerification(w http.ResponseWriter, r *http
 		return
 	}
 	if retry, allowed := handler.auth.rateLimiters.allow(r, authPurposeVerification, string(current.User.ID)); !allowed {
-		writeAuthRateLimited(w, retry)
+		writeRetryableRateLimited(w, retry)
 		return
 	}
 
@@ -93,7 +93,7 @@ func (handler server) VerifyAuthEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if retry, allowed := handler.auth.rateLimiters.allow(r, authPurposeVerification, requestSourceKey(r)); !allowed {
-		writeAuthRateLimited(w, retry)
+		writeRetryableRateLimited(w, retry)
 		return
 	}
 

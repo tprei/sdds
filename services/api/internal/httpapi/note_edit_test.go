@@ -42,6 +42,7 @@ func newNoteEditTestRouter(editor fakeNoteEditor) http.Handler {
 		AuthDependencies{Users: authenticatedFakeUserStore(fakeUserStore{}), ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
+		PublicReadDependencies{},
 	))
 }
 

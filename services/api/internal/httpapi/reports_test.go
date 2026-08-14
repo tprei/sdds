@@ -453,6 +453,7 @@ func TestCreateReportRejectsUnauthenticatedBeforeValidation(t *testing.T) {
 		AuthDependencies{Users: authenticatedFakeUserStore(fakeUserStore{}), ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
+		PublicReadDependencies{},
 	)
 	request := jsonRequest(http.MethodPost, "/v1/reports", `{"reason":`)
 	response := httptest.NewRecorder()
@@ -550,6 +551,7 @@ func newReportRouter(reports fakeReportStore, notes fakeNoteStore, comments fake
 		AuthDependencies{Users: authenticatedFakeUserStore(fakeUserStore{}), ContactChannels: fakeContactChannelStore{}, Limits: DefaultAuthLimits()},
 		MediaDependencies{ImageUploads: fakeUploadPreparer{}, AttachedImages: fakeAttachedImageReader{}},
 		SystemDependencies{Readiness: fakeReadiness{}},
+		PublicReadDependencies{},
 	))
 }
 

@@ -58,6 +58,7 @@ func newEventHTTPRouterWithSessionError(t *testing.T, store EventStore, limits E
 		},
 		mediaHandlers{imageUploads: fakeUploadPreparer{}, attachedImages: fakeAttachedImageReader{}},
 		systemHandlers{readiness: fakeReadiness{}},
+		newPublicReadRateLimiters(DefaultPublicReadLimits(), clock),
 	)
 	if authenticated {
 		return withCurrentSessionHeader(handler)

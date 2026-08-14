@@ -173,13 +173,19 @@ const userEmailSchema = z.object({
   verified: z.boolean(),
 }) satisfies z.ZodType<GeneratedSchemas['UserEmail']>;
 
+export const loginIdentitySummarySchema = z.object({
+  id: z.string(),
+  kind: z.enum(['oidc', 'password']),
+  provider: z.enum(['apple', 'google', 'local']),
+}) satisfies z.ZodType<GeneratedSchemas['LoginIdentitySummary']>;
+
 export const currentUserSchema = z.object({
   id: z.string(),
   username: z.string(),
   author: authorSummarySchema,
   email: userEmailSchema.optional(),
+  identities: z.array(loginIdentitySummarySchema),
 }) satisfies z.ZodType<CurrentUserResponse>;
-
 export const authSessionResponseSchema = z.object({
   token: z.string(),
   expires_at: z.number().int().nonnegative(),
@@ -232,7 +238,7 @@ export const errorCodeSchema = z.enum([
   'invalid_token',
   'oidc_unavailable',
   'username_required',
-  'mail_unavailable',
+  'last_sign_in_method',
 ]) satisfies z.ZodType<ErrorCode>;
 
 export const validationFieldSchema = z.enum([

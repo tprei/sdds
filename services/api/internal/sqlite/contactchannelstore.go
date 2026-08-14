@@ -50,11 +50,6 @@ const (
 		JOIN user_contact_channels ON user_contact_channels.id = user_contact_channel_tokens.channel_id
 		WHERE user_contact_channel_tokens.token_hash = ? AND user_contact_channel_tokens.purpose = ?
 	`
-	findVerifiedEmailValueForUserSQL = `
-		SELECT normalized_value FROM user_contact_channels
-		WHERE user_id = ? AND channel = 'email' AND verified_at IS NOT NULL
-		LIMIT 1
-	`
 	deletePendingEmailTokensSQL = `
 		DELETE FROM user_contact_channel_tokens
 		WHERE channel_id IN (
@@ -85,30 +80,20 @@ const (
 		WHERE id = ?
 	`
 	updatePasswordIdentitySQL = `
-		UPDATE user_login_identities
-		SET secret_hash = ?, updated_at = MAX(updated_at + 1, ?)
-		WHERE user_id = ? AND kind = ? AND provider = ?
-	`
-	insertPasswordIdentitySQL = `
-		INSERT INTO user_login_identities (id, user_id, kind, provider, normalized_identifier, secret_hash, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`
-	findLoginIdentifierForUserSQL = `
-		SELECT normalized_identifier
-		FROM user_login_identities
-		WHERE user_id = ? AND kind = ? AND provider = ?
-		LIMIT 1
+	UPDATE user_login_identities
+	SET kind = ?, secret_hash = ?, updated_at = MAX(updated_at + 1, ?)
+	WHERE user_id = ? AND provider = ?
 	`
 	revokeAllSessionsSQL = `
-		UPDATE sessions
-		SET revoked_at = COALESCE(revoked_at, ?)
-		WHERE user_id = ? AND revoked_at IS NULL
+	UPDATE sessions
+	SET revoked_at = COALESCE(revoked_at, ?)
+	WHERE user_id = ? AND revoked_at IS NULL
 	`
 	consumeAllAccountTokensSQL = `
-		UPDATE user_contact_channel_tokens
-		SET consumed_at = COALESCE(consumed_at, ?)
-		WHERE consumed_at IS NULL
-			AND channel_id IN (SELECT id FROM user_contact_channels WHERE user_id = ?)
+	UPDATE user_contact_channel_tokens
+	SET consumed_at = COALESCE(consumed_at, ?)
+	WHERE consumed_at IS NULL
+	    AND channel_id IN (SELECT id FROM user_contact_channels WHERE user_id = ?)
 	`
 )
 
@@ -314,7 +299,9 @@ func (store *ContactChannelStore) ConsumeTokenAndSetPassword(ctx context.Context
 		return user.ContactChannelRecord{}, user.ErrContactChannelTokenInvalid
 	}
 
-	updateResult, err := tx.ExecContext(ctx, updatePasswordIdentitySQL, secretHash, unixMillis(now), channel.UserID, user.LoginIdentityKindPassword, user.LoginIdentityProviderLocal)
+	updateResult, err := tx.ExecContext(ctx, updatePasswordIdentitySQL,
+		user.LoginIdentityKindPassword, secretHash, unixMillis(now), channel.UserID, user.LoginIdentityProviderLocal,
+	)
 	if err != nil {
 		return user.ContactChannelRecord{}, fmt.Errorf("set password: %w", err)
 	}
@@ -323,19 +310,7 @@ func (store *ContactChannelStore) ConsumeTokenAndSetPassword(ctx context.Context
 		return user.ContactChannelRecord{}, fmt.Errorf("set password: %w", err)
 	}
 	if updated == 0 {
-		identifier, err := loginIdentifierForUser(ctx, tx, channel.UserID)
-		if err != nil {
-			return user.ContactChannelRecord{}, fmt.Errorf("set password: %w", err)
-		}
-		identityID, err := user.NewLoginIdentityID()
-		if err != nil {
-			return user.ContactChannelRecord{}, fmt.Errorf("set password: %w", err)
-		}
-		if _, err := tx.ExecContext(ctx, insertPasswordIdentitySQL,
-			identityID, channel.UserID, user.LoginIdentityKindPassword, user.LoginIdentityProviderLocal, identifier, secretHash, unixMillis(now), unixMillis(now),
-		); err != nil {
-			return user.ContactChannelRecord{}, fmt.Errorf("set password: %w", err)
-		}
+		return user.ContactChannelRecord{}, fmt.Errorf("set password: user %s has no local login identity", channel.UserID)
 	}
 
 	if _, err := tx.ExecContext(ctx, revokeAllSessionsSQL, unixMillis(now), channel.UserID); err != nil {
@@ -348,22 +323,6 @@ func (store *ContactChannelStore) ConsumeTokenAndSetPassword(ctx context.Context
 		return user.ContactChannelRecord{}, fmt.Errorf("commit set password: %w", err)
 	}
 	return channel, nil
-}
-
-func loginIdentifierForUser(ctx context.Context, tx *sql.Tx, userID user.UserID) (string, error) {
-	var identifier string
-	err := tx.QueryRowContext(ctx, findLoginIdentifierForUserSQL, userID, user.LoginIdentityKindPassword, user.LoginIdentityProviderLocal).Scan(&identifier)
-	if err == nil {
-		return identifier, nil
-	}
-	if errors.Is(err, sql.ErrNoRows) {
-		var value string
-		if scanErr := tx.QueryRowContext(ctx, findVerifiedEmailValueForUserSQL, userID).Scan(&value); scanErr != nil {
-			return "", scanErr
-		}
-		return value, nil
-	}
-	return "", err
 }
 
 // queryContactChannel scans one contact-channel row. found is false when the row

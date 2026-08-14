@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/tprei/sdds/services/api/internal/author"
 	"github.com/tprei/sdds/services/api/internal/user"
 )
 
@@ -287,6 +288,44 @@ func TestUserStoreRejectsExpiredRevokedAndDisabledSessions(t *testing.T) {
 	})
 	if !errors.Is(err, user.ErrUserDisabled) {
 		t.Fatalf("disabled create session error = %v, want ErrUserDisabled", err)
+	}
+}
+func TestUserStoreFindCurrentSessionReadsUsernameFromLocalOIDCRow(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
+	db := openMigratedDatabase(t, ctx)
+	insertAuthorStoreUser(t, ctx, db, "user-alice", author.AuthorID("author-alice"), "Alice")
+
+	if _, err := db.ExecContext(ctx, `INSERT INTO user_login_identities (id, user_id, kind, provider, normalized_identifier, secret_hash, created_at, updated_at) VALUES ('identity-alice', 'user-alice', 'oidc', 'local', 'alice', NULL, ?, ?)`, unixMillis(now), unixMillis(now)); err != nil {
+		t.Fatalf("insert local oidc identity: %v", err)
+	}
+	tokenHash := user.HashSessionToken("alice-session")
+	if _, err := db.ExecContext(ctx, `INSERT INTO sessions (id, user_id, token_hash, created_at, expires_at, revoked_at) VALUES ('session-alice', 'user-alice', ?, ?, ?, NULL)`, tokenHash, unixMillis(now), unixMillis(now.Add(user.SessionLifetime))); err != nil {
+		t.Fatalf("insert session: %v", err)
+	}
+
+	current, err := newUserStore(db, func() time.Time { return now }).FindCurrentSession(ctx, tokenHash, now)
+	if err != nil {
+		t.Fatalf("find current session: %v", err)
+	}
+	if current.Username != "alice" {
+		t.Fatalf("username = %q, want alice", current.Username)
+	}
+}
+
+func TestUserStoreRejectsDuplicateLocalUsernameAcrossUsers(t *testing.T) {
+	ctx := context.Background()
+	db := openMigratedDatabase(t, ctx)
+	insertAuthorStoreUser(t, ctx, db, "user-a", author.AuthorID("author-a"), "Alice")
+	if _, err := db.ExecContext(ctx, `INSERT INTO user_login_identities (id, user_id, kind, provider, normalized_identifier, secret_hash, created_at, updated_at) VALUES ('identity-a', 'user-a', 'oidc', 'local', 'alice', NULL, 0, 0)`); err != nil {
+		t.Fatalf("insert first local username: %v", err)
+	}
+	insertAuthorStoreUser(t, ctx, db, "user-b", author.AuthorID("author-b"), "Bob")
+	if _, err := db.ExecContext(ctx, `INSERT INTO user_login_identities (id, user_id, kind, provider, normalized_identifier, secret_hash, created_at, updated_at) VALUES ('identity-b', 'user-b', 'password', 'local', 'alice', 'secret-hash', 0, 0)`); err == nil {
+		t.Fatal("insert duplicate local username error = nil, want constraint error")
+	}
+	if count := countRows(t, ctx, db, `SELECT COUNT(*) FROM user_login_identities WHERE provider = 'local' AND normalized_identifier = 'alice'`); count != 1 {
+		t.Fatalf("local alice identity count = %d, want 1", count)
 	}
 }
 

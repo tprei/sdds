@@ -200,6 +200,9 @@ func TestContactChannelSetPasswordCreatesIdentityRevokesSessionsConsumesAllToken
 	if _, err := db.ExecContext(ctx, `INSERT INTO authors (id, user_id, display_name, created_at, updated_at) VALUES ('author-x', 'user-x', 'X', 0, 0)`); err != nil {
 		t.Fatalf("insert author: %v", err)
 	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO user_login_identities (id, user_id, kind, provider, normalized_identifier, secret_hash, created_at, updated_at) VALUES ('identity-x', 'user-x', 'oidc', 'local', 'x', NULL, 0, 0)`); err != nil {
+		t.Fatalf("insert local identity: %v", err)
+	}
 	if _, err := db.ExecContext(ctx, `INSERT INTO sessions (id, user_id, token_hash, created_at, expires_at, revoked_at) VALUES ('sess-1', 'user-x', 'hash-1', 0, 9999999999, NULL)`); err != nil {
 		t.Fatalf("insert session: %v", err)
 	}
@@ -366,23 +369,15 @@ func TestContactChannelCreateTokenMapsPrimaryKeyCollisionToConflict(t *testing.T
 	}
 }
 
-func TestContactChannelSetPasswordSeedsLocalIdentityFromVerifiedEmail(t *testing.T) {
+func TestContactChannelSetPasswordUpgradesLocalOIDCIdentity(t *testing.T) {
 	ctx := context.Background()
 	db := openMigratedDatabase(t, ctx)
 	store := NewContactChannelStore(db)
 	clock, _ := newContactChannelStoreTestClock()
 
-	if _, err := db.ExecContext(ctx, `INSERT INTO users (id, state, created_at, updated_at) VALUES ('user-o', 'active', 0, 0)`); err != nil {
-		t.Fatalf("insert user: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, `INSERT INTO authors (id, user_id, display_name, created_at, updated_at) VALUES ('author-o', 'user-o', 'O', 0, 0)`); err != nil {
-		t.Fatalf("insert author: %v", err)
-	}
-	// The user has only a non-local identity; a naive identifier lookup would
-	// seed the new local credential with this OIDC subject instead of the
-	// verified email.
-	if _, err := db.ExecContext(ctx, `INSERT INTO user_login_identities (id, user_id, kind, provider, normalized_identifier, secret_hash, created_at, updated_at) VALUES ('oidc-o', 'user-o', 'oidc', 'google', 'google-sub-123', NULL, 0, 0)`); err != nil {
-		t.Fatalf("insert oidc identity: %v", err)
+	insertAuthorStoreUser(t, ctx, db, "user-o", "author-o", "Octavio")
+	if _, err := db.ExecContext(ctx, `INSERT INTO user_login_identities (id, user_id, kind, provider, normalized_identifier, secret_hash, created_at, updated_at) VALUES ('identity-o', 'user-o', 'oidc', 'local', 'octavio', NULL, 0, 0)`); err != nil {
+		t.Fatalf("insert local identity: %v", err)
 	}
 
 	channel, err := store.UpsertUnverifiedEmail(ctx, "user-o", "octavio@example.com", clock())
@@ -403,11 +398,31 @@ func TestContactChannelSetPasswordSeedsLocalIdentityFromVerifiedEmail(t *testing
 		t.Fatalf("set password: %v", err)
 	}
 
-	var identifier string
-	if err := db.QueryRowContext(ctx, `SELECT normalized_identifier FROM user_login_identities WHERE user_id = 'user-o' AND kind = 'password' AND provider = 'local'`).Scan(&identifier); err != nil {
-		t.Fatalf("read seeded local identity: %v", err)
+	var identityID, kind, identifier, secretHash string
+	if err := db.QueryRowContext(ctx, `SELECT id, kind, normalized_identifier, secret_hash FROM user_login_identities WHERE user_id = 'user-o'`).Scan(&identityID, &kind, &identifier, &secretHash); err != nil {
+		t.Fatalf("read upgraded local identity: %v", err)
 	}
-	if identifier != "octavio@example.com" {
-		t.Fatalf("seeded local identifier = %q, want octavio@example.com", identifier)
+	if identityID != "identity-o" {
+		t.Fatalf("identity id = %q, want identity-o", identityID)
+	}
+	if kind != string(user.LoginIdentityKindPassword) {
+		t.Fatalf("identity kind = %q, want password", kind)
+	}
+	if identifier != "octavio" {
+		t.Fatalf("normalized identifier = %q, want octavio", identifier)
+	}
+	if secretHash != "new-hash" {
+		t.Fatalf("secret hash = %q, want new-hash", secretHash)
+	}
+
+	login, err := newUserStore(db, clock).FindPasswordLogin(ctx, "octavio")
+	if err != nil {
+		t.Fatalf("find password login: %v", err)
+	}
+	if login.User.ID != "user-o" {
+		t.Fatalf("password login user id = %q, want user-o", login.User.ID)
+	}
+	if login.SecretHash != "new-hash" {
+		t.Fatalf("password login secret hash = %q, want new-hash", login.SecretHash)
 	}
 }

@@ -90,10 +90,9 @@ const (
 		FROM sessions
 		JOIN users ON users.id = sessions.user_id
 		JOIN authors ON authors.user_id = users.id
-		LEFT JOIN user_login_identities ON user_login_identities.user_id = users.id
-			AND user_login_identities.kind = ?
-			AND user_login_identities.provider = ?
-		WHERE sessions.token_hash = ?
+        LEFT JOIN user_login_identities ON user_login_identities.user_id = users.id
+            AND user_login_identities.provider = ?
+        WHERE sessions.token_hash = ?
 	`
 	revokeSessionSQL = `
 		UPDATE sessions
@@ -256,7 +255,6 @@ func (store *UserStore) FindCurrentSession(ctx context.Context, tokenHash string
 	row := store.db.QueryRowContext(
 		ctx,
 		findCurrentSessionSQL,
-		user.LoginIdentityKindPassword,
 		user.LoginIdentityProviderLocal,
 		tokenHash,
 	)

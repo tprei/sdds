@@ -230,6 +230,8 @@ export const errorCodeSchema = z.enum([
   'invalid_email',
   'mail_unavailable',
   'invalid_token',
+  'oidc_unavailable',
+  'username_required',
   'mail_unavailable',
 ]) satisfies z.ZodType<ErrorCode>;
 

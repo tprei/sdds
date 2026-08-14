@@ -329,6 +329,7 @@ func registerAuthenticatedRoutes(router chi.Router, wrapper openapi.ServerInterf
 		router.Post("/auth/email/verifications", wrapper.CreateAuthEmailVerification)
 		router.Get("/auth/session", wrapper.GetAuthSession)
 		router.Delete("/auth/session", wrapper.DeleteAuthSession)
+		router.Delete("/auth/identities/{identity_id}", wrapper.DeleteAuthIdentity)
 		router.Delete("/auth/users/me", wrapper.DeleteAuthUser)
 	})
 }

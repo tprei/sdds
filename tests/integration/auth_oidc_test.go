@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/tprei/sdds/services/api/openapi"
 )
@@ -46,4 +47,51 @@ func TestOIDCSessionDisabledRuntimeBoundaries(t *testing.T) {
 			t.Fatalf("attempt %d: fields = %+v, want none", attempt, raw.Fields)
 		}
 	}
+}
+
+// TestLoginIdentitiesRuntimeBoundaries proves the identity surfaces against
+// the assembled stack: the session response carries the caller's login
+// identities, the only identity cannot be disconnected, and a foreign or
+// unknown identity answers 404.
+func TestLoginIdentitiesRuntimeBoundaries(t *testing.T) {
+	publicClient := newAPIClient(t)
+	waitForReadiness(t, publicClient)
+
+	signup := createAuthUser(t, publicClient, openapi.CreateAuthUserJSONRequestBody{
+		Username:    fmt.Sprintf("ident-%d", time.Now().UnixNano()),
+		Password:    "secret-password",
+		DisplayName: "Identidade",
+	})
+	client := newAuthenticatedAPIClient(t, signup.Token)
+
+	session, err := client.GetAuthSessionWithResponse(context.Background())
+	if err != nil {
+		t.Fatalf("GET /v1/auth/session: %v", err)
+	}
+	requireStatus(t, "GET /v1/auth/session", session.StatusCode(), http.StatusOK, session.Body)
+	if session.JSON200 == nil {
+		t.Fatalf("session body is absent: %s", string(session.Body))
+	}
+	identities := session.JSON200.User.Identities
+	if len(identities) != 1 {
+		t.Fatalf("identities = %+v, want exactly the password identity", identities)
+	}
+	if identities[0].Kind != openapi.LoginIdentityKindPassword || identities[0].Provider != openapi.LoginIdentityProviderLocal {
+		t.Fatalf("identity = %+v, want password/local", identities[0])
+	}
+
+	last, err := client.DeleteAuthIdentityWithResponse(context.Background(), identities[0].Id)
+	if err != nil {
+		t.Fatalf("DELETE /v1/auth/identities/{id}: %v", err)
+	}
+	requireStatus(t, "DELETE last identity", last.StatusCode(), http.StatusConflict, last.Body)
+	if last.JSON409 == nil || last.JSON409.Code != openapi.ErrorCodeLastSignInMethod {
+		t.Fatalf("DELETE last identity body = %s, want last_sign_in_method", string(last.Body))
+	}
+
+	missing, err := client.DeleteAuthIdentityWithResponse(context.Background(), "00000000-0000-0000-0000-000000000000")
+	if err != nil {
+		t.Fatalf("DELETE unknown identity: %v", err)
+	}
+	requireStatus(t, "DELETE unknown identity", missing.StatusCode(), http.StatusNotFound, missing.Body)
 }

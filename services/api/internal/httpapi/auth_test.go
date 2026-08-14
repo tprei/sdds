@@ -69,6 +69,7 @@ func TestCreateAuthUserReturnsSession(t *testing.T) {
 				Id:          "author-id-thiago",
 				DisplayName: "Thiago",
 			},
+			Identities: []openapi.LoginIdentitySummary{},
 		},
 	}
 	if diff := cmp.Diff(want, body); diff != "" {

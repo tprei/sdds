@@ -19,6 +19,7 @@ import (
 	"github.com/tprei/sdds/services/api/internal/mail"
 	"github.com/tprei/sdds/services/api/internal/media"
 	"github.com/tprei/sdds/services/api/internal/note"
+	"github.com/tprei/sdds/services/api/internal/oidc"
 	"github.com/tprei/sdds/services/api/internal/s3store"
 	"github.com/tprei/sdds/services/api/internal/sqlite"
 )
@@ -118,6 +119,22 @@ var newMailSender = func() (mail.Sender, string, error) {
 		return nil, "", fmt.Errorf("build mail sender: %w", err)
 	}
 	return sender, config.AppBaseURL(), nil
+}
+
+// newOIDCVerifier loads provider sign-in configuration from the environment.
+// SDDS_AUTH_OIDC_MODE unset or disabled leaves provider sign-in off (the caller
+// gets a nil verifier and the endpoint answers 503 oidc_unavailable); any other
+// invalid configuration is fatal rather than silently half-configured.
+var newOIDCVerifier = func() (oidc.Verifier, error) {
+	client, err := oidc.LoadFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("load oidc config: %w", err)
+	}
+	if client == nil {
+		slog.Warn("provider sign-in disabled; the OIDC endpoint will return 503", "env", "SDDS_AUTH_OIDC_MODE=disabled")
+		return nil, nil
+	}
+	return client, nil
 }
 
 var listenAndServe = func(server *http.Server) error {
@@ -315,13 +332,17 @@ func runServer(ctx context.Context, config config, s3Config s3store.Config, embe
 	if err != nil {
 		return err
 	}
+	oidcVerifier, err := newOIDCVerifier()
+	if err != nil {
+		return err
+	}
 	readiness := runtimeReadiness{database: db, media: store, embedding: embeddingClient}
 	server := newServer(config, httpapi.NewRouter(
 		httpapi.NotesDependencies{Stores: noteStore, Publisher: publisher, Searcher: searcher, Catalog: catalogStore, Editor: editor},
 		httpapi.CommentDependencies{Store: commentStore},
 		httpapi.ReportDependencies{Store: sqlite.NewReportStore(db), CommentTargets: commentStore},
 		httpapi.EventDependencies{Store: sqlite.NewEventStore(db), Limits: httpapi.DefaultEventLimits()},
-		httpapi.AuthDependencies{Users: userStore, ContactChannels: sqlite.NewContactChannelStore(db), Mail: mailSender, AppBaseURL: appBaseURL, Limits: config.authLimits},
+		httpapi.AuthDependencies{Users: userStore, ContactChannels: sqlite.NewContactChannelStore(db), Mail: mailSender, AppBaseURL: appBaseURL, Limits: config.authLimits, OIDC: oidcVerifier},
 		httpapi.MediaDependencies{ImageUploads: uploadService, AttachedImages: imageReader},
 		httpapi.SystemDependencies{Readiness: readiness},
 		httpapi.PublicReadDependencies{Limits: config.publicReadLimits},

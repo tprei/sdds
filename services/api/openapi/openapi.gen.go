@@ -45,6 +45,7 @@ const (
 	ErrorCodeMediaStagingQuotaExceeded ErrorCode = "media_staging_quota_exceeded"
 	ErrorCodeMediaStorageUnavailable   ErrorCode = "media_storage_unavailable"
 	ErrorCodeNotFound                  ErrorCode = "not_found"
+	ErrorCodeOidcUnavailable           ErrorCode = "oidc_unavailable"
 	ErrorCodeRateLimited               ErrorCode = "rate_limited"
 	ErrorCodeRequestTooLarge           ErrorCode = "request_too_large"
 	ErrorCodeTooManyImages             ErrorCode = "too_many_images"
@@ -52,6 +53,7 @@ const (
 	ErrorCodeUnsupportedMediaType      ErrorCode = "unsupported_media_type"
 	ErrorCodeUploadExpired             ErrorCode = "upload_expired"
 	ErrorCodeUploadInProgress          ErrorCode = "upload_in_progress"
+	ErrorCodeUsernameRequired          ErrorCode = "username_required"
 	ErrorCodeUsernameTaken             ErrorCode = "username_taken"
 )
 
@@ -100,6 +102,8 @@ func (e ErrorCode) Valid() bool {
 		return true
 	case ErrorCodeNotFound:
 		return true
+	case ErrorCodeOidcUnavailable:
+		return true
 	case ErrorCodeRateLimited:
 		return true
 	case ErrorCodeRequestTooLarge:
@@ -113,6 +117,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeUploadExpired:
 		return true
 	case ErrorCodeUploadInProgress:
+		return true
+	case ErrorCodeUsernameRequired:
 		return true
 	case ErrorCodeUsernameTaken:
 		return true
@@ -658,6 +664,24 @@ func (e NoteImageContentType) Valid() bool {
 	}
 }
 
+// Defines values for OidcProvider.
+const (
+	OidcProviderApple  OidcProvider = "apple"
+	OidcProviderGoogle OidcProvider = "google"
+)
+
+// Valid indicates whether the value is a known member of the OidcProvider enum.
+func (e OidcProvider) Valid() bool {
+	switch e {
+	case OidcProviderApple:
+		return true
+	case OidcProviderGoogle:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReportReason.
 const (
 	Harassment          ReportReason = "harassment"
@@ -910,6 +934,14 @@ type CreateNoteRequest struct {
 	ClientRequestId string       `json:"client_request_id"`
 	ImageUploadIds  *[]string    `json:"image_upload_ids,omitempty"`
 	Title           string       `json:"title"`
+}
+
+// CreateOidcSessionRequest defines model for CreateOidcSessionRequest.
+type CreateOidcSessionRequest struct {
+	IdToken  string       `json:"id_token"`
+	Nonce    string       `json:"nonce"`
+	Provider OidcProvider `json:"provider"`
+	Username *string      `json:"username,omitempty"`
 }
 
 // CreatePasswordResetRequest defines model for CreatePasswordResetRequest.
@@ -1446,6 +1478,9 @@ type NoteImage struct {
 // NoteImageContentType defines model for NoteImage.ContentType.
 type NoteImageContentType string
 
+// OidcProvider defines model for OidcProvider.
+type OidcProvider string
+
 // PrepareImageUploadMultipart defines model for PrepareImageUploadMultipart.
 type PrepareImageUploadMultipart struct {
 	File            openapi_types.File `json:"file"`
@@ -1579,6 +1614,9 @@ type SetAuthEmailJSONRequestBody = SetUserEmailRequest
 
 // VerifyAuthEmailJSONRequestBody defines body for VerifyAuthEmail for application/json ContentType.
 type VerifyAuthEmailJSONRequestBody = VerifyEmailRequest
+
+// CreateAuthOidcSessionJSONRequestBody defines body for CreateAuthOidcSession for application/json ContentType.
+type CreateAuthOidcSessionJSONRequestBody = CreateOidcSessionRequest
 
 // SetAuthPasswordJSONRequestBody defines body for SetAuthPassword for application/json ContentType.
 type SetAuthPasswordJSONRequestBody = SetPasswordRequest
@@ -2308,6 +2346,11 @@ type ClientInterface interface {
 	// CreateAuthEmailVerification request
 	CreateAuthEmailVerification(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CreateAuthOidcSessionWithBody request with any body
+	CreateAuthOidcSessionWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateAuthOidcSession(ctx context.Context, body CreateAuthOidcSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// SetAuthPasswordWithBody request with any body
 	SetAuthPasswordWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -2483,6 +2526,30 @@ func (c *Client) VerifyAuthEmail(ctx context.Context, body VerifyAuthEmailJSONRe
 
 func (c *Client) CreateAuthEmailVerification(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateAuthEmailVerificationRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAuthOidcSessionWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAuthOidcSessionRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateAuthOidcSession(ctx context.Context, body CreateAuthOidcSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAuthOidcSessionRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3094,6 +3161,46 @@ func NewCreateAuthEmailVerificationRequest(server string) (*http.Request, error)
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewCreateAuthOidcSessionRequest calls the generic CreateAuthOidcSession builder with application/json body
+func NewCreateAuthOidcSessionRequest(server string, body CreateAuthOidcSessionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateAuthOidcSessionRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateAuthOidcSessionRequestWithBody generates requests for CreateAuthOidcSession with any type of body
+func NewCreateAuthOidcSessionRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/auth/oidc/sessions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -4242,6 +4349,11 @@ type ClientWithResponsesInterface interface {
 	// CreateAuthEmailVerificationWithResponse request
 	CreateAuthEmailVerificationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CreateAuthEmailVerificationHTTPResponse, error)
 
+	// CreateAuthOidcSessionWithBodyWithResponse request with any body
+	CreateAuthOidcSessionWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAuthOidcSessionHTTPResponse, error)
+
+	CreateAuthOidcSessionWithResponse(ctx context.Context, body CreateAuthOidcSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAuthOidcSessionHTTPResponse, error)
+
 	// SetAuthPasswordWithBodyWithResponse request with any body
 	SetAuthPasswordWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAuthPasswordHTTPResponse, error)
 
@@ -4497,6 +4609,43 @@ func (r CreateAuthEmailVerificationHTTPResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CreateAuthEmailVerificationHTTPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateAuthOidcSessionHTTPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *AuthSessionResponse
+	JSON400      *ErrorResponse
+	JSON401      *ErrorResponse
+	JSON409      *ErrorResponse
+	JSON413      *ErrorResponse
+	JSON429      *ErrorResponse
+	JSON500      *ErrorResponse
+	JSON503      *ErrorResponse
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateAuthOidcSessionHTTPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAuthOidcSessionHTTPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateAuthOidcSessionHTTPResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -5452,6 +5601,23 @@ func (c *ClientWithResponses) CreateAuthEmailVerificationWithResponse(ctx contex
 	return ParseCreateAuthEmailVerificationHTTPResponse(rsp)
 }
 
+// CreateAuthOidcSessionWithBodyWithResponse request with arbitrary body returning *CreateAuthOidcSessionHTTPResponse
+func (c *ClientWithResponses) CreateAuthOidcSessionWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAuthOidcSessionHTTPResponse, error) {
+	rsp, err := c.CreateAuthOidcSessionWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAuthOidcSessionHTTPResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateAuthOidcSessionWithResponse(ctx context.Context, body CreateAuthOidcSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAuthOidcSessionHTTPResponse, error) {
+	rsp, err := c.CreateAuthOidcSession(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAuthOidcSessionHTTPResponse(rsp)
+}
+
 // SetAuthPasswordWithBodyWithResponse request with arbitrary body returning *SetAuthPasswordHTTPResponse
 func (c *ClientWithResponses) SetAuthPasswordWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAuthPasswordHTTPResponse, error) {
 	rsp, err := c.SetAuthPasswordWithBody(ctx, contentType, body, reqEditors...)
@@ -5947,6 +6113,81 @@ func ParseCreateAuthEmailVerificationHTTPResponse(rsp *http.Response) (*CreateAu
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateAuthOidcSessionHTTPResponse parses an HTTP response from a CreateAuthOidcSessionWithResponse call
+func ParseCreateAuthOidcSessionHTTPResponse(rsp *http.Response) (*CreateAuthOidcSessionHTTPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAuthOidcSessionHTTPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest AuthSessionResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest ErrorResponse

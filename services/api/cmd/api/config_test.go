@@ -51,6 +51,8 @@ func TestLoadConfigUsesEnvironmentOverrides(t *testing.T) {
 	t.Setenv("SDDS_AUTH_VERIFICATION_REQUESTS_PER_MINUTE", "9")
 	t.Setenv("SDDS_AUTH_GLOBAL_VERIFICATION_REQUESTS_PER_MINUTE", "90")
 	t.Setenv("SDDS_AUTH_HASH_CONCURRENCY", "3")
+	t.Setenv("SDDS_AUTH_OIDC_REQUESTS_PER_MINUTE", "13")
+	t.Setenv("SDDS_AUTH_GLOBAL_OIDC_REQUESTS_PER_MINUTE", "130")
 
 	got, err := loadConfig()
 	if err != nil {
@@ -68,6 +70,8 @@ func TestLoadConfigUsesEnvironmentOverrides(t *testing.T) {
 			PasswordResetRequestsPerMinute:       3,
 			PasswordResetGlobalRequestsPerMinute: 30,
 			PasswordHashConcurrency:              3,
+			OIDCRequestsPerMinute:                13,
+			OIDCGlobalRequestsPerMinute:          130,
 		},
 		publicReadLimits: httpapi.DefaultPublicReadLimits(),
 		databasePath:     "/tmp/sdds-test.db",

@@ -4,7 +4,7 @@ import { useLocalSearchParams } from 'expo-router';
 
 import { invalidTokenMessage } from '@/features/auth/auth-messages';
 import { styles } from '@/features/auth/auth-screen.styles';
-import { createAPIClient } from '@/lib/api/client';
+import { useAPIClient } from '@/lib/api/api-client-provider';
 import { AuthAPIRequestError } from '@/lib/api/auth';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { AppHeader } from '@/ui/app-header';
@@ -21,6 +21,7 @@ export default function VerifyEmailScreen() {
   const { token } = useLocalSearchParams<{ token?: string | string[] }>();
   const tokenParam = typeof token === 'string' ? token : undefined;
   const { refresh } = useAuth();
+  const apiClient = useAPIClient();
   const [verifyState, setVerifyState] = useState<VerifyState>(() =>
     tokenParam === undefined ? { status: 'invalid' } : { status: 'loading' },
   );
@@ -31,7 +32,7 @@ export default function VerifyEmailScreen() {
     }
 
     let active = true;
-    createAPIClient()
+    apiClient
       .verifyAuthEmail(tokenParam)
       .then(async () => {
         if (!active) {
@@ -58,7 +59,7 @@ export default function VerifyEmailScreen() {
     return () => {
       active = false;
     };
-  }, [refresh, tokenParam]);
+  }, [apiClient, refresh, tokenParam]);
 
   return (
     <Screen header={<AppHeader back />}>

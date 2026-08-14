@@ -24,7 +24,7 @@ describe('events API client', () => {
       return jsonResponse({ accepted_count: 1, duplicate_count: 0 });
     });
 
-    await expect(createAPIClient('session-token').createEvents([event()])).resolves.toEqual({
+    await expect(createAPIClient({ kind: 'authenticated', token: 'session-token' }).createEvents([event()])).resolves.toEqual({
       accepted_count: 1,
       duplicate_count: 0,
     });
@@ -58,7 +58,7 @@ describe('events API client', () => {
     });
 
     await expect(
-      createAPIClient('session-token').createEvents([
+      createAPIClient({ kind: 'authenticated', token: 'session-token' }).createEvents([
         commentCreatedEvent(eventID, null),
         commentCreatedEvent(replyEventID, parentCommentID),
       ]),

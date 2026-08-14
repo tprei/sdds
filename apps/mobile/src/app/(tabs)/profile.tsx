@@ -15,6 +15,7 @@ import { Button } from '@/ui/button';
 import { AppText } from '@/ui/text';
 import { PressableScale } from '@/ui/pressable-scale';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { useAPIClient } from '@/lib/api/api-client-provider';
 import { Badge } from '@/ui/badge';
 
 import { styles } from './profile.styles';
@@ -32,7 +33,8 @@ type ResendState =
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { apiClient, logout, state } = useAuth();
+  const apiClient = useAPIClient();
+  const { logout, state } = useAuth();
   const [logoutState, setLogoutState] = useState<LogoutState>({
     status: 'idle',
   });

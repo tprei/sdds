@@ -52,7 +52,7 @@ describe('reports API client', () => {
       return jsonResponse(apiReceipt({ details: ' spam details ' }), 201);
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.createReport({
         targetType: 'note',
@@ -85,7 +85,7 @@ describe('reports API client', () => {
       return jsonResponse(apiReceipt(), 201);
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.createReport({
         targetType: 'comment',
@@ -114,7 +114,7 @@ describe('reports API client', () => {
         jsonResponse(apiReceipt({ target_type: targetType, reason }), status),
       );
 
-      const client = createAPIClient(exampleToken);
+      const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
       await expect(
         client.createReport({
           targetType: targetType as 'note' | 'comment',
@@ -128,7 +128,7 @@ describe('reports API client', () => {
   it('preserves null details and non-null details', async () => {
     stubFetch(async () => jsonResponse(apiReceipt({ details: null }), 201));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.createReport({ targetType: 'note', targetID, reason: 'spam' }),
     ).resolves.toEqual(expectedReceipt({ details: null }));
@@ -148,7 +148,7 @@ describe('reports API client', () => {
     async (_name, response) => {
       stubFetch(async () => jsonResponse(response, 201));
 
-      const client = createAPIClient(exampleToken);
+      const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
       await expect(
         client.createReport({ targetType: 'note', targetID, reason: 'spam' }),
       ).rejects.toThrow(APIResponseError);
@@ -166,7 +166,7 @@ describe('reports API client', () => {
       ),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     const error = await client
       .createReport({ targetType: 'note', targetID, reason: 'spam' })
       .catch((caught: unknown) => caught);
@@ -190,7 +190,7 @@ describe('reports API client', () => {
   ])('retains %s request errors through rewrapTransportError', async (_name, status, code) => {
     stubFetch(async () => jsonResponse({ code }, status));
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(
       client.createReport({ targetType: 'note', targetID, reason: 'spam' }),
     ).rejects.toMatchObject({
@@ -207,7 +207,7 @@ describe('reports API client', () => {
       return jsonResponse(apiReceipt(), 201);
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await client.createReport({ targetType: 'note', targetID, reason: 'spam' });
 
     const request = onlyRequest(requests);

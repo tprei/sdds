@@ -7,7 +7,7 @@ import { semanticColors, spacing } from '@sdds/tokens';
 import { styles } from '@/features/auth/auth-screen.styles';
 import { sessionCleanupFailedMessage } from '@/features/auth/auth-messages';
 import { AuthAPIRequestError } from '@/lib/api/auth';
-import { createAPIClient } from '@/lib/api/client';
+import { useAPIClient } from '@/lib/api/api-client-provider';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { AppHeader } from '@/ui/app-header';
 import { Button } from '@/ui/button';
@@ -29,21 +29,22 @@ const genericDeleteErrorMessage =
 export default function DeleteAccountScreen() {
   const router = useRouter();
   const { logout, state } = useAuth();
+  const apiClient = useAPIClient();
   const [password, setPassword] = useState('');
   const [accountState, setAccountState] = useState<DeleteAccountState>({
     status: 'idle',
   });
 
-  const token = state.status === 'authenticated' ? state.token : undefined;
+  const isAuthenticated = state.status === 'authenticated';
 
   async function requestDelete() {
-    if (token === undefined) {
+    if (!isAuthenticated) {
       setAccountState({ status: 'error', message: genericDeleteErrorMessage });
       return;
     }
     setAccountState({ status: 'submitting' });
     try {
-      await createAPIClient(token).deleteAuthUser(password);
+      await apiClient.deleteAuthUser(password);
     } catch (error: unknown) {
       // An expired or revoked session is not a wrong password; route the user
       // back to login to re-authenticate instead of surfacing a dead end.
@@ -72,7 +73,7 @@ export default function DeleteAccountScreen() {
   }
 
   const isSubmitting = accountState.status === 'submitting';
-  const canSubmit = password.length > 0 && token !== undefined && !isSubmitting;
+  const canSubmit = password.length > 0 && isAuthenticated && !isSubmitting;
 
   return (
     <Screen header={<AppHeader back />}>

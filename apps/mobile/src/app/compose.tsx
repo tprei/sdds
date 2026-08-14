@@ -15,6 +15,7 @@ import {
 } from '@/features/notes/compose-draft';
 import { PostItComposer } from '@/features/notes/post-it-composer';
 import { useAuth } from '@/lib/auth/auth-provider';
+import { useAPIClient } from '@/lib/api/api-client-provider';
 import type { APIClient } from '@/lib/api/client';
 import type { CreateNoteInput } from '@/lib/api/notes';
 import { useProductEvents } from '@/lib/events/product-event-provider';
@@ -48,7 +49,8 @@ export default function ComposeScreen({
   draftStore = composeDraftStore,
 }: ComposeScreenProps = {}) {
   const router = useRouter();
-  const { apiClient, logout, state } = useAuth();
+  const apiClient = useAPIClient();
+  const { logout, state } = useAuth();
 
   if (state.status === 'authenticated') {
     return (

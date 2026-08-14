@@ -28,7 +28,7 @@ describe('contact email API client', () => {
       return new Response(null, { status: httpStatusAccepted });
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     const result = await client.setAuthEmail('voce@email.com');
 
     const request = onlyFetchCall(calls);
@@ -47,7 +47,7 @@ describe('contact email API client', () => {
       ),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     await expect(client.setAuthEmail('voce')).rejects.toMatchObject(
       new AuthAPIRequestError(httpStatusBadRequest, {
         code: 'invalid_auth',
@@ -63,7 +63,7 @@ describe('contact email API client', () => {
       return new Response(null, { status: httpStatusAccepted });
     });
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     const result = await client.createAuthEmailVerification();
 
     const request = onlyFetchCall(calls);
@@ -117,7 +117,7 @@ describe('contact email API client', () => {
       ),
     );
 
-    const client = createAPIClient(exampleToken);
+    const client = createAPIClient({ kind: 'authenticated', token: exampleToken });
     const session = await client.getAuthSession();
 
     expect(session.user.email).toEqual({ address: 'voce@email.com', verified: false });

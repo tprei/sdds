@@ -107,9 +107,11 @@ vi.mock('@/features/notes/category-filter-controls', () => ({
 vi.mock('@/components/read-auth-gate', () => ({
   ReadAuthGate: () => createElement('div'),
 }));
+vi.mock('@/lib/api/api-client-provider', () => ({
+  useAPIClient: () => mocks.apiClient,
+}));
 vi.mock('@/lib/auth/auth-provider', () => ({
   useAuth: () => ({
-    apiClient: mocks.apiClient,
     logout: mocks.logout,
     state: mocks.authState,
   }),

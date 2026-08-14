@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
     bootstrap: vi.fn<() => Promise<AuthState>>(),
     login: vi.fn(),
     logout: vi.fn(),
+    refresh: vi.fn(),
+    signInWithOIDC: vi.fn(),
     signup: vi.fn(),
   },
 }));
@@ -57,6 +59,41 @@ describe('AuthProvider', () => {
     });
 
     expect(latestState).toEqual({ status: 'anonymous' });
+  });
+
+  it('exposes OIDC sign-in through the mutation queue', async () => {
+    mocks.controller.bootstrap.mockResolvedValue({ status: 'anonymous' });
+    mocks.controller.signInWithOIDC.mockResolvedValue({ status: 'anonymous' });
+
+    let signInWithOIDC: (() => Promise<void>) | undefined;
+    function Probe() {
+      const auth = useAuth();
+      signInWithOIDC = () =>
+        auth.signInWithOIDC({
+          idToken: 'provider-id-token',
+          nonce: 'nonce-value',
+          provider: 'google',
+        });
+      return null;
+    }
+
+    await act(async () => {
+      create(
+        <AuthProvider>
+          <Probe />
+        </AuthProvider>,
+      );
+    });
+
+    await act(async () => {
+      await signInWithOIDC?.();
+    });
+
+    expect(mocks.controller.signInWithOIDC).toHaveBeenCalledWith({
+      idToken: 'provider-id-token',
+      nonce: 'nonce-value',
+      provider: 'google',
+    });
   });
 });
 

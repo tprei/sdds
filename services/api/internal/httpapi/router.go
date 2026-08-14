@@ -24,6 +24,7 @@ type NoteStores interface {
 
 type UserStores interface {
 	user.Store
+	user.LoginIdentityStore
 	author.PublicAuthorStore
 }
 

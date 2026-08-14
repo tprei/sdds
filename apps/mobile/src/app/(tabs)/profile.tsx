@@ -5,7 +5,12 @@ import { useRouter } from 'expo-router';
 import { semanticColors } from '@sdds/tokens';
 
 import { AuthorProfileContent } from '@/features/authors/author-profile-content';
+import {
+  identityDisconnectErrorMessage,
+  identityProviderLabel,
+} from '@/features/auth/profile-identities';
 import { LegalLinksSection } from '@/features/legal/legal-links-section';
+import type { LoginIdentity } from '@/lib/api/auth';
 import { requestStatus } from '@/lib/api/request-error';
 import { unauthorizedStatus } from '@/lib/api/status';
 import { Screen } from '@/ui/screen';
@@ -31,14 +36,22 @@ type ResendState =
   | { status: 'sent' }
   | { message: string; status: 'error' };
 
+type DisconnectState =
+  | { status: 'idle' }
+  | { status: 'submitting' }
+  | { message: string; status: 'error' };
+
 export default function ProfileScreen() {
   const router = useRouter();
   const apiClient = useAPIClient();
-  const { logout, state } = useAuth();
+  const { logout, refresh, state } = useAuth();
   const [logoutState, setLogoutState] = useState<LogoutState>({
     status: 'idle',
   });
   const [resendState, setResendState] = useState<ResendState>({
+    status: 'idle',
+  });
+  const [disconnectState, setDisconnectState] = useState<DisconnectState>({
     status: 'idle',
   });
 
@@ -75,6 +88,24 @@ export default function ProfileScreen() {
     } catch (error: unknown) {
       setLogoutState({
         message: logoutErrorMessage(error),
+        status: 'error',
+      });
+    }
+  }
+
+  async function handleDisconnectIdentity(identity: LoginIdentity) {
+    if (disconnectState.status === 'submitting') {
+      return;
+    }
+
+    setDisconnectState({ status: 'submitting' });
+    try {
+      await apiClient.deleteAuthIdentity(identity.id);
+      setDisconnectState({ status: 'idle' });
+      await refresh();
+    } catch (error: unknown) {
+      setDisconnectState({
+        message: identityDisconnectErrorMessage(error),
         status: 'error',
       });
     }
@@ -131,6 +162,34 @@ export default function ProfileScreen() {
                 variant="soft"
               />
             )
+          ) : null}
+        </View>
+        <View style={styles.identitySection}>
+          {state.user.identities.map((identity) => (
+            <View
+              key={identity.id}
+              style={styles.identityRow}
+              testID={'profile-identity-' + identity.provider}
+            >
+              <AppText color={semanticColors.textStrong} variant="body">
+                {identityProviderLabel(identity.provider)}
+              </AppText>
+              {state.user.identities.length > 1 ? (
+                <Button
+                  disabled={disconnectState.status === 'submitting'}
+                  label="Desconectar"
+                  onPress={() => handleDisconnectIdentity(identity)}
+                  size="sm"
+                  testID={'profile-disconnect-' + identity.provider}
+                  variant="ghost"
+                />
+              ) : null}
+            </View>
+          ))}
+          {disconnectState.status === 'error' ? (
+            <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm">
+              {disconnectState.message}
+            </AppText>
           ) : null}
         </View>
         <LegalLinksSection />

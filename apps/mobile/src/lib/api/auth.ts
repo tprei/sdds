@@ -141,6 +141,7 @@ export type AuthAPI = {
   createAuthSession(input: CreateAuthSessionInput): Promise<AuthSession>;
   createAuthOidcSession(input: CreateOidcSessionInput): Promise<AuthSession>;
   getAuthSession(): Promise<CurrentAuthSession>;
+  deleteAuthIdentity(identityID: string): Promise<void>;
   deleteAuthSession(): Promise<void>;
   deleteAuthUser(password: string): Promise<void>;
   setAuthEmail(email: string): Promise<void>;
@@ -211,6 +212,15 @@ export function bindAuthAPI(transport: TypedTransport): AuthAPI {
       }
     },
 
+    async deleteAuthIdentity(identityID) {
+      try {
+        await transport.DELETE('/v1/auth/identities/{identity_id}', {
+          params: { path: { identity_id: identityID } },
+        });
+      } catch (error) {
+        rewrapAuthTransportError(error);
+      }
+    },
     async deleteAuthSession() {
       try {
         await transport.DELETE('/v1/auth/session');

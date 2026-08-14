@@ -238,6 +238,7 @@ func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandl
 	router.Use(localBrowserCORS)
 	validateOpenAPIRequest := openAPIRequestValidator()
 	requireCurrentSession := requireAuth(auth.users, auth.clock)
+	optionalCurrentSession := optionalAuth(auth.users, auth.clock)
 	handler := server{notes: notes, comments: comments, reports: reports, events: events, auth: auth, media: media, system: system}
 	wrapper := openapi.ServerInterfaceWrapper{
 		Handler:          handler,
@@ -248,6 +249,7 @@ func newRouter(notes noteHandlers, comments commentHandlers, reports reportHandl
 	router.With(validateOpenAPIRequest).Get("/readyz", wrapper.GetReadiness)
 	router.Route("/v1", func(router chi.Router) {
 		registerPublicRoutes(router, wrapper, validateOpenAPIRequest)
+		registerPublicReadRoutes(router, wrapper, optionalCurrentSession, validateOpenAPIRequest)
 		registerUploadRoutes(router, wrapper, requireCurrentSession, validateOpenAPIRequest)
 		registerAuthenticatedRoutes(router, wrapper, requireCurrentSession, validateOpenAPIRequest)
 	})
@@ -267,6 +269,20 @@ func registerPublicRoutes(router chi.Router, wrapper openapi.ServerInterfaceWrap
 	})
 }
 
+func registerPublicReadRoutes(router chi.Router, wrapper openapi.ServerInterfaceWrapper, optionalCurrentSession func(http.Handler) http.Handler, validateOpenAPIRequest func(http.Handler) http.Handler) {
+	router.Group(func(router chi.Router) {
+		router.Use(optionalCurrentSession)
+		router.Use(validateOpenAPIRequest)
+		router.Get("/categories", wrapper.ListCategories)
+		router.Get("/notes", wrapper.ListNotes)
+		router.Get("/notes/{note_id}", wrapper.GetNote)
+		router.Get("/notes/{note_id}/comments", wrapper.ListNoteComments)
+		router.Get("/authors/{author_id}", wrapper.GetAuthor)
+		router.Get("/authors/{author_id}/notes", wrapper.ListAuthorNotes)
+		router.Get("/search/notes", wrapper.SearchNotes)
+	})
+}
+
 func registerUploadRoutes(router chi.Router, wrapper openapi.ServerInterfaceWrapper, requireCurrentSession func(http.Handler) http.Handler, validateOpenAPIRequest func(http.Handler) http.Handler) {
 	router.Group(func(router chi.Router) {
 		router.Use(requireCurrentSession)
@@ -279,20 +295,13 @@ func registerAuthenticatedRoutes(router chi.Router, wrapper openapi.ServerInterf
 	router.Group(func(router chi.Router) {
 		router.Use(requireCurrentSession)
 		router.Use(validateOpenAPIRequest)
-		router.Get("/categories", wrapper.ListCategories)
-		router.Get("/notes", wrapper.ListNotes)
-		router.Get("/authors/{author_id}", wrapper.GetAuthor)
-		router.Get("/authors/{author_id}/notes", wrapper.ListAuthorNotes)
-		router.Get("/notes/{note_id}", wrapper.GetNote)
 		router.Patch("/notes/{note_id}", wrapper.UpdateNote)
 		router.Delete("/notes/{note_id}", wrapper.DeleteNote)
-		router.Get("/notes/{note_id}/comments", wrapper.ListNoteComments)
 		router.Post("/notes/{note_id}/comments", wrapper.CreateNoteComment)
 		router.Delete("/notes/{note_id}/comments/{comment_id}", wrapper.DeleteNoteComment)
 		router.Post("/comments/{comment_id}/replies", wrapper.CreateCommentReply)
 		router.Post("/reports", wrapper.CreateReport)
 		router.Post("/events", wrapper.CreateEvents)
-		router.Get("/search/notes", wrapper.SearchNotes)
 		router.Put("/notes/{note_id}/useful", wrapper.MarkNoteUseful)
 		router.Delete("/notes/{note_id}/useful", wrapper.UnmarkNoteUseful)
 		router.Post("/notes", wrapper.CreateNote)

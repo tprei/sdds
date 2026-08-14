@@ -20,12 +20,8 @@ type commentCursorPayload struct {
 }
 
 func (handler server) ListNoteComments(w http.ResponseWriter, r *http.Request, noteID string, params openapi.ListNoteCommentsParams) {
-	current, ok := currentSessionFromContext(r.Context())
-	if !ok {
-		writeUnauthenticated(w)
-		return
-	}
-	if !handler.findCommentNote(w, r, noteID, current.User.ID) {
+	viewerID, _ := viewerUserID(r.Context())
+	if !handler.findCommentNote(w, r, noteID, viewerID) {
 		return
 	}
 

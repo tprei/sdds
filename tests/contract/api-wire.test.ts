@@ -103,6 +103,14 @@ describe('isNoteResponse', () => {
     void body;
     expect(isNoteResponse(missing)).toBe(false);
   });
+  it('accepts a note without useful_by_current_user (anonymous read)', () => {
+    const { useful_by_current_user, ...withoutViewer } = noteFixture();
+    void useful_by_current_user;
+    expect(isNoteResponse(withoutViewer)).toBe(true);
+  });
+  it('rejects a non-boolean useful_by_current_user', () => {
+    expect(isNoteResponse(noteFixture({ useful_by_current_user: 'yes' as unknown as boolean }))).toBe(false);
+  });
   it('rejects a non-integer useful_count', () => {
     expect(isNoteResponse(noteFixture({ useful_count: 1.5 }))).toBe(false);
   });

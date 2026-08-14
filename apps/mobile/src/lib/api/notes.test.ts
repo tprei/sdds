@@ -380,6 +380,17 @@ describe('notes API client', () => {
     });
   });
 
+  it('defaults useful_by_current_user to false when absent (anonymous read)', async () => {
+    const { useful_by_current_user, ...withoutViewer } = apiNote();
+    void useful_by_current_user;
+    stubFetch(async () => jsonResponse(withoutViewer));
+
+    const client = createAPIClient();
+    const note = await client.getNote(exampleNoteID);
+
+    expect(note.usefulByCurrentUser).toBe(false);
+  });
+
   it('sends search note requests with the raw query parameter', async () => {
     const calls: FetchCall[] = [];
     stubFetch(async (request) => {

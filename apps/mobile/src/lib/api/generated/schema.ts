@@ -980,8 +980,8 @@ export interface components {
              * @description Number of users who marked this note useful.
              */
             useful_count: number;
-            /** @description Whether the current authenticated user marked this note useful. */
-            useful_by_current_user: boolean;
+            /** @description Whether the current authenticated user marked this note useful. Absent for unauthenticated callers. */
+            useful_by_current_user?: boolean;
         };
         /** @enum {string} */
         ValidationField: "title" | "body" | "category_slug" | "q" | "username" | "password" | "display_name" | "limit" | "cursor" | "client_request_id" | "upload_request_id" | "image_upload_ids" | "file" | "target_type" | "target_id" | "reason" | "details" | "parent_comment_id" | "email";

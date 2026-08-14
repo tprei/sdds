@@ -122,7 +122,7 @@ export const noteSchema = z.object({
   updated_at: z.number().int().nonnegative(),
   images: noteImagesSchema,
   useful_count: z.number().int().nonnegative(),
-  useful_by_current_user: z.boolean(),
+  useful_by_current_user: z.boolean().optional(),
 }) satisfies z.ZodType<NoteResponse>;
 
 export const authorNotesPageSchema = z.object({

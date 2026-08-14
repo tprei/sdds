@@ -1423,8 +1423,8 @@ type Note struct {
 	// UpdatedAt Unix timestamp in milliseconds.
 	UpdatedAt int64 `json:"updated_at"`
 
-	// UsefulByCurrentUser Whether the current authenticated user marked this note useful.
-	UsefulByCurrentUser bool `json:"useful_by_current_user"`
+	// UsefulByCurrentUser Whether the current authenticated user marked this note useful. Absent for unauthenticated callers.
+	UsefulByCurrentUser *bool `json:"useful_by_current_user,omitempty"`
 
 	// UsefulCount Number of users who marked this note useful.
 	UsefulCount int64 `json:"useful_count"`

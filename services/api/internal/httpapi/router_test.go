@@ -562,14 +562,17 @@ func (catalog fakeCatalog) FindActiveCategory(ctx context.Context, slug note.Cat
 }
 
 type fakeUserStore struct {
-	createPasswordUser func(ctx context.Context, input user.CreatePasswordUserInput) (user.CurrentSession, error)
-	findPasswordLogin  func(ctx context.Context, normalizedUsername string) (user.PasswordLogin, error)
-	createSession      func(ctx context.Context, input user.CreateSessionInput) (user.CurrentSession, error)
-	findCurrentSession func(ctx context.Context, tokenHash string, now time.Time) (user.CurrentSession, error)
-	revokeSession      func(ctx context.Context, sessionID user.SessionID, revokedAt time.Time) error
-	findAuthorByUserID func(ctx context.Context, userID user.UserID) (user.Author, error)
-	deleteUser         func(ctx context.Context, userID user.UserID, deletedAt time.Time) error
-	findPublicAuthor   func(ctx context.Context, authorID author.AuthorID) (author.PublicAuthor, error)
+	createPasswordUser  func(ctx context.Context, input user.CreatePasswordUserInput) (user.CurrentSession, error)
+	findPasswordLogin   func(ctx context.Context, normalizedUsername string) (user.PasswordLogin, error)
+	createSession       func(ctx context.Context, input user.CreateSessionInput) (user.CurrentSession, error)
+	findCurrentSession  func(ctx context.Context, tokenHash string, now time.Time) (user.CurrentSession, error)
+	revokeSession       func(ctx context.Context, sessionID user.SessionID, revokedAt time.Time) error
+	findAuthorByUserID  func(ctx context.Context, userID user.UserID) (user.Author, error)
+	deleteUser          func(ctx context.Context, userID user.UserID, deletedAt time.Time) error
+	findPublicAuthor    func(ctx context.Context, authorID author.AuthorID) (author.PublicAuthor, error)
+	resolveOIDCIdentity func(ctx context.Context, input user.ResolveOIDCIdentityInput) (user.CurrentSession, error)
+	listLoginIdentities func(ctx context.Context, userID user.UserID) ([]user.LoginIdentitySummary, error)
+	deleteLoginIdentity func(ctx context.Context, userID user.UserID, identityID user.LoginIdentityID) error
 }
 
 func (store fakeUserStore) CreatePasswordUser(ctx context.Context, input user.CreatePasswordUserInput) (user.CurrentSession, error) {
@@ -598,6 +601,26 @@ func (store fakeUserStore) FindCurrentSession(ctx context.Context, tokenHash str
 		return user.CurrentSession{}, fmt.Errorf("find current session not implemented")
 	}
 	return store.findCurrentSession(ctx, tokenHash, now)
+}
+func (store fakeUserStore) ResolveOIDCIdentity(ctx context.Context, input user.ResolveOIDCIdentityInput) (user.CurrentSession, error) {
+	if store.resolveOIDCIdentity == nil {
+		return user.CurrentSession{}, fmt.Errorf("resolve oidc identity not implemented")
+	}
+	return store.resolveOIDCIdentity(ctx, input)
+}
+
+func (store fakeUserStore) ListLoginIdentities(ctx context.Context, userID user.UserID) ([]user.LoginIdentitySummary, error) {
+	if store.listLoginIdentities == nil {
+		return nil, fmt.Errorf("list login identities not implemented")
+	}
+	return store.listLoginIdentities(ctx, userID)
+}
+
+func (store fakeUserStore) DeleteLoginIdentity(ctx context.Context, userID user.UserID, identityID user.LoginIdentityID) error {
+	if store.deleteLoginIdentity == nil {
+		return fmt.Errorf("delete login identity not implemented")
+	}
+	return store.deleteLoginIdentity(ctx, userID, identityID)
 }
 
 // testCurrentUserSessionResolver is the explicit session resolver used by

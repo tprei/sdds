@@ -87,6 +87,53 @@ describe('auth API client', () => {
     });
   });
 
+  it('sends OIDC session requests with API wire keys', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return jsonResponse(apiAuthSession(), httpStatusCreated);
+    });
+
+    const client = createAPIClient();
+    await client.createAuthOidcSession({
+      idToken: 'provider-id-token',
+      nonce: 'nonce-value',
+      provider: 'google',
+      username: 'thiago',
+    });
+
+    const request = onlyFetchCall(calls);
+    expect(request.url).toBe('http://localhost:8080/v1/auth/oidc/sessions');
+    expect(request.method).toBe('POST');
+    await expect(requestJSON(request)).resolves.toEqual({
+      id_token: 'provider-id-token',
+      nonce: 'nonce-value',
+      provider: 'google',
+      username: 'thiago',
+    });
+  });
+
+  it('omits an absent OIDC username from the request body', async () => {
+    const calls: FetchCall[] = [];
+    stubFetch(async (request) => {
+      calls.push({ request });
+      return jsonResponse(apiAuthSession(), httpStatusCreated);
+    });
+
+    const client = createAPIClient();
+    await client.createAuthOidcSession({
+      idToken: 'provider-id-token',
+      nonce: 'nonce-value',
+      provider: 'apple',
+    });
+
+    await expect(requestJSON(onlyFetchCall(calls))).resolves.toEqual({
+      id_token: 'provider-id-token',
+      nonce: 'nonce-value',
+      provider: 'apple',
+    });
+  });
+
   it('parses created auth sessions from the API wire shape', async () => {
     stubFetch(async () => jsonResponse(apiAuthSession(), httpStatusCreated));
 
@@ -105,6 +152,7 @@ describe('auth API client', () => {
           id: exampleAuthorID,
         },
         id: exampleUserID,
+        identities: [{ id: 'identity-1', kind: 'password', provider: 'local' }],
         username: 'thiago',
       },
     });
@@ -132,6 +180,7 @@ describe('auth API client', () => {
           id: exampleAuthorID,
         },
         id: exampleUserID,
+        identities: [{ id: 'identity-1', kind: 'password', provider: 'local' }],
         username: 'thiago',
       },
     });
@@ -346,6 +395,7 @@ describe('auth API client', () => {
           id: exampleAuthorID,
         },
         id: exampleUserID,
+        identities: [{ id: 'identity-1', kind: 'password', provider: 'local' }],
         username: 'thiago',
       },
     });

@@ -9,13 +9,19 @@ import {
   useState,
 } from 'react';
 
-import type { AuthState, LoginInput, SignupInput } from './session';
+import type {
+  AuthState,
+  LoginInput,
+  OIDCSignInInput,
+  SignupInput,
+} from './session';
 import { createAuthController } from './session';
 
 type AuthContextValue = {
   login(input: LoginInput): Promise<void>;
   logout(): Promise<void>;
   refresh(): Promise<void>;
+  signInWithOIDC(input: OIDCSignInInput): Promise<void>;
   signup(input: SignupInput): Promise<void>;
   state: AuthState;
 };
@@ -83,6 +89,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     },
     [controller, enqueueAuthMutation],
   );
+  const signInWithOIDC = useCallback(
+    async (input: OIDCSignInInput) => {
+      await enqueueAuthMutation(() => controller.signInWithOIDC(input));
+    },
+    [controller, enqueueAuthMutation],
+  );
 
   const logout = useCallback(async () => {
     await enqueueAuthMutation(() => controller.logout(stateRef.current));
@@ -93,8 +105,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [controller, enqueueAuthMutation]);
 
   const value = useMemo(
-    () => ({ login, logout, refresh, signup, state }),
-    [login, logout, refresh, signup, state],
+    () => ({ login, logout, refresh, signInWithOIDC, signup, state }),
+    [login, logout, refresh, signInWithOIDC, signup, state],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

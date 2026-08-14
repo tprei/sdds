@@ -1,4 +1,8 @@
-import type { AuthSession, AuthUser } from '@/lib/api/auth';
+import type {
+  AuthSession,
+  AuthUser,
+  CreateOidcSessionInput,
+} from '@/lib/api/auth';
 import { AuthAPIRequestError } from '@/lib/api/auth';
 import { anonymousSession, createAPIClient } from '@/lib/api/client';
 
@@ -19,6 +23,8 @@ export type LoginInput = {
   username: string;
 };
 
+export type OIDCSignInInput = CreateOidcSessionInput;
+
 export type SignupInput = {
   displayName: string;
   email?: string;
@@ -31,6 +37,7 @@ export type AuthController = {
   login(input: LoginInput): Promise<AuthState>;
   logout(state: AuthState): Promise<AuthState>;
   refresh(state: AuthState): Promise<AuthState>;
+  signInWithOIDC(input: OIDCSignInInput): Promise<AuthState>;
   signup(input: SignupInput): Promise<AuthState>;
 };
 
@@ -62,6 +69,12 @@ export function createAuthController(): AuthController {
     async login(input) {
       return runAuthMutation(async () => {
         const session = await createAPIClient(anonymousSession).createAuthSession(input);
+        return persistSession(session);
+      });
+    },
+    async signInWithOIDC(input) {
+      return runAuthMutation(async () => {
+        const session = await createAPIClient(anonymousSession).createAuthOidcSession(input);
         return persistSession(session);
       });
     },

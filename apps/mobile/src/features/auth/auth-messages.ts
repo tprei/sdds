@@ -21,6 +21,13 @@ export const mailUnavailableMessage =
   'Não conseguimos enviar e-mails agora. Tenta de novo mais tarde.';
 export const sessionCleanupFailedMessage =
   'Não foi possível sair da sessão atual. Tenta de novo.';
+export const genericOidcErrorMessage =
+  'Não deu pra entrar com esse provedor agora. Tente de novo em instantes.';
+export const oidcUnavailableMessage =
+  'Entrar com Google ou Apple está indisponível agora. Tente de novo mais tarde.';
+export const expiredOidcCredentialMessage =
+  'Sua sessão de entrada expirou, comece de novo.';
+
 
 const staticReturnPaths: readonly ReturnPath[] = [
   '/',

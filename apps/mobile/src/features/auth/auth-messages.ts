@@ -27,6 +27,10 @@ export const oidcUnavailableMessage =
   'Entrar com Google ou Apple está indisponível agora. Tente de novo mais tarde.';
 export const expiredOidcCredentialMessage =
   'Sua sessão de entrada expirou, comece de novo.';
+export const lastSignInMethodMessage =
+  'Esse é seu único jeito de entrar. Conecte outro antes de desconectar.';
+export const identityDisconnectFailedMessage =
+  'Não foi possível desconectar agora. Tente de novo.';
 
 
 const staticReturnPaths: readonly ReturnPath[] = [

@@ -20,6 +20,16 @@ export const styles = StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
   },
+  identitySection: {
+    gap: spacing.sp3,
+    padding: spacing.sp4,
+  },
+  identityRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sp3,
+    justifyContent: 'space-between',
+  },
   logoutSection: {
     gap: spacing.sp3,
     padding: spacing.sp4,

@@ -334,3 +334,34 @@ export function IconCheck({
     </Svg>
   );
 }
+
+export function IconShare({
+  size = defaults.size,
+  color = defaults.color,
+}: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 15V3"
+        stroke={color}
+        strokeWidth={STROKE_WIDTH}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="m8 7 4-4 4 4"
+        stroke={color}
+        strokeWidth={STROKE_WIDTH}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"
+        stroke={color}
+        strokeWidth={STROKE_WIDTH}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}

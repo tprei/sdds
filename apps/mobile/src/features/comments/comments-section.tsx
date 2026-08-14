@@ -32,7 +32,7 @@ import type {
 } from './comment-thread';
 
 export type CommentsSectionProps = {
-  currentAuthorID: string;
+  currentAuthorID: string | null;
   noteAuthorID: string;
   onDraftChange: (draft: string) => void;
   onLoadMore: () => void;
@@ -47,6 +47,8 @@ export type CommentsSectionProps = {
   onSubmitReply?: (body: string) => void;
   composerRef?: Ref<TextInput>;
   thread: CommentThreadState;
+  /** Non-null when the viewer is signed out: call it instead of performing a write. */
+  requireAuth: (() => void) | null;
 };
 
 export function CommentsSection({
@@ -65,7 +67,9 @@ export function CommentsSection({
   onReplyDraftChange = () => undefined,
   onSubmitReply = () => undefined,
   thread,
+  requireAuth,
 }: CommentsSectionProps) {
+  const interactive = requireAuth === null;
   const validation = validateCommentDraft(thread.draft);
   const submitDisabled = !canSubmitComment(thread);
   const draftError = thread.draftTouched ? validation.error : null;
@@ -89,9 +93,10 @@ export function CommentsSection({
         onReportComment={onReportComment}
         onRetryInitial={onRetryInitial}
         onStartReply={onStartReply}
-        onCancelReply={onCancelReply}
         onReplyDraftChange={onReplyDraftChange}
+        onCancelReply={onCancelReply}
         onSubmitReply={onSubmitReply}
+        interactive={interactive}
         replyDraft={thread.replyDraft}
         replyDraftTouched={thread.replyDraftTouched}
         replyDraftError={replyDraftError}
@@ -100,38 +105,46 @@ export function CommentsSection({
         replySubmitStatus={thread.replySubmitStatus}
         thread={thread}
       />
-      <View style={styles.composer}>
-        <TextField
-          counter={{
-            count: validation.codePointCount,
-            max: commentBodyMaxCodePoints,
-          }}
-          label="Escreva um comentário"
-          multiline
-          onChangeText={onDraftChange}
-          placeholder="Escreva um comentário"
-          ref={composerRef}
-          testID="comment-draft"
-          value={thread.draft}
-        />
-        {draftError === null ? null : (
-          <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm" weight="semibold">
-            {draftErrorMessage(draftError)}
-          </AppText>
-        )}
-        {thread.submitStatus === 'error' ? (
-          <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm" weight="semibold">
-            Não deu pra publicar o comentário. Tenta de novo.
-          </AppText>
-        ) : null}
+      {interactive ? (
+        <View style={styles.composer}>
+          <TextField
+            counter={{
+              count: validation.codePointCount,
+              max: commentBodyMaxCodePoints,
+            }}
+            label="Escreva um comentário"
+            multiline
+            onChangeText={onDraftChange}
+            placeholder="Escreva um comentário"
+            ref={composerRef}
+            testID="comment-draft"
+            value={thread.draft}
+          />
+          {draftError === null ? null : (
+            <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm" weight="semibold">
+              {draftErrorMessage(draftError)}
+            </AppText>
+          )}
+          {thread.submitStatus === 'error' ? (
+            <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm" weight="semibold">
+              Não deu pra publicar o comentário. Tenta de novo.
+            </AppText>
+          ) : null}
+          <Button
+            disabled={submitDisabled}
+            label={thread.submitStatus === 'pending' ? 'Publicando…' : 'Comentar'}
+            onPress={() => onSubmit(validation.body)}
+            testID="comment-submit"
+            variant="primary"
+          />
+        </View>
+      ) : (
         <Button
-          disabled={submitDisabled}
-          label={thread.submitStatus === 'pending' ? 'Publicando…' : 'Comentar'}
-          onPress={() => onSubmit(validation.body)}
-          testID="comment-submit"
-          variant="primary"
+          label="Entre para comentar"
+          onPress={() => requireAuth?.()}
+          testID="comment-sign-in"
         />
-      </View>
+      )}
     </View>
   );
 }
@@ -148,6 +161,7 @@ function CommentThreadView({
   onCancelReply = () => undefined,
   onReplyDraftChange = () => undefined,
   onSubmitReply = () => undefined,
+  interactive = true,
   replyDraft,
   replyDraftTouched,
   replyDraftError,
@@ -170,6 +184,7 @@ function CommentThreadView({
   | 'onSubmitReply'
   | 'thread'
 > & {
+  interactive: boolean;
   replyDraft: string;
   replyDraftTouched: boolean;
   replyDraftError: 'required' | 'too_long' | null;
@@ -212,6 +227,7 @@ function CommentThreadView({
           thread.deleteStatusByCommentID,
         )}
         currentAuthorID={currentAuthorID}
+        interactive={interactive}
         deleteStatusByCommentID={thread.deleteStatusByCommentID}
         noteAuthorID={noteAuthorID}
         onDeleteComment={onDeleteComment}
@@ -239,6 +255,7 @@ function CommentThreadView({
         deleteStatusByCommentID={thread.deleteStatusByCommentID}
         noteAuthorID={noteAuthorID}
         onDeleteComment={onDeleteComment}
+        interactive={interactive}
         onReportComment={onReportComment}
         onPressAuthor={onPressAuthor}
         onStartReply={onStartReply}
@@ -329,6 +346,7 @@ function CommentList({
   onReportComment,
   onStartReply,
   onCancelReply,
+  interactive,
   onReplyDraftChange,
   onSubmitReply,
   replyTarget,
@@ -340,9 +358,10 @@ function CommentList({
   replySubmitStatus,
 }: {
   threads: CommentThread[];
-  currentAuthorID: string;
+  currentAuthorID: string | null;
   deleteStatusByCommentID: ReadonlyMap<string, CommentDeleteStatus>;
   noteAuthorID: string;
+  interactive: boolean;
   onDeleteComment: (commentID: string) => void;
   onReportComment: (commentID: string) => void;
   onPressAuthor: (authorID: string) => void;
@@ -373,20 +392,23 @@ function CommentList({
           onDeleteComment={onDeleteComment}
           onPressAuthor={onPressAuthor}
           onReportComment={onReportComment}
+          interactive={interactive}
         />
-        <Button
-          disabled={replySubmitStatus === 'pending'}
-          label="Responder"
-          onPress={() =>
-            onStartReply(
-              thread.comment.id,
-              thread.comment.author.displayName,
-            )
-          }
-          size="sm"
-          testID={`comment-reply-${thread.comment.id}`}
-          variant="ghost"
-        />
+        {interactive ? (
+          <Button
+            disabled={replySubmitStatus === 'pending'}
+            label="Responder"
+            onPress={() =>
+              onStartReply(
+                thread.comment.id,
+                thread.comment.author.displayName,
+              )
+            }
+            size="sm"
+            testID={`comment-reply-${thread.comment.id}`}
+            variant="ghost"
+          />
+        ) : null}
         {replies.length > 0 ? (
           <View style={styles.replyList}>
             {replies.map((reply) => (
@@ -399,6 +421,7 @@ function CommentList({
                   onDeleteComment={onDeleteComment}
                   onPressAuthor={onPressAuthor}
                   onReportComment={onReportComment}
+                  interactive={interactive}
                 />
               </View>
             ))}
@@ -434,14 +457,16 @@ function CommentRow({
   onDeleteComment,
   onPressAuthor,
   onReportComment,
+  interactive = true,
 }: {
   comment: CommentThread['comment'];
-  currentAuthorID: string;
+  currentAuthorID: string | null;
   deleteStatusByCommentID: ReadonlyMap<string, CommentDeleteStatus>;
   noteAuthorID: string;
   onDeleteComment: (commentID: string) => void;
   onPressAuthor: (authorID: string) => void;
   onReportComment: (commentID: string) => void;
+  interactive: boolean;
 }) {
   return (
     <View style={styles.commentRow}>
@@ -475,13 +500,15 @@ function CommentRow({
             testID={`comment-delete-${comment.id}`}
           />
         ) : null}
-        <IconButton
-          accessibilityLabel="Denunciar comentário"
-          icon={<IconFlag color={semanticColors.textMeta} size={componentMetrics.icon.sm} />}
-          onPress={() => onReportComment(comment.id)}
-          size={componentMetrics.minTarget}
-          testID={`comment-report-${comment.id}`}
-        />
+        {interactive ? (
+          <IconButton
+            accessibilityLabel="Denunciar comentário"
+            icon={<IconFlag color={semanticColors.textMeta} size={componentMetrics.icon.sm} />}
+            onPress={() => onReportComment(comment.id)}
+            size={componentMetrics.minTarget}
+            testID={`comment-report-${comment.id}`}
+          />
+        ) : null}
       </View>
       {deleteStatusByCommentID.get(comment.id) === 'error' ? (
         <AppText accessibilityRole="alert" color={semanticColors.danger} variant="sm" weight="semibold">

@@ -65,7 +65,12 @@ func (handler server) CreateAuthUser(w http.ResponseWriter, r *http.Request) {
 			handler.auth.schedule(func() { handler.dispatchEmailVerification(channel) })
 		}
 	}
-	writeJSON(w, http.StatusCreated, handler.newAuthSessionResponse(r.Context(), current, token))
+	session, err := handler.newAuthSessionResponse(r.Context(), current, token)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+	writeJSON(w, http.StatusCreated, session)
 }
 
 func (handler server) CreateAuthSession(w http.ResponseWriter, r *http.Request) {
@@ -133,7 +138,12 @@ func (handler server) CreateAuthSession(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, handler.newAuthSessionResponse(r.Context(), current, token))
+	session, err := handler.newAuthSessionResponse(r.Context(), current, token)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+	writeJSON(w, http.StatusCreated, session)
 }
 
 func (handler server) GetAuthSession(w http.ResponseWriter, r *http.Request) {
@@ -143,7 +153,12 @@ func (handler server) GetAuthSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, handler.newCurrentSessionResponse(r.Context(), current))
+	session, err := handler.newCurrentSessionResponse(r.Context(), current)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+	writeJSON(w, http.StatusOK, session)
 }
 
 func (handler server) DeleteAuthSession(w http.ResponseWriter, r *http.Request) {
@@ -234,37 +249,55 @@ func (handler server) writeInvalidCredentialsAfterVerification(w http.ResponseWr
 	writeInvalidCredentials(w)
 }
 
-func (handler server) newAuthSessionResponse(ctx context.Context, current user.CurrentSession, token string) openapi.AuthSessionResponse {
+func (handler server) newAuthSessionResponse(ctx context.Context, current user.CurrentSession, token string) (openapi.AuthSessionResponse, error) {
+	user, err := handler.newCurrentUserResponse(ctx, current)
+	if err != nil {
+		return openapi.AuthSessionResponse{}, err
+	}
 	return openapi.AuthSessionResponse{
 		Token:     token,
 		ExpiresAt: current.Session.ExpiresAt.UTC().UnixMilli(),
-		User:      handler.newCurrentUserResponse(ctx, current),
-	}
+		User:      user,
+	}, nil
 }
 
-func (handler server) newCurrentSessionResponse(ctx context.Context, current user.CurrentSession) openapi.CurrentSessionResponse {
+func (handler server) newCurrentSessionResponse(ctx context.Context, current user.CurrentSession) (openapi.CurrentSessionResponse, error) {
+	user, err := handler.newCurrentUserResponse(ctx, current)
+	if err != nil {
+		return openapi.CurrentSessionResponse{}, err
+	}
 	return openapi.CurrentSessionResponse{
 		ExpiresAt: current.Session.ExpiresAt.UTC().UnixMilli(),
-		User:      handler.newCurrentUserResponse(ctx, current),
-	}
+		User:      user,
+	}, nil
 }
 
-func (handler server) newCurrentUserResponse(ctx context.Context, current user.CurrentSession) openapi.CurrentUser {
+func (handler server) newCurrentUserResponse(ctx context.Context, current user.CurrentSession) (openapi.CurrentUser, error) {
+	identities, err := handler.auth.users.ListLoginIdentities(ctx, current.User.ID)
+	if err != nil {
+		return openapi.CurrentUser{}, err
+	}
+	summaries := make([]openapi.LoginIdentitySummary, 0, len(identities))
+	for _, identity := range identities {
+		summaries = append(summaries, openapi.LoginIdentitySummary{
+			Id:       string(identity.ID),
+			Kind:     openapi.LoginIdentitySummaryKind(identity.Kind),
+			Provider: openapi.LoginIdentitySummaryProvider(identity.Provider),
+		})
+	}
 	response := openapi.CurrentUser{
-		Id:       string(current.User.ID),
-		Username: current.Username,
-		Author: openapi.AuthorSummary{
-			Id:          string(current.Author.ID),
-			DisplayName: current.Author.DisplayName,
-		},
+		Id:         string(current.User.ID),
+		Username:   current.Username,
+		Author:     openapi.AuthorSummary{Id: string(current.Author.ID), DisplayName: current.Author.DisplayName},
+		Identities: summaries,
 	}
 	channel, err := handler.auth.contactChannels.FindEmailForUser(ctx, current.User.ID)
 	if err != nil {
 		if !errors.Is(err, user.ErrContactChannelNotFound) {
 			log.Printf("find email for user %s: %v", current.User.ID, err)
 		}
-		return response
+		return response, nil
 	}
 	response.Email = &openapi.UserEmail{Address: channel.Value, Verified: channel.VerifiedAt != nil}
-	return response
+	return response, nil
 }

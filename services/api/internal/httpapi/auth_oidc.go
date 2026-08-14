@@ -83,5 +83,36 @@ func (handler server) CreateAuthOidcSession(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, handler.newAuthSessionResponse(r.Context(), current, token))
+	session, err := handler.newAuthSessionResponse(r.Context(), current, token)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+	writeJSON(w, http.StatusCreated, session)
+}
+
+// DeleteAuthIdentity disconnects one login identity from the authenticated
+// account. The last remaining way in is refused, and an identity owned by
+// another user answers the same 404 as a nonexistent one so the route cannot
+// be used to probe for identity IDs.
+func (handler server) DeleteAuthIdentity(w http.ResponseWriter, r *http.Request, identityID string) {
+	current, ok := currentSessionFromContext(r.Context())
+	if !ok {
+		writeUnauthenticated(w)
+		return
+	}
+	err := handler.auth.users.DeleteLoginIdentity(r.Context(), current.User.ID, user.LoginIdentityID(identityID))
+	if errors.Is(err, user.ErrLoginIdentityNotFound) {
+		writeError(w, http.StatusNotFound, openapi.ErrorResponse{Code: openapi.ErrorCodeNotFound})
+		return
+	}
+	if errors.Is(err, user.ErrLastLoginIdentity) {
+		writeError(w, http.StatusConflict, openapi.ErrorResponse{Code: openapi.ErrorCodeLastSignInMethod})
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, openapi.ErrorResponse{Code: openapi.ErrorCodeInternal})
+		return
+	}
+	noContent(w, r)
 }

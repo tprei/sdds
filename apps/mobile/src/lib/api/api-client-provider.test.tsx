@@ -49,6 +49,7 @@ const authenticatedState: AuthState = {
   user: {
     author: { displayName: 'Thiago', id: exampleAuthorID },
     id: exampleUserID,
+    identities: [{ id: 'identity-1', kind: 'password', provider: 'local' }],
     username: 'thiago',
   },
 };

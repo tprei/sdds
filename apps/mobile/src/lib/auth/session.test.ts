@@ -13,6 +13,7 @@ import {
 const mocks = vi.hoisted(() => {
   const mockClient = {
     createAuthSession: vi.fn(),
+    createAuthOidcSession: vi.fn(),
     createAuthUser: vi.fn(),
     deleteAuthSession: vi.fn(),
     getAuthSession: vi.fn(),
@@ -51,6 +52,7 @@ describe('auth session controller', () => {
   beforeEach(() => {
     createAPIClient.mockClear();
     mockClient.createAuthSession.mockReset();
+    mockClient.createAuthOidcSession.mockReset();
     mockClient.createAuthUser.mockReset();
     mockClient.deleteAuthSession.mockReset();
     mockClient.getAuthSession.mockReset();
@@ -258,6 +260,32 @@ describe('auth session controller', () => {
     expect(saveSessionToken).toHaveBeenNthCalledWith(2, 'bia-token');
   });
 
+  it('signs in with OIDC and persists the returned token', async () => {
+    mockClient.createAuthOidcSession.mockResolvedValue(apiAuthSession());
+    vi.mocked(saveSessionToken).mockResolvedValue(undefined);
+
+    await expect(
+      createAuthController().signInWithOIDC({
+        idToken: 'provider-id-token',
+        nonce: 'nonce-value',
+        provider: 'google',
+        username: 'thiago',
+      }),
+    ).resolves.toEqual({
+      status: 'authenticated',
+      token: 'session-token',
+      user: apiUser(),
+    });
+    expect(createAPIClient).toHaveBeenCalledWith({ kind: 'anonymous' });
+    expect(mockClient.createAuthOidcSession).toHaveBeenCalledWith({
+      idToken: 'provider-id-token',
+      nonce: 'nonce-value',
+      provider: 'google',
+      username: 'thiago',
+    });
+    expect(saveSessionToken).toHaveBeenCalledWith('session-token');
+  });
+
   it('signs up and persists the returned token', async () => {
     mockClient.createAuthUser.mockResolvedValue(apiAuthSession());
     vi.mocked(saveSessionToken).mockResolvedValue(undefined);
@@ -405,6 +433,7 @@ function apiUser(): AuthUser {
       id: 'author-id',
     },
     id: 'private-user-id',
+    identities: [{ id: 'identity-1', kind: 'password', provider: 'local' }],
     username: 'thiago',
   };
 }

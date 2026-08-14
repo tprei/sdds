@@ -74,9 +74,11 @@ type SearchScreenState =
     }
   | { request: SearchRequest; status: 'error' };
 
-type AuthenticatedSearchScreenProps = {
+type SearchContentProps = {
   apiClient: APIClient;
   onSessionExpired: () => Promise<void>;
+  /** Non-null when the viewer is signed out: call it instead of performing a write. */
+  requireAuth: (() => void) | null;
 };
 
 type UsefulMutationState = 'error' | 'pending';
@@ -92,36 +94,41 @@ export default function SearchScreen() {
   const router = useRouter();
   const { apiClient, logout, state } = useAuth();
 
-  if (state.status === 'authenticated') {
+  if (state.status === 'loading') {
     return (
-      <AuthenticatedSearchScreen
-        key={state.user.id}
-        apiClient={apiClient}
-        onSessionExpired={logout}
-      />
+      <Screen header={<AppHeader showWordmark />}>
+        <BrandHeader compact showWordmark={false} />
+        <ReadAuthGate
+          onLogin={() =>
+            router.push({ pathname: '/login', params: { next: '/search' } })
+          }
+          onSignup={() =>
+            router.push({ pathname: '/signup', params: { next: '/search' } })
+          }
+          status="loading"
+        />
+      </Screen>
     );
   }
 
+  const requireAuth = () =>
+    router.push({ pathname: '/login', params: { next: '/search' } });
+
   return (
-    <Screen header={<AppHeader showWordmark />}>
-      <BrandHeader compact showWordmark={false} />
-      <ReadAuthGate
-        onLogin={() =>
-          router.push({ pathname: '/login', params: { next: '/search' } })
-        }
-        onSignup={() =>
-          router.push({ pathname: '/signup', params: { next: '/search' } })
-        }
-        status={state.status}
-      />
-    </Screen>
+    <SearchContent
+      key={state.status === 'authenticated' ? state.user.id : 'anonymous'}
+      apiClient={apiClient}
+      onSessionExpired={logout}
+      requireAuth={state.status === 'authenticated' ? null : requireAuth}
+    />
   );
 }
 
-function AuthenticatedSearchScreen({
+function SearchContent({
   apiClient,
   onSessionExpired,
-}: AuthenticatedSearchScreenProps) {
+  requireAuth,
+}: SearchContentProps) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const gridLayout = resolveGridLayout(width);
@@ -487,6 +494,10 @@ function AuthenticatedSearchScreen({
   const toggleUseful = useCallback(
     async (target: PresentedSearchResult) => {
       const targetNote = target.note;
+      if (requireAuth !== null) {
+        requireAuth();
+        return;
+      }
       if (
         usefulMutations[targetNote.id] === 'pending' ||
         usefulPendingRef.current.has(targetNote.id)
@@ -576,7 +587,7 @@ function AuthenticatedSearchScreen({
         usefulPendingRef.current.delete(targetNote.id);
       }
     },
-    [apiClient, onSessionExpired, productEvents, usefulMutations],
+    [apiClient, onSessionExpired, productEvents, requireAuth, usefulMutations],
   );
   useFocusEffect(
     useCallback(() => {

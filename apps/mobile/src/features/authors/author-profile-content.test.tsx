@@ -136,6 +136,7 @@ describe('AuthorProfileContent', () => {
           onPressNote={() => undefined}
           onSessionExpired={onSessionExpired}
           apiClient={mockClient}
+          requireAuth={null}
         />,
       );
       await flushPromises();
@@ -187,6 +188,7 @@ describe('AuthorProfileContent', () => {
           onPressNote={() => undefined}
           onSessionExpired={onSessionExpired}
           apiClient={mockClient}
+          requireAuth={null}
         />,
       );
       await flushPromises();
@@ -269,6 +271,7 @@ describe('AuthorProfileContent', () => {
           onPressNote={() => undefined}
           onSessionExpired={onSessionExpired}
           apiClient={mockClient}
+          requireAuth={null}
         />,
       );
       await flushPromises();
@@ -286,6 +289,7 @@ describe('AuthorProfileContent', () => {
           onPressNote={() => undefined}
           onSessionExpired={onSessionExpired}
           apiClient={mockClient}
+          requireAuth={null}
         />,
       );
       await flushPromises();
@@ -337,6 +341,7 @@ describe('AuthorProfileContent', () => {
           onPressNote={() => undefined}
           onSessionExpired={onSessionExpired}
           apiClient={mockClient}
+          requireAuth={null}
         />,
       );
       await flushPromises();
@@ -352,6 +357,7 @@ describe('AuthorProfileContent', () => {
           onPressNote={() => undefined}
           onSessionExpired={onSessionExpired}
           apiClient={mockClient}
+          requireAuth={null}
         />,
       );
       await flushPromises();
@@ -400,6 +406,7 @@ describe('AuthorProfileContent', () => {
           onPressNote={() => undefined}
           onSessionExpired={onSessionExpired}
           apiClient={mockClient}
+          requireAuth={null}
         />,
       );
       await flushPromises();
@@ -435,6 +442,7 @@ describe('AuthorProfileContent', () => {
           onPressNote={() => undefined}
           onSessionExpired={onSessionExpired}
           apiClient={mockClient}
+          requireAuth={null}
         />,
       );
       await flushPromises();
@@ -465,6 +473,7 @@ describe('AuthorProfileContent', () => {
           onPressNote={() => undefined}
           onSessionExpired={onSessionExpired}
           apiClient={mockClient}
+          requireAuth={null}
         />,
       );
       await flushPromises();

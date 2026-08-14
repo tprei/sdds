@@ -52,9 +52,11 @@ type FeedState =
     }
   | { status: 'error' };
 
-type AuthenticatedHomeScreenProps = {
+type HomeFeedProps = {
   apiClient: APIClient;
   onSessionExpired: () => Promise<void>;
+  /** Non-null when the viewer is signed out: call it instead of performing a write. */
+  requireAuth: (() => void) | null;
 };
 
 type UsefulMutationState = 'error' | 'pending';
@@ -83,42 +85,46 @@ export default function HomeScreen() {
   const { apiClient, logout, state } = useAuth();
   const router = useRouter();
 
-  if (state.status === 'authenticated') {
+  if (state.status === 'loading') {
     return (
-      <AuthenticatedHomeScreen
-        key={state.user.id}
-        apiClient={apiClient}
-        onSessionExpired={logout}
-      />
+      <Screen header={<AppHeader showWordmark />}>
+        <BrandHeader compact showWordmark={false} />
+        <ReadAuthGate
+          onLogin={() =>
+            router.push({
+              pathname: '/login',
+              params: { next: '/' },
+            })
+          }
+          onSignup={() =>
+            router.push({
+              pathname: '/signup',
+              params: { next: '/' },
+            })
+          }
+          status="loading"
+        />
+      </Screen>
     );
   }
 
+  const requireAuth = () =>
+    router.push({ pathname: '/login', params: { next: '/' } });
+
   return (
-    <Screen header={<AppHeader showWordmark />}>
-      <BrandHeader compact showWordmark={false} />
-      <ReadAuthGate
-        onLogin={() =>
-          router.push({
-            pathname: '/login',
-            params: { next: '/' },
-          })
-        }
-        onSignup={() =>
-          router.push({
-            pathname: '/signup',
-            params: { next: '/' },
-          })
-        }
-        status={state.status}
-      />
-    </Screen>
+    <HomeFeed
+      key={state.status === 'authenticated' ? state.user.id : 'anonymous'}
+      apiClient={apiClient}
+      onSessionExpired={logout}
+      requireAuth={state.status === 'authenticated' ? null : requireAuth}
+    />
   );
 }
-
-function AuthenticatedHomeScreen({
+function HomeFeed({
   apiClient,
   onSessionExpired,
-}: AuthenticatedHomeScreenProps) {
+  requireAuth,
+}: HomeFeedProps) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const gridLayout = resolveGridLayout(width);
@@ -316,6 +322,10 @@ function AuthenticatedHomeScreen({
   const toggleUseful = useCallback(
     async (target: PresentedExploreNote) => {
       const note = target.note;
+      if (requireAuth !== null) {
+        requireAuth();
+        return;
+      }
       if (
         usefulMutations[note.id] === 'pending' ||
         usefulPendingRef.current.has(note.id)
@@ -398,7 +408,7 @@ function AuthenticatedHomeScreen({
         usefulPendingRef.current.delete(note.id);
       }
     },
-    [apiClient, onSessionExpired, productEvents, usefulMutations],
+    [apiClient, onSessionExpired, productEvents, requireAuth, usefulMutations],
   );
 
   useFocusEffect(

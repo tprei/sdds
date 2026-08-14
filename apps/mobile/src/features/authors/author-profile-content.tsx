@@ -45,6 +45,8 @@ type Props = {
   onCompose?: () => void;
   onPressNote: (noteID: string) => void;
   onSessionExpired: () => Promise<void>;
+  /** Non-null when the viewer is signed out: call it instead of performing a write. */
+  requireAuth: (() => void) | null;
 };
 type ProfileError = 'not_found' | 'error' | null;
 type UsefulMutationState = 'error' | 'pending';
@@ -224,6 +226,7 @@ export function AuthorProfileContent({
   onCompose,
   onPressNote,
   onSessionExpired,
+  requireAuth,
 }: Props) {
   const productEvents = useProductEvents();
   const { width } = useWindowDimensions();
@@ -371,6 +374,10 @@ export function AuthorProfileContent({
   );
   const toggleUseful = useCallback(
     async (target: LabelledNote) => {
+      if (requireAuth !== null) {
+        requireAuth();
+        return;
+      }
       if (
         usefulMutations[target.id] === 'pending' ||
         usefulPendingRef.current.has(target.id)
@@ -438,7 +445,7 @@ export function AuthorProfileContent({
         usefulPendingRef.current.delete(target.id);
       }
     },
-    [apiClient, onSessionExpired, productEvents, usefulMutations],
+    [apiClient, onSessionExpired, productEvents, requireAuth, usefulMutations],
   );
 
   useFocusEffect(

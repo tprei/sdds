@@ -22,6 +22,7 @@ const (
 	authPurposeLogin         authRateLimitPurpose = "login"
 	authPurposeVerification  authRateLimitPurpose = "verification"
 	authPurposePasswordReset authRateLimitPurpose = "password_reset"
+	authPurposeOIDC          authRateLimitPurpose = "oidc"
 )
 
 type authRateLimiters struct {
@@ -42,6 +43,7 @@ func newAuthRateLimiters(limits AuthLimits, clock func() time.Time) authRateLimi
 	limiters.registerPurpose(authPurposeLogin, limits.LoginRequestsPerMinute, limits.LoginGlobalRequestsPerMinute)
 	limiters.registerPurpose(authPurposePasswordReset, limits.PasswordResetRequestsPerMinute, limits.PasswordResetGlobalRequestsPerMinute)
 	limiters.registerPurpose(authPurposeVerification, limits.VerificationRequestsPerMinute, limits.VerificationGlobalRequestsPerMinute)
+	limiters.registerPurpose(authPurposeOIDC, limits.OIDCRequestsPerMinute, limits.OIDCGlobalRequestsPerMinute)
 	return limiters
 }
 

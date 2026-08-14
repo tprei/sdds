@@ -84,6 +84,14 @@ func loadAuthLimits() (httpapi.AuthLimits, error) {
 	if err != nil {
 		return httpapi.AuthLimits{}, err
 	}
+	oidcRequestsPerMinute, err := envPositiveInt("SDDS_AUTH_OIDC_REQUESTS_PER_MINUTE", defaults.OIDCRequestsPerMinute)
+	if err != nil {
+		return httpapi.AuthLimits{}, err
+	}
+	oidcGlobalRequestsPerMinute, err := envPositiveInt("SDDS_AUTH_GLOBAL_OIDC_REQUESTS_PER_MINUTE", defaults.OIDCGlobalRequestsPerMinute)
+	if err != nil {
+		return httpapi.AuthLimits{}, err
+	}
 
 	return httpapi.AuthLimits{
 		SignupRequestsPerMinute:              signupRequestsPerMinute,
@@ -95,6 +103,8 @@ func loadAuthLimits() (httpapi.AuthLimits, error) {
 		PasswordResetRequestsPerMinute:       passwordResetRequestsPerMinute,
 		PasswordResetGlobalRequestsPerMinute: passwordResetGlobalRequestsPerMinute,
 		PasswordHashConcurrency:              passwordHashConcurrency,
+		OIDCRequestsPerMinute:                oidcRequestsPerMinute,
+		OIDCGlobalRequestsPerMinute:          oidcGlobalRequestsPerMinute,
 	}, nil
 }
 

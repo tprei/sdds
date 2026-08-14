@@ -386,6 +386,67 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/auth/oidc/sessions:
+    post:
+      operationId: createAuthOidcSession
+      summary: Exchange a provider identity token for a session
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOidcSessionRequest"
+      responses:
+        "201":
+          description: The identity token was exchanged for a session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSessionResponse"
+        "400":
+          description: The request JSON or the chosen username is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The identity token is not valid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The subject is new and needs a username, or the username is taken.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: The request body is too large.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Too many provider sign-in requests are in flight or recently attempted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not create the session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Provider sign-in is not configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/auth/email:
     put:
       operationId: setAuthEmail
@@ -1764,6 +1825,34 @@ components:
           type: string
         password:
           type: string
+    OidcProvider:
+      type: string
+      x-enum-varnames:
+        - OidcProviderApple
+        - OidcProviderGoogle
+      enum:
+        - apple
+        - google
+    CreateOidcSessionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - provider
+        - id_token
+        - nonce
+      properties:
+        provider:
+          $ref: "#/components/schemas/OidcProvider"
+        id_token:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        nonce:
+          type: string
+          minLength: 1
+          maxLength: 256
+        username:
+          type: string
     DeleteUserRequest:
       type: object
       additionalProperties: false
@@ -1907,6 +1996,8 @@ components:
         - ErrorCodeInvalidEmail
         - ErrorCodeMailUnavailable
         - ErrorCodeInvalidToken
+        - ErrorCodeOidcUnavailable
+        - ErrorCodeUsernameRequired
       enum:
         - internal_error
         - forbidden
@@ -1937,6 +2028,8 @@ components:
         - invalid_email
         - mail_unavailable
         - invalid_token
+        - oidc_unavailable
+        - username_required
     ErrorResponse:
       type: object
       additionalProperties: false

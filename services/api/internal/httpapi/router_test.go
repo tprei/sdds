@@ -611,7 +611,9 @@ func (store fakeUserStore) ResolveOIDCIdentity(ctx context.Context, input user.R
 
 func (store fakeUserStore) ListLoginIdentities(ctx context.Context, userID user.UserID) ([]user.LoginIdentitySummary, error) {
 	if store.listLoginIdentities == nil {
-		return nil, fmt.Errorf("list login identities not implemented")
+		// Reading an identity list is part of every session response, so tests
+		// that do not assert on identities get an empty list by default.
+		return nil, nil
 	}
 	return store.listLoginIdentities(ctx, userID)
 }
@@ -631,7 +633,7 @@ func testCurrentUserSessionResolver(_ context.Context, tokenHash string, _ time.
 		return user.CurrentSession{}, user.ErrSessionNotFound
 	}
 	return user.CurrentSession{
-		Session: user.Session{UserID: "user-id-thiago", TokenHash: tokenHash},
+		Session: user.Session{UserID: "user-id-thiago", TokenHash: tokenHash, ExpiresAt: time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC).Add(user.SessionLifetime)},
 		User:    user.User{ID: "user-id-thiago", State: user.UserStateActive},
 		Author:  user.Author{ID: "author-id-thiago", UserID: "user-id-thiago", DisplayName: "Thiago"},
 	}, nil

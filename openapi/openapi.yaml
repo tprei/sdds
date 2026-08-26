@@ -713,6 +713,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/auth/identities/{identity_id}:
+    delete:
+      operationId: deleteAuthIdentity
+      summary: Disconnect one login identity
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: identity_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "204":
+          description: The identity was disconnected.
+        "400":
+          description: The request does not match the API contract.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: The request is not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: The identity does not exist or belongs to another user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The identity is the caller's only remaining way in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The API could not delete the identity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/authors/{author_id}:
     get:
       operationId: getAuthor
@@ -1955,6 +2003,7 @@ components:
         - id
         - username
         - author
+        - identities
       properties:
         id:
           type: string
@@ -1964,6 +2013,38 @@ components:
           $ref: "#/components/schemas/AuthorSummary"
         email:
           $ref: "#/components/schemas/UserEmail"
+        identities:
+          type: array
+          items:
+            $ref: "#/components/schemas/LoginIdentitySummary"
+    LoginIdentitySummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - kind
+        - provider
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          x-enum-varnames:
+            - LoginIdentityKindOidc
+            - LoginIdentityKindPassword
+          enum:
+            - oidc
+            - password
+        provider:
+          type: string
+          x-enum-varnames:
+            - LoginIdentityProviderApple
+            - LoginIdentityProviderGoogle
+            - LoginIdentityProviderLocal
+          enum:
+            - apple
+            - google
+            - local
     ErrorCode:
       type: string
       x-enum-varnames:
@@ -1998,6 +2079,7 @@ components:
         - ErrorCodeInvalidToken
         - ErrorCodeOidcUnavailable
         - ErrorCodeUsernameRequired
+        - ErrorCodeLastSignInMethod
       enum:
         - internal_error
         - forbidden
@@ -2030,6 +2112,7 @@ components:
         - invalid_token
         - oidc_unavailable
         - username_required
+        - last_sign_in_method
     ErrorResponse:
       type: object
       additionalProperties: false

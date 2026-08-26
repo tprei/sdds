@@ -93,6 +93,7 @@ function makeCurrentUser(): CurrentUserResponse {
   return {
     author: makeAuthorSummary(),
     id: 'user-1',
+    identities: [{ id: 'identity-1', kind: 'password', provider: 'local' }],
     username: 'ada',
   };
 }

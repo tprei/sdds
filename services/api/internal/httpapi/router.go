@@ -11,6 +11,7 @@ import (
 	"github.com/tprei/sdds/services/api/internal/mail"
 	"github.com/tprei/sdds/services/api/internal/media"
 	"github.com/tprei/sdds/services/api/internal/note"
+	"github.com/tprei/sdds/services/api/internal/oidc"
 	"github.com/tprei/sdds/services/api/internal/openapi"
 	"github.com/tprei/sdds/services/api/internal/report"
 	"github.com/tprei/sdds/services/api/internal/user"
@@ -74,6 +75,7 @@ type AuthDependencies struct {
 	AppBaseURL      string
 	Schedule        scheduleFunc
 	Limits          AuthLimits
+	OIDC            oidc.Verifier
 }
 
 type MediaDependencies struct {
@@ -106,7 +108,7 @@ type reportHandlers struct {
 	comments comment.ReportTargetStore
 }
 type authHandlers struct {
-	users                 user.Store
+	users                 UserStores
 	publicAuthors         author.PublicAuthorStore
 	contactChannels       user.ContactChannelStore
 	mail                  mail.Sender
@@ -117,6 +119,7 @@ type authHandlers struct {
 	rateLimiters          authRateLimiters
 	newSessionToken       func() (string, error)
 	clock                 func() time.Time
+	oidc                  oidc.Verifier
 }
 
 type mediaHandlers struct {
@@ -165,6 +168,8 @@ type AuthLimits struct {
 	PasswordResetRequestsPerMinute       int
 	PasswordResetGlobalRequestsPerMinute int
 	PasswordHashConcurrency              int
+	OIDCRequestsPerMinute                int
+	OIDCGlobalRequestsPerMinute          int
 }
 
 func DefaultAuthLimits() AuthLimits {
@@ -178,6 +183,8 @@ func DefaultAuthLimits() AuthLimits {
 		PasswordResetRequestsPerMinute:       3,
 		PasswordResetGlobalRequestsPerMinute: 30,
 		PasswordHashConcurrency:              2,
+		OIDCRequestsPerMinute:                10,
+		OIDCGlobalRequestsPerMinute:          120,
 	}
 }
 
@@ -218,6 +225,7 @@ func NewRouter(notes NotesDependencies, comments CommentDependencies, reports Re
 			rateLimiters:          newAuthRateLimiters(auth.Limits, time.Now),
 			newSessionToken:       user.NewSessionToken,
 			clock:                 time.Now,
+			oidc:                  auth.OIDC,
 		},
 		mediaHandlers{imageUploads: media.ImageUploads, attachedImages: media.AttachedImages},
 		systemHandlers{readiness: system.Readiness},
@@ -273,6 +281,7 @@ func registerPublicRoutes(router chi.Router, wrapper openapi.ServerInterfaceWrap
 		router.Get("/media/images/{image_id}", wrapper.GetMediaImage)
 		router.Post("/auth/users", wrapper.CreateAuthUser)
 		router.Post("/auth/sessions", wrapper.CreateAuthSession)
+		router.Post("/auth/oidc/sessions", wrapper.CreateAuthOidcSession)
 		router.Post("/auth/email/verification", wrapper.VerifyAuthEmail)
 		router.Post("/auth/password-resets", wrapper.CreateAuthPasswordReset)
 		router.Post("/auth/password", wrapper.SetAuthPassword)

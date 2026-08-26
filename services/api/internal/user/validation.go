@@ -76,6 +76,12 @@ func appendUsernameValidationProblems(problems []ValidationProblem, username str
 	return problems
 }
 
+// ValidateUsername applies the shared username rules to a single value, for
+// callers that collect a username outside the combined signup and login inputs.
+func ValidateUsername(username string) []ValidationProblem {
+	return appendUsernameValidationProblems(make([]ValidationProblem, 0, 1), username)
+}
+
 func appendDisplayNameValidationProblems(problems []ValidationProblem, displayName string) []ValidationProblem {
 	displayNameLength := utf8.RuneCountInString(displayName)
 	if displayNameLength == 0 {

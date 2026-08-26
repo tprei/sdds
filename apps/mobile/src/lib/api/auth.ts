@@ -14,10 +14,17 @@ export type AuthAuthor = {
   id: string;
 };
 
+export type LoginIdentity = {
+  id: string;
+  kind: 'oidc' | 'password';
+  provider: 'apple' | 'google' | 'local';
+};
+
 export type AuthUser = {
   author: AuthAuthor;
   email?: { address: string; verified: boolean };
   id: string;
+  identities: LoginIdentity[];
   username: string;
 };
 
@@ -44,10 +51,19 @@ export type CreateAuthSessionInput = {
   username: string;
 };
 
+export type CreateOidcSessionInput = {
+  idToken: string;
+  nonce: string;
+  provider: OidcProvider;
+  username?: string;
+};
+
 type GeneratedSchemas = components['schemas'];
 type AuthorSummaryResponse = GeneratedSchemas['AuthorSummary'];
 type CreateSessionRequest = GeneratedSchemas['CreateSessionRequest'];
 type CreateUserRequest = GeneratedSchemas['CreateUserRequest'];
+type CreateOidcSessionRequest = GeneratedSchemas['CreateOidcSessionRequest'];
+type OidcProvider = GeneratedSchemas['OidcProvider'];
 type DeleteUserRequest = GeneratedSchemas['DeleteUserRequest'];
 type CurrentUserResponse = GeneratedSchemas['CurrentUser'];
 type SetUserEmailRequest = GeneratedSchemas['SetUserEmailRequest'];
@@ -103,6 +119,11 @@ function parseCurrentUser(value: CurrentUserResponse): AuthUser {
     author: parseAuthorSummary(value.author),
     email: value.email,
     id: value.id,
+    identities: value.identities.map((identity) => ({
+      id: identity.id,
+      kind: identity.kind,
+      provider: identity.provider,
+    })),
     username: value.username,
   };
 }
@@ -118,6 +139,7 @@ function parseAuthorSummary(value: AuthorSummaryResponse): AuthAuthor {
 export type AuthAPI = {
   createAuthUser(input: CreateAuthUserInput): Promise<AuthSession>;
   createAuthSession(input: CreateAuthSessionInput): Promise<AuthSession>;
+  createAuthOidcSession(input: CreateOidcSessionInput): Promise<AuthSession>;
   getAuthSession(): Promise<CurrentAuthSession>;
   deleteAuthSession(): Promise<void>;
   deleteAuthUser(password: string): Promise<void>;
@@ -159,6 +181,21 @@ export function bindAuthAPI(transport: TypedTransport): AuthAPI {
       };
       try {
         const { data } = await transport.POST('/v1/auth/sessions', { body: request });
+        return parseAuthSessionResponse(data);
+      } catch (error) {
+        rewrapAuthTransportError(error);
+      }
+    },
+
+    async createAuthOidcSession(input) {
+      const request: CreateOidcSessionRequest = {
+        id_token: input.idToken,
+        nonce: input.nonce,
+        provider: input.provider,
+        ...(input.username !== undefined ? { username: input.username } : {}),
+      };
+      try {
+        const { data } = await transport.POST('/v1/auth/oidc/sessions', { body: request });
         return parseAuthSessionResponse(data);
       } catch (error) {
         rewrapAuthTransportError(error);

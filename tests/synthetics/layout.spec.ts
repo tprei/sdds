@@ -212,4 +212,25 @@ test.describe('layout geometry', () => {
       await expectNoHorizontalClipping(header, `the ${path} screen header`);
     }
   });
+
+  test('the username chooser expired state fits the viewport', async ({ page }) => {
+    await page.goto('/choose-username');
+    // Reached cold — no provider credential in memory — the screen renders
+    // its expired state: one message and one full-width way back to /login.
+    const message = page.getByText('Sua sessão de entrada expirou, comece de novo.');
+    await expect(message).toBeVisible({ timeout: 10_000 });
+    const back = page.getByTestId('choose-username-expired');
+    await expectWithinViewport(page, back, 'the expired-state back button');
+    await expectNoHorizontalClipping(back, 'the expired-state back button');
+    const messageBox = await message.boundingBox();
+    const backButton = await back.boundingBox();
+    if (messageBox === null || backButton === null) {
+      throw new Error('expected the expired message and back button to have boxes');
+    }
+    expect(
+      Math.abs(messageBox.x - backButton.x),
+      'the message and the back button should share the screen gutter',
+    ).toBeLessThanOrEqual(0.5);
+    expect(page.url()).not.toContain('?');
+  });
 });

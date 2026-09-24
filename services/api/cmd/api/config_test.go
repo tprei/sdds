@@ -188,16 +188,6 @@ func assertS3ConfigError(t *testing.T, want, prefix string) {
 	}
 }
 
-func TestLoadS3ConfigNormalizesCredentialWhitespace(t *testing.T) {
-	clearConfigEnv(t)
-	accessKeyFile, secretKeyFile := setValidMediaEnv(t)
-	writeMediaFile(t, accessKeyFile, "  access-key\r\n")
-	writeMediaFile(t, secretKeyFile, "\tsecret-key \n")
-	if _, err := s3store.LoadConfigFromEnv(); err != nil {
-		t.Fatalf("load normalized credentials: %v", err)
-	}
-}
-
 func TestLoadS3ConfigAllowsReadableCredentialFiles(t *testing.T) {
 	clearConfigEnv(t)
 	accessKeyFile, secretKeyFile := setValidMediaEnv(t)

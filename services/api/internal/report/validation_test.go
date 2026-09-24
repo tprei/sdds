@@ -184,9 +184,4 @@ func TestValidateCreateInputEmitsNoProblemForMissingReporter(t *testing.T) {
 	if len(problems) != 0 {
 		t.Fatalf("public problems = %v, want none for missing reporter", problems)
 	}
-	for _, problem := range problems {
-		if problem.Field == "reporter_user_id" {
-			t.Fatalf("reporter_user_id leaked as validation field: %+v", problem)
-		}
-	}
 }

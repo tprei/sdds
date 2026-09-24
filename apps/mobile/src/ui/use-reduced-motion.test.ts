@@ -58,16 +58,4 @@ describe('useReducedMotion', () => {
     });
     expect(state.listeners).toHaveLength(0);
   });
-
-  it('defaults to motion enabled before the OS value resolves', async () => {
-    state.enabled = false;
-    state.listeners = [];
-    let renderer!: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(React.createElement(Harness));
-    });
-    await act(async () => {
-      renderer.unmount();
-    });
-  });
 });

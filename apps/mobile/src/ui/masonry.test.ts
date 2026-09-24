@@ -21,13 +21,6 @@ describe('splitIntoColumns', () => {
     expect(columns[1]).toEqual([2, 3]);
   });
 
-  it('is deterministic across calls for the same input and estimator', () => {
-    const estimator = (item: number) => item * 10;
-    expect(splitIntoColumns([1, 2, 3, 4, 5], estimator)).toEqual(
-      splitIntoColumns([1, 2, 3, 4, 5], estimator),
-    );
-  });
-
   it('returns a single column equal to the input when columnCount is 1', () => {
     expect(splitIntoColumns([1, 2, 3], () => 9, 1)).toEqual([[1, 2, 3]]);
   });

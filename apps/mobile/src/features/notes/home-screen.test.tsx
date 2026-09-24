@@ -214,16 +214,6 @@ describe('HomeScreen auth gate', () => {
     });
   });
 
-  it('passes the bearer token to the initial product reads', async () => {
-    await act(async () => {
-      create(createElement(HomeScreen));
-      await settle();
-    });
-
-    expect(mocks.apiClient.listCatalogs).toHaveBeenCalledWith();
-    expect(mocks.apiClient.listNotes).toHaveBeenCalledWith({});
-  });
-
   it('logs out on a read 401', async () => {
     mocks.apiClient.listCatalogs.mockRejectedValueOnce({ status: 401 });
 

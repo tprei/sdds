@@ -153,15 +153,6 @@ describe('SearchScreen auth gate', () => {
     expect(mocks.apiClient.listCatalogs).toHaveBeenCalledWith();
   });
 
-  it('passes the bearer token to catalog reads', async () => {
-    await act(async () => {
-      create(createElement(SearchScreen));
-      await settle();
-    });
-
-    expect(mocks.apiClient.listCatalogs).toHaveBeenCalledWith();
-  });
-
   it('logs out on a catalog 401', async () => {
     mocks.apiClient.listCatalogs.mockRejectedValueOnce({ status: 401 });
 

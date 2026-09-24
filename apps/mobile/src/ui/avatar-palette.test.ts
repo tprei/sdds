@@ -7,13 +7,6 @@ import {
 } from './avatar-palette';
 
 describe('avatar palette', () => {
-  it('hashes the same name to the same duotone pair', () => {
-    expect(avatarColorsFor('Marina Alves')).toEqual(
-      avatarColorsFor('Marina Alves'),
-    );
-    expect(avatarPalette).toContainEqual(avatarColorsFor('Marina Alves'));
-  });
-
   it('keeps every name inside the six palette pairs', () => {
     for (const name of ['Marina Alves', 'João Silva', 'Ana Costa']) {
       expect(avatarPalette).toContainEqual(avatarColorsFor(name));

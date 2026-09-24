@@ -1,5 +1,7 @@
+FROM golang:1.24.7-alpine3.22@sha256:fc2cff6625f3c1c92e6c85938ac5bd09034ad0d4bc2dfb08278020b68540dbb5 AS mc-build
+RUN apk add --no-cache git && git clone --depth 1 --branch RELEASE.2025-08-13T08-35-41Z https://github.com/minio/mc /src && cd /src && go build -trimpath -o /usr/bin/mc .
 FROM amazon/aws-cli:2.27.47@sha256:9c09286acba40b27577e630dc6aff4cc44b401eaa81ebda69d3c761bb566def2
-COPY --from=minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 /usr/bin/mc /usr/local/bin/mc
+COPY --from=mc-build /usr/bin/mc /usr/local/bin/mc
 COPY init.sh /usr/local/bin/rustfs-init
 COPY secret-file.sh /usr/local/lib/rustfs-init/secret-file.sh
 COPY validate-secrets.sh /usr/local/bin/validate-compose-secrets
